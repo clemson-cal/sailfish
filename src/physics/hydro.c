@@ -64,7 +64,118 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 
 
 
-// ============================================================================
+// ============================ STRUCTS =======================================
+struct Mesh
+{
+    unsigned long ni, nj;
+    real x0, x1, y0, y1;
+};
+
+struct PointMass
+{
+    real x;
+    real y;
+    real mass;
+    real rate;
+    real radius;
+};
+
+enum EquationOfStateType
+{
+    Isothermal,
+    LocallyIsothermal,
+    GammaLaw,
+};
+
+struct EquationOfState
+{
+    enum EquationOfStateType type;
+
+    union
+    {
+        struct
+        {
+            real sound_speed;
+        } isothermal;
+
+        struct
+        {
+            real mach_number;
+        } locally_isothermal;
+
+        struct
+        {
+            real gamma_law_index;
+        } gamma_law;
+    };
+};
+
+struct Solver
+{
+    struct Mesh mesh;
+    real *primitive;
+    real *conserved;
+    real *conserved_rk;
+    real *flux_i;
+    real *flux_j;
+    real *flux_k;
+    real *gradient_i;
+    real *gradient_j;
+    real *gradient_k;
+};
+
+
+
+
+// ============================ GRAVITY =======================================
+static __host__ __device__ real gravitational_potential(const struct PointMass *masses, unsigned long num_masses, real x1, real y1)
+{
+    real phi = 0.0;
+
+    for (unsigned long p = 0; p < num_masses; ++p)
+    {
+        real x0 = masses[p].x;
+        real y0 = masses[p].y;
+        real mp = masses[p].mass;
+        real rs = masses[p].radius;
+
+        real dx = x1 - x0;
+        real dy = y1 - y0;
+        real r2 = dx * dx + dy * dy;
+        real r2_soft = r2 + rs * rs;
+
+        phi -= mp / square_root(r2_soft);
+    }
+    return phi;
+}
+
+static __host__ __device__ void point_mass_source_term(struct PointMass mass, real x1, real y1, real dt, const real *prim, real *delta_cons)
+{
+    real sigma = prim[0];
+    real x0 = mass.x;
+    real y0 = mass.y;
+    real mp = mass.mass;
+    real rs = mass.radius;
+
+    real dx = x1 - x0;
+    real dy = y1 - y0;
+    real r2 = dx * dx + dy * dy;
+    real r2_soft = r2 + rs * rs;
+    real dr = square_root(r2);
+    real mag = sigma * mp / r2_soft;
+    real fx = -mag * dx / dr;
+    real fy = -mag * dy / dr;
+    real sink_rate = mass.rate * (dr < rs);
+
+    delta_cons[0] = dt * sigma * sink_rate * -1.0;
+    delta_cons[1] = dt * fx;
+    delta_cons[2] = dt * fy;
+}
+
+
+
+
+// ============================ HYDRO =========================================
 static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
     const real rho = cons[0];
@@ -145,65 +256,6 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     }
 }
 
-struct Mesh
-{
-    unsigned long ni, nj;
-    real x0, x1, y0, y1;
-};
-
-struct PointMass
-{
-    real x;
-    real y;
-    real mass;
-    real rate;
-    real radius;
-};
-
-enum EquationOfStateType
-{
-    Isothermal,
-    LocallyIsothermal,
-    GammaLaw,
-};
-
-struct EquationOfState
-{
-    enum EquationOfStateType type;
-
-    union
-    {
-        struct
-        {
-            real sound_speed;
-        } isothermal;
-
-        struct
-        {
-            real mach_number;
-        } locally_isothermal;
-
-        struct
-        {
-            real gamma_law_index;
-        } gamma_law;
-    };
-};
-
-struct Solver
-{
-    struct Mesh mesh;
-    real *primitive;
-    real *conserved;
-    real *conserved_rk;
-    real *flux_i;
-    real *flux_j;
-    real *flux_k;
-    real *gradient_i;
-    real *gradient_j;
-    real *gradient_k;
-};
-
 struct Solver* FUNC(PREFIX, solver_new)(struct Mesh mesh)
 {
     struct Solver* self = (struct Solver*) malloc(sizeof(struct Solver));
@@ -272,7 +324,7 @@ int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
 int FUNC(PREFIX, solver_advance_cons)(
     struct Solver *self,
     struct EquationOfState eos,
-    struct PointMass *particles,
+    struct PointMass *masses,
     unsigned long num_masses,
     real dt)
 {
@@ -290,6 +342,23 @@ int FUNC(PREFIX, solver_advance_cons)(
     {
         for (long j = 0; j < nj; ++j)
         {
+            /* */ real *cons = &self->conserved[NCONS * (i * nj + j)];
+            const real *prim = &self->primitive[NCONS * (i * nj + j)];
+
+            real xc = self->mesh.x0 + (i + 0.5) * dx;
+            real yc = self->mesh.y0 + (j + 0.5) * dy;
+
+            for (unsigned long p = 0; p < num_masses; ++p)
+            {
+                real delta_cons[NCONS];
+                point_mass_source_term(masses[p], xc, yc, dt, prim, delta_cons);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    cons[q] += delta_cons[q];
+                }
+            }
+
             long il = i - 1;
             long ir = i + 1;
             long jl = j - 1;
@@ -308,66 +377,55 @@ int FUNC(PREFIX, solver_advance_cons)(
             const real *pri = &self->primitive[NCONS * (ir * nj + j)];
             const real *plj = &self->primitive[NCONS * (i * nj + jl)];
             const real *prj = &self->primitive[NCONS * (i * nj + jr)];
-            real *cons = &self->conserved[NCONS * (i * nj + j)];
-            real *prim = &self->primitive[NCONS * (i * nj + j)];
 
-            real phi = 0.0;
-
-            for (unsigned long p = 0; p < num_masses; ++p)
-            {
-                real sigma = prim[0];
-                real x0 = particles[p].x;
-                real y0 = particles[p].y;
-                real mp = particles[p].mass;
-                real rs = particles[p].radius;
-
-                real x1 = self->mesh.x0 + (i + 0.5) * dx;
-                real y1 = self->mesh.y0 + (j + 0.5) * dy;
-
-                real dx = x1 - x0;
-                real dy = y1 - y0;
-                real r2 = dx * dx + dy * dy;
-                real r2_soft = r2 + rs * rs;
-                real dr = square_root(r2);
-                real mag = sigma * mp / r2_soft;
-                real fx = -mag * dx / dr;
-                real fy = -mag * dy / dr;
-                real sink_rate = particles[p].rate * (dr < rs);
-
-                cons[0] -= sigma * sink_rate * dt;
-                cons[1] += fx * dt;
-                cons[2] += fy * dt;
-
-                phi -= sigma * mp / square_root(r2_soft);
-            }
-            real cs2;
+            real cs2_li = 1.0;
+            real cs2_ri = 1.0;
+            real cs2_lj = 1.0;
+            real cs2_rj = 1.0;
 
             switch (eos.type) {
-                case Isothermal:
-                    cs2 = power(eos.isothermal.sound_speed, 2.0);
+                case Isothermal: {
+                    real cs2 = power(eos.isothermal.sound_speed, 2.0);
+                    cs2_li = cs2;
+                    cs2_ri = cs2;
+                    cs2_lj = cs2;
+                    cs2_rj = cs2;
                     break;
-                case LocallyIsothermal:
-                    cs2 = -phi / power(eos.locally_isothermal.mach_number, 2.0);
+                }
+                case LocallyIsothermal: {
+                    const real xl = self->mesh.x0 + (i + 0.0) * dx;
+                    const real xr = self->mesh.x0 + (i + 1.0) * dx;
+                    const real yl = self->mesh.y0 + (j + 0.0) * dy;
+                    const real yr = self->mesh.y0 + (j + 1.0) * dy;
+                    const real mach_squared = power(eos.locally_isothermal.mach_number, 2.0);
+                    real phi_li = gravitational_potential(masses, num_masses, xl, yc);
+                    real phi_ri = gravitational_potential(masses, num_masses, xr, yc);
+                    real phi_lj = gravitational_potential(masses, num_masses, xc, yl);
+                    real phi_rj = gravitational_potential(masses, num_masses, xc, yr);
+                    cs2_li = -phi_li / mach_squared;
+                    cs2_ri = -phi_ri / mach_squared;
+                    cs2_lj = -phi_lj / mach_squared;
+                    cs2_rj = -phi_rj / mach_squared;
                     break;
-                case GammaLaw:
-                    cs2 = 1.0;
+                }
+                case GammaLaw: {
                     break;
+                }
             }
 
             real fli[NCONS];
             real fri[NCONS];
             real flj[NCONS];
             real frj[NCONS];
-            riemann_hlle(pli, prim, fli, cs2, 0);
-            riemann_hlle(prim, pri, fri, cs2, 0);
-            riemann_hlle(plj, prim, flj, cs2, 1);
-            riemann_hlle(prim, prj, frj, cs2, 1);
+            riemann_hlle(pli, prim, fli, cs2_li, 0);
+            riemann_hlle(prim, pri, fri, cs2_ri, 0);
+            riemann_hlle(plj, prim, flj, cs2_lj, 1);
+            riemann_hlle(prim, prj, frj, cs2_rj, 1);
 
             for (unsigned long q = 0; q < NCONS; ++q)
             {
                 cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             }
-
         }
     }
     for (long n = 0; n < ni * nj; ++n)

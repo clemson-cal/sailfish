@@ -1,7 +1,7 @@
 pub mod physics;
 
-use std::io::Write;
 use physics::*;
+use std::io::Write;
 
 fn do_output(primitive: Vec<f64>, output_number: usize) {
     let bytes: Vec<u8> = primitive
@@ -16,7 +16,9 @@ fn do_output(primitive: Vec<f64>, output_number: usize) {
 }
 
 fn main() {
-    let mesh = physics::f64::Mesh {
+    use physics::f64::*;
+
+    let mesh = Mesh {
         ni: 512,
         nj: 512,
         x0: -0.5,
@@ -28,11 +30,10 @@ fn main() {
     let sj = 3;
 
     let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
-    let mut solver = iso2d_cpu_f64::Solver::new(mesh.clone());
+    let mut solver = iso2d_cpu::Solver::new(mesh.clone());
 
     for i in 0..mesh.ni() {
         for j in 0..mesh.nj() {
-
             primitive[i * si + j * sj + 0] = 1.0;
             primitive[i * si + j * sj + 1] = 0.0;
             primitive[i * si + j * sj + 2] = 0.0;
@@ -47,7 +48,7 @@ fn main() {
     let output_cadence = 0.01;
     let dt = mesh.dx().min(mesh.dy()) * 0.01;
 
-    let mass1 = physics::f64::PointMass{
+    let mass1 = PointMass {
         x: 0.0,
         y: 0.0,
         mass: 1.0,
@@ -56,10 +57,10 @@ fn main() {
     };
 
     let masses = vec![mass1];
-    let eos = physics::f64::EquationOfState::LocallyIsothermal{ mach_number: 10.0 };
+    // let eos = EquationOfState::Isothermal { sound_speed: 1.0 };
+    let eos = EquationOfState::LocallyIsothermal { mach_number: 10.0 };
 
     while time < 0.1 {
-
         if time >= next_output_time {
             do_output(solver.primitive(), output_number);
             output_number += 1;
