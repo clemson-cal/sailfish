@@ -235,7 +235,7 @@ int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
     return 0;
 }
 
-int FUNC(PREFIX, solver_do_advance_cons)(struct Solver *self, real dt)
+int FUNC(PREFIX, solver_advance_cons)(struct Solver *self, real dt)
 {
     if (self->primitive == NULL)
     {

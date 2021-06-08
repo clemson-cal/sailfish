@@ -11,8 +11,8 @@ fn main() {
     let si = 3 * config.nj();
     let sj = 3;
 
-    let mut primitive: Vec<f32> = vec![0.0; (config.grid_dim as usize).pow(2) * 3];
-    let mut update = physics::iso2d_cpu_f32::Solver::new(config.clone());
+    let mut primitive: Vec<f64> = vec![0.0; (config.grid_dim as usize).pow(2) * 3];
+    let mut update = physics::iso2d_cpu_f64::Solver::new(config.clone());
 
     for i in 0..config.ni() {
         for j in 0..config.nj() {
