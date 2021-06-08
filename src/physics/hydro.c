@@ -122,7 +122,7 @@ static __host__ __device__ void primitive_to_outer_wavespeeds(const real *prim, 
     wavespeeds[1] = vn + cs;
 }
 
-static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, double cs2, int direction)
+static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
 {
     real ul[NCONS];
     real ur[NCONS];
@@ -133,7 +133,7 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 
     primitive_to_conserved(pl, ul);
     primitive_to_conserved(pr, ur);
-    primitive_to_flux_vector(pl, fl, cs2, direction);
+    primitive_to_flux_vector(pl, fl, cs2, direction); // TODO: pass the conserved variables as well here
     primitive_to_flux_vector(pr, fr, cs2, direction);
     primitive_to_outer_wavespeeds(pl, al, cs2, direction);
     primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
@@ -141,9 +141,9 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     const real am = min3(0.0, al[0], ar[0]);
     const real ap = max3(0.0, al[1], ar[1]);
 
-    for (int i = 0; i < NCONS; ++i)
+    for (int q = 0; q < NCONS; ++q)
     {
-        flux[i] = (fl[i] * ap - fr[i] * am - (ul[i] - ur[i]) * ap * am) / (ap - am);
+        flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
     }
 }
 
@@ -210,7 +210,7 @@ int FUNC(PREFIX, solver_set_primitive)(struct Solver *self, real *primitive)
     {
         real *prim = &primitive[NCONS * n];
         real *cons = &conserved[NCONS * n];
-        primitive_to_conserved(prim, cons);        
+        primitive_to_conserved(prim, cons);
     }
     if (self->primitive == NULL)
     {
@@ -225,12 +225,11 @@ int FUNC(PREFIX, solver_set_primitive)(struct Solver *self, real *primitive)
 
 int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
 {
-    size_t num_bytes = NCONS * self->config.grid_dim * self->config.grid_dim * sizeof(real);
-
     if (self->primitive == NULL)
     {
         return 1;
     }
+    size_t num_bytes = NCONS * self->config.grid_dim * self->config.grid_dim * sizeof(real);
     compute_memcpy_device_to_host(primitive, self->primitive, num_bytes);
     return 0;
 }
@@ -244,7 +243,7 @@ int FUNC(PREFIX, solver_advance_cons)(struct Solver *self, real dt)
 
     long ni = self->config.grid_dim;
     long nj = self->config.grid_dim;
-    double cs2 = self->config.mach_number; // TODO!
+    real cs2 = 1.0;
     const real dx = 2.0 * self->config.domain_radius / ni;
     const real dy = 2.0 * self->config.domain_radius / nj;
 
