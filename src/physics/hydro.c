@@ -101,13 +101,11 @@ static __host__ __device__ real primitive_to_velocity_component(const real *prim
     }
 }
 
-static __host__ __device__ void primitive_to_flux_vector(const real *prim, real *flux, real cs2, int direction)
+static __host__ __device__ void primitive_to_flux_vector(const real *prim, const real *cons, real *flux, real cs2, int direction)
 {
     const real vn = primitive_to_velocity_component(prim, direction);
     const real rho = prim[0];
     const real pressure = rho * cs2;
-    real cons[NCONS];
-    primitive_to_conserved(prim, cons);
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pressure * (direction == 0);
@@ -133,8 +131,8 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 
     primitive_to_conserved(pl, ul);
     primitive_to_conserved(pr, ur);
-    primitive_to_flux_vector(pl, fl, cs2, direction); // TODO: pass the conserved variables as well here
-    primitive_to_flux_vector(pr, fr, cs2, direction);
+    primitive_to_flux_vector(pl, ul, fl, cs2, direction);
+    primitive_to_flux_vector(pr, ur, fr, cs2, direction);
     primitive_to_outer_wavespeeds(pl, al, cs2, direction);
     primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
 
@@ -147,18 +145,15 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     }
 }
 
-struct Configuration
+struct Mesh
 {
-    unsigned long grid_dim;
-    double domain_radius;
-    double mach_number;
-    double sink_radius;
-    double sink_rate;
+    unsigned long ni, nj;
+    double x0, x1, y0, y1;
 };
 
 struct Solver
 {
-    struct Configuration config;
+    struct Mesh mesh;
     real *primitive;
     real *conserved;
     real *conserved_rk;
@@ -170,10 +165,10 @@ struct Solver
     real *gradient_k;
 };
 
-struct Solver* FUNC(PREFIX, solver_new)(struct Configuration config)
+struct Solver* FUNC(PREFIX, solver_new)(struct Mesh mesh)
 {
     struct Solver* self = (struct Solver*) malloc(sizeof(struct Solver));
-    self->config = config;
+    self->mesh = mesh;
     self->primitive = NULL;
     self->conserved = NULL;
     self->conserved_rk = NULL;
@@ -202,11 +197,12 @@ void FUNC(PREFIX, solver_del)(struct Solver *self)
 
 int FUNC(PREFIX, solver_set_primitive)(struct Solver *self, real *primitive)
 {
-    unsigned long grid_dim = self->config.grid_dim;
-    size_t num_bytes = NCONS * grid_dim * grid_dim * sizeof(real);
+    unsigned long ni = self->mesh.ni;
+    unsigned long nj = self->mesh.nj;
+    size_t num_bytes = NCONS * ni * nj * sizeof(real);
     real *conserved = (real*)malloc(num_bytes);
 
-    for (unsigned long n = 0; n < grid_dim * grid_dim; ++n)
+    for (unsigned long n = 0; n < ni * nj; ++n)
     {
         real *prim = &primitive[NCONS * n];
         real *cons = &conserved[NCONS * n];
@@ -229,7 +225,7 @@ int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
     {
         return 1;
     }
-    size_t num_bytes = NCONS * self->config.grid_dim * self->config.grid_dim * sizeof(real);
+    size_t num_bytes = NCONS * self->mesh.ni * self->mesh.nj * sizeof(real);
     compute_memcpy_device_to_host(primitive, self->primitive, num_bytes);
     return 0;
 }
@@ -241,11 +237,11 @@ int FUNC(PREFIX, solver_advance_cons)(struct Solver *self, real dt)
         return 1;
     }
 
-    long ni = self->config.grid_dim;
-    long nj = self->config.grid_dim;
+    long ni = self->mesh.ni;
+    long nj = self->mesh.nj;
     real cs2 = 1.0;
-    const real dx = 2.0 * self->config.domain_radius / ni;
-    const real dy = 2.0 * self->config.domain_radius / nj;
+    const real dx = (self->mesh.x1 - self->mesh.x0) / ni;
+    const real dy = (self->mesh.y1 - self->mesh.y0) / nj;
 
     for (long i = 0; i < ni; ++i)
     {
@@ -269,7 +265,6 @@ int FUNC(PREFIX, solver_advance_cons)(struct Solver *self, real dt)
             const real *pri = &self->primitive[NCONS * (ir * nj + j)];
             const real *plj = &self->primitive[NCONS * (i * nj + jl)];
             const real *prj = &self->primitive[NCONS * (i * nj + jr)];
-
             real *cons = &self->conserved[NCONS * (i * nj + j)];
             real *prim = &self->primitive[NCONS * (i * nj + j)];
 
@@ -286,8 +281,13 @@ int FUNC(PREFIX, solver_advance_cons)(struct Solver *self, real dt)
             {
                 cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             }
-            conserved_to_primitive(cons, prim);
         }
+    }
+    for (long n = 0; n < ni * nj; ++n)
+    {
+        real *prim = &self->primitive[NCONS * n];
+        real *cons = &self->conserved[NCONS * n];
+        conserved_to_primitive(cons, prim);
     }
     return 0;
 }

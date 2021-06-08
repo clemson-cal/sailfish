@@ -1,19 +1,29 @@
 #[repr(C)]
 #[derive(Clone)]
-pub struct Configuration {
-    pub grid_dim: u64,
-    pub sink_rate: f64,
-    pub sink_radius: f64,
-    pub mach_number: f64,
-    pub domain_radius: f64,
+pub struct Mesh {
+    pub ni: u64,
+    pub nj: u64,
+    pub x0: f64,
+    pub x1: f64,
+    pub y0: f64,
+    pub y1: f64,
 }
 
-impl Configuration {
+impl Mesh {
     pub fn ni(&self) -> usize {
-        self.grid_dim as usize
+        self.ni as usize
     }
     pub fn nj(&self) -> usize {
-        self.grid_dim as usize
+        self.nj as usize
+    }
+    pub fn num_total_zones(&self) -> usize {
+        (self.ni * self.nj) as usize
+    }
+    pub fn dx(&self) -> f64 {
+        (self.x1 - self.x0) / self.ni as f64
+    }
+    pub fn dy(&self) -> f64 {
+        (self.y1 - self.y0) / self.nj as f64
     }
 }
 
@@ -26,12 +36,12 @@ macro_rules! solver_module {
      $set_primitive:tt,
      $advance_cons:tt) => {
         pub mod $mod {
-            use super::Configuration;
+            use super::Mesh;
             use std::os::raw::c_void;
 
             extern "C" {
                 #[link_name = $new]
-                pub(crate) fn solver_new(config: Configuration) -> CSolver;
+                pub(crate) fn solver_new(mesh: Mesh) -> CSolver;
                 #[link_name = $del]
                 pub(crate) fn solver_del(solver: CSolver);
                 #[link_name = $get_primitive]
@@ -48,18 +58,18 @@ macro_rules! solver_module {
 
             pub struct Solver {
                 raw: CSolver,
-                config: Configuration,
+                mesh: Mesh,
             }
 
             impl Solver {
-                pub fn new(config: Configuration) -> Self {
+                pub fn new(mesh: Mesh) -> Self {
                     Self {
-                        raw: unsafe { solver_new(config.clone()) },
-                        config: config,
+                        raw: unsafe { solver_new(mesh.clone()) },
+                        mesh,
                     }
                 }
                 pub fn set_primitive(&mut self, primitive: &Vec<$real>) {
-                    let count = 3 * self.config.ni() * self.config.nj();
+                    let count = 3 * self.mesh.ni() * self.mesh.nj();
                     assert! {
                         primitive.len() == count,
                         "primitive buffer has wrong size {}, expected {}",
@@ -69,7 +79,7 @@ macro_rules! solver_module {
                     unsafe { solver_set_primitive(self.raw, primitive.as_ptr()) }
                 }
                 pub fn primitive(&mut self) -> Vec<$real> {
-                    let count = 3 * self.config.ni() * self.config.nj();
+                    let count = 3 * self.mesh.ni() * self.mesh.nj();
                     let mut primitive = vec![0.0; count];
                     unsafe { solver_get_primitive(self.raw, primitive.as_mut_ptr()) }
                     primitive
