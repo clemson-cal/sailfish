@@ -32,8 +32,16 @@ macro_rules! config_module {
             }
 
             #[repr(C)]
+            #[derive(Clone, Copy)]
+            pub enum EquationOfState {
+                Isothermal { sound_speed: $real },
+                LocallyIsothermal { mach_number: $real },
+                GammaLaw { gamma_law_index: $real },
+            }
+
+            #[repr(C)]
             #[derive(Clone)]
-            pub struct Particle {
+            pub struct PointMass {
                 pub x: $real,
                 pub y: $real,
                 pub mass: $real,
@@ -54,7 +62,7 @@ macro_rules! solver_module {
      $set_primitive:tt,
      $advance_cons:tt) => {
         pub mod $mod {
-            use super::$cfg::{Mesh, Particle};
+            use super::$cfg::{Mesh, EquationOfState, PointMass};
             use std::os::raw::c_void;
 
             extern "C" {
@@ -69,8 +77,9 @@ macro_rules! solver_module {
                 #[link_name = $advance_cons]
                 pub(crate) fn solver_advance_cons(
                     solver: CSolver,
-                    particles: *const Particle,
-                    num_particles: u64,
+                    eos: EquationOfState,
+                    masses: *const PointMass,
+                    num_masses: u64,
                     dt: $real);
             }
 
@@ -106,8 +115,8 @@ macro_rules! solver_module {
                     unsafe { solver_get_primitive(self.raw, primitive.as_mut_ptr()) }
                     primitive
                 }
-                pub fn advance_cons(&mut self, particles: &Vec<Particle>, dt: $real) {
-                    unsafe { solver_advance_cons(self.raw, particles.as_ptr(), particles.len() as u64, dt) }
+                pub fn advance_cons(&mut self, eos: EquationOfState, masses: &Vec<PointMass>, dt: $real) {
+                    unsafe { solver_advance_cons(self.raw, eos, masses.as_ptr(), masses.len() as u64, dt) }
                 }
             }
 

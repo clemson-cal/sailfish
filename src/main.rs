@@ -36,19 +36,6 @@ fn main() {
             primitive[i * si + j * sj + 0] = 1.0;
             primitive[i * si + j * sj + 1] = 0.0;
             primitive[i * si + j * sj + 2] = 0.0;
-
-            // let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx();
-            // let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy();
-
-            // if (x * x + y * y).sqrt() < 0.2 {
-            //     primitive[i * si + j * sj + 0] = 1.0;
-            //     primitive[i * si + j * sj + 1] = 0.0;
-            //     primitive[i * si + j * sj + 2] = 0.0;
-            // } else {
-            //     primitive[i * si + j * sj + 0] = 0.1;
-            //     primitive[i * si + j * sj + 1] = 0.0;
-            //     primitive[i * si + j * sj + 2] = 0.0;
-            // }
         }
     }
     solver.set_primitive(&primitive);
@@ -60,23 +47,16 @@ fn main() {
     let output_cadence = 0.01;
     let dt = mesh.dx().min(mesh.dy()) * 0.01;
 
-    let particle1 = physics::f64::Particle{
-        x: 0.1,
-        y: 0.0,
-        mass: 2.0,
-        rate: 0.0,
-        radius: 0.2,
-    };
-
-    let particle2 = physics::f64::Particle{
-        x: -0.1,
+    let mass1 = physics::f64::PointMass{
+        x: 0.0,
         y: 0.0,
         mass: 1.0,
-        rate: 0.0,
-        radius: 0.1,
+        rate: 1.0,
+        radius: 0.05,
     };
 
-    let particles = vec![particle1, particle2];
+    let masses = vec![mass1];
+    let eos = physics::f64::EquationOfState::LocallyIsothermal{ mach_number: 10.0 };
 
     while time < 0.1 {
 
@@ -87,7 +67,7 @@ fn main() {
         }
 
         let start = std::time::Instant::now();
-        solver.advance_cons(&particles, dt);
+        solver.advance_cons(eos, &masses, dt);
         time += dt;
         iteration += 1;
         let seconds = start.elapsed().as_secs_f64();

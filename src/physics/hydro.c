@@ -151,12 +151,43 @@ struct Mesh
     real x0, x1, y0, y1;
 };
 
-struct Particle {
+struct PointMass
+{
     real x;
     real y;
     real mass;
     real rate;
     real radius;
+};
+
+enum EquationOfStateType
+{
+    Isothermal,
+    LocallyIsothermal,
+    GammaLaw,
+};
+
+struct EquationOfState
+{
+    enum EquationOfStateType type;
+
+    union
+    {
+        struct
+        {
+            real sound_speed;
+        } isothermal;
+
+        struct
+        {
+            real mach_number;
+        } locally_isothermal;
+
+        struct
+        {
+            real gamma_law_index;
+        } gamma_law;
+    };
 };
 
 struct Solver
@@ -240,8 +271,9 @@ int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
 
 int FUNC(PREFIX, solver_advance_cons)(
     struct Solver *self,
-    struct Particle *particles,
-    unsigned long num_particles,
+    struct EquationOfState eos,
+    struct PointMass *particles,
+    unsigned long num_masses,
     real dt)
 {
     if (self->primitive == NULL)
@@ -251,7 +283,6 @@ int FUNC(PREFIX, solver_advance_cons)(
 
     long ni = self->mesh.ni;
     long nj = self->mesh.nj;
-    real cs2 = 1.0;
     const real dx = (self->mesh.x1 - self->mesh.x0) / ni;
     const real dy = (self->mesh.y1 - self->mesh.y0) / nj;
 
@@ -280,6 +311,49 @@ int FUNC(PREFIX, solver_advance_cons)(
             real *cons = &self->conserved[NCONS * (i * nj + j)];
             real *prim = &self->primitive[NCONS * (i * nj + j)];
 
+            real phi = 0.0;
+
+            for (unsigned long p = 0; p < num_masses; ++p)
+            {
+                real sigma = prim[0];
+                real x0 = particles[p].x;
+                real y0 = particles[p].y;
+                real mp = particles[p].mass;
+                real rs = particles[p].radius;
+
+                real x1 = self->mesh.x0 + (i + 0.5) * dx;
+                real y1 = self->mesh.y0 + (j + 0.5) * dy;
+
+                real dx = x1 - x0;
+                real dy = y1 - y0;
+                real r2 = dx * dx + dy * dy;
+                real r2_soft = r2 + rs * rs;
+                real dr = square_root(r2);
+                real mag = sigma * mp / r2_soft;
+                real fx = -mag * dx / dr;
+                real fy = -mag * dy / dr;
+                real sink_rate = particles[p].rate * (dr < rs);
+
+                cons[0] -= sigma * sink_rate * dt;
+                cons[1] += fx * dt;
+                cons[2] += fy * dt;
+
+                phi -= sigma * mp / square_root(r2_soft);
+            }
+            real cs2;
+
+            switch (eos.type) {
+                case Isothermal:
+                    cs2 = power(eos.isothermal.sound_speed, 2.0);
+                    break;
+                case LocallyIsothermal:
+                    cs2 = -phi / power(eos.locally_isothermal.mach_number, 2.0);
+                    break;
+                case GammaLaw:
+                    cs2 = 1.0;
+                    break;
+            }
+
             real fli[NCONS];
             real fri[NCONS];
             real flj[NCONS];
@@ -294,32 +368,6 @@ int FUNC(PREFIX, solver_advance_cons)(
                 cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             }
 
-            for (unsigned long p = 0; p < num_particles; ++p)
-            {
-                real sigma = prim[0];
-                real x0 = particles[p].x;
-                real y0 = particles[p].y;
-                real mp = particles[p].mass;
-                real rs = particles[p].radius;
-
-                real x1 = self->mesh.x0 + (i + 0.5) * dx;
-                real y1 = self->mesh.y0 + (j + 0.5) * dy;
-
-                // fx = -G M m dx / r^3
-                // fx = -G M m / r2_soft * x / r
-
-                real dx = x1 - x0;
-                real dy = y1 - y0;
-                real r2 = dx * dx + dy * dy;
-                real r2_soft = r2 + rs * rs;
-                real r = square_root(r2);
-                real mag = sigma * mp / r2_soft;
-                real fx = -mag * dx / r;
-                real fy = -mag * dy / r;
-
-                cons[1] += fx * dt;
-                cons[2] += fy * dt;
-            }
         }
     }
     for (long n = 0; n < ni * nj; ++n)
