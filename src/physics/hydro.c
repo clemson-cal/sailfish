@@ -148,7 +148,15 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 struct Mesh
 {
     unsigned long ni, nj;
-    double x0, x1, y0, y1;
+    real x0, x1, y0, y1;
+};
+
+struct Particle {
+    real x;
+    real y;
+    real mass;
+    real rate;
+    real radius;
 };
 
 struct Solver
@@ -230,7 +238,11 @@ int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
     return 0;
 }
 
-int FUNC(PREFIX, solver_advance_cons)(struct Solver *self, real dt)
+int FUNC(PREFIX, solver_advance_cons)(
+    struct Solver *self,
+    struct Particle *particles,
+    unsigned long num_particles,
+    real dt)
 {
     if (self->primitive == NULL)
     {
@@ -277,9 +289,36 @@ int FUNC(PREFIX, solver_advance_cons)(struct Solver *self, real dt)
             riemann_hlle(plj, prim, flj, cs2, 1);
             riemann_hlle(prim, prj, frj, cs2, 1);
 
-            for (int q = 0; q < NCONS; ++q)
+            for (unsigned long q = 0; q < NCONS; ++q)
             {
                 cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+            }
+
+            for (unsigned long p = 0; p < num_particles; ++p)
+            {
+                real sigma = prim[0];
+                real x0 = particles[p].x;
+                real y0 = particles[p].y;
+                real mp = particles[p].mass;
+                real rs = particles[p].radius;
+
+                real x1 = self->mesh.x0 + (i + 0.5) * dx;
+                real y1 = self->mesh.y0 + (j + 0.5) * dy;
+
+                // fx = -G M m dx / r^3
+                // fx = -G M m / r2_soft * x / r
+
+                real dx = x1 - x0;
+                real dy = y1 - y0;
+                real r2 = dx * dx + dy * dy;
+                real r2_soft = r2 + rs * rs;
+                real r = square_root(r2);
+                real mag = sigma * mp / r2_soft;
+                real fx = -mag * dx / r;
+                real fy = -mag * dy / r;
+
+                cons[1] += fx * dt;
+                cons[2] += fy * dt;
             }
         }
     }

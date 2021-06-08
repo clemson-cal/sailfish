@@ -1,34 +1,52 @@
-#[repr(C)]
-#[derive(Clone)]
-pub struct Mesh {
-    pub ni: u64,
-    pub nj: u64,
-    pub x0: f64,
-    pub x1: f64,
-    pub y0: f64,
-    pub y1: f64,
-}
 
-impl Mesh {
-    pub fn ni(&self) -> usize {
-        self.ni as usize
-    }
-    pub fn nj(&self) -> usize {
-        self.nj as usize
-    }
-    pub fn num_total_zones(&self) -> usize {
-        (self.ni * self.nj) as usize
-    }
-    pub fn dx(&self) -> f64 {
-        (self.x1 - self.x0) / self.ni as f64
-    }
-    pub fn dy(&self) -> f64 {
-        (self.y1 - self.y0) / self.nj as f64
+macro_rules! config_module {
+    ($mod:ident, $real:ty) => {
+        pub mod $mod {
+            #[repr(C)]
+            #[derive(Clone)]
+            pub struct Mesh {
+                pub ni: u64,
+                pub nj: u64,
+                pub x0: $real,
+                pub x1: $real,
+                pub y0: $real,
+                pub y1: $real,
+            }
+
+            impl Mesh {
+                pub fn ni(&self) -> usize {
+                    self.ni as usize
+                }
+                pub fn nj(&self) -> usize {
+                    self.nj as usize
+                }
+                pub fn num_total_zones(&self) -> usize {
+                    (self.ni * self.nj) as usize
+                }
+                pub fn dx(&self) -> $real {
+                    (self.x1 - self.x0) / self.ni as $real
+                }
+                pub fn dy(&self) -> $real {
+                    (self.y1 - self.y0) / self.nj as $real
+                }
+            }
+
+            #[repr(C)]
+            #[derive(Clone)]
+            pub struct Particle {
+                pub x: $real,
+                pub y: $real,
+                pub mass: $real,
+                pub rate: $real,
+                pub radius: $real,
+            }
+        }
     }
 }
 
 macro_rules! solver_module {
     ($mod:ident,
+     $cfg:ident,
      $real:ty,
      $new:tt,
      $del:tt,
@@ -36,7 +54,7 @@ macro_rules! solver_module {
      $set_primitive:tt,
      $advance_cons:tt) => {
         pub mod $mod {
-            use super::Mesh;
+            use super::$cfg::{Mesh, Particle};
             use std::os::raw::c_void;
 
             extern "C" {
@@ -49,7 +67,11 @@ macro_rules! solver_module {
                 #[link_name = $set_primitive]
                 pub(crate) fn solver_set_primitive(solver: CSolver, primitive: *const $real);
                 #[link_name = $advance_cons]
-                pub(crate) fn solver_advance_cons(solver: CSolver, dt: $real);
+                pub(crate) fn solver_advance_cons(
+                    solver: CSolver,
+                    particles: *const Particle,
+                    num_particles: u64,
+                    dt: $real);
             }
 
             #[repr(C)]
@@ -84,8 +106,8 @@ macro_rules! solver_module {
                     unsafe { solver_get_primitive(self.raw, primitive.as_mut_ptr()) }
                     primitive
                 }
-                pub fn advance_cons(&mut self, dt: $real) {
-                    unsafe { solver_advance_cons(self.raw, dt) }
+                pub fn advance_cons(&mut self, particles: &Vec<Particle>, dt: $real) {
+                    unsafe { solver_advance_cons(self.raw, particles.as_ptr(), particles.len() as u64, dt) }
                 }
             }
 
@@ -98,8 +120,12 @@ macro_rules! solver_module {
     };
 }
 
+config_module!(f32, f32);
+config_module!(f64, f64);
+
 solver_module!(
     iso2d_cpu_f32,
+    f32,
     f32,
     "iso2d_cpu_f32_solver_new",
     "iso2d_cpu_f32_solver_del",
@@ -110,6 +136,7 @@ solver_module!(
 
 solver_module!(
     iso2d_cpu_f64,
+    f64,
     f64,
     "iso2d_cpu_f64_solver_new",
     "iso2d_cpu_f64_solver_del",

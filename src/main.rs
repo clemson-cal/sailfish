@@ -16,9 +16,9 @@ fn do_output(primitive: Vec<f64>, output_number: usize) {
 }
 
 fn main() {
-    let mesh = physics::Mesh {
-        ni: 1024,
-        nj: 1024,
+    let mesh = physics::f64::Mesh {
+        ni: 512,
+        nj: 512,
         x0: -0.5,
         x1: 0.5,
         y0: -0.5,
@@ -32,18 +32,23 @@ fn main() {
 
     for i in 0..mesh.ni() {
         for j in 0..mesh.nj() {
-            let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx();
-            let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy();
 
-            if (x * x + y * y).sqrt() < 0.2 {
-                primitive[i * si + j * sj + 0] = 1.0;
-                primitive[i * si + j * sj + 1] = 0.0;
-                primitive[i * si + j * sj + 2] = 0.0;
-            } else {
-                primitive[i * si + j * sj + 0] = 0.1;
-                primitive[i * si + j * sj + 1] = 0.0;
-                primitive[i * si + j * sj + 2] = 0.0;
-            }
+            primitive[i * si + j * sj + 0] = 1.0;
+            primitive[i * si + j * sj + 1] = 0.0;
+            primitive[i * si + j * sj + 2] = 0.0;
+
+            // let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx();
+            // let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy();
+
+            // if (x * x + y * y).sqrt() < 0.2 {
+            //     primitive[i * si + j * sj + 0] = 1.0;
+            //     primitive[i * si + j * sj + 1] = 0.0;
+            //     primitive[i * si + j * sj + 2] = 0.0;
+            // } else {
+            //     primitive[i * si + j * sj + 0] = 0.1;
+            //     primitive[i * si + j * sj + 1] = 0.0;
+            //     primitive[i * si + j * sj + 2] = 0.0;
+            // }
         }
     }
     solver.set_primitive(&primitive);
@@ -53,7 +58,25 @@ fn main() {
     let mut output_number = 0;
     let mut next_output_time = time;
     let output_cadence = 0.01;
-    let dt = mesh.dx().min(mesh.dy()) * 0.1;
+    let dt = mesh.dx().min(mesh.dy()) * 0.01;
+
+    let particle1 = physics::f64::Particle{
+        x: 0.1,
+        y: 0.0,
+        mass: 2.0,
+        rate: 0.0,
+        radius: 0.2,
+    };
+
+    let particle2 = physics::f64::Particle{
+        x: -0.1,
+        y: 0.0,
+        mass: 1.0,
+        rate: 0.0,
+        radius: 0.1,
+    };
+
+    let particles = vec![particle1, particle2];
 
     while time < 0.1 {
 
@@ -64,7 +87,7 @@ fn main() {
         }
 
         let start = std::time::Instant::now();
-        solver.advance_cons(dt);
+        solver.advance_cons(&particles, dt);
         time += dt;
         iteration += 1;
         let seconds = start.elapsed().as_secs_f64();
