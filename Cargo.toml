@@ -4,6 +4,7 @@ version = "0.1.0"
 edition = "2018"
 
 [dependencies]
+kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
 
 [build-dependencies]
 cc = "*"
