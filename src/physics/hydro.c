@@ -186,9 +186,8 @@ static __host__ __device__ real gravitational_potential(const struct PointMass *
     return phi;
 }
 
-static __host__ __device__ void point_mass_source_term(struct PointMass mass, real x1, real y1, real dt, const real *prim, real *delta_cons)
+static __host__ __device__ void point_mass_source_term(struct PointMass mass, real x1, real y1, real dt, real sigma, real *delta_cons)
 {
-    real sigma = prim[0];
     real x0 = mass.x;
     real y0 = mass.y;
     real mp = mass.mass;
@@ -211,6 +210,27 @@ static __host__ __device__ void point_mass_source_term(struct PointMass mass, re
     delta_cons[0] = dt * sigma * sink_rate * -1.0;
     delta_cons[1] = dt * fx;
     delta_cons[2] = dt * fy;
+}
+
+static __host__ __device__ void point_masses_source_term(
+    struct PointMass* masses,
+    unsigned long num_masses,
+    real x1,
+    real y1,
+    real dt,
+    real sigma,
+    real *cons)
+{
+    for (unsigned long p = 0; p < num_masses; ++p)
+    {
+        real delta_cons[NCONS];
+        point_mass_source_term(masses[p], x1, y1, dt, sigma, delta_cons);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            cons[q] += delta_cons[q];
+        }
+    }
 }
 
 
@@ -367,6 +387,19 @@ struct Mesh FUNC(PREFIX, solver_get_mesh)(struct Solver *self)
     return self->mesh;
 }
 
+static __device__ real sound_speed_squared(struct EquationOfState *eos, real x, real y, struct PointMass *masses, unsigned long num_masses)
+{
+    switch (eos->type)
+    {
+        case Isothermal:
+            return power(eos->isothermal.sound_speed, 2.0);
+        case LocallyIsothermal:
+            return -gravitational_potential(masses, num_masses, x, y) / power(eos->locally_isothermal.mach_number, 2.0);
+        case GammaLaw:
+            return 1.0; // WARNING
+    }
+}
+
 int FUNC(PREFIX, solver_advance)(
     struct Solver *self,
     struct EquationOfState eos,
@@ -375,15 +408,15 @@ int FUNC(PREFIX, solver_advance)(
     unsigned long num_masses,
     real dt)
 {
-    if (self->primitive == NULL)
-    {
-        return 1;
-    }
-
     long ni = self->mesh.ni;
     long nj = self->mesh.nj;
     const real dx = (self->mesh.x1 - self->mesh.x0) / ni;
     const real dy = (self->mesh.y1 - self->mesh.y0) / nj;
+
+    if (self->primitive == NULL)
+    {
+        return 1;
+    }
 
     for (long i = 0; i < ni; ++i)
     {
@@ -395,16 +428,7 @@ int FUNC(PREFIX, solver_advance)(
             real xc = self->mesh.x0 + (i + 0.5) * dx;
             real yc = self->mesh.y0 + (j + 0.5) * dy;
 
-            for (unsigned long p = 0; p < num_masses; ++p)
-            {
-                real delta_cons[NCONS];
-                point_mass_source_term(masses[p], xc, yc, dt, prim, delta_cons);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    cons[q] += delta_cons[q];
-                }
-            }
+            point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
 
             long il = i - 1;
             long ir = i + 1;
@@ -487,11 +511,8 @@ int FUNC(PREFIX, solver_advance)(
                         real py = pf * ( xc / rc);
                         real u0[NCONS] = {surface_density, px, py};
 
-                        real delta = (rc - onset_radius) / onset_width;
                         real omega_outer = square_root(central_mass / power(onset_radius, 3.0));
                         real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
-
-                        // * 0.5 * (1.0 + hyperbolic_tangent(delta)); <-- slow
 
                         for (int q = 0; q < NCONS; ++q)
                         {

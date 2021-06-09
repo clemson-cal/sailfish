@@ -89,7 +89,6 @@ fn main() {
 
     let eos = EquationOfState::LocallyIsothermal { mach_number: 10.0 };
     // let eos = EquationOfState::Isothermal { sound_speed: 0.01 };
-
     // let buffer = BufferZone::None;
     let buffer = BufferZone::Keplerian {
         central_mass: 1.0,
