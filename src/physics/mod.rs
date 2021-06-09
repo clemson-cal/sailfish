@@ -4,42 +4,53 @@ macro_rules! c_api {
      $del:tt,
      $get_primitive:tt,
      $set_primitive:tt,
-     $advance_cons:tt) => {
+     $get_mesh:tt,
+     $advance:tt) => {
         use std::os::raw::c_void;
+        use super::*;
 
         #[repr(C)]
-        #[derive(Copy, Clone)]
-        pub struct CSolver(*mut c_void);
-
-        pub struct Solver {
-            raw: CSolver,
-            mesh: Mesh,
-        }
+        pub struct Solver(*mut c_void);
 
         impl Solver {
+
+            /// Creates a new solver instance from a mesh instance.
             pub fn new(mesh: Mesh) -> Self {
-                Self {
-                    raw: unsafe { solver_new(mesh.clone()) },
-                    mesh,
-                }
+                unsafe { Self(solver_new(mesh.clone())) }
             }
+
+            /// Sets the primitive variable array in the solver. The number of
+            /// elements in the input buffer must match the number of zones,
+            /// times the number of primitive variables per zone.
             pub fn set_primitive(&mut self, primitive: &[$real]) {
-                let count = 3 * self.mesh.ni() * self.mesh.nj();
+                let count = 3 * self.mesh().num_total_zones();
                 assert! {
                     primitive.len() == count,
                     "primitive buffer has wrong size {}, expected {}",
                     primitive.len(),
                     count
                 };
-                unsafe { solver_set_primitive(self.raw, primitive.as_ptr()) }
+                unsafe { solver_set_primitive(self.0, primitive.as_ptr()) }
             }
+
+            /// Makes a deep copy of the primitive variable array in the
+            /// solver and returns it as a vector.
             pub fn primitive(&mut self) -> Vec<$real> {
-                let count = 3 * self.mesh.ni() * self.mesh.nj();
+                let count = 3 * self.mesh().num_total_zones();
                 let mut primitive = vec![0.0; count];
-                unsafe { solver_get_primitive(self.raw, primitive.as_mut_ptr()) }
+                unsafe { solver_get_primitive(self.0, primitive.as_mut_ptr()) }
                 primitive
             }
-            pub fn advance_cons(
+
+            /// Retrieve a copy of the mesh struct used to create this solver
+            /// instance.
+            pub fn mesh(&self) -> Mesh {
+                unsafe { solver_get_mesh(self.0) }
+            }
+
+            /// Advances the internal state of the solver by the given time
+            /// step.
+            pub fn advance(
                 &mut self,
                 eos: EquationOfState,
                 buffer: BufferZone,
@@ -47,29 +58,31 @@ macro_rules! c_api {
                 dt: $real,
             ) {
                 unsafe {
-                    solver_advance_cons(self.raw, eos, buffer, masses.as_ptr(), masses.len() as u64, dt)
+                    solver_advance(self.0, eos, buffer, masses.as_ptr(), masses.len() as u64, dt)
                 }
             }
         }
 
         impl Drop for Solver {
             fn drop(&mut self) {
-                unsafe { solver_del(self.raw) }
+                unsafe { solver_del(self.0) }
             }
         }
 
         extern "C" {
             #[link_name = $new]
-            pub(crate) fn solver_new(mesh: Mesh) -> CSolver;
+            pub(crate) fn solver_new(mesh: Mesh) -> *mut c_void;
             #[link_name = $del]
-            pub(crate) fn solver_del(solver: CSolver);
+            pub(crate) fn solver_del(solver: *mut c_void);
             #[link_name = $get_primitive]
-            pub(crate) fn solver_get_primitive(solver: CSolver, primitive: *mut $real);
+            pub(crate) fn solver_get_primitive(solver: *mut c_void, primitive: *mut $real);
             #[link_name = $set_primitive]
-            pub(crate) fn solver_set_primitive(solver: CSolver, primitive: *const $real);
-            #[link_name = $advance_cons]
-            pub(crate) fn solver_advance_cons(
-                solver: CSolver,
+            pub(crate) fn solver_set_primitive(solver: *mut c_void, primitive: *const $real);
+            #[link_name = $get_mesh]
+            pub(crate) fn solver_get_mesh(solver: *mut c_void) -> Mesh;
+            #[link_name = $advance]
+            pub(crate) fn solver_advance(
+                solver: *mut c_void,
                 eos: EquationOfState,
                 buffer: BufferZone,
                 masses: *const PointMass,
@@ -85,27 +98,38 @@ macro_rules! mesh_struct {
         #[repr(C)]
         #[derive(Debug, Clone)]
         pub struct Mesh {
+            /// Number of zones on the i-axis
             pub ni: u64,
+            /// Number of zones on the j-axis
             pub nj: u64,
+            /// Left coordinate edge of the domain
             pub x0: $real,
+            /// Right coordinate edge of the domain
             pub x1: $real,
+            /// Bottom coordinate edge of the domain
             pub y0: $real,
+            /// Top coordinate edge of the domain
             pub y1: $real,
         }
 
         impl Mesh {
+            /// Returns the number of zones on the i-axis as a `usize`.
             pub fn ni(&self) -> usize {
                 self.ni as usize
             }
+            /// Returns the number of zones on the j-axis as a `usize`.
             pub fn nj(&self) -> usize {
                 self.nj as usize
             }
+            /// Returns the number of total zones (`ni * nj`) as a `usize`.
             pub fn num_total_zones(&self) -> usize {
                 (self.ni * self.nj) as usize
             }
+            /// Returns the grid spacing on the i-axis.
             pub fn dx(&self) -> $real {
                 (self.x1 - self.x0) / self.ni as $real
             }
+            /// Returns the grid spacing on the j-axis.
             pub fn dy(&self) -> $real {
                 (self.y1 - self.y0) / self.nj as $real
             }
@@ -162,14 +186,14 @@ pub mod f32 {
     point_mass_struct!(f32);
     buffer_zone_struct!(f32);
     pub mod iso2d_cpu {
-        use super::*;
         c_api! {
             f32,
             "iso2d_cpu_f32_solver_new",
             "iso2d_cpu_f32_solver_del",
             "iso2d_cpu_f32_solver_get_primitive",
             "iso2d_cpu_f32_solver_set_primitive",
-            "iso2d_cpu_f32_solver_advance_cons"
+            "iso2d_cpu_f32_solver_get_mesh",
+            "iso2d_cpu_f32_solver_advance"
         }
     }
 }
@@ -180,14 +204,14 @@ pub mod f64 {
     point_mass_struct!(f64);
     buffer_zone_struct!(f64);
     pub mod iso2d_cpu {
-        use super::*;
         c_api! {
             f64,
             "iso2d_cpu_f64_solver_new",
             "iso2d_cpu_f64_solver_del",
             "iso2d_cpu_f64_solver_get_primitive",
             "iso2d_cpu_f64_solver_set_primitive",
-            "iso2d_cpu_f64_solver_advance_cons"
+            "iso2d_cpu_f64_solver_get_mesh",
+            "iso2d_cpu_f64_solver_advance"
         }
     }
 }

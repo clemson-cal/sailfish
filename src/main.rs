@@ -109,7 +109,7 @@ fn main() {
 
         for _ in 0..fold {
             let masses = point_masses(binary.orbital_state_from_time(time), sink_rate, sink_radius);
-            solver.advance_cons(eos, buffer, &masses, dt);
+            solver.advance(eos, buffer, &masses, dt);
             time += dt;
             iteration += 1;
         }

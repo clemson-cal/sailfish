@@ -358,7 +358,12 @@ int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
     return 0;
 }
 
-int FUNC(PREFIX, solver_advance_cons)(
+struct Mesh FUNC(PREFIX, solver_get_mesh)(struct Solver *self)
+{
+    return self->mesh;
+}
+
+int FUNC(PREFIX, solver_advance)(
     struct Solver *self,
     struct EquationOfState eos,
     struct BufferZone buffer,
