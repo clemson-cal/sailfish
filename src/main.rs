@@ -32,16 +32,24 @@ fn main() {
     let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
     let mut solver = iso2d_cpu::Solver::new(mesh.clone());
 
+    let a: f64 = 1.0;
+    let m: f64 = 1.0;
+    let q: f64 = 1.0;    
+    let e: f64 = 0.0;
+
+    let binary = kepler_two_body::OrbitalElements(a, m, q, e);
+
     for i in 0..mesh.ni() {
         for j in 0..mesh.nj() {
             let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx();
             let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy();
-            let r = (x * x + y * y + r_soft.powf(2.0)).sqrt();
+            let r = (x * x + y * y).sqrt();
+            let rs= (x * x + y * y + r_soft.powf(2.0)).sqrt();
             let phi_hat_x = -y / r;
             let phi_hat_y =  x / r;
             let d = 1.0;
-            let u = phi_hat_x / r.sqrt();
-            let v = phi_hat_y / r.sqrt();
+            let u = phi_hat_x / rs.sqrt();
+            let v = phi_hat_y / rs.sqrt();
             primitive[i * si + j * sj + 0] = d;
             primitive[i * si + j * sj + 1] = u;
             primitive[i * si + j * sj + 2] = v;
@@ -58,15 +66,23 @@ fn main() {
     let cfl = 0.2;
     let dt = mesh.dx().min(mesh.dy()) / v_max * cfl;
 
-    let mass = PointMass {
-        x: 0.0,
+    let mut mass0 = PointMass {
+        x: -0.5,
         y: 0.0,
-        mass: 1.0,
+        mass: 0.5,
         rate: 40.0,
         radius: r_soft,
     };
 
-    let masses = vec![mass];
+    let mut mass1 = PointMass {
+        x: 0.5,
+        y: 0.0,
+        mass: 0.5,
+        rate: 40.0,
+        radius: r_soft,
+    };
+
+    let masses = vec![mass0,mass1];
     let eos = EquationOfState::LocallyIsothermal { mach_number: 10.0 };
     // let buffer = BufferZone::None;
     let buffer = BufferZone::Keplerian {
@@ -77,7 +93,7 @@ fn main() {
         onset_width: 1.0,
     };
 
-    while time < 50.0 {
+    while time < 1000.0 {
         if time >= next_output_time {
             do_output(&solver.primitive(), output_number);
             output_number += 1;
@@ -85,6 +101,11 @@ fn main() {
         }
 
         let start = std::time::Instant::now();
+        let state = binary.orbital_state_from_time(time);
+        mass0.x = state.0.position_x();
+        mass0.y = state.0.position_y();
+        mass1.x = state.1.position_x();
+        mass1.y = state.1.position_y();
         solver.advance_cons(eos, buffer, &masses, dt);
         time += dt;
         iteration += 1;
