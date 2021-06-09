@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <math.h>
 
 #define CONCAT(a, b) a ## _ ## b
@@ -199,7 +200,7 @@ static __host__ __device__ void point_mass_source_term(struct PointMass mass, re
     real fy = -mag * dy / dr;
     real sink_rate = 0.0;
 
-    if (dr < 4 * rs)
+    if (dr < 4.0 * rs)
     {
         sink_rate = mass.rate * exponential(-power(dr / rs, 6.0));
     }
@@ -494,6 +495,11 @@ int FUNC(PREFIX, solver_advance_cons)(
             for (unsigned long q = 0; q < NCONS; ++q)
             {
                 cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+            }
+
+            if (cons[0] <= 0.0) {
+                printf("ERROR: negative density %f at (%f %f)\n", cons[0], xc, yc);
+                exit(1);
             }
         }
     }

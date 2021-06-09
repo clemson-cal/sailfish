@@ -23,7 +23,7 @@ macro_rules! c_api {
                     mesh,
                 }
             }
-            pub fn set_primitive(&mut self, primitive: &Vec<$real>) {
+            pub fn set_primitive(&mut self, primitive: &[$real]) {
                 let count = 3 * self.mesh.ni() * self.mesh.nj();
                 assert! {
                     primitive.len() == count,
@@ -43,7 +43,7 @@ macro_rules! c_api {
                 &mut self,
                 eos: EquationOfState,
                 buffer: BufferZone,
-                masses: &Vec<PointMass>,
+                masses: &[PointMass],
                 dt: $real,
             ) {
                 unsafe {
