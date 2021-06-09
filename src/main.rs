@@ -38,8 +38,8 @@ fn main() {
     use physics::f64::*;
 
     let mesh = Mesh {
-        ni:  512,
-        nj:  512,
+        ni:  2048,
+        nj:  2048,
         x0: -8.0,
         x1:  8.0,
         y0: -8.0,

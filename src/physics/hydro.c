@@ -466,11 +466,7 @@ int FUNC(PREFIX, solver_advance)(
     const real dx = (self->mesh.x1 - self->mesh.x0) / ni;
     const real dy = (self->mesh.y1 - self->mesh.y0) / nj;
 
-    real fli[NCONS];
-    real fri[NCONS];
-    real flj[NCONS];
-    real frj[NCONS];
-
+    #pragma omp parallel for
     for (long i = 0; i < ni; ++i)
     {
         for (long j = 0; j < nj; ++j)
@@ -495,6 +491,11 @@ int FUNC(PREFIX, solver_advance)(
             }
             else
             {
+                real fli[NCONS];
+                real fri[NCONS];
+                real flj[NCONS];
+                real frj[NCONS];
+
                 long il = i - (i > 0);
                 long ir = i + (i < ni - 1);
                 long jl = j - (j > 0);
@@ -528,14 +529,15 @@ int FUNC(PREFIX, solver_advance)(
             point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
             buffer_source_term(&buffer, xc, yc, dt, cons);
 
-            if (cons[0] <= 0.0)
-            {
-                printf("ERROR: negative density %f at (%f %f)\n", cons[0], xc, yc);
-                exit(1);
-            }
+            // if (cons[0] <= 0.0)
+            // {
+            //     printf("ERROR: negative density %f at (%f %f)\n", cons[0], xc, yc);
+            //     exit(1);
+            // }
         }
     }
 
+    #pragma omp parallel for
     for (long n = 0; n < ni * nj; ++n)
     {
         real *prim = &self->primitive[NCONS * n];
@@ -566,6 +568,7 @@ int FUNC(PREFIX, solver_compute_fluxes)(
         self->flux_j = (real*) compute_malloc(ni * (nj + 1) * NCONS * sizeof(real));
     }
 
+    #pragma omp parallel for
     for (long i = 0; i < ni + 1; ++i)
     {
         for (long j = 0; j < nj; ++j)
@@ -581,6 +584,7 @@ int FUNC(PREFIX, solver_compute_fluxes)(
         }
     }
 
+    #pragma omp parallel for
     for (long i = 0; i < ni; ++i)
     {
         for (long j = 0; j < nj + 1; ++j)
