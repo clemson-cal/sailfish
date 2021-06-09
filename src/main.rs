@@ -3,12 +3,11 @@ pub mod physics;
 use physics::*;
 use std::io::Write;
 
-fn do_output(primitive: Vec<f64>, output_number: usize) {
-    let bytes: Vec<u8> = primitive
-        .into_iter()
-        .map(|x| x.to_le_bytes())
-        .flatten()
-        .collect();
+fn do_output(primitive: &Vec<f64>, output_number: usize) {
+    let mut bytes = Vec::new();
+    for x in primitive {
+        bytes.extend(x.to_le_bytes().iter());
+    }
     let filename = format!("sailfish.{:04}.bin", output_number);
     let mut file = std::fs::File::create(&filename).unwrap();
     file.write_all(&bytes).unwrap();
@@ -80,7 +79,7 @@ fn main() {
 
     while time < 50.0 {
         if time >= next_output_time {
-            do_output(solver.primitive(), output_number);
+            do_output(&solver.primitive(), output_number);
             output_number += 1;
             next_output_time += output_cadence;
         }
@@ -94,5 +93,5 @@ fn main() {
         println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps);
     }
 
-    do_output(solver.primitive(), output_number);
+    do_output(&solver.primitive(), output_number);
 }
