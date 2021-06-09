@@ -38,8 +38,8 @@ fn main() {
     use physics::f64::*;
 
     let mesh = Mesh {
-        ni:  256,
-        nj:  256,
+        ni:  512,
+        nj:  512,
         x0: -8.0,
         x1:  8.0,
         y0: -8.0,
@@ -108,7 +108,9 @@ fn main() {
 
         for _ in 0..fold {
             let masses = point_masses(binary.orbital_state_from_time(time), sink_rate, sink_radius);
+            solver.compute_fluxes(eos, &masses);
             solver.advance(eos, buffer, &masses, dt);
+
             time += dt;
             iteration += 1;
         }

@@ -5,6 +5,7 @@ macro_rules! c_api {
      $get_primitive:tt,
      $set_primitive:tt,
      $get_mesh:tt,
+     $compute_fluxes:tt,
      $advance:tt) => {
         use std::os::raw::c_void;
         use super::*;
@@ -48,8 +49,26 @@ macro_rules! c_api {
                 unsafe { solver_get_mesh(self.0) }
             }
 
+            /// Pre-computes the Godunov fluxes on zone interfaces. If this
+            /// function is called before `Solver::advance`, then the
+            /// pre-computed Godunov fluxes will be loaded from buffers rather
+            /// than computed in-place. The performance trade-off has to be
+            /// checked empirically: especially on the GPU, it can be faster
+            /// to compute fluxes with two-fold redundancy than to load them
+            /// from global memory.
+            pub fn compute_fluxes(
+                &mut self,
+                eos: EquationOfState,
+                masses: &[PointMass],
+            ) {
+                unsafe {
+                    solver_compute_fluxes(self.0, eos, masses.as_ptr(), masses.len() as u64)
+                }
+            }
+
             /// Advances the internal state of the solver by the given time
-            /// step.
+            /// step. Fluxes will be computed on-the-fly if they were not
+            /// pre-computed.
             pub fn advance(
                 &mut self,
                 eos: EquationOfState,
@@ -80,6 +99,13 @@ macro_rules! c_api {
             pub(crate) fn solver_set_primitive(solver: *mut c_void, primitive: *const $real);
             #[link_name = $get_mesh]
             pub(crate) fn solver_get_mesh(solver: *mut c_void) -> Mesh;
+            #[link_name = $compute_fluxes]
+            pub(crate) fn solver_compute_fluxes(
+                solver: *mut c_void,
+                eos: EquationOfState,
+                masses: *const PointMass,
+                num_masses: u64,
+            );
             #[link_name = $advance]
             pub(crate) fn solver_advance(
                 solver: *mut c_void,
@@ -193,6 +219,7 @@ pub mod f32 {
             "iso2d_cpu_f32_solver_get_primitive",
             "iso2d_cpu_f32_solver_set_primitive",
             "iso2d_cpu_f32_solver_get_mesh",
+            "iso2d_cpu_f32_solver_compute_fluxes",
             "iso2d_cpu_f32_solver_advance"
         }
     }
@@ -211,6 +238,7 @@ pub mod f64 {
             "iso2d_cpu_f64_solver_get_primitive",
             "iso2d_cpu_f64_solver_set_primitive",
             "iso2d_cpu_f64_solver_get_mesh",
+            "iso2d_cpu_f64_solver_compute_fluxes",
             "iso2d_cpu_f64_solver_advance"
         }
     }
