@@ -173,7 +173,7 @@ macro_rules! buffer_zone_struct {
                 surface_density: f64,
                 central_mass: f64,
                 driving_rate: f64,
-                onset_radius: f64,
+                outer_radius: f64,
                 onset_width: f64,
             }
         }

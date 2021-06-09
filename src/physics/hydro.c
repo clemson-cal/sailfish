@@ -20,6 +20,7 @@
 #define PREFIX iso2d_cuda_f32
 #define real float
 #define square_root sqrtf
+#define hyperbolic_tangent tanhf
 #define power powf
 #define exponential expf
 #define abs_val fabsf
@@ -28,6 +29,7 @@
 #define PREFIX iso2d_cuda_f64
 #define real double
 #define square_root sqrt
+#define hyperbolic_tangent tanh
 #define power pow
 #define exponential exp
 #define abs_val fabs
@@ -47,6 +49,7 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define PREFIX iso2d_cpu_f32
 #define real float
 #define square_root sqrtf
+#define hyperbolic_tangent tanhf
 #define power powf
 #define exponential expf
 #define abs_val fabsf
@@ -55,6 +58,7 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define PREFIX iso2d_cpu_f64
 #define real double
 #define square_root sqrt
+#define hyperbolic_tangent tanh
 #define power pow
 #define exponential exp
 #define abs_val fabs
@@ -137,7 +141,7 @@ struct BufferZone
             real surface_density;
             real central_mass;
             real driving_rate;
-            real onset_radius;
+            real outer_radius;
             real onset_width;
         } keplerian;
     };
@@ -468,20 +472,30 @@ int FUNC(PREFIX, solver_advance)(
                 }
                 case Keplerian:
                 {
-                    real r = square_root(xc * xc + yc * yc);
+                    real rc = square_root(xc * xc + yc * yc);
+                    real surface_density = buffer.keplerian.surface_density;
+                    real central_mass = buffer.keplerian.central_mass;
+                    real driving_rate = buffer.keplerian.driving_rate;
+                    real outer_radius = buffer.keplerian.outer_radius;
+                    real onset_width = buffer.keplerian.onset_width;
+                    real onset_radius = outer_radius - onset_width;
 
-                    if (r > buffer.keplerian.onset_radius)
+                    if (rc > onset_radius)
                     {
-                        real m = buffer.keplerian.central_mass;
-                        real d = buffer.keplerian.surface_density;
-                        real p_phi = d * square_root(m / r);
-                        real px = p_phi * (-yc / r);
-                        real py = p_phi * ( xc / r);
-                        real u0[NCONS] = {d, px, py};
+                        real pf = surface_density * square_root(central_mass / rc);
+                        real px = pf * (-yc / rc);
+                        real py = pf * ( xc / rc);
+                        real u0[NCONS] = {surface_density, px, py};
+
+                        real delta = (rc - onset_radius) / onset_width;
+                        real omega_outer = square_root(central_mass / power(onset_radius, 3.0));
+                        real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+
+                        // * 0.5 * (1.0 + hyperbolic_tangent(delta)); <-- slow
 
                         for (int q = 0; q < NCONS; ++q)
                         {
-                            cons[q] -= (cons[q] - u0[q]) * buffer.keplerian.driving_rate * dt;
+                            cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
                         }
                     }
                     break;

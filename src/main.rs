@@ -38,12 +38,12 @@ fn main() {
     use physics::f64::*;
 
     let mesh = Mesh {
-        ni:  512,
-        nj:  512,
-        x0: -10.0,
-        x1:  10.0,
-        y0: -10.0,
-        y1:  10.0,
+        ni:  256,
+        nj:  256,
+        x0: -8.0,
+        x1:  8.0,
+        y0: -8.0,
+        y1:  8.0,
     };
     let si = 3 * mesh.nj();
     let sj = 3;
@@ -90,14 +90,14 @@ fn main() {
     let eos = EquationOfState::LocallyIsothermal { mach_number: 10.0 };
     // let eos = EquationOfState::Isothermal { sound_speed: 0.01 };
 
-    let buffer = BufferZone::None;
-    // let buffer = BufferZone::Keplerian {
-    //     central_mass: 1.0,
-    //     surface_density: 1.0,
-    //     driving_rate: 1e3,
-    //     onset_radius: 5.0,
-    //     onset_width: 1.0,
-    // };
+    // let buffer = BufferZone::None;
+    let buffer = BufferZone::Keplerian {
+        central_mass: 1.0,
+        surface_density: 1.0,
+        driving_rate: 1e3,
+        outer_radius: 8.0,
+        onset_width: 1.0,
+    };
 
     while time < 20.0 {
         if time >= next_output_time {
