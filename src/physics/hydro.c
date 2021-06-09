@@ -20,6 +20,7 @@
 #define real float
 #define square_root sqrtf
 #define power powf
+#define exponential expf
 #define abs_val fabsf
 #else
 // ============================ DOUBLE PRECISION ==============================
@@ -27,6 +28,7 @@
 #define real double
 #define square_root sqrt
 #define power pow
+#define exponential exp
 #define abs_val fabs
 #endif
 // ============================ MEMORY =========================================
@@ -45,6 +47,7 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define real float
 #define square_root sqrtf
 #define power powf
+#define exponential expf
 #define abs_val fabsf
 #else
 // ============================ DOUBLE PRECISION ==============================
@@ -52,6 +55,7 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define real double
 #define square_root sqrt
 #define power pow
+#define exponential exp
 #define abs_val fabs
 #endif
 // ============================ MEMORY =========================================
@@ -110,6 +114,34 @@ struct EquationOfState
     };
 };
 
+enum BufferZoneType
+{
+    None,
+    Keplerian,
+};
+
+struct BufferZone
+{
+    enum BufferZoneType type;
+
+    union
+    {
+        struct
+        {
+
+        } none;
+
+        struct
+        {
+            real surface_density;
+            real central_mass;
+            real driving_rate;
+            real onset_radius;
+            real onset_width;
+        } keplerian;
+    };
+};
+
 struct Solver
 {
     struct Mesh mesh;
@@ -165,8 +197,12 @@ static __host__ __device__ void point_mass_source_term(struct PointMass mass, re
     real mag = sigma * mp / r2_soft;
     real fx = -mag * dx / dr;
     real fy = -mag * dy / dr;
-    real sink_rate = mass.rate * (dr < rs);
+    real sink_rate = 0.0;
 
+    if (dr < 4 * rs)
+    {
+        sink_rate = mass.rate * exponential(-power(dr / rs, 6.0));
+    }
     delta_cons[0] = dt * sigma * sink_rate * -1.0;
     delta_cons[1] = dt * fx;
     delta_cons[2] = dt * fy;
@@ -324,6 +360,7 @@ int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
 int FUNC(PREFIX, solver_advance_cons)(
     struct Solver *self,
     struct EquationOfState eos,
+    struct BufferZone buffer,
     struct PointMass *masses,
     unsigned long num_masses,
     real dt)
@@ -383,8 +420,10 @@ int FUNC(PREFIX, solver_advance_cons)(
             real cs2_lj = 1.0;
             real cs2_rj = 1.0;
 
-            switch (eos.type) {
-                case Isothermal: {
+            switch (eos.type)
+            {
+                case Isothermal:
+                {
                     real cs2 = power(eos.isothermal.sound_speed, 2.0);
                     cs2_li = cs2;
                     cs2_ri = cs2;
@@ -392,7 +431,8 @@ int FUNC(PREFIX, solver_advance_cons)(
                     cs2_rj = cs2;
                     break;
                 }
-                case LocallyIsothermal: {
+                case LocallyIsothermal:
+                {
                     const real xl = self->mesh.x0 + (i + 0.0) * dx;
                     const real xr = self->mesh.x0 + (i + 1.0) * dx;
                     const real yl = self->mesh.y0 + (j + 0.0) * dy;
@@ -408,7 +448,36 @@ int FUNC(PREFIX, solver_advance_cons)(
                     cs2_rj = -phi_rj / mach_squared;
                     break;
                 }
-                case GammaLaw: {
+                case GammaLaw:
+                {
+                    break;
+                }
+            }
+
+            switch (buffer.type)
+            {
+                case None:
+                {
+                    break;
+                }
+                case Keplerian:
+                {
+                    real r = square_root(xc * xc + yc * yc);
+
+                    if (r > buffer.keplerian.onset_radius)
+                    {
+                        real m = buffer.keplerian.central_mass;
+                        real d = buffer.keplerian.surface_density;
+                        real p_phi = d * square_root(m / r);
+                        real px = p_phi * (-yc / r);
+                        real py = p_phi * ( xc / r);
+                        real u0[NCONS] = {d, px, py};
+
+                        for (int q = 0; q < NCONS; ++q)
+                        {
+                            cons[q] -= (cons[q] - u0[q]) * buffer.keplerian.driving_rate * dt;
+                        }
+                    }
                     break;
                 }
             }

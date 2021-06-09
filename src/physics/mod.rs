@@ -42,11 +42,12 @@ macro_rules! c_api {
             pub fn advance_cons(
                 &mut self,
                 eos: EquationOfState,
+                buffer: BufferZone,
                 masses: &Vec<PointMass>,
                 dt: $real,
             ) {
                 unsafe {
-                    solver_advance_cons(self.raw, eos, masses.as_ptr(), masses.len() as u64, dt)
+                    solver_advance_cons(self.raw, eos, buffer, masses.as_ptr(), masses.len() as u64, dt)
                 }
             }
         }
@@ -70,6 +71,7 @@ macro_rules! c_api {
             pub(crate) fn solver_advance_cons(
                 solver: CSolver,
                 eos: EquationOfState,
+                buffer: BufferZone,
                 masses: *const PointMass,
                 num_masses: u64,
                 dt: $real,
@@ -81,7 +83,7 @@ macro_rules! c_api {
 macro_rules! mesh_struct {
     ($real:ty) => {
         #[repr(C)]
-        #[derive(Clone)]
+        #[derive(Debug, Clone)]
         pub struct Mesh {
             pub ni: u64,
             pub nj: u64,
@@ -114,7 +116,7 @@ macro_rules! mesh_struct {
 macro_rules! equation_of_state_struct {
     ($real:ty) => {
         #[repr(C)]
-        #[derive(Clone, Copy)]
+        #[derive(Debug, Clone, Copy)]
         pub enum EquationOfState {
             Isothermal { sound_speed: $real },
             LocallyIsothermal { mach_number: $real },
@@ -126,7 +128,7 @@ macro_rules! equation_of_state_struct {
 macro_rules! point_mass_struct {
     ($real:ty) => {
         #[repr(C)]
-        #[derive(Clone)]
+        #[derive(Debug, Clone, Copy)]
         pub struct PointMass {
             pub x: $real,
             pub y: $real,
@@ -137,10 +139,28 @@ macro_rules! point_mass_struct {
     };
 }
 
+macro_rules! buffer_zone_struct {
+    ($real:ty) => {
+        #[repr(C)]
+        #[derive(Debug, Clone, Copy)]
+        pub enum BufferZone {
+            None,
+            Keplerian {
+                surface_density: f64,
+                central_mass: f64,
+                driving_rate: f64,
+                onset_radius: f64,
+                onset_width: f64,
+            }
+        }
+    }
+}
+
 pub mod f32 {
     mesh_struct!(f32);
     equation_of_state_struct!(f32);
     point_mass_struct!(f32);
+    buffer_zone_struct!(f32);
     pub mod iso2d_cpu {
         use super::*;
         c_api! {
@@ -158,6 +178,7 @@ pub mod f64 {
     mesh_struct!(f64);
     equation_of_state_struct!(f64);
     point_mass_struct!(f64);
+    buffer_zone_struct!(f64);
     pub mod iso2d_cpu {
         use super::*;
         c_api! {
