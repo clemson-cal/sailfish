@@ -45,7 +45,7 @@ fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, error::Erro
 
         #[cfg(not(feature="omp"))]
         {
-            Err(Error::CompiledWithoutOpenMP)
+            Err(error::Error::CompiledWithoutOpenMP)
         }
     } else {
         Ok(Box::new(iso2d_cpu::Solver::new(mesh)))

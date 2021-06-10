@@ -363,6 +363,7 @@ static inline __device__ real sound_speed_squared(
         case GammaLaw:
             return 1.0; // WARNING
     }
+    return 0.0;
 }
 
 static inline __device__ void buffer_source_term(
