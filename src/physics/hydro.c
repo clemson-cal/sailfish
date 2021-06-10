@@ -82,6 +82,7 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 
 
 // ============================ STRUCTS =======================================
+// ============================================================================
 struct Mesh
 {
     unsigned long ni, nj;
@@ -173,6 +174,7 @@ struct Solver
 
 
 // ============================ GRAVITY =======================================
+// ============================================================================
 static __device__ real gravitational_potential(const struct PointMass *masses, unsigned long num_masses, real x1, real y1)
 {
     real phi = 0.0;
@@ -245,6 +247,7 @@ static __device__ void point_masses_source_term(
 
 
 // ============================ HYDRO =========================================
+// ============================================================================
 static __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
     const real rho = cons[0];
@@ -271,7 +274,7 @@ static __device__ void primitive_to_conserved(const real *prim, real *cons)
     cons[2] = py;
 }
 
-static __device__ real primitive_to_velocity_component(const real *prim, int direction)
+static __device__ real primitive_to_velocity(const real *prim, int direction)
 {
     switch (direction)
     {
@@ -281,9 +284,9 @@ static __device__ real primitive_to_velocity_component(const real *prim, int dir
     }
 }
 
-static __device__ void primitive_to_flux_vector(const real *prim, const real *cons, real *flux, real cs2, int direction)
+static __device__ void primitive_to_flux(const real *prim, const real *cons, real *flux, real cs2, int direction)
 {
-    const real vn = primitive_to_velocity_component(prim, direction);
+    const real vn = primitive_to_velocity(prim, direction);
     const real rho = prim[0];
     const real pressure = rho * cs2;
 
@@ -295,7 +298,7 @@ static __device__ void primitive_to_flux_vector(const real *prim, const real *co
 static __device__ void primitive_to_outer_wavespeeds(const real *prim, real *wavespeeds, real cs2, int direction)
 {
     const real cs = square_root(cs2);
-    const real vn = primitive_to_velocity_component(prim, direction);
+    const real vn = primitive_to_velocity(prim, direction);
     wavespeeds[0] = vn - cs;
     wavespeeds[1] = vn + cs;
 }
@@ -311,8 +314,8 @@ static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, 
 
     primitive_to_conserved(pl, ul);
     primitive_to_conserved(pr, ur);
-    primitive_to_flux_vector(pl, ul, fl, cs2, direction);
-    primitive_to_flux_vector(pr, ur, fr, cs2, direction);
+    primitive_to_flux(pl, ul, fl, cs2, direction);
+    primitive_to_flux(pr, ur, fr, cs2, direction);
     primitive_to_outer_wavespeeds(pl, al, cs2, direction);
     primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
 
@@ -386,6 +389,11 @@ static inline __device__ void buffer_source_term(
     }
 }
 
+
+
+
+// ============================ PUBLIC API ====================================
+// ============================================================================
 struct Solver* FUNC(PREFIX, solver_new)(struct Mesh mesh)
 {
     struct Solver* self = (struct Solver*) malloc(sizeof(struct Solver));
