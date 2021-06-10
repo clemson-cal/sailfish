@@ -11,3 +11,7 @@ git-version = "*"
 
 [build-dependencies]
 cc = "*"
+
+[features]
+default = ["omp"]
+omp = []

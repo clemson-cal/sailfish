@@ -41,7 +41,7 @@ static void compute_memcpy_host_to_device(void *dst, const void *src, size_t cou
 static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost); }
 
 #else
-// ============================ CPU VERSION ==================================
+// ============================ CPU VERSION ===================================
 #define __host__
 #define __device__
 #ifdef SINGLE
@@ -175,7 +175,11 @@ struct Solver
 
 // ============================ GRAVITY =======================================
 // ============================================================================
-static __device__ real gravitational_potential(const struct PointMass *masses, unsigned long num_masses, real x1, real y1)
+static __device__ real gravitational_potential(
+    const struct PointMass *masses,
+    unsigned long num_masses,
+    real x1,
+    real y1)
 {
     real phi = 0.0;
 
@@ -196,12 +200,18 @@ static __device__ real gravitational_potential(const struct PointMass *masses, u
     return phi;
 }
 
-static __device__ void point_mass_source_term(struct PointMass mass, real x1, real y1, real dt, real sigma, real *delta_cons)
+static __device__ void point_mass_source_term(
+    struct PointMass *mass,
+    real x1,
+    real y1,
+    real dt,
+    real sigma,
+    real *delta_cons)
 {
-    real x0 = mass.x;
-    real y0 = mass.y;
-    real mp = mass.mass;
-    real rs = mass.radius;
+    real x0 = mass->x;
+    real y0 = mass->y;
+    real mp = mass->mass;
+    real rs = mass->radius;
 
     real dx = x1 - x0;
     real dy = y1 - y0;
@@ -215,7 +225,7 @@ static __device__ void point_mass_source_term(struct PointMass mass, real x1, re
 
     if (dr < 4.0 * rs)
     {
-        sink_rate = mass.rate * exponential(-power(dr / rs, 6.0));
+        sink_rate = mass->rate * exponential(-power(dr / rs, 4.0));
     }
     delta_cons[0] = dt * sigma * sink_rate * -1.0;
     delta_cons[1] = dt * fx;
@@ -234,7 +244,7 @@ static __device__ void point_masses_source_term(
     for (unsigned long p = 0; p < num_masses; ++p)
     {
         real delta_cons[NCONS];
-        point_mass_source_term(masses[p], x1, y1, dt, sigma, delta_cons);
+        point_mass_source_term(&masses[p], x1, y1, dt, sigma, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -284,7 +294,12 @@ static __device__ real primitive_to_velocity(const real *prim, int direction)
     }
 }
 
-static __device__ void primitive_to_flux(const real *prim, const real *cons, real *flux, real cs2, int direction)
+static __device__ void primitive_to_flux(
+    const real *prim,
+    const real *cons,
+    real *flux,
+    real cs2,
+    int direction)
 {
     const real vn = primitive_to_velocity(prim, direction);
     const real rho = prim[0];
@@ -295,7 +310,11 @@ static __device__ void primitive_to_flux(const real *prim, const real *cons, rea
     flux[2] = vn * cons[2] + pressure * (direction == 1);
 }
 
-static __device__ void primitive_to_outer_wavespeeds(const real *prim, real *wavespeeds, real cs2, int direction)
+static __device__ void primitive_to_outer_wavespeeds(
+    const real *prim,
+    real *wavespeeds,
+    real cs2,
+    int direction)
 {
     const real cs = square_root(cs2);
     const real vn = primitive_to_velocity(prim, direction);
@@ -387,6 +406,125 @@ static inline __device__ void buffer_source_term(
             break;
         }
     }
+}
+
+
+
+
+// ============================ WORK FUNCTIONS ================================
+// ============================================================================
+static inline __device__ void advance_loop_body(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct BufferZone *buffer,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    real dt,
+    long i,
+    long j)
+{
+    long ni = self->mesh.ni;
+    long nj = self->mesh.nj;
+    real xc = self->mesh.x0 + (i + 0.5) * dx;
+    real yc = self->mesh.y0 + (j + 0.5) * dy;
+    real *cons = &self->conserved[NCONS * (i * nj + j)];
+    real *prim = &self->primitive[NCONS * (i * nj + j)];
+
+    if (self->flux_i != NULL && self->flux_j != NULL)
+    {
+        real *fli = self->flux_i + NCONS * ((i + 0) * (nj + 0) + j);
+        real *fri = self->flux_i + NCONS * ((i + 1) * (nj + 0) + j);
+        real *flj = self->flux_j + NCONS * (i * (nj + 1) + (j + 0));
+        real *frj = self->flux_j + NCONS * (i * (nj + 1) + (j + 1));
+
+        for (unsigned long q = 0; q < NCONS; ++q)
+        {
+            cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        }
+    }
+    else
+    {
+        real fli[NCONS];
+        real fri[NCONS];
+        real flj[NCONS];
+        real frj[NCONS];
+
+        long il = i - (i > 0);
+        long ir = i + (i < ni - 1);
+        long jl = j - (j > 0);
+        long jr = j + (j < nj - 1);
+        
+        real xl = self->mesh.x0 + (i + 0.0) * dx;
+        real xr = self->mesh.x0 + (i + 1.0) * dx;
+        real yl = self->mesh.y0 + (j + 0.0) * dy;
+        real yr = self->mesh.y0 + (j + 1.0) * dy;
+
+        real cs2_li = sound_speed_squared(eos, xl, yc, masses, num_masses);
+        real cs2_ri = sound_speed_squared(eos, xr, yc, masses, num_masses);
+        real cs2_lj = sound_speed_squared(eos, xc, yl, masses, num_masses);
+        real cs2_rj = sound_speed_squared(eos, xc, yr, masses, num_masses);
+
+        real *pli = &self->primitive[NCONS * (il * nj + j)];
+        real *pri = &self->primitive[NCONS * (ir * nj + j)];
+        real *plj = &self->primitive[NCONS * (i * nj + jl)];
+        real *prj = &self->primitive[NCONS * (i * nj + jr)];
+
+        riemann_hlle(pli, prim, fli, cs2_li, 0);
+        riemann_hlle(prim, pri, fri, cs2_ri, 0);
+        riemann_hlle(plj, prim, flj, cs2_lj, 1);
+        riemann_hlle(prim, prj, frj, cs2_rj, 1);
+
+        for (unsigned long q = 0; q < NCONS; ++q)
+        {
+            cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        }
+    }
+    point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
+    buffer_source_term(buffer, xc, yc, dt, cons);
+}
+
+static inline __device__ void compute_fluxes_i_loop_body(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    long i,
+    long j)
+{
+    long nj = self->mesh.nj;
+    long il = i - (i > 0);
+    long ir = i;
+    real x = self->mesh.x0 + (i + 0.0) * dx;
+    real y = self->mesh.y0 + (j + 0.5) * dy;
+    real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
+    real *pl = &self->primitive[NCONS * (il * nj + j)];
+    real *pr = &self->primitive[NCONS * (ir * nj + j)];
+    riemann_hlle(pl, pr, self->flux_i + NCONS * (i * (nj + 0) + j), cs2, 0);
+}
+
+static inline __device__ void compute_fluxes_j_loop_body(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    long i,
+    long j)
+{
+    long nj = self->mesh.nj;
+    long jl = j - (j > 0);
+    long jr = j;
+    real x = self->mesh.x0 + (i + 0.5) * dx;
+    real y = self->mesh.y0 + (j + 0.0) * dy;
+    real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
+    real *pl = &self->primitive[NCONS * (i * nj + jl)];
+    real *pr = &self->primitive[NCONS * (i * nj + jr)];
+    riemann_hlle(pl, pr, self->flux_j + NCONS * (i * (nj + 1) + j), cs2, 1);
 }
 
 
@@ -487,78 +625,14 @@ int FUNC(PREFIX, solver_advance)(
     {
         for (long j = 0; j < nj; ++j)
         {
-            real xc = self->mesh.x0 + (i + 0.5) * dx;
-            real yc = self->mesh.y0 + (j + 0.5) * dy;
-
-            real *cons = &self->conserved[NCONS * (i * nj + j)];
-            real *prim = &self->primitive[NCONS * (i * nj + j)];
-
-            if (self->flux_i != NULL && self->flux_j != NULL)
-            {
-                real *fli = self->flux_i + NCONS * ((i + 0) * (nj + 0) + j);
-                real *fri = self->flux_i + NCONS * ((i + 1) * (nj + 0) + j);
-                real *flj = self->flux_j + NCONS * (i * (nj + 1) + (j + 0));
-                real *frj = self->flux_j + NCONS * (i * (nj + 1) + (j + 1));
-
-                for (unsigned long q = 0; q < NCONS; ++q)
-                {
-                    cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-                }
-            }
-            else
-            {
-                real fli[NCONS];
-                real fri[NCONS];
-                real flj[NCONS];
-                real frj[NCONS];
-
-                long il = i - (i > 0);
-                long ir = i + (i < ni - 1);
-                long jl = j - (j > 0);
-                long jr = j + (j < nj - 1);
-                
-                real xl = self->mesh.x0 + (i + 0.0) * dx;
-                real xr = self->mesh.x0 + (i + 1.0) * dx;
-                real yl = self->mesh.y0 + (j + 0.0) * dy;
-                real yr = self->mesh.y0 + (j + 1.0) * dy;
-
-                real cs2_li = sound_speed_squared(&eos, xl, yc, masses, num_masses);
-                real cs2_ri = sound_speed_squared(&eos, xr, yc, masses, num_masses);
-                real cs2_lj = sound_speed_squared(&eos, xc, yl, masses, num_masses);
-                real cs2_rj = sound_speed_squared(&eos, xc, yr, masses, num_masses);
-
-                real *pli = &self->primitive[NCONS * (il * nj + j)];
-                real *pri = &self->primitive[NCONS * (ir * nj + j)];
-                real *plj = &self->primitive[NCONS * (i * nj + jl)];
-                real *prj = &self->primitive[NCONS * (i * nj + jr)];
-
-                riemann_hlle(pli, prim, fli, cs2_li, 0);
-                riemann_hlle(prim, pri, fri, cs2_ri, 0);
-                riemann_hlle(plj, prim, flj, cs2_lj, 1);
-                riemann_hlle(prim, prj, frj, cs2_rj, 1);
-
-                for (unsigned long q = 0; q < NCONS; ++q)
-                {
-                    cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-                }
-            }
-            point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
-            buffer_source_term(&buffer, xc, yc, dt, cons);
-
-            // if (cons[0] <= 0.0)
-            // {
-            //     printf("ERROR: negative density %f at (%f %f)\n", cons[0], xc, yc);
-            //     exit(1);
-            // }
+            advance_loop_body(self, &eos, &buffer, masses, num_masses, dx, dy, dt, i, j);
         }
     }
 
     #pragma omp parallel for
     for (long n = 0; n < ni * nj; ++n)
     {
-        real *prim = &self->primitive[NCONS * n];
-        real *cons = &self->conserved[NCONS * n];
-        conserved_to_primitive(cons, prim);
+        conserved_to_primitive(self->conserved + NCONS * n, self->primitive + NCONS * n);
     }
     return 0;
 }
@@ -589,14 +663,7 @@ int FUNC(PREFIX, solver_compute_fluxes)(
     {
         for (long j = 0; j < nj; ++j)
         {
-            long il = i - (i > 0);
-            long ir = i;
-            real x = self->mesh.x0 + (i + 0.0) * dx;
-            real y = self->mesh.y0 + (j + 0.5) * dy;
-            real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
-            real *pl = &self->primitive[NCONS * (il * nj + j)];
-            real *pr = &self->primitive[NCONS * (ir * nj + j)];
-            riemann_hlle(pl, pr, self->flux_i + NCONS * (i * (nj + 0) + j), cs2, 0);
+            compute_fluxes_i_loop_body(self, &eos, masses, num_masses, dx, dy, i, j);
         }
     }
 
@@ -605,14 +672,7 @@ int FUNC(PREFIX, solver_compute_fluxes)(
     {
         for (long j = 0; j < nj + 1; ++j)
         {
-            long jl = j - (j > 0);
-            long jr = j;
-            real x = self->mesh.x0 + (i + 0.5) * dx;
-            real y = self->mesh.y0 + (j + 0.0) * dy;
-            real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
-            real *pl = &self->primitive[NCONS * (i * nj + jl)];
-            real *pr = &self->primitive[NCONS * (i * nj + jr)];
-            riemann_hlle(pl, pr, self->flux_j + NCONS * (i * (nj + 1) + j), cs2, 1);
+            compute_fluxes_j_loop_body(self, &eos, masses, num_masses, dx, dy, i, j);
         }
     }
     return 0;

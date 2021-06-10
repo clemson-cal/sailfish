@@ -1,8 +1,14 @@
 pub mod physics;
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
-use physics::*;
+use physics::f64::*;
 use std::io::Write;
+
+#[derive(Debug)]
+enum Error {
+    #[allow(unused)]
+    CompiledWithoutOpenMP
+}
 
 fn do_output(primitive: &Vec<f64>, output_number: usize) {
     let mut bytes = Vec::new();
@@ -15,16 +21,16 @@ fn do_output(primitive: &Vec<f64>, output_number: usize) {
     println!("write {}", filename);
 }
 
-fn point_masses(state: OrbitalState, rate: f64, radius: f64) -> [f64::PointMass; 2] {
+fn point_masses(state: OrbitalState, rate: f64, radius: f64) -> [PointMass; 2] {
     let OrbitalState(mass0, mass1) = state;
-    let mass0 = f64::PointMass {
+    let mass0 = PointMass {
         x: mass0.position_x(),
         y: mass0.position_y(),
         mass: mass0.mass(),
         rate,
         radius,
     };
-    let mass1 = f64::PointMass {
+    let mass1 = PointMass {
         x: mass1.position_x(),
         y: mass1.position_y(),
         mass: mass1.mass(),
@@ -34,7 +40,23 @@ fn point_masses(state: OrbitalState, rate: f64, radius: f64) -> [f64::PointMass;
     [mass0, mass1]
 }
 
-fn run(cmdline: CommandLine) {
+fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, Error> {
+    if use_omp {
+        #[cfg(feature="omp")]
+        {
+            Ok(Box::new(iso2d_omp::Solver::new(mesh)))
+        }
+
+        #[cfg(not(feature="omp"))]
+        {
+            Err(Error::CompiledWithoutOpenMP)
+        }
+    } else {
+        Ok(Box::new(iso2d_cpu::Solver::new(mesh)))
+    }
+}
+
+fn run(cmdline: CommandLine) -> Result<(), Error> {
     use physics::f64::*;
 
     println!("{:?}", cmdline);
@@ -50,14 +72,10 @@ fn run(cmdline: CommandLine) {
     let si = 3 * mesh.nj();
     let sj = 3;
 
-    let sink_radius: f64 = 0.1;
-    let sink_rate: f64 = 10.0;
+    let sink_radius: f64 = 0.025;
+    let sink_rate: f64 = 40.0;
     let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
-    let mut solver: Box<dyn Solve> = if cmdline.no_omp {
-        Box::new(iso2d_cpu::Solver::new(mesh.clone()))
-    } else {
-        Box::new(iso2d_omp::Solver::new(mesh.clone()))
-    };
+    let mut solver = build_solver(mesh.clone(), cmdline.use_omp)?;
 
     let a: f64 = 1.0;
     let m: f64 = 1.0;
@@ -104,7 +122,7 @@ fn run(cmdline: CommandLine) {
         onset_width: 1.0,
     };
 
-    while time < 20.0 {
+    while time < 600.0 {
         if time >= next_output_time {
             do_output(&solver.primitive(), output_number);
             output_number += 1;
@@ -125,18 +143,22 @@ fn run(cmdline: CommandLine) {
         println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps);
     }
     do_output(&solver.primitive(), output_number);
+
+    Ok(())
 }
 
 #[derive(Debug)]
 struct CommandLine {
-    no_omp: bool,
+    use_omp: bool,
     resolution: u64,
     fold: u32,
 }
 
 fn main() {
+    use git_version::git_version;
+
     let mut c = CommandLine {
-        no_omp: false,
+        use_omp: false,
         resolution: 1024,
         fold: 100,
     };
@@ -163,19 +185,19 @@ fn main() {
         match state {
             State::Ready => match arg.as_str() {
                 "-h" | "--help" => {
-                    println!("   -h | --help          display this help message");
+                    println!("   -h | --help           display this help message");
                     println!("   --version             print the code version number");
-                    println!("   --no-omp              disable running with OpenMP");
+                    println!("   -p | --use-omp        run with OpenMP [OMP_NUM_THREADS]");
                     println!("   -n | --resolution     grid resolution [1024]");
                     println!("   -f | --fold           number of iterations between messages");
                     return;
                 }
                 "--version" => {
-                    println!("sailfish 0.1.0 {}", git_version::git_version!());
+                    println!("sailfish 0.1.0 {}", git_version!());
                     return;
                 }
-                "--no-omp" => {
-                    c.no_omp = true;
+                "-p" | "--use-omp" => {
+                    c.use_omp = true;
                 }
                 "-n" | "--res" => {
                     state = State::GridResolution;
@@ -215,5 +237,11 @@ fn main() {
         eprintln!("missing argument");
         return;
     }
-    run(c)
+
+    match run(c) {
+        Ok(()) => {}
+        Err(e) => {
+            println!("error: {:?}", e)
+        }
+    }
 }

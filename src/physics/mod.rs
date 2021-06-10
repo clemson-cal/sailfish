@@ -249,6 +249,7 @@ pub mod f32 {
         }
     }
 
+    #[cfg(feature="omp")]
     pub mod iso2d_omp {
         c_api! {
             f32,
@@ -283,6 +284,7 @@ pub mod f64 {
         }
     }
 
+    #[cfg(feature="omp")]
     pub mod iso2d_omp {
         c_api! {
             f64,
