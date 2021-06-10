@@ -211,6 +211,7 @@ pub mod f32 {
     equation_of_state_struct!(f32);
     point_mass_struct!(f32);
     buffer_zone_struct!(f32);
+
     pub mod iso2d_cpu {
         c_api! {
             f32,
@@ -223,6 +224,19 @@ pub mod f32 {
             "iso2d_cpu_f32_solver_advance"
         }
     }
+
+    pub mod iso2d_omp {
+        c_api! {
+            f64,
+            "iso2d_omp_f32_solver_new",
+            "iso2d_omp_f32_solver_del",
+            "iso2d_omp_f32_solver_get_primitive",
+            "iso2d_omp_f32_solver_set_primitive",
+            "iso2d_omp_f32_solver_get_mesh",
+            "iso2d_omp_f32_solver_compute_fluxes",
+            "iso2d_omp_f32_solver_advance"
+        }
+    }
 }
 
 pub mod f64 {
@@ -230,6 +244,7 @@ pub mod f64 {
     equation_of_state_struct!(f64);
     point_mass_struct!(f64);
     buffer_zone_struct!(f64);
+
     pub mod iso2d_cpu {
         c_api! {
             f64,
@@ -240,6 +255,19 @@ pub mod f64 {
             "iso2d_cpu_f64_solver_get_mesh",
             "iso2d_cpu_f64_solver_compute_fluxes",
             "iso2d_cpu_f64_solver_advance"
+        }
+    }
+
+    pub mod iso2d_omp {
+        c_api! {
+            f64,
+            "iso2d_omp_f64_solver_new",
+            "iso2d_omp_f64_solver_del",
+            "iso2d_omp_f64_solver_get_primitive",
+            "iso2d_omp_f64_solver_set_primitive",
+            "iso2d_omp_f64_solver_get_mesh",
+            "iso2d_omp_f64_solver_compute_fluxes",
+            "iso2d_omp_f64_solver_advance"
         }
     }
 }

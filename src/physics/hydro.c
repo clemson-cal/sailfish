@@ -46,7 +46,11 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define __device__
 #ifdef SINGLE
 // ============================ SINGLE PRECISION ==============================
+#ifdef _OPENMP
+#define PREFIX iso2d_omp_f32
+#else
 #define PREFIX iso2d_cpu_f32
+#endif
 #define real float
 #define square_root sqrtf
 #define hyperbolic_tangent tanhf
@@ -55,7 +59,11 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define abs_val fabsf
 #else
 // ============================ DOUBLE PRECISION ==============================
+#ifdef _OPENMP
+#define PREFIX iso2d_omp_f64
+#else
 #define PREFIX iso2d_cpu_f64
+#endif
 #define real double
 #define square_root sqrt
 #define hyperbolic_tangent tanh
