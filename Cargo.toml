@@ -7,6 +7,7 @@ description = "fast code to simulate binary accretion"
 
 [dependencies]
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
+git-version = "*"
 
 [build-dependencies]
 cc = "*"

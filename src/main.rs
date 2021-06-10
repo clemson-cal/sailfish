@@ -156,9 +156,15 @@ fn main() {
         match state {
             State::Ready => match arg.as_str() {
                 "-h" | "--help" => {
+                    println!("   -h  | --help          display this help message");
+                    println!("   --version             print the code version number");
                     println!("   -no-omp | --no-omp    disable running with OpenMP");
                     println!("   -n | --resolution     grid resolution [1024]");
                     println!("   -f | --fold           number of iterations between messages");
+                    return;
+                }
+                "--version" => {
+                    println!("sailfish 0.1.0 {}", git_version::git_version!());
                     return;
                 }
                 "-no-omp" | "--no-omp" => {
