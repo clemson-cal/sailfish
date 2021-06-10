@@ -34,16 +34,18 @@ fn point_masses(state: OrbitalState, rate: f64, radius: f64) -> [f64::PointMass;
     [mass0, mass1]
 }
 
-fn main() {
+fn run(cmdline: CommandLine) {
     use physics::f64::*;
 
+    println!("{:?}", cmdline);
+
     let mesh = Mesh {
-        ni:  2048,
-        nj:  2048,
+        ni: cmdline.resolution,
+        nj: cmdline.resolution,
         x0: -8.0,
-        x1:  8.0,
+        x1: 8.0,
         y0: -8.0,
-        y1:  8.0,
+        y1: 8.0,
     };
     let si = 3 * mesh.nj();
     let sj = 3;
@@ -51,7 +53,11 @@ fn main() {
     let sink_radius: f64 = 0.1;
     let sink_rate: f64 = 10.0;
     let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
-    let mut solver: Box<dyn Solve> = Box::new(iso2d_omp::Solver::new(mesh.clone()));
+    let mut solver: Box<dyn Solve> = if cmdline.no_omp {
+        Box::new(iso2d_cpu::Solver::new(mesh.clone()))
+    } else {
+        Box::new(iso2d_omp::Solver::new(mesh.clone()))
+    };
 
     let a: f64 = 1.0;
     let m: f64 = 1.0;
@@ -64,9 +70,9 @@ fn main() {
             let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx();
             let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy();
             let r = (x * x + y * y).sqrt();
-            let rs= (x * x + y * y + sink_radius.powf(2.0)).sqrt();
+            let rs = (x * x + y * y + sink_radius.powf(2.0)).sqrt();
             let phi_hat_x = -y / r;
-            let phi_hat_y =  x / r;
+            let phi_hat_y = x / r;
             let d = 1.0;
             let u = phi_hat_x / rs.sqrt();
             let v = phi_hat_y / rs.sqrt();
@@ -85,7 +91,7 @@ fn main() {
     let v_max = 1.0 / sink_radius.sqrt();
     let cfl = 0.2;
     let dt = mesh.dx().min(mesh.dy()) / v_max * cfl;
-    let fold = 100;
+    let fold = cmdline.fold;
 
     let eos = EquationOfState::LocallyIsothermal { mach_number: 10.0 };
     // let eos = EquationOfState::Isothermal { sound_speed: 0.01 };
@@ -119,4 +125,82 @@ fn main() {
         println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps);
     }
     do_output(&solver.primitive(), output_number);
+}
+
+#[derive(Debug)]
+struct CommandLine {
+    no_omp: bool,
+    resolution: u64,
+    fold: u32,
+}
+
+fn main() {
+    let mut c = CommandLine {
+        no_omp: false,
+        resolution: 1024,
+        fold: 100,
+    };
+
+    enum State {
+        Ready,
+        GridResolution,
+        Fold,
+    }
+    let mut state = State::Ready;
+
+    for arg in std::env::args()
+        .skip(1)
+        .map(|arg| arg.split("=").map(str::to_string).collect::<Vec<_>>())
+        .flatten()
+    {
+        match state {
+            State::Ready => match arg.as_str() {
+                "-h" | "--help" => {
+                    println!("   -no-omp | --no-omp    disable running with OpenMP");
+                    println!("   -n | --resolution     grid resolution [1024]");
+                    println!("   -f | --fold           number of iterations between messages");
+                    return;
+                }
+                "-no-omp" | "--no-omp" => {
+                    c.no_omp = true;
+                }
+                "-n" | "--res" => {
+                    state = State::GridResolution;
+                }
+                "-f" | "--fold" => {
+                    state = State::Fold;
+                }
+                _ => {
+                    eprintln!("unrecognized option {}", arg);
+                    return;
+                }
+            },
+            State::GridResolution => match arg.parse() {
+                Ok(n) => {
+                    c.resolution = n;
+                    state = State::Ready;
+                }
+                Err(e) => {
+                    eprintln!("-n | --resolution {}: {}", arg, e);
+                    return;
+                }
+            },
+            State::Fold => match arg.parse() {
+                Ok(f) => {
+                    c.fold = f;
+                    state = State::Ready;
+                }
+                Err(e) => {
+                    eprintln!("-f | --fold {}: {}", arg, e);
+                    return;
+                }
+            },
+        }
+    }
+
+    if !std::matches!(state, State::Ready) {
+        eprintln!("missing argument");
+        return;
+    }
+    run(c)
 }

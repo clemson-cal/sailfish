@@ -2,6 +2,8 @@
 name = "sailfish"
 version = "0.1.0"
 edition = "2018"
+authors = ["J. Zrake <jzrake@clemson.edu>", "A. MacFadyen <macfadyen@nyu.edu>"]
+description = "fast code to simulate binary accretion"
 
 [dependencies]
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
