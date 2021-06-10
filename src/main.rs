@@ -150,15 +150,22 @@ fn main() {
 
     for arg in std::env::args()
         .skip(1)
-        .map(|arg| arg.split("=").map(str::to_string).collect::<Vec<_>>())
-        .flatten()
+        .flat_map(|arg| arg.split("=").map(str::to_string).collect::<Vec<_>>())
+        .flat_map(|arg| {
+            if arg.starts_with("-") && !arg.starts_with("--") && arg.len() > 2 {
+                let (a, b) = arg.split_at(2);
+                vec![a.to_string(), b.to_string()]
+            } else {
+                vec![arg.to_string()]
+            }
+        })
     {
         match state {
             State::Ready => match arg.as_str() {
                 "-h" | "--help" => {
-                    println!("   -h  | --help          display this help message");
+                    println!("   -h | --help          display this help message");
                     println!("   --version             print the code version number");
-                    println!("   -no-omp | --no-omp    disable running with OpenMP");
+                    println!("   --no-omp              disable running with OpenMP");
                     println!("   -n | --resolution     grid resolution [1024]");
                     println!("   -f | --fold           number of iterations between messages");
                     return;
@@ -167,7 +174,7 @@ fn main() {
                     println!("sailfish 0.1.0 {}", git_version::git_version!());
                     return;
                 }
-                "-no-omp" | "--no-omp" => {
+                "--no-omp" => {
                     c.no_omp = true;
                 }
                 "-n" | "--res" => {
