@@ -51,7 +51,7 @@ fn main() {
     let sink_radius: f64 = 0.1;
     let sink_rate: f64 = 10.0;
     let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
-    let mut solver = iso2d_omp::Solver::new(mesh.clone());
+    let mut solver: Box<dyn Solve> = Box::new(iso2d_omp::Solver::new(mesh.clone()));
 
     let a: f64 = 1.0;
     let m: f64 = 1.0;

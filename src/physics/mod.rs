@@ -14,16 +14,17 @@ macro_rules! c_api {
         pub struct Solver(*mut c_void);
 
         impl Solver {
-
             /// Creates a new solver instance from a mesh instance.
             pub fn new(mesh: Mesh) -> Self {
                 unsafe { Self(solver_new(mesh.clone())) }
             }
+        }
 
+        impl Solve for Solver {
             /// Sets the primitive variable array in the solver. The number of
             /// elements in the input buffer must match the number of zones,
             /// times the number of primitive variables per zone.
-            pub fn set_primitive(&mut self, primitive: &[$real]) {
+            fn set_primitive(&mut self, primitive: &[$real]) {
                 let count = 3 * self.mesh().num_total_zones();
                 assert! {
                     primitive.len() == count,
@@ -36,7 +37,7 @@ macro_rules! c_api {
 
             /// Makes a deep copy of the primitive variable array in the
             /// solver and returns it as a vector.
-            pub fn primitive(&mut self) -> Vec<$real> {
+            fn primitive(&mut self) -> Vec<$real> {
                 let count = 3 * self.mesh().num_total_zones();
                 let mut primitive = vec![0.0; count];
                 unsafe { solver_get_primitive(self.0, primitive.as_mut_ptr()) }
@@ -45,7 +46,7 @@ macro_rules! c_api {
 
             /// Retrieve a copy of the mesh struct used to create this solver
             /// instance.
-            pub fn mesh(&self) -> Mesh {
+            fn mesh(&self) -> Mesh {
                 unsafe { solver_get_mesh(self.0) }
             }
 
@@ -56,7 +57,7 @@ macro_rules! c_api {
             /// checked empirically: especially on the GPU, it can be faster
             /// to compute fluxes with two-fold redundancy than to load them
             /// from global memory.
-            pub fn compute_fluxes(
+            fn compute_fluxes(
                 &mut self,
                 eos: EquationOfState,
                 masses: &[PointMass],
@@ -69,7 +70,7 @@ macro_rules! c_api {
             /// Advances the internal state of the solver by the given time
             /// step. Fluxes will be computed on-the-fly if they were not
             /// pre-computed.
-            pub fn advance(
+            fn advance(
                 &mut self,
                 eos: EquationOfState,
                 buffer: BufferZone,
@@ -206,11 +207,34 @@ macro_rules! buffer_zone_struct {
     }
 }
 
+macro_rules! solve_trait {
+    ($real:ty) => {
+        pub trait Solve {
+            fn set_primitive(&mut self, primitive: &[$real]);
+            fn primitive(&mut self) -> Vec<$real>;
+            fn mesh(&self) -> Mesh;
+            fn compute_fluxes(
+                &mut self,
+                eos: EquationOfState,
+                masses: &[PointMass],
+            );
+            fn advance(
+                &mut self,
+                eos: EquationOfState,
+                buffer: BufferZone,
+                masses: &[PointMass],
+                dt: $real,
+            );
+        }
+    }
+}
+
 pub mod f32 {
     mesh_struct!(f32);
     equation_of_state_struct!(f32);
     point_mass_struct!(f32);
     buffer_zone_struct!(f32);
+    solve_trait!(f32);
 
     pub mod iso2d_cpu {
         c_api! {
@@ -227,7 +251,7 @@ pub mod f32 {
 
     pub mod iso2d_omp {
         c_api! {
-            f64,
+            f32,
             "iso2d_omp_f32_solver_new",
             "iso2d_omp_f32_solver_del",
             "iso2d_omp_f32_solver_get_primitive",
@@ -244,6 +268,7 @@ pub mod f64 {
     equation_of_state_struct!(f64);
     point_mass_struct!(f64);
     buffer_zone_struct!(f64);
+    solve_trait!(f64);
 
     pub mod iso2d_cpu {
         c_api! {
