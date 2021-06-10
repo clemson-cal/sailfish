@@ -1,14 +1,10 @@
+pub mod cmdline;
 pub mod physics;
+pub mod error;
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use physics::f64::*;
 use std::io::Write;
-
-#[derive(Debug)]
-enum Error {
-    #[allow(unused)]
-    CompiledWithoutOpenMP
-}
 
 fn do_output(primitive: &Vec<f64>, output_number: usize) {
     let mut bytes = Vec::new();
@@ -40,7 +36,7 @@ fn point_masses(state: OrbitalState, rate: f64, radius: f64) -> [PointMass; 2] {
     [mass0, mass1]
 }
 
-fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, Error> {
+fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, error::Error> {
     if use_omp {
         #[cfg(feature="omp")]
         {
@@ -56,11 +52,10 @@ fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, Error> {
     }
 }
 
-fn run(cmdline: CommandLine) -> Result<(), Error> {
+fn run() -> Result<(), error::Error> {
     use physics::f64::*;
 
-    println!("{:?}", cmdline);
-
+    let cmdline = cmdline::parse_command_line()?;
     let mesh = Mesh {
         ni: cmdline.resolution,
         nj: cmdline.resolution,
@@ -143,105 +138,18 @@ fn run(cmdline: CommandLine) -> Result<(), Error> {
         println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps);
     }
     do_output(&solver.primitive(), output_number);
-
     Ok(())
 }
 
-#[derive(Debug)]
-struct CommandLine {
-    use_omp: bool,
-    resolution: u64,
-    fold: u32,
-}
-
 fn main() {
-    use git_version::git_version;
-
-    let mut c = CommandLine {
-        use_omp: false,
-        resolution: 1024,
-        fold: 100,
-    };
-
-    enum State {
-        Ready,
-        GridResolution,
-        Fold,
-    }
-    let mut state = State::Ready;
-
-    for arg in std::env::args()
-        .skip(1)
-        .flat_map(|arg| arg.split("=").map(str::to_string).collect::<Vec<_>>())
-        .flat_map(|arg| {
-            if arg.starts_with("-") && !arg.starts_with("--") && arg.len() > 2 {
-                let (a, b) = arg.split_at(2);
-                vec![a.to_string(), b.to_string()]
-            } else {
-                vec![arg.to_string()]
-            }
-        })
-    {
-        match state {
-            State::Ready => match arg.as_str() {
-                "-h" | "--help" => {
-                    println!("   -h | --help           display this help message");
-                    println!("   --version             print the code version number");
-                    println!("   -p | --use-omp        run with OpenMP [OMP_NUM_THREADS]");
-                    println!("   -n | --resolution     grid resolution [1024]");
-                    println!("   -f | --fold           number of iterations between messages");
-                    return;
-                }
-                "--version" => {
-                    println!("sailfish 0.1.0 {}", git_version!());
-                    return;
-                }
-                "-p" | "--use-omp" => {
-                    c.use_omp = true;
-                }
-                "-n" | "--res" => {
-                    state = State::GridResolution;
-                }
-                "-f" | "--fold" => {
-                    state = State::Fold;
-                }
-                _ => {
-                    eprintln!("unrecognized option {}", arg);
-                    return;
-                }
-            },
-            State::GridResolution => match arg.parse() {
-                Ok(n) => {
-                    c.resolution = n;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    eprintln!("-n | --resolution {}: {}", arg, e);
-                    return;
-                }
-            },
-            State::Fold => match arg.parse() {
-                Ok(f) => {
-                    c.fold = f;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    eprintln!("-f | --fold {}: {}", arg, e);
-                    return;
-                }
-            },
-        }
-    }
-
-    if !std::matches!(state, State::Ready) {
-        eprintln!("missing argument");
-        return;
-    }
-
-    match run(c) {
-        Ok(()) => {}
+    match run() {
+        Ok(_) => {},
         Err(e) => {
-            println!("error: {:?}", e)
-        }
+            let message = format!("{}", e);
+            print!("{}", message);
+            if !message.ends_with("\n") {
+                println!()
+            }
+        }        
     }
 }
