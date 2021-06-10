@@ -7,6 +7,7 @@ pub struct CommandLine {
     pub use_omp: bool,
     pub resolution: u64,
     pub fold: u32,
+    pub precompute_flux: bool,
 }
 
 pub fn parse_command_line() -> Result<CommandLine, Error> {
@@ -14,6 +15,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         use_omp: false,
         resolution: 1024,
         fold: 100,
+        precompute_flux: false,
     };
 
     enum State {
@@ -45,13 +47,17 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -p | --use-omp        run with OpenMP [OMP_NUM_THREADS]").unwrap();
                     writeln!(message, "       -n | --resolution     grid resolution [1024]").unwrap();
                     writeln!(message, "       -f | --fold           number of iterations between messages").unwrap();
-                    return Err(Error::CommandLineInterrupt(message));
+                    writeln!(message, "       --precompute-flux     compute and store Godunov fluxes before update").unwrap();
+                    return Err(Error::PrintUserInformation(message));
                 }
                 "--version" => {
-                    return Err(Error::CommandLineInterrupt(format!("sailfish 0.1.0 {}", git_version!())));
+                    return Err(Error::PrintUserInformation(format!("sailfish 0.1.0 {}\n", git_version!())));
                 }
                 "-p" | "--use-omp" => {
                     c.use_omp = true;
+                }
+                "--precompute-flux" => {
+                    c.precompute_flux = true;
                 }
                 "-n" | "--res" => {
                     state = State::GridResolution;
@@ -60,7 +66,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     state = State::Fold;
                 }
                 _ => {
-                    return Err(Error::CommandLineInterrupt(format!("unrecognized option {}", arg)));
+                    return Err(Error::CommandLineParse(format!("unrecognized option {}", arg)));
                 }
             },
             State::GridResolution => match arg.parse() {
@@ -69,7 +75,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     state = State::Ready;
                 }
                 Err(e) => {
-                    return Err(Error::CommandLineInterrupt(format!("-n | --resolution {}: {}", arg, e)));
+                    return Err(Error::CommandLineParse(format!("-n | --resolution {}: {}", arg, e)));
                 }
             },
             State::Fold => match arg.parse() {
@@ -78,14 +84,14 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     state = State::Ready;
                 }
                 Err(e) => {
-                    return Err(Error::CommandLineInterrupt(format!("-f | --fold {}: {}", arg, e)));
+                    return Err(Error::CommandLineParse(format!("-f | --fold {}: {}", arg, e)));
                 }
             },
         }
     }
 
     if !std::matches!(state, State::Ready) {
-        return Err(Error::CommandLineInterrupt(format!("missing argument")));
+        return Err(Error::CommandLineParse(format!("missing argument")));
     }
     Ok(c)
 }

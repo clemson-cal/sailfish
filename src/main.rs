@@ -127,16 +127,20 @@ fn run() -> Result<(), error::Error> {
 
         for _ in 0..fold {
             let masses = point_masses(binary.orbital_state_from_time(time), sink_rate, sink_radius);
-            solver.compute_fluxes(eos, &masses);
+
+            if cmdline.precompute_flux {
+                solver.compute_fluxes(eos, &masses);
+            }
             solver.advance(eos, buffer, &masses, dt);
 
             time += dt;
             iteration += 1;
         }
         let seconds = start.elapsed().as_secs_f64();
-        let mzps = (mesh.ni() * mesh.nj()) as f64 / 1e6 / seconds * fold as f64;
+        let mzps = mesh.num_total_zones() as f64 / 1e6 / seconds * fold as f64;
         println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps);
     }
+
     do_output(&solver.primitive(), output_number);
     Ok(())
 }
@@ -144,12 +148,6 @@ fn run() -> Result<(), error::Error> {
 fn main() {
     match run() {
         Ok(_) => {},
-        Err(e) => {
-            let message = format!("{}", e);
-            print!("{}", message);
-            if !message.ends_with("\n") {
-                println!()
-            }
-        }        
+        Err(e) => print!("{}", e),
     }
 }

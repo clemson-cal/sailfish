@@ -168,6 +168,7 @@ struct Solver
     real *gradient_i;
     real *gradient_j;
     real *gradient_k;
+    int flux_buffers_current;
 };
 
 
@@ -414,79 +415,7 @@ static inline __device__ void buffer_source_term(
 
 // ============================ WORK FUNCTIONS ================================
 // ============================================================================
-static inline __device__ void advance_loop_body(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct BufferZone *buffer,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    real dt,
-    long i,
-    long j)
-{
-    long ni = self->mesh.ni;
-    long nj = self->mesh.nj;
-    real xc = self->mesh.x0 + (i + 0.5) * dx;
-    real yc = self->mesh.y0 + (j + 0.5) * dy;
-    real *cons = &self->conserved[NCONS * (i * nj + j)];
-    real *prim = &self->primitive[NCONS * (i * nj + j)];
-
-    if (self->flux_i != NULL && self->flux_j != NULL)
-    {
-        real *fli = self->flux_i + NCONS * ((i + 0) * (nj + 0) + j);
-        real *fri = self->flux_i + NCONS * ((i + 1) * (nj + 0) + j);
-        real *flj = self->flux_j + NCONS * (i * (nj + 1) + (j + 0));
-        real *frj = self->flux_j + NCONS * (i * (nj + 1) + (j + 1));
-
-        for (unsigned long q = 0; q < NCONS; ++q)
-        {
-            cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-        }
-    }
-    else
-    {
-        real fli[NCONS];
-        real fri[NCONS];
-        real flj[NCONS];
-        real frj[NCONS];
-
-        long il = i - (i > 0);
-        long ir = i + (i < ni - 1);
-        long jl = j - (j > 0);
-        long jr = j + (j < nj - 1);
-        
-        real xl = self->mesh.x0 + (i + 0.0) * dx;
-        real xr = self->mesh.x0 + (i + 1.0) * dx;
-        real yl = self->mesh.y0 + (j + 0.0) * dy;
-        real yr = self->mesh.y0 + (j + 1.0) * dy;
-
-        real cs2_li = sound_speed_squared(eos, xl, yc, masses, num_masses);
-        real cs2_ri = sound_speed_squared(eos, xr, yc, masses, num_masses);
-        real cs2_lj = sound_speed_squared(eos, xc, yl, masses, num_masses);
-        real cs2_rj = sound_speed_squared(eos, xc, yr, masses, num_masses);
-
-        real *pli = &self->primitive[NCONS * (il * nj + j)];
-        real *pri = &self->primitive[NCONS * (ir * nj + j)];
-        real *plj = &self->primitive[NCONS * (i * nj + jl)];
-        real *prj = &self->primitive[NCONS * (i * nj + jr)];
-
-        riemann_hlle(pli, prim, fli, cs2_li, 0);
-        riemann_hlle(prim, pri, fri, cs2_ri, 0);
-        riemann_hlle(plj, prim, flj, cs2_lj, 1);
-        riemann_hlle(prim, prj, frj, cs2_rj, 1);
-
-        for (unsigned long q = 0; q < NCONS; ++q)
-        {
-            cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-        }
-    }
-    point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
-    buffer_source_term(buffer, xc, yc, dt, cons);
-}
-
-static inline __device__ void compute_fluxes_loop_body(
+static inline __device__ void compute_fluxes_i_loop_body(
     struct Solver *self,
     struct EquationOfState *eos,
     struct PointMass *masses,
@@ -494,7 +423,8 @@ static inline __device__ void compute_fluxes_loop_body(
     real dx,
     real dy,
     long i,
-    long j)
+    long j,
+    real *flux)
 {
     long ni = self->mesh.ni;
     long nj = self->mesh.nj;
@@ -508,8 +438,23 @@ static inline __device__ void compute_fluxes_loop_body(
         real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
         real *pl = &self->primitive[NCONS * (il * nj + j)];
         real *pr = &self->primitive[NCONS * (ir * nj + j)];
-        riemann_hlle(pl, pr, self->flux_i + NCONS * (i * (nj + 0) + j), cs2, 0);
+        riemann_hlle(pl, pr, flux, cs2, 0);
     }
+}
+
+static inline __device__ void compute_fluxes_j_loop_body(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    long i,
+    long j,
+    real *flux)
+{
+    long ni = self->mesh.ni;
+    long nj = self->mesh.nj;
 
     if (i < ni && j <= nj)
     {
@@ -520,10 +465,75 @@ static inline __device__ void compute_fluxes_loop_body(
         real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
         real *pl = &self->primitive[NCONS * (i * nj + jl)];
         real *pr = &self->primitive[NCONS * (i * nj + jr)];
-        riemann_hlle(pl, pr, self->flux_j + NCONS * (i * (nj + 1) + j), cs2, 1);
+        riemann_hlle(pl, pr, flux, cs2, 1);
     }
 }
 
+static inline __device__ void advance_with_precomputed_fluxes(
+    struct Solver *self,
+    struct BufferZone *buffer,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    real dt,
+    long i,
+    long j)
+{
+    long nj = self->mesh.nj;
+    real xc = self->mesh.x0 + (i + 0.5) * dx;
+    real yc = self->mesh.y0 + (j + 0.5) * dy;
+    real *cons = &self->conserved[NCONS * (i * nj + j)];
+    real *prim = &self->primitive[NCONS * (i * nj + j)];
+
+    real *fli = self->flux_i + NCONS * ((i + 0) * (nj + 0) + j);
+    real *fri = self->flux_i + NCONS * ((i + 1) * (nj + 0) + j);
+    real *flj = self->flux_j + NCONS * (i * (nj + 1) + (j + 0));
+    real *frj = self->flux_j + NCONS * (i * (nj + 1) + (j + 1));
+
+    for (unsigned long q = 0; q < NCONS; ++q)
+    {
+        cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+    }
+    point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
+    buffer_source_term(buffer, xc, yc, dt, cons);
+}
+
+static inline __device__ void advance_no_precomputed_fluxes(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct BufferZone *buffer,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    real dt,
+    long i,
+    long j)
+{
+    long nj = self->mesh.nj;
+    real xc = self->mesh.x0 + (i + 0.5) * dx;
+    real yc = self->mesh.y0 + (j + 0.5) * dy;
+    real *cons = &self->conserved[NCONS * (i * nj + j)];
+    real *prim = &self->primitive[NCONS * (i * nj + j)];
+
+    real fli[NCONS];
+    real fri[NCONS];
+    real flj[NCONS];
+    real frj[NCONS];
+
+    compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 0, j, fli);
+    compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 1, j, fri);
+    compute_fluxes_j_loop_body(self, eos, masses, num_masses, dx, dy, i, j + 0, flj);
+    compute_fluxes_j_loop_body(self, eos, masses, num_masses, dx, dy, i, j + 1, frj);
+
+    for (unsigned long q = 0; q < NCONS; ++q)
+    {
+        cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+    }
+    point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
+    buffer_source_term(buffer, xc, yc, dt, cons);
+}
 
 
 
@@ -542,6 +552,7 @@ struct Solver* FUNC(PREFIX, solver_new)(struct Mesh mesh)
     self->gradient_i = NULL;
     self->gradient_j = NULL;
     self->gradient_k = NULL;
+    self->flux_buffers_current = 0;
     return self;
 }
 
@@ -617,13 +628,32 @@ int FUNC(PREFIX, solver_advance)(
     const real dx = (self->mesh.x1 - self->mesh.x0) / ni;
     const real dy = (self->mesh.y1 - self->mesh.y0) / nj;
 
-    #pragma omp parallel for
-    for (long i = 0; i < ni; ++i)
+    if (self->flux_buffers_current)
     {
-        for (long j = 0; j < nj; ++j)
+        if (! self->flux_i || ! self->flux_j)
         {
-            advance_loop_body(self, &eos, &buffer, masses, num_masses, dx, dy, dt, i, j);
+            return 1;
         }
+
+        #pragma omp parallel for
+        for (long i = 0; i < ni; ++i)
+        {
+            for (long j = 0; j < nj; ++j)
+            {
+                advance_with_precomputed_fluxes(self, &buffer, masses, num_masses, dx, dy, dt, i, j);
+            }
+        }        
+    }
+    else
+    {
+        #pragma omp parallel for
+        for (long i = 0; i < ni; ++i)
+        {
+            for (long j = 0; j < nj; ++j)
+            {
+                advance_no_precomputed_fluxes(self, &eos, &buffer, masses, num_masses, dx, dy, dt, i, j);
+            }
+        }        
     }
 
     #pragma omp parallel for
@@ -631,6 +661,8 @@ int FUNC(PREFIX, solver_advance)(
     {
         conserved_to_primitive(self->conserved + NCONS * n, self->primitive + NCONS * n);
     }
+
+    self->flux_buffers_current = 0;
     return 0;
 }
 
@@ -660,8 +692,11 @@ int FUNC(PREFIX, solver_compute_fluxes)(
     {
         for (long j = 0; j < nj + 1; ++j)
         {
-            compute_fluxes_loop_body(self, &eos, masses, num_masses, dx, dy, i, j);
+            compute_fluxes_i_loop_body(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_i + NCONS * (i * (nj + 0) + j));
+            compute_fluxes_j_loop_body(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_j + NCONS * (i * (nj + 1) + j));
         }
     }
+
+    self->flux_buffers_current = 1;
     return 0;
 }
