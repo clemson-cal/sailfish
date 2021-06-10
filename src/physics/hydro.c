@@ -228,6 +228,8 @@ static __device__ void point_mass_source_term(
     {
         sink_rate = mass->rate * exponential(-power(dr / rs, 4.0));
     }
+
+    // NOTE: This is a force-free sink.
     delta_cons[0] = dt * sigma * sink_rate * -1.0;
     delta_cons[1] = dt * fx;
     delta_cons[2] = dt * fy;
@@ -348,7 +350,7 @@ static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, 
     }
 }
 
-static inline __device__ real sound_speed_squared(
+static __device__ real sound_speed_squared(
     struct EquationOfState *eos,
     real x,
     real y,
@@ -367,7 +369,7 @@ static inline __device__ real sound_speed_squared(
     return 0.0;
 }
 
-static inline __device__ void buffer_source_term(
+static __device__ void buffer_source_term(
     struct BufferZone *buffer,
     real xc,
     real yc,
