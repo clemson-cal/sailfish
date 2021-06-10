@@ -486,7 +486,7 @@ static inline __device__ void advance_loop_body(
     buffer_source_term(buffer, xc, yc, dt, cons);
 }
 
-static inline __device__ void compute_fluxes_i_loop_body(
+static inline __device__ void compute_fluxes_loop_body(
     struct Solver *self,
     struct EquationOfState *eos,
     struct PointMass *masses,
@@ -496,36 +496,32 @@ static inline __device__ void compute_fluxes_i_loop_body(
     long i,
     long j)
 {
+    long ni = self->mesh.ni;
     long nj = self->mesh.nj;
-    long il = i - (i > 0);
-    long ir = i;
-    real x = self->mesh.x0 + (i + 0.0) * dx;
-    real y = self->mesh.y0 + (j + 0.5) * dy;
-    real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
-    real *pl = &self->primitive[NCONS * (il * nj + j)];
-    real *pr = &self->primitive[NCONS * (ir * nj + j)];
-    riemann_hlle(pl, pr, self->flux_i + NCONS * (i * (nj + 0) + j), cs2, 0);
-}
 
-static inline __device__ void compute_fluxes_j_loop_body(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    long i,
-    long j)
-{
-    long nj = self->mesh.nj;
-    long jl = j - (j > 0);
-    long jr = j;
-    real x = self->mesh.x0 + (i + 0.5) * dx;
-    real y = self->mesh.y0 + (j + 0.0) * dy;
-    real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
-    real *pl = &self->primitive[NCONS * (i * nj + jl)];
-    real *pr = &self->primitive[NCONS * (i * nj + jr)];
-    riemann_hlle(pl, pr, self->flux_j + NCONS * (i * (nj + 1) + j), cs2, 1);
+    if (i <= ni && j < nj)
+    {
+        long il = i - (i > 0);
+        long ir = i;
+        real x = self->mesh.x0 + (i + 0.0) * dx;
+        real y = self->mesh.y0 + (j + 0.5) * dy;
+        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
+        real *pl = &self->primitive[NCONS * (il * nj + j)];
+        real *pr = &self->primitive[NCONS * (ir * nj + j)];
+        riemann_hlle(pl, pr, self->flux_i + NCONS * (i * (nj + 0) + j), cs2, 0);
+    }
+
+    if (i < ni && j <= nj)
+    {
+        long jl = j - (j > 0);
+        long jr = j;
+        real x = self->mesh.x0 + (i + 0.5) * dx;
+        real y = self->mesh.y0 + (j + 0.0) * dy;
+        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
+        real *pl = &self->primitive[NCONS * (i * nj + jl)];
+        real *pr = &self->primitive[NCONS * (i * nj + jr)];
+        riemann_hlle(pl, pr, self->flux_j + NCONS * (i * (nj + 1) + j), cs2, 1);
+    }
 }
 
 
@@ -662,18 +658,9 @@ int FUNC(PREFIX, solver_compute_fluxes)(
     #pragma omp parallel for
     for (long i = 0; i < ni + 1; ++i)
     {
-        for (long j = 0; j < nj; ++j)
-        {
-            compute_fluxes_i_loop_body(self, &eos, masses, num_masses, dx, dy, i, j);
-        }
-    }
-
-    #pragma omp parallel for
-    for (long i = 0; i < ni; ++i)
-    {
         for (long j = 0; j < nj + 1; ++j)
         {
-            compute_fluxes_j_loop_body(self, &eos, masses, num_masses, dx, dy, i, j);
+            compute_fluxes_loop_body(self, &eos, masses, num_masses, dx, dy, i, j);
         }
     }
     return 0;
