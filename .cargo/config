@@ -1,6 +1,0 @@
-[target.'cfg(target_arch = "linux")']
-[build]
-rustflags = ["-C", "link-args=-fopenmp"]
-
-[target.'cfg(not(target_arch = "linux"))']
-rustflags = ["-C", "link-args=-lomp"]
