@@ -6,7 +6,10 @@ use std::fmt::Write;
 pub struct CommandLine {
     pub use_omp: bool,
     pub resolution: u64,
-    pub fold: u32,
+    pub fold: usize,
+    pub checkpoint_interval: f64,
+    pub end_time: f64,
+    pub cfl_number: f64,
     pub precompute_flux: bool,
 }
 
@@ -15,6 +18,9 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         use_omp: false,
         resolution: 1024,
         fold: 100,
+        checkpoint_interval: 1.0,
+        end_time: 1.0,
+        cfl_number: 0.2,
         precompute_flux: false,
     };
 
@@ -22,6 +28,9 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Ready,
         GridResolution,
         Fold,
+        Checkpoint,
+        EndTime,
+        CFL,
     }
     let mut state = State::Ready;
 
@@ -39,6 +48,9 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
     {
         match state {
             State::Ready => match arg.as_str() {
+                "--version" => {
+                    return Err(Error::PrintUserInformation(format!("sailfish 0.1.0 {}\n", git_version!())));
+                }
                 "-h" | "--help" => {
                     let mut message = String::new();
                     writeln!(message, "usage: sailfish [--version] [--help] <[options]>").unwrap();
@@ -47,44 +59,64 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -p | --use-omp        run with OpenMP [OMP_NUM_THREADS]").unwrap();
                     writeln!(message, "       -n | --resolution     grid resolution [1024]").unwrap();
                     writeln!(message, "       -f | --fold           number of iterations between messages").unwrap();
+                    writeln!(message, "       -c | --checkpoint     amount of time between writing checkpoints").unwrap();
+                    writeln!(message, "       -e | --end-time       simulation end time").unwrap();
+                    writeln!(message, "       --cfl                 CFL number").unwrap();
                     writeln!(message, "       --precompute-flux     compute and store Godunov fluxes before update").unwrap();
                     return Err(Error::PrintUserInformation(message));
                 }
-                "--version" => {
-                    return Err(Error::PrintUserInformation(format!("sailfish 0.1.0 {}\n", git_version!())));
-                }
-                "-p" | "--use-omp" => {
-                    c.use_omp = true;
-                }
-                "--precompute-flux" => {
-                    c.precompute_flux = true;
-                }
-                "-n" | "--res" => {
-                    state = State::GridResolution;
-                }
-                "-f" | "--fold" => {
-                    state = State::Fold;
-                }
-                _ => {
-                    return Err(Error::CommandLineParse(format!("unrecognized option {}", arg)));
-                }
+                "-p" | "--use-omp" => c.use_omp = true,
+                "-n" | "--res" => state = State::GridResolution,
+                "-f" | "--fold" => state = State::Fold,
+                "-c" | "--checkpoint" => state = State::Checkpoint,
+                "-e" | "--end-time" => state = State::EndTime,
+                "--cfl" => state = State::CFL,
+                "--precompute-flux" =>  c.precompute_flux = true,
+                _ => return Err(Error::CommandLineParse(format!("unrecognized option {}", arg))),
             },
             State::GridResolution => match arg.parse() {
-                Ok(n) => {
-                    c.resolution = n;
+                Ok(x) => {
+                    c.resolution = x;
                     state = State::Ready;
                 }
                 Err(e) => {
-                    return Err(Error::CommandLineParse(format!("-n | --resolution {}: {}", arg, e)));
+                    return Err(Error::CommandLineParse(format!("resolution {}: {}", arg, e)));
                 }
             },
             State::Fold => match arg.parse() {
-                Ok(f) => {
-                    c.fold = f;
+                Ok(x) => {
+                    c.fold = x;
                     state = State::Ready;
                 }
                 Err(e) => {
-                    return Err(Error::CommandLineParse(format!("-f | --fold {}: {}", arg, e)));
+                    return Err(Error::CommandLineParse(format!("fold {}: {}", arg, e)));
+                }
+            },
+            State::Checkpoint => match arg.parse() {
+                Ok(x) => {
+                    c.checkpoint_interval = x;
+                    state = State::Ready;
+                }
+                Err(e) => {
+                    return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
+                }
+            },
+            State::EndTime => match arg.parse() {
+                Ok(x) => {
+                    c.cfl_number = x;
+                    state = State::Ready;
+                }
+                Err(e) => {
+                    return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
+                }
+            },
+            State::CFL => match arg.parse() {
+                Ok(x) => {
+                    c.cfl_number = x;
+                    state = State::Ready;
+                }
+                Err(e) => {
+                    return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
                 }
             },
         }

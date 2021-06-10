@@ -52,6 +52,12 @@ fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, error::Erro
     }
 }
 
+fn time_exec<F>(mut f: F) -> std::time::Duration where F: FnMut() {
+    let start = std::time::Instant::now();
+    f();
+    start.elapsed()
+}
+
 fn run() -> Result<(), error::Error> {
     use physics::f64::*;
 
@@ -100,15 +106,15 @@ fn run() -> Result<(), error::Error> {
     let mut iteration = 0;
     let mut output_number = 0;
     let mut next_output_time = time;
-    let output_cadence = 1.0;
+    let mut mzps_log = Vec::new();
+
+    let checkpoint_interval = cmdline.checkpoint_interval;
     let v_max = 1.0 / sink_radius.sqrt();
-    let cfl = 0.2;
+    let cfl = cmdline.checkpoint_interval;
     let dt = mesh.dx().min(mesh.dy()) / v_max * cfl;
     let fold = cmdline.fold;
 
     let eos = EquationOfState::LocallyIsothermal { mach_number: 10.0 };
-    // let eos = EquationOfState::Isothermal { sound_speed: 0.01 };
-    // let buffer = BufferZone::None;
     let buffer = BufferZone::Keplerian {
         central_mass: 1.0,
         surface_density: 1.0,
@@ -117,31 +123,32 @@ fn run() -> Result<(), error::Error> {
         onset_width: 1.0,
     };
 
-    while time < 600.0 {
+    while time < cmdline.end_time {
         if time >= next_output_time {
             do_output(&solver.primitive(), output_number);
             output_number += 1;
-            next_output_time += output_cadence;
+            next_output_time += checkpoint_interval;
         }
-        let start = std::time::Instant::now();
 
-        for _ in 0..fold {
-            let masses = point_masses(binary.orbital_state_from_time(time), sink_rate, sink_radius);
+        let elapsed = time_exec(|| {
+            for _ in 0..fold {
+                let masses = point_masses(binary.orbital_state_from_time(time), sink_rate, sink_radius);
 
-            if cmdline.precompute_flux {
-                solver.compute_fluxes(eos, &masses);
+                if cmdline.precompute_flux {
+                    solver.compute_fluxes(eos, &masses);
+                }
+                solver.advance(eos, buffer, &masses, dt);
+
+                time += dt;
+                iteration += 1;
             }
-            solver.advance(eos, buffer, &masses, dt);
-
-            time += dt;
-            iteration += 1;
-        }
-        let seconds = start.elapsed().as_secs_f64();
-        let mzps = mesh.num_total_zones() as f64 / 1e6 / seconds * fold as f64;
-        println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps);
+        });
+        mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
+        println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps_log.last().unwrap());
     }
-
     do_output(&solver.primitive(), output_number);
+
+    println!("average perf: {:.3} Mzps", mzps_log.iter().fold(0.0, |a, b| a + b) / mzps_log.len() as f64);
     Ok(())
 }
 
