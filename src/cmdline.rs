@@ -103,7 +103,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
             },
             State::EndTime => match arg.parse() {
                 Ok(x) => {
-                    c.cfl_number = x;
+                    c.end_time = x;
                     state = State::Ready;
                 }
                 Err(e) => {

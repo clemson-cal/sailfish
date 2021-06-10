@@ -110,9 +110,9 @@ fn run() -> Result<(), error::Error> {
 
     let checkpoint_interval = cmdline.checkpoint_interval;
     let v_max = 1.0 / sink_radius.sqrt();
-    let cfl = cmdline.checkpoint_interval;
-    let dt = mesh.dx().min(mesh.dy()) / v_max * cfl;
+    let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
+    let dt = mesh.dx().min(mesh.dy()) / v_max * cfl;
 
     let eos = EquationOfState::LocallyIsothermal { mach_number: 10.0 };
     let buffer = BufferZone::Keplerian {
