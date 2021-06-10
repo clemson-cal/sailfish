@@ -13,12 +13,6 @@ fn main() {
 
     #[cfg(feature="omp")]
     {
-        #[cfg(target_os="linux")]
-        println!("cargo:rustc-link-lib=gomp");
-
-        #[cfg(target_os="macos")]
-        println!("cargo:rustc-link-lib=omp");
-
         cc::Build::new()
             .file("src/physics/hydro.c")
             .flag("-Xpreprocessor")

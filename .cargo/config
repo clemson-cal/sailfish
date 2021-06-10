@@ -1,0 +1,8 @@
+# Note: we cannot forego linking against OpenMP when it's disabled, because
+# cfg(feature = "...") is ignored in this file. If there is ever a way to
+# specify -fopenmp in the build script, it could be optionally emitted there
+# since features are resolved by the time the buidl script runs. However
+# cargo:rustc-flags only allows options that start with -l, and the more
+# general cargo:rustc-cfg chokes on ["-C", "link-args=-fopenmp"].
+target.'cfg(target_os = "linux")'.rustflags = ["-C", "link-args=-fopenmp"]
+target.'cfg(target_os = "macos")'.rustflags = ["-C", "link-args=-lomp"]
