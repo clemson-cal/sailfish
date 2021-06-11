@@ -434,7 +434,7 @@ static inline __device__ void compute_fluxes_i_loop_body(
     if (i <= ni && j < nj)
     {
         long il = i - (i > 0);
-        long ir = i;
+        long ir = i - (i == ni);
         real x = self->mesh.x0 + (i + 0.0) * dx;
         real y = self->mesh.y0 + (j + 0.5) * dy;
         real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
@@ -461,7 +461,7 @@ static inline __device__ void compute_fluxes_j_loop_body(
     if (i < ni && j <= nj)
     {
         long jl = j - (j > 0);
-        long jr = j;
+        long jr = j - (j == nj);
         real x = self->mesh.x0 + (i + 0.5) * dx;
         real y = self->mesh.y0 + (j + 0.0) * dy;
         real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
