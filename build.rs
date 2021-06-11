@@ -2,13 +2,11 @@ fn main() {
     cc::Build::new()
         .file("src/physics/hydro.c")
         .define("SINGLE", None)
-        .flag("-Wno-unknown-pragmas")
         .compile("physics_cpu_f32");
 
     cc::Build::new()
         .file("src/physics/hydro.c")
         .define("DOUBLE", None)
-        .flag("-Wno-unknown-pragmas")
         .compile("physics_cpu_f64");
 
     #[cfg(feature="omp")]
@@ -26,5 +24,16 @@ fn main() {
             .flag("-fopenmp")
             .define("DOUBLE", None)
             .compile("physics_omp_f64");
-        }
+    }
+
+    #[cfg(feature="cuda")]
+    {
+        cc::Build::new()
+            .file("src/physics/hydro.cu")
+            .cuda(true)
+            .compile("test");
+
+        println!("cargo:rustc-link-lib=cudart");
+        println!("cargo:rustc-link-lib=cuda");        
+    }
 }

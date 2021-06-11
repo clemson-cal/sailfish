@@ -176,7 +176,7 @@ struct Solver
 
 // ============================ GRAVITY =======================================
 // ============================================================================
-static __device__ real gravitational_potential(
+static __device__ __host__ real gravitational_potential(
     const struct PointMass *masses,
     unsigned long num_masses,
     real x1,
@@ -201,7 +201,7 @@ static __device__ real gravitational_potential(
     return phi;
 }
 
-static __device__ void point_mass_source_term(
+static __device__ __host__ void point_mass_source_term(
     struct PointMass *mass,
     real x1,
     real y1,
@@ -235,7 +235,7 @@ static __device__ void point_mass_source_term(
     delta_cons[2] = dt * fy;
 }
 
-static __device__ void point_masses_source_term(
+static __device__ __host__ void point_masses_source_term(
     struct PointMass* masses,
     unsigned long num_masses,
     real x1,
@@ -261,7 +261,7 @@ static __device__ void point_masses_source_term(
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __device__ void conserved_to_primitive(const real *cons, real *prim)
+static __device__ __host__ void conserved_to_primitive(const real *cons, real *prim)
 {
     const real rho = cons[0];
     const real px = cons[1];
@@ -274,7 +274,7 @@ static __device__ void conserved_to_primitive(const real *cons, real *prim)
     prim[2] = vy;
 }
 
-static __device__ void primitive_to_conserved(const real *prim, real *cons)
+static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons)
 {
     const real rho = prim[0];
     const real vx = prim[1];
@@ -287,7 +287,7 @@ static __device__ void primitive_to_conserved(const real *prim, real *cons)
     cons[2] = py;
 }
 
-static __device__ real primitive_to_velocity(const real *prim, int direction)
+static __device__ __host__ real primitive_to_velocity(const real *prim, int direction)
 {
     switch (direction)
     {
@@ -297,7 +297,7 @@ static __device__ real primitive_to_velocity(const real *prim, int direction)
     }
 }
 
-static __device__ void primitive_to_flux(
+static __device__ __host__ void primitive_to_flux(
     const real *prim,
     const real *cons,
     real *flux,
@@ -313,7 +313,7 @@ static __device__ void primitive_to_flux(
     flux[2] = vn * cons[2] + pressure * (direction == 1);
 }
 
-static __device__ void primitive_to_outer_wavespeeds(
+static __device__ __host__ void primitive_to_outer_wavespeeds(
     const real *prim,
     real *wavespeeds,
     real cs2,
@@ -325,7 +325,7 @@ static __device__ void primitive_to_outer_wavespeeds(
     wavespeeds[1] = vn + cs;
 }
 
-static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
+static __device__ __host__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
 {
     real ul[NCONS];
     real ur[NCONS];
@@ -350,7 +350,7 @@ static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, 
     }
 }
 
-static __device__ real sound_speed_squared(
+static __device__ __host__ real sound_speed_squared(
     struct EquationOfState *eos,
     real x,
     real y,
@@ -369,7 +369,7 @@ static __device__ real sound_speed_squared(
     return 0.0;
 }
 
-static __device__ void buffer_source_term(
+static __device__ __host__ void buffer_source_term(
     struct BufferZone *buffer,
     real xc,
     real yc,
@@ -417,7 +417,7 @@ static __device__ void buffer_source_term(
 
 // ============================ WORK FUNCTIONS ================================
 // ============================================================================
-static inline __device__ void compute_fluxes_i_loop_body(
+static inline __device__ __host__ void compute_fluxes_i_loop_body(
     struct Solver *self,
     struct EquationOfState *eos,
     struct PointMass *masses,
@@ -444,7 +444,7 @@ static inline __device__ void compute_fluxes_i_loop_body(
     }
 }
 
-static inline __device__ void compute_fluxes_j_loop_body(
+static inline __device__ __host__ void compute_fluxes_j_loop_body(
     struct Solver *self,
     struct EquationOfState *eos,
     struct PointMass *masses,
@@ -471,7 +471,7 @@ static inline __device__ void compute_fluxes_j_loop_body(
     }
 }
 
-static inline __device__ void advance_with_precomputed_fluxes(
+static inline __device__ __host__ void advance_with_precomputed_fluxes(
     struct Solver *self,
     struct BufferZone *buffer,
     struct PointMass *masses,
@@ -501,7 +501,23 @@ static inline __device__ void advance_with_precomputed_fluxes(
     buffer_source_term(buffer, xc, yc, dt, cons);
 }
 
-static inline __device__ void advance_no_precomputed_fluxes(
+#ifdef __NVCC__
+static __global__ void advance_with_precomputed_fluxes_kernel(
+    struct Solver *self,
+    struct BufferZone *buffer,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    real dt)
+{
+    long i = blockIdx.x * blockDim.x + threadIdx.x;
+    long j = blockIdx.y * blockDim.y + threadIdx.y;
+    advance_with_precomputed_fluxes(self, buffer, masses, num_masses, dx, dy, dt, i, j);
+}
+#endif
+
+static inline __device__ __host__ void advance_no_precomputed_fluxes(
     struct Solver *self,
     struct EquationOfState *eos,
     struct BufferZone *buffer,
@@ -519,10 +535,10 @@ static inline __device__ void advance_no_precomputed_fluxes(
     real *cons = &self->conserved[NCONS * (i * nj + j)];
     real *prim = &self->primitive[NCONS * (i * nj + j)];
 
-    real fli[NCONS];
-    real fri[NCONS];
-    real flj[NCONS];
-    real frj[NCONS];
+    real fli[NCONS] = {0.0, 0.0, 0.0};
+    real fri[NCONS] = {0.0, 0.0, 0.0};
+    real flj[NCONS] = {0.0, 0.0, 0.0};
+    real frj[NCONS] = {0.0, 0.0, 0.0};
 
     compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 0, j, fli);
     compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 1, j, fri);
@@ -536,6 +552,7 @@ static inline __device__ void advance_no_precomputed_fluxes(
     point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
     buffer_source_term(buffer, xc, yc, dt, cons);
 }
+
 
 
 
@@ -636,29 +653,40 @@ int FUNC(PREFIX, solver_advance)(
         {
             return 1;
         }
-
+        #ifdef __NVCC__
+        dim3 bs = dim3(8, 8);
+        dim3 bd = dim3(ni / bs.x, nj / bs.y);
+        advance_with_precomputed_fluxes_kernel<<<bd, bs>>>(self, &buffer, masses, num_masses, dx, dy, dt);
+        #else
+        #ifdef _OPENMP
         #pragma omp parallel for
+        #endif
         for (long i = 0; i < ni; ++i)
         {
             for (long j = 0; j < nj; ++j)
             {
                 advance_with_precomputed_fluxes(self, &buffer, masses, num_masses, dx, dy, dt, i, j);
             }
-        }        
+        }
+        #endif
     }
     else
     {
+        #ifdef _OPENMP
         #pragma omp parallel for
+        #endif
         for (long i = 0; i < ni; ++i)
         {
             for (long j = 0; j < nj; ++j)
             {
                 advance_no_precomputed_fluxes(self, &eos, &buffer, masses, num_masses, dx, dy, dt, i, j);
             }
-        }        
+        }
     }
 
+    #ifdef _OPENMP
     #pragma omp parallel for
+    #endif
     for (long n = 0; n < ni * nj; ++n)
     {
         conserved_to_primitive(self->conserved + NCONS * n, self->primitive + NCONS * n);
@@ -689,7 +717,9 @@ int FUNC(PREFIX, solver_compute_fluxes)(
         self->flux_j = (real*) compute_malloc(ni * (nj + 1) * NCONS * sizeof(real));
     }
 
+    #ifdef _OPENMP
     #pragma omp parallel for
+    #endif
     for (long i = 0; i < ni + 1; ++i)
     {
         for (long j = 0; j < nj + 1; ++j)
