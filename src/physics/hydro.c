@@ -471,7 +471,33 @@ static inline __device__ __host__ void compute_fluxes_j_loop_body(
     }
 }
 
-static inline __device__ __host__ void advance_with_precomputed_fluxes(
+#ifdef __NVCC__
+static __global__ void compute_fluxes_loop_body_kernel(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy)
+{
+    long nj = self->mesh.nj;
+    long i = blockIdx.x * blockDim.x + threadIdx.x;
+    long j = blockIdx.y * blockDim.y + threadIdx.y;
+    real *fi = self->flux_i + NCONS * (i * (nj + 0) + j);
+    real *fj = self->flux_j + NCONS * (i * (nj + 1) + j);
+
+    if (i <= self->mesh.ni && j < self->mesh.nj)
+    {
+        compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i, j, fi);
+    }
+    if (i < self->mesh.ni && j <= self->mesh.nj)
+    {
+        compute_fluxes_j_loop_body(self, eos, masses, num_masses, dx, dy, i, j, fj);
+    }
+}
+#endif
+
+static inline __device__ __host__ void advance_with_precomputed_fluxes_and_update_prim(
     struct Solver *self,
     struct BufferZone *buffer,
     struct PointMass *masses,
@@ -499,10 +525,11 @@ static inline __device__ __host__ void advance_with_precomputed_fluxes(
     }
     point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
     buffer_source_term(buffer, xc, yc, dt, cons);
+    conserved_to_primitive(cons, prim);
 }
 
 #ifdef __NVCC__
-static __global__ void advance_with_precomputed_fluxes_kernel(
+static __global__ void advance_with_precomputed_fluxes_and_update_prim_kernel(
     struct Solver *self,
     struct BufferZone *buffer,
     struct PointMass *masses,
@@ -513,7 +540,11 @@ static __global__ void advance_with_precomputed_fluxes_kernel(
 {
     long i = blockIdx.x * blockDim.x + threadIdx.x;
     long j = blockIdx.y * blockDim.y + threadIdx.y;
-    advance_with_precomputed_fluxes(self, buffer, masses, num_masses, dx, dy, dt, i, j);
+
+    if (i < self->mesh.ni && j < self->mesh.nj)
+    {
+        advance_with_precomputed_fluxes_and_update_prim(self, buffer, masses, num_masses, dx, dy, dt, i, j);
+    }
 }
 #endif
 
@@ -552,6 +583,33 @@ static inline __device__ __host__ void advance_no_precomputed_fluxes(
     point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
     buffer_source_term(buffer, xc, yc, dt, cons);
 }
+
+#ifdef __NVCC__
+static __global__ void advance_no_precomputed_fluxes_and_update_prim_kernel(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct BufferZone *buffer,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    real dt)
+{
+    long i = blockIdx.x * blockDim.x + threadIdx.x;
+    long j = blockIdx.y * blockDim.y + threadIdx.y;
+
+    if (i < self->mesh.ni || j < self->mesh.nj)
+    {
+        advance_no_precomputed_fluxes(self, eos, buffer, masses, num_masses, dx, dy, dt, i, j);
+        __syncthreads();
+
+        long nj = self->mesh.nj;
+        real *cons = &self->conserved[NCONS * (i * nj + j)];
+        real *prim = &self->primitive[NCONS * (i * nj + j)];
+        conserved_to_primitive(cons, prim);
+    }
+}
+#endif
 
 
 
@@ -649,15 +707,12 @@ int FUNC(PREFIX, solver_advance)(
 
     if (self->flux_buffers_current)
     {
-        if (! self->flux_i || ! self->flux_j)
-        {
-            return 1;
-        }
         #ifdef __NVCC__
         dim3 bs = dim3(8, 8);
-        dim3 bd = dim3(ni / bs.x, nj / bs.y);
-        advance_with_precomputed_fluxes_kernel<<<bd, bs>>>(self, &buffer, masses, num_masses, dx, dy, dt);
+        dim3 bd = dim3((ni + bs.x - 1) / bs.x, (nj + bs.y - 1) / bs.y);
+        advance_with_precomputed_fluxes_and_update_prim_kernel<<<bd, bs>>>(self, &buffer, masses, num_masses, dx, dy, dt);
         #else
+
         #ifdef _OPENMP
         #pragma omp parallel for
         #endif
@@ -665,13 +720,19 @@ int FUNC(PREFIX, solver_advance)(
         {
             for (long j = 0; j < nj; ++j)
             {
-                advance_with_precomputed_fluxes(self, &buffer, masses, num_masses, dx, dy, dt, i, j);
+                advance_with_precomputed_fluxes_and_update_prim(self, &buffer, masses, num_masses, dx, dy, dt, i, j);
             }
         }
         #endif
     }
     else
     {
+        #ifdef __NVCC__
+        dim3 bs = dim3(8, 8);
+        dim3 bd = dim3((ni + bs.x - 1) / bs.x, (nj + bs.y - 1) / bs.y);
+        advance_no_precomputed_fluxes_and_update_prim_kernel<<<bd, bs>>>(self, &eos, &buffer, masses, num_masses, dx, dy, dt);
+        #else
+
         #ifdef _OPENMP
         #pragma omp parallel for
         #endif
@@ -682,14 +743,15 @@ int FUNC(PREFIX, solver_advance)(
                 advance_no_precomputed_fluxes(self, &eos, &buffer, masses, num_masses, dx, dy, dt, i, j);
             }
         }
-    }
 
-    #ifdef _OPENMP
-    #pragma omp parallel for
-    #endif
-    for (long n = 0; n < ni * nj; ++n)
-    {
-        conserved_to_primitive(self->conserved + NCONS * n, self->primitive + NCONS * n);
+        #ifdef _OPENMP
+        #pragma omp parallel for
+        #endif
+        for (long n = 0; n < ni * nj; ++n)
+        {
+            conserved_to_primitive(self->conserved + NCONS * n, self->primitive + NCONS * n);
+        }
+        #endif
     }
 
     self->flux_buffers_current = 0;
@@ -717,6 +779,12 @@ int FUNC(PREFIX, solver_compute_fluxes)(
         self->flux_j = (real*) compute_malloc(ni * (nj + 1) * NCONS * sizeof(real));
     }
 
+    #ifdef __NVCC__
+    dim3 bs = dim3(8, 8);
+    dim3 bd = dim3((ni + bs.x) / bs.x, (nj + bs.y) / bs.y);
+    compute_fluxes_loop_body_kernel<<<bd, bs>>>(self, &eos, masses, num_masses, dx, dy);
+    #else
+
     #ifdef _OPENMP
     #pragma omp parallel for
     #endif
@@ -728,6 +796,7 @@ int FUNC(PREFIX, solver_compute_fluxes)(
             compute_fluxes_j_loop_body(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_j + NCONS * (i * (nj + 1) + j));
         }
     }
+    #endif
 
     self->flux_buffers_current = 1;
     return 0;

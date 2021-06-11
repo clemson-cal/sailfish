@@ -249,7 +249,7 @@ pub mod f32 {
         }
     }
 
-    #[cfg(feature="omp")]
+    #[cfg(feature = "omp")]
     pub mod iso2d_omp {
         c_api! {
             f32,
@@ -263,7 +263,7 @@ pub mod f32 {
         }
     }
 
-    #[cfg(feature="cuda")]
+    #[cfg(feature = "cuda")]
     pub mod iso2d_cuda {
         c_api! {
             f32,
@@ -298,7 +298,7 @@ pub mod f64 {
         }
     }
 
-    #[cfg(feature="omp")]
+    #[cfg(feature = "omp")]
     pub mod iso2d_omp {
         c_api! {
             f64,
@@ -312,10 +312,10 @@ pub mod f64 {
         }
     }
 
-    #[cfg(feature="cuda")]
+    #[cfg(feature = "cuda")]
     pub mod iso2d_cuda {
         c_api! {
-            f32,
+            f64,
             "iso2d_cuda_f64_solver_new",
             "iso2d_cuda_f64_solver_del",
             "iso2d_cuda_f64_solver_get_primitive",
