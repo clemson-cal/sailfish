@@ -55,21 +55,21 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     let mut message = String::new();
                     writeln!(message, "usage: sailfish [--version] [--help] <[options]>").unwrap();
                     writeln!(message, "       --version             print the code version number").unwrap();
-                    writeln!(message, "       -h | --help           display this help message").unwrap();
-                    writeln!(message, "       -p | --use-omp        run with OpenMP [OMP_NUM_THREADS]").unwrap();
-                    writeln!(message, "       -n | --resolution     grid resolution [1024]").unwrap();
-                    writeln!(message, "       -f | --fold           number of iterations between messages").unwrap();
-                    writeln!(message, "       -c | --checkpoint     amount of time between writing checkpoints").unwrap();
-                    writeln!(message, "       -e | --end-time       simulation end time").unwrap();
+                    writeln!(message, "       -h|--help           display this help message").unwrap();
+                    writeln!(message, "       -p|--use-omp        run with OpenMP [OMP_NUM_THREADS]").unwrap();
+                    writeln!(message, "       -n|--resolution     grid resolution [1024]").unwrap();
+                    writeln!(message, "       -f|--fold           number of iterations between messages").unwrap();
+                    writeln!(message, "       -c|--checkpoint     amount of time between writing checkpoints").unwrap();
+                    writeln!(message, "       -e|--end-time       simulation end time").unwrap();
                     writeln!(message, "       --cfl                 CFL number").unwrap();
                     writeln!(message, "       --precompute-flux     compute and store Godunov fluxes before update").unwrap();
                     return Err(Error::PrintUserInformation(message));
                 }
-                "-p" | "--use-omp" => c.use_omp = true,
-                "-n" | "--res" => state = State::GridResolution,
-                "-f" | "--fold" => state = State::Fold,
-                "-c" | "--checkpoint" => state = State::Checkpoint,
-                "-e" | "--end-time" => state = State::EndTime,
+                "-p"|"--use-omp" => c.use_omp = true,
+                "-n"|"--res" => state = State::GridResolution,
+                "-f"|"--fold" => state = State::Fold,
+                "-c"|"--checkpoint" => state = State::Checkpoint,
+                "-e"|"--end-time" => state = State::EndTime,
                 "--cfl" => state = State::CFL,
                 "--precompute-flux" =>  c.precompute_flux = true,
                 _ => return Err(Error::CommandLineParse(format!("unrecognized option {}", arg))),
