@@ -535,10 +535,10 @@ static inline __device__ __host__ void advance_no_precomputed_fluxes(
     real *cons = &self->conserved[NCONS * (i * nj + j)];
     real *prim = &self->primitive[NCONS * (i * nj + j)];
 
-    real fli[NCONS] = {0.0, 0.0, 0.0};
-    real fri[NCONS] = {0.0, 0.0, 0.0};
-    real flj[NCONS] = {0.0, 0.0, 0.0};
-    real frj[NCONS] = {0.0, 0.0, 0.0};
+    real fli[NCONS];
+    real fri[NCONS];
+    real flj[NCONS];
+    real frj[NCONS];
 
     compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 0, j, fli);
     compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 1, j, fri);

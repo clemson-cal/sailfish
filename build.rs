@@ -9,7 +9,7 @@ fn main() {
         .define("DOUBLE", None)
         .compile("physics_cpu_f64");
 
-    #[cfg(feature="omp")]
+    #[cfg(feature = "omp")]
     {
         cc::Build::new()
             .file("src/physics/hydro.c")
@@ -26,7 +26,7 @@ fn main() {
             .compile("physics_omp_f64");
     }
 
-    #[cfg(feature="cuda")]
+    #[cfg(feature = "cuda")]
     {
         cc::Build::new()
             .file("src/physics/hydro.cu")

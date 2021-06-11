@@ -262,6 +262,20 @@ pub mod f32 {
             "iso2d_omp_f32_solver_advance"
         }
     }
+
+    #[cfg(feature="cuda")]
+    pub mod iso2d_cuda {
+        c_api! {
+            f32,
+            "iso2d_cuda_f32_solver_new",
+            "iso2d_cuda_f32_solver_del",
+            "iso2d_cuda_f32_solver_get_primitive",
+            "iso2d_cuda_f32_solver_set_primitive",
+            "iso2d_cuda_f32_solver_get_mesh",
+            "iso2d_cuda_f32_solver_compute_fluxes",
+            "iso2d_cuda_f32_solver_advance"
+        }
+    }
 }
 
 pub mod f64 {
@@ -295,6 +309,20 @@ pub mod f64 {
             "iso2d_omp_f64_solver_get_mesh",
             "iso2d_omp_f64_solver_compute_fluxes",
             "iso2d_omp_f64_solver_advance"
+        }
+    }
+
+    #[cfg(feature="cuda")]
+    pub mod iso2d_cuda {
+        c_api! {
+            f32,
+            "iso2d_cuda_f64_solver_new",
+            "iso2d_cuda_f64_solver_del",
+            "iso2d_cuda_f64_solver_get_primitive",
+            "iso2d_cuda_f64_solver_set_primitive",
+            "iso2d_cuda_f64_solver_get_mesh",
+            "iso2d_cuda_f64_solver_compute_fluxes",
+            "iso2d_cuda_f64_solver_advance"
         }
     }
 }

@@ -38,12 +38,11 @@ fn point_masses(state: OrbitalState, rate: f64, radius: f64) -> [PointMass; 2] {
 
 fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, error::Error> {
     if use_omp {
-        #[cfg(feature="omp")]
+        #[cfg(feature = "omp")]
         {
             Ok(Box::new(iso2d_omp::Solver::new(mesh)))
         }
-
-        #[cfg(not(feature="omp"))]
+        #[cfg(not(feature = "omp"))]
         {
             Err(error::Error::CompiledWithoutOpenMP)
         }
@@ -60,6 +59,9 @@ fn time_exec<F>(mut f: F) -> std::time::Duration where F: FnMut() {
 
 fn run() -> Result<(), error::Error> {
     use physics::f64::*;
+
+    println!("omp enabled: {}", cfg!(feature = "omp"));
+    println!("cuda enabled: {}", cfg!(feature = "cuda"));
 
     let cmdline = cmdline::parse_command_line()?;
     let mesh = Mesh {
