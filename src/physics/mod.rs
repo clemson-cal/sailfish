@@ -160,6 +160,11 @@ macro_rules! mesh_struct {
             pub fn dy(&self) -> $real {
                 (self.y1 - self.y0) / self.nj as $real
             }
+            /// Return the row-major memory strides. Assumes 3 conserved
+            /// quantities.
+            pub fn strides(&self) -> [usize; 2] {
+                [self.nj as usize * 3, 3]
+            }
         }
     };
 }
