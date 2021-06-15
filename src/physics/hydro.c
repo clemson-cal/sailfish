@@ -12,6 +12,7 @@
 #define min2(a, b) (a) < (b) ? (a) : (b)
 #define max3(a, b, c) max2(a, max2(b, c))
 #define min3(a, b, c) min2(a, min2(b, c))
+#define PLM_THETA 1.5
 
 #ifdef __NVCC__
 // ============================ CUDA VERSION ==================================
@@ -24,6 +25,7 @@
 #define power powf
 #define exponential expf
 #define abs_val fabsf
+#define sign(x) copysignf(1.0f, x)
 #else
 // ============================ DOUBLE PRECISION ==============================
 #define PREFIX iso2d_cuda_f64
@@ -33,6 +35,7 @@
 #define power pow
 #define exponential exp
 #define abs_val fabs
+#define sign(x) copysign(1.0, x)
 #endif
 // ============================ MEMORY =========================================
 static void *compute_malloc(size_t count) { void *ptr; cudaMalloc(&ptr, count); return ptr; }
@@ -57,6 +60,7 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define power powf
 #define exponential expf
 #define abs_val fabsf
+#define sign(x) copysignf(1.0f, x)
 #else
 // ============================ DOUBLE PRECISION ==============================
 #ifdef _OPENMP
@@ -70,6 +74,7 @@ static void compute_memcpy_device_to_host(void *dst, const void *src, size_t cou
 #define power pow
 #define exponential exp
 #define abs_val fabs
+#define sign(x) copysign(1.0, x)
 #endif
 // ============================ MEMORY =========================================
 static void *compute_malloc(size_t count) { return malloc(count); }
@@ -77,6 +82,32 @@ static void compute_free(void *ptr) { free(ptr); }
 static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
 static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
 #endif
+
+
+
+
+// ============================ MATH STUFF ====================================
+// ============================================================================
+static inline __device__ real minabs(real a, real b, real c)
+{
+    return min3(abs_val(a), abs_val(b), abs_val(c));
+}
+
+static inline __device__ real plm_gradient_scalar(real yl, real y0, real yr)
+{
+    real a = (y0 - yl) * PLM_THETA;
+    real b = (yr - yl) * 0.5;
+    real c = (yr - y0) * PLM_THETA;
+    return 0.25 * abs_val(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
+}
+
+static inline __device__ void plm_gradient(const real *yl, const real *y0, const real *yr, real *g)
+{
+    for (int q = 0; q < NCONS; ++q)
+    {
+        g[q] = plm_gradient_scalar(yl[q], y0[q], yr[q]);
+    }
+}
 
 
 
@@ -417,7 +448,7 @@ static __device__ __host__ void buffer_source_term(
 
 // ============================ WORK FUNCTIONS ================================
 // ============================================================================
-static inline __device__ __host__ void compute_fluxes_i_loop_body(
+static inline __device__ __host__ void compute_fluxes_i(
     struct Solver *self,
     struct EquationOfState *eos,
     struct PointMass *masses,
@@ -444,7 +475,7 @@ static inline __device__ __host__ void compute_fluxes_i_loop_body(
     }
 }
 
-static inline __device__ __host__ void compute_fluxes_j_loop_body(
+static inline __device__ __host__ void compute_fluxes_j(
     struct Solver *self,
     struct EquationOfState *eos,
     struct PointMass *masses,
@@ -471,8 +502,120 @@ static inline __device__ __host__ void compute_fluxes_j_loop_body(
     }
 }
 
+static inline __device__ __host__ void compute_fluxes_plm_i(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    long i,
+    long j,
+    real *flux)
+{
+    long ni = self->mesh.ni;
+    long nj = self->mesh.nj;
+
+    if (i <= ni && j < nj)
+    {
+        long ill = i - 2;
+        long il  = i - 1;
+        long ir  = i + 0;
+        long irr = i + 1;
+
+        if (ill < 0)
+            ill = 0;
+        if (il < 0)
+            il = 0;
+        if (ir == ni)
+            ir = ni - 1;
+        if (irr >= ni)
+            irr = ni - 1;
+
+        real x = self->mesh.x0 + (i + 0.0) * dx;
+        real y = self->mesh.y0 + (j + 0.5) * dy;
+        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
+
+        real *pll = &self->primitive[NCONS * (ill * nj + j)];
+        real *pl  = &self->primitive[NCONS * (il  * nj + j)];
+        real *pr  = &self->primitive[NCONS * (ir  * nj + j)];
+        real *prr = &self->primitive[NCONS * (irr * nj + j)];
+
+        real gl[4];
+        real gr[4];
+        real pm[4];
+        real pp[4];
+
+        plm_gradient(pll, pl, pr, gl);
+        plm_gradient(pl, pr, prr, gr);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            pm[q] = pl[q] + 0.5 * gl[q];
+            pp[q] = pr[q] - 0.5 * gr[q];
+        }
+        riemann_hlle(pm, pp, flux, cs2, 0);
+    }
+}
+
+static inline __device__ __host__ void compute_fluxes_plm_j(
+    struct Solver *self,
+    struct EquationOfState *eos,
+    struct PointMass *masses,
+    unsigned long num_masses,
+    real dx,
+    real dy,
+    long i,
+    long j,
+    real *flux)
+{
+    long ni = self->mesh.ni;
+    long nj = self->mesh.nj;
+
+    if (i < ni && j <= nj)
+    {
+        long jll = j - 2;
+        long jl  = j - 1;
+        long jr  = j + 0;
+        long jrr = j + 1;
+
+        if (jll < 0)
+            jll = 0;
+        if (jl < 0)
+            jl = 0;
+        if (jr == nj)
+            jr = nj - 1;
+        if (jrr >= nj)
+            jrr = nj - 1;
+
+        real x = self->mesh.x0 + (i + 0.5) * dx;
+        real y = self->mesh.y0 + (j + 0.0) * dy;
+        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
+
+        real *pll = &self->primitive[NCONS * (i * nj + jll)];
+        real *pl  = &self->primitive[NCONS * (i * nj + jl)];
+        real *pr  = &self->primitive[NCONS * (i * nj + jr)];
+        real *prr = &self->primitive[NCONS * (i * nj + jrr)];
+
+        real gl[4];
+        real gr[4];
+        real pm[4];
+        real pp[4];
+
+        plm_gradient(pll, pl, pr, gl);
+        plm_gradient(pl, pr, prr, gr);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            pm[q] = pl[q] + 0.5 * gl[q];
+            pp[q] = pr[q] - 0.5 * gr[q];
+        }
+        riemann_hlle(pm, pp, flux, cs2, 1);
+    }
+}
+
 #ifdef __NVCC__
-static __global__ void compute_fluxes_loop_body_kernel(
+static __global__ void compute_fluxes_kernel(
     struct Solver *self,
     struct EquationOfState *eos,
     struct PointMass *masses,
@@ -488,11 +631,11 @@ static __global__ void compute_fluxes_loop_body_kernel(
 
     if (i <= self->mesh.ni && j < self->mesh.nj)
     {
-        compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i, j, fi);
+        compute_fluxes_i(self, eos, masses, num_masses, dx, dy, i, j, fi);
     }
     if (i < self->mesh.ni && j <= self->mesh.nj)
     {
-        compute_fluxes_j_loop_body(self, eos, masses, num_masses, dx, dy, i, j, fj);
+        compute_fluxes_j(self, eos, masses, num_masses, dx, dy, i, j, fj);
     }
 }
 #endif
@@ -571,10 +714,10 @@ static inline __device__ __host__ void advance_no_precomputed_fluxes(
     real flj[NCONS];
     real frj[NCONS];
 
-    compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 0, j, fli);
-    compute_fluxes_i_loop_body(self, eos, masses, num_masses, dx, dy, i + 1, j, fri);
-    compute_fluxes_j_loop_body(self, eos, masses, num_masses, dx, dy, i, j + 0, flj);
-    compute_fluxes_j_loop_body(self, eos, masses, num_masses, dx, dy, i, j + 1, frj);
+    compute_fluxes_plm_i(self, eos, masses, num_masses, dx, dy, i + 0, j, fli);
+    compute_fluxes_plm_i(self, eos, masses, num_masses, dx, dy, i + 1, j, fri);
+    compute_fluxes_plm_j(self, eos, masses, num_masses, dx, dy, i, j + 0, flj);
+    compute_fluxes_plm_j(self, eos, masses, num_masses, dx, dy, i, j + 1, frj);
 
     for (unsigned long q = 0; q < NCONS; ++q)
     {
@@ -782,7 +925,7 @@ int FUNC(PREFIX, solver_compute_fluxes)(
     #ifdef __NVCC__
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((ni + bs.x) / bs.x, (nj + bs.y) / bs.y);
-    compute_fluxes_loop_body_kernel<<<bd, bs>>>(self, &eos, masses, num_masses, dx, dy);
+    compute_fluxes_kernel<<<bd, bs>>>(self, &eos, masses, num_masses, dx, dy);
     #else
 
     #ifdef _OPENMP
@@ -792,8 +935,8 @@ int FUNC(PREFIX, solver_compute_fluxes)(
     {
         for (long j = 0; j < nj + 1; ++j)
         {
-            compute_fluxes_i_loop_body(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_i + NCONS * (i * (nj + 0) + j));
-            compute_fluxes_j_loop_body(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_j + NCONS * (i * (nj + 1) + j));
+            compute_fluxes_i(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_i + NCONS * (i * (nj + 0) + j));
+            compute_fluxes_j(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_j + NCONS * (i * (nj + 1) + j));
         }
     }
     #endif
