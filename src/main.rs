@@ -1,11 +1,11 @@
 pub mod cmdline;
-pub mod physics;
 pub mod error;
+pub mod physics;
 pub mod setup;
 
+use crate::setup::Setup;
 use physics::f64::*;
 use std::io::Write;
-use crate::setup::Setup;
 
 fn do_output(primitive: &Vec<f64>, output_number: usize) {
     let mut bytes = Vec::new();
@@ -33,7 +33,10 @@ fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, error::Erro
     }
 }
 
-fn time_exec<F>(mut f: F) -> std::time::Duration where F: FnMut() {
+fn time_exec<F>(mut f: F) -> std::time::Duration
+where
+    F: FnMut(),
+{
     let start = std::time::Instant::now();
     f();
     start.elapsed()
@@ -41,7 +44,7 @@ fn time_exec<F>(mut f: F) -> std::time::Duration where F: FnMut() {
 
 fn run() -> Result<(), error::Error> {
     use physics::f64::*;
-    let setup = setup::Shocktube{};
+    let setup = setup::Shocktube {};
     let cmdline = cmdline::parse_command_line()?;
     let mesh = Mesh {
         ni: cmdline.resolution,
@@ -71,10 +74,10 @@ fn run() -> Result<(), error::Error> {
     let mut next_output_time = time;
     let mut mzps_log = vec![];
 
-    let checkpoint_interval = cmdline.checkpoint_interval;
     let v_max = setup.max_signal_speed().unwrap();
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
+    let checkpoint_interval = cmdline.checkpoint_interval;
     let dt = mesh.dx().min(mesh.dy()) / v_max * cfl;
 
     let eos = setup.equation_of_state();
@@ -104,17 +107,25 @@ fn run() -> Result<(), error::Error> {
             }
         });
         mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
-        println!("[{}] t={:.3} Mzps={:.3}", iteration, time, mzps_log.last().unwrap());
+        println!(
+            "[{}] t={:.3} Mzps={:.3}",
+            iteration,
+            time,
+            mzps_log.last().unwrap()
+        );
     }
     do_output(&solver.primitive(), output_number);
 
-    println!("average perf: {:.3} Mzps", mzps_log.iter().fold(0.0, |a, b| a + b) / mzps_log.len() as f64);
+    println!(
+        "average perf: {:.3} Mzps",
+        mzps_log.iter().fold(0.0, |a, b| a + b) / mzps_log.len() as f64
+    );
     Ok(())
 }
 
 fn main() {
     match run() {
-        Ok(_) => {},
+        Ok(_) => {}
         Err(e) => print!("{}", e),
     }
 }

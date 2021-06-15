@@ -1,6 +1,5 @@
-use kepler_two_body::OrbitalState;
-use kepler_two_body::OrbitalElements;
 use crate::physics::f64::{BufferZone, EquationOfState, PointMass};
+use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup: Sized {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
@@ -10,8 +9,7 @@ pub trait Setup: Sized {
     fn max_signal_speed(&self) -> Option<f64>;
 }
 
-pub struct Shocktube {
-}
+pub struct Shocktube {}
 
 impl Setup for Shocktube {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
@@ -81,7 +79,7 @@ impl Setup for Binary {
         vec![mass0, mass1]
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::Isothermal { sound_speed: 1.0 }
+        EquationOfState::LocallyIsothermal { mach_number: 10.0 }
     }
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None
