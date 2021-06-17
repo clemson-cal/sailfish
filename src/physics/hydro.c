@@ -274,6 +274,38 @@ static __device__ void godunov_j(const struct Patch p, struct Patch g, struct Pa
     riemann_hlle(pm, pp, GET(f, i, j), 1.0, 1);
 }
 
+static __device__ void update_conserved_and_primitive(
+    struct Patch p,
+    struct Patch u,
+    struct Patch u0,
+    struct Patch grad_i,
+    struct Patch grad_j,
+    struct Patch flux_i,
+    struct Patch flux_j,
+    struct Mesh mesh,
+    real a,
+    real dt,
+    int i,
+    int j)
+{
+    real dx = mesh.dx;
+    real dy = mesh.dy;
+    real *fli = GET(flux_i, i + 0, j);
+    real *fri = GET(flux_i, i + 1, j);
+    real *flj = GET(flux_j, i, j + 0);
+    real *frj = GET(flux_j, i, j + 1);
+    real *pc = GET(p, i, j);
+    real *uc = GET(u, i, j);
+    real *un = GET(u0, i, j);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        uc[q] = a * un[q] + (1.0 - a) * uc[q];
+    }
+    conserved_to_primitive(uc, pc);
+}
+
 
 // ============================ SOLVER ========================================
 // ============================================================================
@@ -365,37 +397,12 @@ void solver_advance_rk(struct Solver *self, real a, real dt)
     struct Patch grad_j = self->grad_j;
     struct Patch flux_i = self->flux_i;
     struct Patch flux_j = self->flux_j;
-    real dx = self->mesh.dx;
-    real dy = self->mesh.dy;
 
-    FOR_EACH(grad_i) {
-        gradient_i(p, grad_i, i, j);
-    }
-    FOR_EACH(grad_j) {
-        gradient_j(p, grad_j, i, j);
-    }
-    FOR_EACH(flux_i) {
-        godunov_i(p, grad_i, flux_i, i, j);
-    }
-    FOR_EACH(flux_j) {
-        godunov_j(p, grad_j, flux_j, i, j);
-    }
-    FOR_EACH(u) {
-        real *fli = GET(flux_i, i + 0, j);
-        real *fri = GET(flux_i, i + 1, j);
-        real *flj = GET(flux_j, i, j + 0);
-        real *frj = GET(flux_j, i, j + 1);
-        real *pc = GET(p, i, j);
-        real *uc = GET(u, i, j);
-        real *un = GET(u0, i, j);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-            uc[q] = a * un[q] + (1.0 - a) * uc[q];
-        }
-        conserved_to_primitive(uc, pc);
-    }
+    FOR_EACH(grad_i) gradient_i(p, grad_i, i, j);
+    FOR_EACH(grad_j) gradient_j(p, grad_j, i, j);
+    FOR_EACH(flux_i) godunov_i(p, grad_i, flux_i, i, j);
+    FOR_EACH(flux_j) godunov_j(p, grad_j, flux_j, i, j);
+    FOR_EACH(u) update_conserved_and_primitive(p, u, u0, grad_i, grad_j, flux_i, flux_j, self->mesh, a, dt, i, j);
 }
 
 void solver_new_timestep(struct Solver *self)
