@@ -378,7 +378,7 @@ void solver_set_primitive(struct Solver *self, real *primitive_data)
         int jj = min2(max2(j, 0), self->mesh.nj - 1);
 
         real *pc = GET(self->primitive, i, j);
-        real *uc = GET(self->conserved, i, j);
+        real *uc = GET(self->conserved, ii, jj);
 
         for (int q = 0; q < NCONS; ++q)
         {
