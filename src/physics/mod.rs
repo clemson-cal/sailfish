@@ -37,6 +37,13 @@ impl Mesh {
     }
 }
 
+#[derive(Clone, Copy)]
+pub enum ExecutionMode {
+    CPU,
+    OMP,
+    GPU,
+}
+
 #[repr(C)]
 pub struct Solver(*mut c_void);
 
@@ -65,21 +72,22 @@ impl Solver {
         unsafe { solver_set_primitive(self.0, primitive.as_ptr()) };
     }
 
-    pub fn advance(&mut self, rk_order: u32, dt: f64) {
+    pub fn advance(&mut self, rk_order: u32, dt: f64, mode: ExecutionMode) {
         match rk_order {
             1 => {
-                self.advance_rk(0.0, dt);
+                self.new_timestep(mode);
+                self.advance_rk(0.0, dt, mode);
             }
             2 => {
-                self.new_timestep();
-                self.advance_rk(0./1., dt);
-                self.advance_rk(1./2., dt);
+                self.new_timestep(mode);
+                self.advance_rk(0./1., dt, mode);
+                self.advance_rk(1./2., dt, mode);
             }
             3 => {
-                self.new_timestep();
-                self.advance_rk(0./1., dt);
-                self.advance_rk(3./4., dt);
-                self.advance_rk(1./3., dt);
+                self.new_timestep(mode);
+                self.advance_rk(0./1., dt, mode);
+                self.advance_rk(3./4., dt, mode);
+                self.advance_rk(1./3., dt, mode);
             }
             _ => {
                 panic!("invalid runge-kutta order")
@@ -89,12 +97,20 @@ impl Solver {
 
     /// Caches the conserved variables to the start of the time step to
     /// prepare for RK integration steps.
-    fn new_timestep(&mut self) {
-        unsafe { solver_new_timestep(self.0) }
+    fn new_timestep(&mut self, mode: ExecutionMode) {
+        match mode {
+            ExecutionMode::CPU => unsafe { solver_new_timestep_cpu(self.0) }
+            ExecutionMode::OMP => unsafe { solver_new_timestep_omp(self.0) }
+            ExecutionMode::GPU => todo!()
+        }
     }
 
-    fn advance_rk(&mut self, a: f64, dt: f64) {
-        unsafe { solver_advance_rk(self.0, a, dt) }
+    fn advance_rk(&mut self, a: f64, dt: f64, mode: ExecutionMode) {
+        match mode {
+            ExecutionMode::CPU => unsafe { solver_advance_rk_cpu(self.0, a, dt) }
+            ExecutionMode::OMP => unsafe { solver_advance_rk_omp(self.0, a, dt) }
+            ExecutionMode::GPU => todo!()
+        }
     }
 }
 
@@ -110,8 +126,10 @@ extern "C" {
     pub(crate) fn solver_get_mesh(solver: *mut c_void) -> Mesh;
     pub(crate) fn solver_get_primitive(solver: *mut c_void, primitive: *mut f64);
     pub(crate) fn solver_set_primitive(solver: *mut c_void, primitive: *const f64);
-    pub(crate) fn solver_new_timestep(solver: *mut c_void);
-    pub(crate) fn solver_advance_rk(solver: *mut c_void, a: f64, dt: f64);
+    pub(crate) fn solver_new_timestep_cpu(solver: *mut c_void);
+    pub(crate) fn solver_new_timestep_omp(solver: *mut c_void);
+    pub(crate) fn solver_advance_rk_cpu(solver: *mut c_void, a: f64, dt: f64);
+    pub(crate) fn solver_advance_rk_omp(solver: *mut c_void, a: f64, dt: f64);
 }
 
 #[repr(C)]

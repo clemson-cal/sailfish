@@ -1,4 +1,5 @@
 use crate::setup::Setup;
+use crate::physics::ExecutionMode;
 use std::io::Write;
 
 pub mod cmdline;
@@ -56,6 +57,11 @@ fn run() -> Result<(), error::Error> {
     let fold = cmdline.fold;
     let checkpoint_interval = cmdline.checkpoint_interval;
     let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
+    let mode = if cmdline.use_omp {
+        ExecutionMode::OMP
+    } else {
+        ExecutionMode::CPU
+    };
 
     let mut time = 0.0;
     let mut iteration = 0;
@@ -72,7 +78,7 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                solver.advance(rk_order, dt);
+                solver.advance(rk_order, dt, mode);
                 time += dt;
                 iteration += 1;
             }

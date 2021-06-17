@@ -58,8 +58,16 @@ static __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 // ============================ PATCH API =====================================
 // ============================================================================
 #define GET(p, i, j) (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
-#define FOR_EACH(p) for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
-                    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define FOR_EACH(p) \
+for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j) \
+
+#define FOR_EACH_OMP(p) \
+_Pragma("omp parallel for") \
+for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j) \
+
+
 #define ELEMENTS(p) (p.count[0] * p.count[1] * NCONS)
 #define BYTES(p) (ELEMENTS(p) * sizeof(real))
 
@@ -278,8 +286,6 @@ static __device__ void update_conserved_and_primitive(
     struct Patch p,
     struct Patch u,
     struct Patch u0,
-    struct Patch grad_i,
-    struct Patch grad_j,
     struct Patch flux_i,
     struct Patch flux_j,
     struct Mesh mesh,
@@ -362,10 +368,7 @@ void solver_get_primitive(struct Solver *self, real *primitive_data)
     struct Patch primitive = patch_view(0, 0, self->mesh.ni, self->mesh.nj, primitive_data);
 
     FOR_EACH(primitive) {
-        for (int q = 0; q < NCONS; ++q)
-        {
-            GET(primitive, i, j)[q] = GET(self->primitive, i, j)[q];
-        }
+        memcpy(GET(primitive, i, j), GET(self->primitive, i, j), NCONS * sizeof(real));
     }
 }
 
@@ -388,7 +391,7 @@ void solver_set_primitive(struct Solver *self, real *primitive_data)
     }
 }
 
-void solver_advance_rk(struct Solver *self, real a, real dt)
+void solver_advance_rk_cpu(struct Solver *self, real a, real dt)
 {
     struct Patch p = self->primitive;
     struct Patch u = self->conserved;
@@ -402,10 +405,42 @@ void solver_advance_rk(struct Solver *self, real a, real dt)
     FOR_EACH(grad_j) gradient_j(p, grad_j, i, j);
     FOR_EACH(flux_i) godunov_i(p, grad_i, flux_i, i, j);
     FOR_EACH(flux_j) godunov_j(p, grad_j, flux_j, i, j);
-    FOR_EACH(u) update_conserved_and_primitive(p, u, u0, grad_i, grad_j, flux_i, flux_j, self->mesh, a, dt, i, j);
+    FOR_EACH(u) update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
 }
 
-void solver_new_timestep(struct Solver *self)
+void solver_advance_rk_omp(struct Solver *self, real a, real dt)
 {
-    memcpy(self->conserved_rk.data, self->conserved.data, BYTES(self->conserved));
+    struct Patch p = self->primitive;
+    struct Patch u = self->conserved;
+    struct Patch u0 = self->conserved_rk;
+    struct Patch grad_i = self->grad_i;
+    struct Patch grad_j = self->grad_j;
+    struct Patch flux_i = self->flux_i;
+    struct Patch flux_j = self->flux_j;
+
+    FOR_EACH_OMP(grad_i) gradient_i(p, grad_i, i, j);
+    FOR_EACH_OMP(grad_j) gradient_j(p, grad_j, i, j);
+    FOR_EACH_OMP(flux_i) godunov_i(p, grad_i, flux_i, i, j);
+    FOR_EACH_OMP(flux_j) godunov_j(p, grad_j, flux_j, i, j);
+    FOR_EACH_OMP(u) update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
+}
+
+void solver_new_timestep_cpu(struct Solver *self)
+{
+    struct Patch u = self->conserved;
+    struct Patch u0 = self->conserved_rk;
+
+    FOR_EACH(u0) {
+        memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
+    }
+}
+
+void solver_new_timestep_omp(struct Solver *self)
+{
+    struct Patch u = self->conserved;
+    struct Patch u0 = self->conserved_rk;
+
+    FOR_EACH_OMP(u0) {
+        memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
+    }
 }
