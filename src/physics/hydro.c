@@ -1,107 +1,52 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
-#include <stdio.h>
 #include <math.h>
+#include <time.h>
 
-#define CONCAT(a, b) a ## _ ## b
-#define FUNC(a, b) CONCAT(a, b)
-#define NCONS 3
 
-#define max2(a, b) (a) > (b) ? (a) : (b)
-#define min2(a, b) (a) < (b) ? (a) : (b)
-#define max3(a, b, c) max2(a, max2(b, c))
-#define min3(a, b, c) min2(a, min2(b, c))
-#define PLM_THETA 1.5
-
-#ifdef __NVCC__
-// ============================ CUDA VERSION ==================================
-#ifdef SINGLE
-// ============================ SINGLE PRECISION ==============================
-#define PREFIX iso2d_cuda_f32
-#define real float
-#define square_root sqrtf
-#define hyperbolic_tangent tanhf
-#define power powf
-#define exponential expf
-#define abs_val fabsf
-#define sign(x) copysignf(1.0f, x)
-#else
-// ============================ DOUBLE PRECISION ==============================
-#define PREFIX iso2d_cuda_f64
-#define real double
-#define square_root sqrt
-#define hyperbolic_tangent tanh
-#define power pow
-#define exponential exp
-#define abs_val fabs
-#define sign(x) copysign(1.0, x)
-#endif
-// ============================ MEMORY =========================================
-static void *compute_malloc(size_t count) { void *ptr; cudaMalloc(&ptr, count); return ptr; }
-static void compute_free(void *ptr) { cudaFree(ptr); }
-static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice); }
-static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost); }
-
-#else
-// ============================ CPU VERSION ===================================
+// ============================ COMPAT ========================================
+// ============================================================================
 #define __host__
 #define __device__
-#ifdef SINGLE
-// ============================ SINGLE PRECISION ==============================
-#ifdef _OPENMP
-#define PREFIX iso2d_omp_f32
-#else
-#define PREFIX iso2d_cpu_f32
-#endif
-#define real float
-#define square_root sqrtf
-#define hyperbolic_tangent tanhf
-#define power powf
-#define exponential expf
-#define abs_val fabsf
-#define sign(x) copysignf(1.0f, x)
-#else
-// ============================ DOUBLE PRECISION ==============================
-#ifdef _OPENMP
-#define PREFIX iso2d_omp_f64
-#else
-#define PREFIX iso2d_cpu_f64
-#endif
-#define real double
-#define square_root sqrt
-#define hyperbolic_tangent tanh
-#define power pow
-#define exponential exp
-#define abs_val fabs
-#define sign(x) copysign(1.0, x)
-#endif
-// ============================ MEMORY =========================================
+#define PREFIX iso2d_cpu
+#define CONCAT(a, b) a ## _ ## b
+#define PUBLIC(f) CONCAT(PREFIX, f)
+
+
+// ============================ MEMORY ========================================
+// ============================================================================
 static void *compute_malloc(size_t count) { return malloc(count); }
 static void compute_free(void *ptr) { free(ptr); }
-static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
-static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
-#endif
+// static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
+// static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
 
 
-
-
-// ============================ MATH STUFF ====================================
+// ============================ PHYSICS =======================================
 // ============================================================================
-static inline __device__ real minabs(real a, real b, real c)
-{
-    return min3(abs_val(a), abs_val(b), abs_val(c));
-}
+#define NCONS 3
+#define PLM_THETA 1.5
 
-static inline __device__ real plm_gradient_scalar(real yl, real y0, real yr)
+
+// ============================ MATH ==========================================
+// ============================================================================
+#define real double
+#define min2(a, b) ((a) < (b) ? (a) : (b))
+#define max2(a, b) ((a) > (b) ? (a) : (b))
+#define min3(a, b, c) min2(a, min2(b, c))
+#define max3(a, b, c) max2(a, max2(b, c))
+#define sign(x) copysign(1.0, x)
+#define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
+
+static __device__ real plm_gradient_scalar(real yl, real y0, real yr)
 {
     real a = (y0 - yl) * PLM_THETA;
     real b = (yr - yl) * 0.5;
     real c = (yr - y0) * PLM_THETA;
-    return 0.25 * abs_val(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
+    return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
 }
 
-static inline __device__ void plm_gradient(const real *yl, const real *y0, const real *yr, real *g)
+static __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 {
     for (int q = 0; q < NCONS; ++q)
     {
@@ -110,189 +55,80 @@ static inline __device__ void plm_gradient(const real *yl, const real *y0, const
 }
 
 
+// ============================ PATCH API =====================================
+// ============================================================================
+#define GET(p, i, j) &p.data[p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1])]
+#define FOR_EACH(p) for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+                    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define ELEMENTS(p) (p.count[0] * p.count[1] * NCONS)
+#define BYTES(p) (ELEMENTS(p) * sizeof(real))
+
+struct Patch
+{
+    int start[2];
+    int count[2];
+    int jumps[2];
+    int owned;
+    real *data;
+};
+
+// static struct Patch patch_view(int start_i, int start_j, int count_i, int count_j, real *data)
+// {
+//     struct Patch self;
+//     self.start[0] = start_i;
+//     self.start[1] = start_j;
+//     self.count[0] = count_i;
+//     self.count[1] = count_j;
+//     self.jumps[0] = NCONS * count_j;
+//     self.jumps[1] = NCONS;
+//     self.data = data;
+//     self.owned = 0;
+//     return self;
+// }
+
+static struct Patch patch_alloc(int start_i, int start_j, int count_i, int count_j)
+{
+    struct Patch self;
+    self.start[0] = start_i;
+    self.start[1] = start_j;
+    self.count[0] = count_i;
+    self.count[1] = count_j;
+    self.jumps[0] = NCONS * count_j;
+    self.jumps[1] = NCONS;
+    self.data = compute_malloc(NCONS * count_i * count_j * sizeof(real));
+    self.owned = 1;
+
+    for (int n = 0; n < ELEMENTS(self); ++n)
+    {
+        self.data[n] = 0.0;
+    }
+    return self;
+}
+
+static void patch_release(struct Patch self)
+{
+    if (self.owned)
+    {
+        compute_free(self.data);
+    }
+}
 
 
-// ============================ STRUCTS =======================================
+// ============================ MESH ==========================================
 // ============================================================================
 struct Mesh
 {
-    unsigned long ni, nj;
-    real x0, x1, y0, y1;
+    int ni, nj;
+    real x0, y0;
+    real dx, dy;
 };
-
-struct PointMass
-{
-    real x;
-    real y;
-    real mass;
-    real rate;
-    real radius;
-};
-
-enum EquationOfStateType
-{
-    Isothermal,
-    LocallyIsothermal,
-    GammaLaw,
-};
-
-struct EquationOfState
-{
-    enum EquationOfStateType type;
-
-    union
-    {
-        struct
-        {
-            real sound_speed;
-        } isothermal;
-
-        struct
-        {
-            real mach_number;
-        } locally_isothermal;
-
-        struct
-        {
-            real gamma_law_index;
-        } gamma_law;
-    };
-};
-
-enum BufferZoneType
-{
-    None,
-    Keplerian,
-};
-
-struct BufferZone
-{
-    enum BufferZoneType type;
-
-    union
-    {
-        struct
-        {
-
-        } none;
-
-        struct
-        {
-            real surface_density;
-            real central_mass;
-            real driving_rate;
-            real outer_radius;
-            real onset_width;
-        } keplerian;
-    };
-};
-
-struct Solver
-{
-    struct Mesh mesh;
-    real *primitive;
-    real *conserved;
-    real *conserved_rk;
-    real *flux_i;
-    real *flux_j;
-    real *flux_k;
-    real *gradient_i;
-    real *gradient_j;
-    real *gradient_k;
-    int flux_buffers_current;
-};
-
-
-
-
-// ============================ GRAVITY =======================================
-// ============================================================================
-static __device__ __host__ real gravitational_potential(
-    const struct PointMass *masses,
-    unsigned long num_masses,
-    real x1,
-    real y1)
-{
-    real phi = 0.0;
-
-    for (unsigned long p = 0; p < num_masses; ++p)
-    {
-        real x0 = masses[p].x;
-        real y0 = masses[p].y;
-        real mp = masses[p].mass;
-        real rs = masses[p].radius;
-
-        real dx = x1 - x0;
-        real dy = y1 - y0;
-        real r2 = dx * dx + dy * dy;
-        real r2_soft = r2 + rs * rs;
-
-        phi -= mp / square_root(r2_soft);
-    }
-    return phi;
-}
-
-static __device__ __host__ void point_mass_source_term(
-    struct PointMass *mass,
-    real x1,
-    real y1,
-    real dt,
-    real sigma,
-    real *delta_cons)
-{
-    real x0 = mass->x;
-    real y0 = mass->y;
-    real mp = mass->mass;
-    real rs = mass->radius;
-
-    real dx = x1 - x0;
-    real dy = y1 - y0;
-    real r2 = dx * dx + dy * dy;
-    real r2_soft = r2 + rs * rs;
-    real dr = square_root(r2);
-    real mag = sigma * mp / r2_soft;
-    real fx = -mag * dx / dr;
-    real fy = -mag * dy / dr;
-    real sink_rate = 0.0;
-
-    if (dr < 4.0 * rs)
-    {
-        sink_rate = mass->rate * exponential(-power(dr / rs, 4.0));
-    }
-
-    // NOTE: This is a force-free sink.
-    delta_cons[0] = dt * sigma * sink_rate * -1.0;
-    delta_cons[1] = dt * fx;
-    delta_cons[2] = dt * fy;
-}
-
-static __device__ __host__ void point_masses_source_term(
-    struct PointMass* masses,
-    unsigned long num_masses,
-    real x1,
-    real y1,
-    real dt,
-    real sigma,
-    real *cons)
-{
-    for (unsigned long p = 0; p < num_masses; ++p)
-    {
-        real delta_cons[NCONS];
-        point_mass_source_term(&masses[p], x1, y1, dt, sigma, delta_cons);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            cons[q] += delta_cons[q];
-        }
-    }
-}
-
-
+#define X(m, i) (m.x0 + (i) * m.dx)
+#define Y(m, i) (m.y0 + (j) * m.dy)
 
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __device__ __host__ void conserved_to_primitive(const real *cons, real *prim)
+static __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
     const real rho = cons[0];
     const real px = cons[1];
@@ -305,7 +141,7 @@ static __device__ __host__ void conserved_to_primitive(const real *cons, real *p
     prim[2] = vy;
 }
 
-static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons)
+static __device__ void primitive_to_conserved(const real *prim, real *cons)
 {
     const real rho = prim[0];
     const real vx = prim[1];
@@ -318,7 +154,7 @@ static __device__ __host__ void primitive_to_conserved(const real *prim, real *c
     cons[2] = py;
 }
 
-static __device__ __host__ real primitive_to_velocity(const real *prim, int direction)
+static __device__ real primitive_to_velocity(const real *prim, int direction)
 {
     switch (direction)
     {
@@ -328,7 +164,7 @@ static __device__ __host__ real primitive_to_velocity(const real *prim, int dire
     }
 }
 
-static __device__ __host__ void primitive_to_flux(
+static __device__ void primitive_to_flux(
     const real *prim,
     const real *cons,
     real *flux,
@@ -344,19 +180,19 @@ static __device__ __host__ void primitive_to_flux(
     flux[2] = vn * cons[2] + pressure * (direction == 1);
 }
 
-static __device__ __host__ void primitive_to_outer_wavespeeds(
+static __device__ void primitive_to_outer_wavespeeds(
     const real *prim,
     real *wavespeeds,
     real cs2,
     int direction)
 {
-    const real cs = square_root(cs2);
+    const real cs = sqrt(cs2);
     const real vn = primitive_to_velocity(prim, direction);
     wavespeeds[0] = vn - cs;
     wavespeeds[1] = vn + cs;
 }
 
-static __device__ __host__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
+static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
 {
     real ul[NCONS];
     real ur[NCONS];
@@ -381,566 +217,174 @@ static __device__ __host__ void riemann_hlle(const real *pl, const real *pr, rea
     }
 }
 
-static __device__ __host__ real sound_speed_squared(
-    struct EquationOfState *eos,
-    real x,
-    real y,
-    struct PointMass *masses,
-    unsigned long num_masses)
-{
-    switch (eos->type)
-    {
-        case Isothermal:
-            return power(eos->isothermal.sound_speed, 2.0);
-        case LocallyIsothermal:
-            return -gravitational_potential(masses, num_masses, x, y) / power(eos->locally_isothermal.mach_number, 2.0);
-        case GammaLaw:
-            return 1.0; // WARNING
-    }
-    return 0.0;
-}
 
-static __device__ __host__ void buffer_source_term(
-    struct BufferZone *buffer,
-    real xc,
-    real yc,
-    real dt,
-    real *cons)
-{
-    switch (buffer->type)
-    {
-        case None:
-        {
-            break;
-        }
-        case Keplerian:
-        {
-            real rc = square_root(xc * xc + yc * yc);
-            real surface_density = buffer->keplerian.surface_density;
-            real central_mass = buffer->keplerian.central_mass;
-            real driving_rate = buffer->keplerian.driving_rate;
-            real outer_radius = buffer->keplerian.outer_radius;
-            real onset_width = buffer->keplerian.onset_width;
-            real onset_radius = outer_radius - onset_width;
-
-            if (rc > onset_radius)
-            {
-                real pf = surface_density * square_root(central_mass / rc);
-                real px = pf * (-yc / rc);
-                real py = pf * ( xc / rc);
-                real u0[NCONS] = {surface_density, px, py};
-
-                real omega_outer = square_root(central_mass / power(onset_radius, 3.0));
-                real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
-                }
-            }
-            break;
-        }
-    }
-}
-
-
-
-
-// ============================ WORK FUNCTIONS ================================
+// ============================ SCHEME ========================================
 // ============================================================================
-static inline __device__ __host__ void compute_fluxes_i(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    long i,
-    long j,
-    real *flux)
+static __device__ void gradient_i(const struct Patch p, struct Patch g, int i, int j)
 {
-    long ni = self->mesh.ni;
-    long nj = self->mesh.nj;
-
-    if (i <= ni && j < nj)
-    {
-        long il = i - (i > 0);
-        long ir = i - (i == ni);
-        real x = self->mesh.x0 + (i + 0.0) * dx;
-        real y = self->mesh.y0 + (j + 0.5) * dy;
-        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
-        real *pl = &self->primitive[NCONS * (il * nj + j)];
-        real *pr = &self->primitive[NCONS * (ir * nj + j)];
-        riemann_hlle(pl, pr, flux, cs2, 0);
-    }
+    real *pl = GET(p, i - 1, j);
+    real *pc = GET(p, i + 0, j);
+    real *pr = GET(p, i + 1, j);
+    real *gc = GET(g, i, j);
+    plm_gradient(pl, pc, pr, gc);
 }
 
-static inline __device__ __host__ void compute_fluxes_j(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    long i,
-    long j,
-    real *flux)
+static __device__ void gradient_j(const struct Patch p, struct Patch g, int i, int j)
 {
-    long ni = self->mesh.ni;
-    long nj = self->mesh.nj;
-
-    if (i < ni && j <= nj)
-    {
-        long jl = j - (j > 0);
-        long jr = j - (j == nj);
-        real x = self->mesh.x0 + (i + 0.5) * dx;
-        real y = self->mesh.y0 + (j + 0.0) * dy;
-        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
-        real *pl = &self->primitive[NCONS * (i * nj + jl)];
-        real *pr = &self->primitive[NCONS * (i * nj + jr)];
-        riemann_hlle(pl, pr, flux, cs2, 1);
-    }
+    real *pl = GET(p, i, j - 1);
+    real *pc = GET(p, i, j + 0);
+    real *pr = GET(p, i, j + 1);
+    real *gc = GET(g, i, j);
+    plm_gradient(pl, pc, pr, gc);
 }
 
-static inline __device__ __host__ void compute_fluxes_plm_i(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    long i,
-    long j,
-    real *flux)
+static __device__ void godunov_i(const struct Patch p, struct Patch g, struct Patch f, int i, int j)
 {
-    long ni = self->mesh.ni;
-    long nj = self->mesh.nj;
+    real *pl = GET(p, i - 1, j);
+    real *pr = GET(p, i + 0, j);
+    real *gl = GET(g, i - 1, j);
+    real *gr = GET(g, i + 0, j);
 
-    if (i <= ni && j < nj)
+    real pm[NCONS];
+    real pp[NCONS];
+
+    for (int q = 0; q < NCONS; ++q)
     {
-        long ill = i - 2;
-        long il  = i - 1;
-        long ir  = i + 0;
-        long irr = i + 1;
-
-        if (ill < 0)
-            ill = 0;
-        if (il < 0)
-            il = 0;
-        if (ir == ni)
-            ir = ni - 1;
-        if (irr >= ni)
-            irr = ni - 1;
-
-        real x = self->mesh.x0 + (i + 0.0) * dx;
-        real y = self->mesh.y0 + (j + 0.5) * dy;
-        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
-
-        real *pll = &self->primitive[NCONS * (ill * nj + j)];
-        real *pl  = &self->primitive[NCONS * (il  * nj + j)];
-        real *pr  = &self->primitive[NCONS * (ir  * nj + j)];
-        real *prr = &self->primitive[NCONS * (irr * nj + j)];
-
-        real gl[4];
-        real gr[4];
-        real pm[4];
-        real pp[4];
-
-        plm_gradient(pll, pl, pr, gl);
-        plm_gradient(pl, pr, prr, gr);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            pm[q] = pl[q] + 0.5 * gl[q];
-            pp[q] = pr[q] - 0.5 * gr[q];
-        }
-        riemann_hlle(pm, pp, flux, cs2, 0);
+        pm[q] = pl[q] + 0.5 * gl[q];
+        pp[q] = pr[q] - 0.5 * gr[q];
     }
+    riemann_hlle(pm, pp, GET(f, i, j), 1.0, 0);
 }
 
-static inline __device__ __host__ void compute_fluxes_plm_j(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    long i,
-    long j,
-    real *flux)
+static __device__ void godunov_j(const struct Patch p, struct Patch g, struct Patch f, int i, int j)
 {
-    long ni = self->mesh.ni;
-    long nj = self->mesh.nj;
+    real *pl = GET(p, i, j - 1);
+    real *pr = GET(p, i, j + 0);
+    real *gl = GET(g, i, j - 1);
+    real *gr = GET(g, i, j + 0);
 
-    if (i < ni && j <= nj)
+    real pm[NCONS];
+    real pp[NCONS];
+
+    for (int q = 0; q < NCONS; ++q)
     {
-        long jll = j - 2;
-        long jl  = j - 1;
-        long jr  = j + 0;
-        long jrr = j + 1;
-
-        if (jll < 0)
-            jll = 0;
-        if (jl < 0)
-            jl = 0;
-        if (jr == nj)
-            jr = nj - 1;
-        if (jrr >= nj)
-            jrr = nj - 1;
-
-        real x = self->mesh.x0 + (i + 0.5) * dx;
-        real y = self->mesh.y0 + (j + 0.0) * dy;
-        real cs2 = sound_speed_squared(eos, x, y, masses, num_masses);
-
-        real *pll = &self->primitive[NCONS * (i * nj + jll)];
-        real *pl  = &self->primitive[NCONS * (i * nj + jl)];
-        real *pr  = &self->primitive[NCONS * (i * nj + jr)];
-        real *prr = &self->primitive[NCONS * (i * nj + jrr)];
-
-        real gl[4];
-        real gr[4];
-        real pm[4];
-        real pp[4];
-
-        plm_gradient(pll, pl, pr, gl);
-        plm_gradient(pl, pr, prr, gr);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            pm[q] = pl[q] + 0.5 * gl[q];
-            pp[q] = pr[q] - 0.5 * gr[q];
-        }
-        riemann_hlle(pm, pp, flux, cs2, 1);
+        pm[q] = pl[q] + 0.5 * gl[q];
+        pp[q] = pr[q] - 0.5 * gr[q];
     }
+    riemann_hlle(pm, pp, GET(f, i, j), 1.0, 1);
 }
 
-#ifdef __NVCC__
-static __global__ void compute_fluxes_kernel(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy)
-{
-    long nj = self->mesh.nj;
-    long i = blockIdx.x * blockDim.x + threadIdx.x;
-    long j = blockIdx.y * blockDim.y + threadIdx.y;
-    real *fi = self->flux_i + NCONS * (i * (nj + 0) + j);
-    real *fj = self->flux_j + NCONS * (i * (nj + 1) + j);
 
-    if (i <= self->mesh.ni && j < self->mesh.nj)
-    {
-        compute_fluxes_i(self, eos, masses, num_masses, dx, dy, i, j, fi);
-    }
-    if (i < self->mesh.ni && j <= self->mesh.nj)
-    {
-        compute_fluxes_j(self, eos, masses, num_masses, dx, dy, i, j, fj);
-    }
-}
-#endif
-
-static inline __device__ __host__ void advance_with_precomputed_fluxes_and_update_prim(
-    struct Solver *self,
-    struct BufferZone *buffer,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    real dt,
-    long i,
-    long j)
-{
-    long nj = self->mesh.nj;
-    real xc = self->mesh.x0 + (i + 0.5) * dx;
-    real yc = self->mesh.y0 + (j + 0.5) * dy;
-    real *cons = &self->conserved[NCONS * (i * nj + j)];
-    real *prim = &self->primitive[NCONS * (i * nj + j)];
-
-    real *fli = self->flux_i + NCONS * ((i + 0) * (nj + 0) + j);
-    real *fri = self->flux_i + NCONS * ((i + 1) * (nj + 0) + j);
-    real *flj = self->flux_j + NCONS * (i * (nj + 1) + (j + 0));
-    real *frj = self->flux_j + NCONS * (i * (nj + 1) + (j + 1));
-
-    for (unsigned long q = 0; q < NCONS; ++q)
-    {
-        cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-    }
-    point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
-    buffer_source_term(buffer, xc, yc, dt, cons);
-    conserved_to_primitive(cons, prim);
-}
-
-#ifdef __NVCC__
-static __global__ void advance_with_precomputed_fluxes_and_update_prim_kernel(
-    struct Solver *self,
-    struct BufferZone *buffer,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    real dt)
-{
-    long i = blockIdx.x * blockDim.x + threadIdx.x;
-    long j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (i < self->mesh.ni && j < self->mesh.nj)
-    {
-        advance_with_precomputed_fluxes_and_update_prim(self, buffer, masses, num_masses, dx, dy, dt, i, j);
-    }
-}
-#endif
-
-static inline __device__ __host__ void advance_no_precomputed_fluxes(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct BufferZone *buffer,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    real dt,
-    long i,
-    long j)
-{
-    long nj = self->mesh.nj;
-    real xc = self->mesh.x0 + (i + 0.5) * dx;
-    real yc = self->mesh.y0 + (j + 0.5) * dy;
-    real *cons = &self->conserved[NCONS * (i * nj + j)];
-    real *prim = &self->primitive[NCONS * (i * nj + j)];
-
-    real fli[NCONS];
-    real fri[NCONS];
-    real flj[NCONS];
-    real frj[NCONS];
-
-    compute_fluxes_plm_i(self, eos, masses, num_masses, dx, dy, i + 0, j, fli);
-    compute_fluxes_plm_i(self, eos, masses, num_masses, dx, dy, i + 1, j, fri);
-    compute_fluxes_plm_j(self, eos, masses, num_masses, dx, dy, i, j + 0, flj);
-    compute_fluxes_plm_j(self, eos, masses, num_masses, dx, dy, i, j + 1, frj);
-
-    for (unsigned long q = 0; q < NCONS; ++q)
-    {
-        cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-    }
-    point_masses_source_term(masses, num_masses, xc, yc, dt, prim[0], cons);
-    buffer_source_term(buffer, xc, yc, dt, cons);
-}
-
-#ifdef __NVCC__
-static __global__ void advance_no_precomputed_fluxes_and_update_prim_kernel(
-    struct Solver *self,
-    struct EquationOfState *eos,
-    struct BufferZone *buffer,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dx,
-    real dy,
-    real dt)
-{
-    long i = blockIdx.x * blockDim.x + threadIdx.x;
-    long j = blockIdx.y * blockDim.y + threadIdx.y;
-
-    if (i < self->mesh.ni || j < self->mesh.nj)
-    {
-        advance_no_precomputed_fluxes(self, eos, buffer, masses, num_masses, dx, dy, dt, i, j);
-        __syncthreads();
-
-        long nj = self->mesh.nj;
-        real *cons = &self->conserved[NCONS * (i * nj + j)];
-        real *prim = &self->primitive[NCONS * (i * nj + j)];
-        conserved_to_primitive(cons, prim);
-    }
-}
-#endif
-
-
-
-
-// ============================ PUBLIC API ====================================
+// ============================ SOLVER ========================================
 // ============================================================================
-struct Solver* FUNC(PREFIX, solver_new)(struct Mesh mesh)
+struct Solver
 {
-    struct Solver* self = (struct Solver*) malloc(sizeof(struct Solver));
+    struct Mesh mesh;
+    struct Patch primitive;
+    struct Patch conserved;
+    struct Patch conserved_rk;
+    struct Patch grad_i;
+    struct Patch grad_j;
+    struct Patch flux_i;
+    struct Patch flux_j;
+};
+
+struct Solver *solver_new(struct Mesh mesh)
+{
+    int i0 = 0;
+    int j0 = 0;
+    int ni = mesh.ni;
+    int nj = mesh.nj;
+
+    struct Solver *self = malloc(sizeof(struct Solver));
     self->mesh = mesh;
-    self->primitive = NULL;
-    self->conserved = NULL;
-    self->conserved_rk = NULL;
-    self->flux_i = NULL;
-    self->flux_j = NULL;
-    self->flux_k = NULL;
-    self->gradient_i = NULL;
-    self->gradient_j = NULL;
-    self->gradient_k = NULL;
-    self->flux_buffers_current = 0;
+    self->primitive = patch_alloc(i0 - 2, j0 - 2, ni + 4, nj + 4);
+    self->conserved = patch_alloc(i0, i0, ni, nj);
+    self->conserved_rk = patch_alloc(i0, j0, ni, nj);
+    self->grad_i = patch_alloc(i0 - 1, j0, ni + 2, nj);
+    self->grad_j = patch_alloc(i0, j0 - 1, ni, nj + 2);
+    self->flux_i = patch_alloc(i0, j0, ni + 1, nj);
+    self->flux_j = patch_alloc(i0, j0, ni, nj + 1);
+
+    FOR_EACH(self->primitive) {
+        real *p = GET(self->primitive, i, j);
+        real x = X(mesh, i);
+        real y = Y(mesh, j);
+
+        if (sqrt(x * x + y * y) < 0.25) {
+            p[0] = 1.0;
+            p[1] = 0.0;
+            p[2] = 0.0;
+        } else {
+            p[0] = 0.1;
+            p[1] = 0.0;
+            p[2] = 0.0;
+        }
+    }
+
+    FOR_EACH(self->conserved) {
+        real *u = GET(self->conserved, i, j);
+        real *p = GET(self->primitive, i, j);
+        primitive_to_conserved(p, u);
+    }
     return self;
 }
 
-void FUNC(PREFIX, solver_del)(struct Solver *self)
+void solver_del(struct Solver *self)
 {
-    compute_free(self->primitive);
-    compute_free(self->conserved);
-    compute_free(self->conserved_rk);
-    compute_free(self->flux_i);
-    compute_free(self->flux_j);
-    compute_free(self->flux_k);
-    compute_free(self->gradient_i);
-    compute_free(self->gradient_j);
-    compute_free(self->gradient_k);
+    patch_release(self->primitive);
+    patch_release(self->conserved);
+    patch_release(self->conserved_rk);
+    patch_release(self->grad_i);
+    patch_release(self->grad_j);
+    patch_release(self->flux_i);
+    patch_release(self->flux_j);
     free(self);
 }
 
-int FUNC(PREFIX, solver_set_primitive)(struct Solver *self, real *primitive)
+void solver_advance_rk(struct Solver *self, real a, real dt)
 {
-    unsigned long ni = self->mesh.ni;
-    unsigned long nj = self->mesh.nj;
-    size_t num_bytes = NCONS * ni * nj * sizeof(real);
-    real *conserved = (real*)malloc(num_bytes);
+    struct Patch p = self->primitive;
+    struct Patch u = self->conserved;
+    struct Patch u0 = self->conserved_rk;
+    struct Patch grad_i = self->grad_i;
+    struct Patch grad_j = self->grad_j;
+    struct Patch flux_i = self->flux_i;
+    struct Patch flux_j = self->flux_j;
+    real dx = self->mesh.dx;
+    real dy = self->mesh.dy;
 
-    for (unsigned long n = 0; n < ni * nj; ++n)
-    {
-        real *prim = &primitive[NCONS * n];
-        real *cons = &conserved[NCONS * n];
-        primitive_to_conserved(prim, cons);
+    FOR_EACH(grad_i) {
+        gradient_i(p, grad_i, i, j);
     }
-    if (self->primitive == NULL)
-    {
-        self->primitive = (real*) compute_malloc(num_bytes);
-        self->conserved = (real*) compute_malloc(num_bytes);
+    FOR_EACH(grad_j) {
+        gradient_j(p, grad_j, i, j);
     }
-    compute_memcpy_host_to_device(self->primitive, primitive, num_bytes);
-    compute_memcpy_host_to_device(self->conserved, conserved, num_bytes);
-    free(conserved);
-    return 0;
+    FOR_EACH(flux_i) {
+        godunov_i(p, grad_i, flux_i, i, j);
+    }
+    FOR_EACH(flux_j) {
+        godunov_j(p, grad_j, flux_j, i, j);
+    }
+    FOR_EACH(u) {
+        real *fli = GET(flux_i, i + 0, j);
+        real *fri = GET(flux_i, i + 1, j);
+        real *flj = GET(flux_j, i, j + 0);
+        real *frj = GET(flux_j, i, j + 1);
+        real *pc = GET(p, i, j);
+        real *uc = GET(u, i, j);
+        real *un = GET(u0, i, j);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+            uc[q] = a * un[q] + (1.0 - a) * uc[q];
+        }
+        conserved_to_primitive(uc, pc);
+    }
 }
 
-int FUNC(PREFIX, solver_get_primitive)(struct Solver *self, real *primitive)
+void solver_new_timestep(struct Solver *self)
 {
-    if (self->primitive == NULL)
-    {
-        return 1;
-    }
-    size_t num_bytes = NCONS * self->mesh.ni * self->mesh.nj * sizeof(real);
-    compute_memcpy_device_to_host(primitive, self->primitive, num_bytes);
-    return 0;
-}
-
-struct Mesh FUNC(PREFIX, solver_get_mesh)(struct Solver *self)
-{
-    return self->mesh;
-}
-
-int FUNC(PREFIX, solver_advance)(
-    struct Solver *self,
-    struct EquationOfState eos,
-    struct BufferZone buffer,
-    struct PointMass *masses,
-    unsigned long num_masses,
-    real dt)
-{
-    if (self->primitive == NULL)
-    {
-        return 1;
-    }
-
-    long ni = self->mesh.ni;
-    long nj = self->mesh.nj;
-    const real dx = (self->mesh.x1 - self->mesh.x0) / ni;
-    const real dy = (self->mesh.y1 - self->mesh.y0) / nj;
-
-    if (self->flux_buffers_current)
-    {
-        #ifdef __NVCC__
-        dim3 bs = dim3(8, 8);
-        dim3 bd = dim3((ni + bs.x - 1) / bs.x, (nj + bs.y - 1) / bs.y);
-        advance_with_precomputed_fluxes_and_update_prim_kernel<<<bd, bs>>>(self, &buffer, masses, num_masses, dx, dy, dt);
-        #else
-
-        #ifdef _OPENMP
-        #pragma omp parallel for
-        #endif
-        for (long i = 0; i < ni; ++i)
-        {
-            for (long j = 0; j < nj; ++j)
-            {
-                advance_with_precomputed_fluxes_and_update_prim(self, &buffer, masses, num_masses, dx, dy, dt, i, j);
-            }
-        }
-        #endif
-    }
-    else
-    {
-        #ifdef __NVCC__
-        dim3 bs = dim3(8, 8);
-        dim3 bd = dim3((ni + bs.x - 1) / bs.x, (nj + bs.y - 1) / bs.y);
-        advance_no_precomputed_fluxes_and_update_prim_kernel<<<bd, bs>>>(self, &eos, &buffer, masses, num_masses, dx, dy, dt);
-        #else
-
-        #ifdef _OPENMP
-        #pragma omp parallel for
-        #endif
-        for (long i = 0; i < ni; ++i)
-        {
-            for (long j = 0; j < nj; ++j)
-            {
-                advance_no_precomputed_fluxes(self, &eos, &buffer, masses, num_masses, dx, dy, dt, i, j);
-            }
-        }
-
-        #ifdef _OPENMP
-        #pragma omp parallel for
-        #endif
-        for (long n = 0; n < ni * nj; ++n)
-        {
-            conserved_to_primitive(self->conserved + NCONS * n, self->primitive + NCONS * n);
-        }
-        #endif
-    }
-
-    self->flux_buffers_current = 0;
-    return 0;
-}
-
-int FUNC(PREFIX, solver_compute_fluxes)(
-    struct Solver *self,
-    struct EquationOfState eos,
-    struct PointMass *masses,
-    unsigned long num_masses)
-{
-    long ni = self->mesh.ni;
-    long nj = self->mesh.nj;
-    const real dx = (self->mesh.x1 - self->mesh.x0) / ni;
-    const real dy = (self->mesh.y1 - self->mesh.y0) / nj;
-
-    if (self->primitive == NULL)
-    {
-        return 1;
-    }
-    if (self->flux_i == NULL && self->flux_j == NULL)
-    {
-        self->flux_i = (real*) compute_malloc((ni + 1) * nj * NCONS * sizeof(real));
-        self->flux_j = (real*) compute_malloc(ni * (nj + 1) * NCONS * sizeof(real));
-    }
-
-    #ifdef __NVCC__
-    dim3 bs = dim3(8, 8);
-    dim3 bd = dim3((ni + bs.x) / bs.x, (nj + bs.y) / bs.y);
-    compute_fluxes_kernel<<<bd, bs>>>(self, &eos, masses, num_masses, dx, dy);
-    #else
-
-    #ifdef _OPENMP
-    #pragma omp parallel for
-    #endif
-    for (long i = 0; i < ni + 1; ++i)
-    {
-        for (long j = 0; j < nj + 1; ++j)
-        {
-            compute_fluxes_i(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_i + NCONS * (i * (nj + 0) + j));
-            compute_fluxes_j(self, &eos, masses, num_masses, dx, dy, i, j, self->flux_j + NCONS * (i * (nj + 1) + j));
-        }
-    }
-    #endif
-
-    self->flux_buffers_current = 1;
-    return 0;
+    memcpy(self->conserved_rk.data, self->conserved.data, BYTES(self->conserved));
 }
