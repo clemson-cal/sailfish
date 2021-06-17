@@ -1,18 +1,19 @@
+use std::io::Write;
+
 pub mod cmdline;
 pub mod error;
 pub mod physics;
 pub mod setup;
 
-#[allow(unused)]
 fn do_output(primitive: &Vec<f64>, output_number: usize) {
-    // let mut bytes = Vec::new();
-    // for x in primitive {
-    //     bytes.extend(x.to_le_bytes().iter());
-    // }
-    // let filename = format!("sailfish.{:04}.bin", output_number);
-    // let mut file = std::fs::File::create(&filename).unwrap();
-    // file.write_all(&bytes).unwrap();
-    // println!("write {}", filename);
+    let mut bytes = Vec::new();
+    for x in primitive {
+        bytes.extend(x.to_le_bytes().iter());
+    }
+    let filename = format!("sailfish.{:04}.bin", output_number);
+    let mut file = std::fs::File::create(&filename).unwrap();
+    file.write_all(&bytes).unwrap();
+    println!("write {}", filename);
 }
 
 fn time_exec<F>(mut f: F) -> std::time::Duration
@@ -52,8 +53,7 @@ fn run() -> Result<(), error::Error> {
     while time < cmdline.end_time {
 
         if time >= next_output_time {
-            do_output(&vec![], output_number);
-            // do_output(&solver.primitive(), output_number);
+            do_output(&solver.primitive(), output_number);
             output_number += 1;
             next_output_time += checkpoint_interval;
         }
@@ -74,6 +74,7 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
+    do_output(&solver.primitive(), output_number);
     Ok(())
 }
 

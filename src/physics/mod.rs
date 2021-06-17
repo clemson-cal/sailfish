@@ -52,6 +52,19 @@ impl Solver {
         unsafe { solver_get_mesh(self.0) }
     }
 
+    pub fn primitive(&self) -> Vec<f64> {
+        let mut primitive = vec![0.0; self.mesh().num_total_zones() * 3];
+        unsafe { solver_get_primitive(self.0, primitive.as_mut_ptr()) };
+        primitive
+    }
+
+    pub fn set_primitive(&self, primitive: &[f64]) {
+        if primitive.len() != self.mesh().num_total_zones() * 3 {
+            panic!("wrong number of zones for primitive array")
+        }
+        unsafe { solver_set_primitive(self.0, primitive.as_ptr()) };
+    }
+
     pub fn advance(&mut self, rk_order: u32, dt: f64) {
         match rk_order {
             1 => {
@@ -95,6 +108,8 @@ extern "C" {
     pub(crate) fn solver_new(mesh: Mesh) -> *mut c_void;
     pub(crate) fn solver_del(solver: *mut c_void);
     pub(crate) fn solver_get_mesh(solver: *mut c_void) -> Mesh;
+    pub(crate) fn solver_get_primitive(solver: *mut c_void, primitive: *mut f64);
+    pub(crate) fn solver_set_primitive(solver: *mut c_void, primitive: *const f64);
     pub(crate) fn solver_new_timestep(solver: *mut c_void);
     pub(crate) fn solver_advance_rk(solver: *mut c_void, a: f64, dt: f64);
 }

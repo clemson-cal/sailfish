@@ -57,7 +57,7 @@ static __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 
 // ============================ PATCH API =====================================
 // ============================================================================
-#define GET(p, i, j) &p.data[p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1])]
+#define GET(p, i, j) (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
 #define FOR_EACH(p) for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
                     for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
 #define ELEMENTS(p) (p.count[0] * p.count[1] * NCONS)
@@ -72,19 +72,19 @@ struct Patch
     real *data;
 };
 
-// static struct Patch patch_view(int start_i, int start_j, int count_i, int count_j, real *data)
-// {
-//     struct Patch self;
-//     self.start[0] = start_i;
-//     self.start[1] = start_j;
-//     self.count[0] = count_i;
-//     self.count[1] = count_j;
-//     self.jumps[0] = NCONS * count_j;
-//     self.jumps[1] = NCONS;
-//     self.data = data;
-//     self.owned = 0;
-//     return self;
-// }
+static struct Patch patch_view(int start_i, int start_j, int count_i, int count_j, real *data)
+{
+    struct Patch self;
+    self.start[0] = start_i;
+    self.start[1] = start_j;
+    self.count[0] = count_i;
+    self.count[1] = count_j;
+    self.jumps[0] = NCONS * count_j;
+    self.jumps[1] = NCONS;
+    self.data = data;
+    self.owned = 0;
+    return self;
+}
 
 static struct Patch patch_alloc(int start_i, int start_j, int count_i, int count_j)
 {
@@ -340,6 +340,38 @@ void solver_del(struct Solver *self)
     patch_release(self->flux_i);
     patch_release(self->flux_j);
     free(self);
+}
+
+struct Mesh solver_get_mesh(struct Solver *self)
+{
+    return self->mesh;
+}
+
+void solver_get_primitive(struct Solver *self, real *primitive_data)
+{
+    struct Patch primitive = patch_view(0, 0, self->mesh.ni, self->mesh.nj, primitive_data);
+
+    FOR_EACH(primitive) {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            GET(primitive, i, j)[q] = GET(self->primitive, i, j)[q];
+        }
+    }
+}
+
+void solver_set_primitive(struct Solver *self, real *primitive_data)
+{
+    struct Patch primitive = patch_view(0, 0, self->mesh.ni, self->mesh.nj, primitive_data);
+
+    FOR_EACH(self->primitive) {
+        int ii = min2(max2(i, 0), self->mesh.ni - 1);
+        int jj = min2(max2(j, 0), self->mesh.nj - 1);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            GET(self->primitive, i, j)[q] = GET(primitive, ii, jj)[q];
+        }
+    }
 }
 
 void solver_advance_rk(struct Solver *self, real a, real dt)
