@@ -1,3 +1,4 @@
+use crate::setup::Setup;
 use std::io::Write;
 
 pub mod cmdline;
@@ -35,8 +36,20 @@ fn run() -> Result<(), error::Error> {
         dx: 2.0 / cmdline.resolution as f64,
         dy: 2.0 / cmdline.resolution as f64,
     };
-
     let mut solver = physics::Solver::new(mesh.clone());
+    let setup = setup::Explosion {};
+    let [si, sj] = mesh.strides();
+    let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
+    for i in 0..mesh.ni() {
+        for j in 0..mesh.nj() {
+            let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx;
+            let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy;
+            let n = i * si + j * sj;
+            setup.initial_primitive(x, y, &mut primitive[n..n + 3]);
+        }
+    }
+    solver.set_primitive(&primitive);
+
     let v_max = 1.0;
     let rk_order = cmdline.rk_order;
     let cfl = cmdline.cfl_number;
@@ -51,7 +64,6 @@ fn run() -> Result<(), error::Error> {
     let mut mzps_log = vec![];
 
     while time < cmdline.end_time {
-
         if time >= next_output_time {
             do_output(&solver.primitive(), output_number);
             output_number += 1;

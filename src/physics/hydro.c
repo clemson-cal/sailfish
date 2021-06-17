@@ -305,28 +305,6 @@ struct Solver *solver_new(struct Mesh mesh)
     self->grad_j = patch_alloc(i0, j0 - 1, ni, nj + 2);
     self->flux_i = patch_alloc(i0, j0, ni + 1, nj);
     self->flux_j = patch_alloc(i0, j0, ni, nj + 1);
-
-    FOR_EACH(self->primitive) {
-        real *p = GET(self->primitive, i, j);
-        real x = X(mesh, i);
-        real y = Y(mesh, j);
-
-        if (sqrt(x * x + y * y) < 0.25) {
-            p[0] = 1.0;
-            p[1] = 0.0;
-            p[2] = 0.0;
-        } else {
-            p[0] = 0.1;
-            p[1] = 0.0;
-            p[2] = 0.0;
-        }
-    }
-
-    FOR_EACH(self->conserved) {
-        real *u = GET(self->conserved, i, j);
-        real *p = GET(self->primitive, i, j);
-        primitive_to_conserved(p, u);
-    }
     return self;
 }
 
@@ -367,10 +345,14 @@ void solver_set_primitive(struct Solver *self, real *primitive_data)
         int ii = min2(max2(i, 0), self->mesh.ni - 1);
         int jj = min2(max2(j, 0), self->mesh.nj - 1);
 
+        real *pc = GET(self->primitive, i, j);
+        real *uc = GET(self->conserved, i, j);
+
         for (int q = 0; q < NCONS; ++q)
         {
-            GET(self->primitive, i, j)[q] = GET(primitive, ii, jj)[q];
+            pc[q] = GET(primitive, ii, jj)[q];
         }
+        primitive_to_conserved(pc, uc);
     }
 }
 

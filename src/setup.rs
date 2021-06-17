@@ -9,11 +9,11 @@ pub trait Setup: Sized {
     fn max_signal_speed(&self) -> Option<f64>;
 }
 
-pub struct Shocktube {}
+pub struct Explosion {}
 
-impl Setup for Shocktube {
+impl Setup for Explosion {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-        if x + y < 0.0 {
+        if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
             primitive[1] = 0.0;
             primitive[2] = 0.0;
