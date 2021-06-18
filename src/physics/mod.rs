@@ -101,7 +101,7 @@ impl Solver {
         match mode {
             ExecutionMode::CPU => unsafe { solver_new_timestep_cpu(self.0) }
             ExecutionMode::OMP => unsafe { solver_new_timestep_omp(self.0) }
-            ExecutionMode::GPU => todo!()
+            ExecutionMode::GPU => unsafe { solver_new_timestep_gpu(self.0) }
         }
     }
 
@@ -109,7 +109,7 @@ impl Solver {
         match mode {
             ExecutionMode::CPU => unsafe { solver_advance_rk_cpu(self.0, a, dt) }
             ExecutionMode::OMP => unsafe { solver_advance_rk_omp(self.0, a, dt) }
-            ExecutionMode::GPU => todo!()
+            ExecutionMode::GPU => unsafe { solver_advance_rk_gpu(self.0, a, dt) }
         }
     }
 }
@@ -128,8 +128,10 @@ extern "C" {
     pub(crate) fn solver_set_primitive(solver: *mut c_void, primitive: *const f64);
     pub(crate) fn solver_new_timestep_cpu(solver: *mut c_void);
     pub(crate) fn solver_new_timestep_omp(solver: *mut c_void);
+    pub(crate) fn solver_new_timestep_gpu(solver: *mut c_void);
     pub(crate) fn solver_advance_rk_cpu(solver: *mut c_void, a: f64, dt: f64);
     pub(crate) fn solver_advance_rk_omp(solver: *mut c_void, a: f64, dt: f64);
+    pub(crate) fn solver_advance_rk_gpu(solver: *mut c_void, a: f64, dt: f64);
 }
 
 #[repr(C)]

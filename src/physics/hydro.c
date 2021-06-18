@@ -7,19 +7,29 @@
 
 // ============================ COMPAT ========================================
 // ============================================================================
+#ifndef __NVCC__
 #define __host__
 #define __device__
-#define PREFIX iso2d_cpu
-#define CONCAT(a, b) a ## _ ## b
-#define PUBLIC(f) CONCAT(PREFIX, f)
+#endif
 
 
 // ============================ MEMORY ========================================
 // ============================================================================
+#define BUFFER_MODE_VIEW 0
+#define BUFFER_MODE_HOST 1
+#define BUFFER_MODE_DEVICE 2
+
+#ifndef __NVCC__
 static void *compute_malloc(size_t count) { return malloc(count); }
 static void compute_free(void *ptr) { free(ptr); }
-// static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
-// static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
+static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
+static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
+#else
+// static void *compute_malloc(size_t count) { void *ptr; cudaMalloc(&ptr, count); return ptr; }
+// static void compute_free(void *ptr) { cudaFree(ptr); }
+// static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice); }
+// static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost); }
+#endif
 
 
 // ============================ PHYSICS =======================================
@@ -76,11 +86,12 @@ struct Patch
     int start[2];
     int count[2];
     int jumps[2];
-    int owned;
+    int buffer_mode;
     real *data;
 };
 
-static struct Patch patch_view(int start_i, int start_j, int count_i, int count_j, real *data)
+#ifndef __NVCC__
+static struct Patch patch_new(int start_i, int start_j, int count_i, int count_j, real *data, int buffer_mode)
 {
     struct Patch self;
     self.start[0] = start_i;
@@ -89,37 +100,39 @@ static struct Patch patch_view(int start_i, int start_j, int count_i, int count_
     self.count[1] = count_j;
     self.jumps[0] = NCONS * count_j;
     self.jumps[1] = NCONS;
-    self.data = data;
-    self.owned = 0;
-    return self;
-}
+    self.buffer_mode = buffer_mode;
 
-static struct Patch patch_alloc(int start_i, int start_j, int count_i, int count_j)
-{
-    struct Patch self;
-    self.start[0] = start_i;
-    self.start[1] = start_j;
-    self.count[0] = count_i;
-    self.count[1] = count_j;
-    self.jumps[0] = NCONS * count_j;
-    self.jumps[1] = NCONS;
-    self.data = compute_malloc(NCONS * count_i * count_j * sizeof(real));
-    self.owned = 1;
-
-    for (int n = 0; n < ELEMENTS(self); ++n)
+    switch (buffer_mode)
     {
-        self.data[n] = 0.0;
+        case BUFFER_MODE_VIEW:
+            self.data = data;
+            break;
+        case BUFFER_MODE_HOST:
+            self.data = (real*)malloc(NCONS * count_i * count_j * sizeof(real));
+            break;
+        case BUFFER_MODE_DEVICE:
+            self.data = (real*)compute_malloc(NCONS * count_i * count_j * sizeof(real));
+            break;
     }
+
     return self;
 }
 
 static void patch_release(struct Patch self)
 {
-    if (self.owned)
+    switch (self.buffer_mode)
     {
-        compute_free(self.data);
+        case BUFFER_MODE_VIEW:
+            break;
+        case BUFFER_MODE_HOST:
+            free(self.data);
+            break;
+        case BUFFER_MODE_DEVICE:
+            compute_free(self.data);
+            break;
     }
 }
+#endif
 
 
 // ============================ MESH ==========================================
@@ -327,6 +340,7 @@ struct Solver
     struct Patch flux_j;
 };
 
+#ifndef __NVCC__
 struct Solver *solver_new(struct Mesh mesh)
 {
     int i0 = 0;
@@ -334,15 +348,15 @@ struct Solver *solver_new(struct Mesh mesh)
     int ni = mesh.ni;
     int nj = mesh.nj;
 
-    struct Solver *self = malloc(sizeof(struct Solver));
+    struct Solver *self = (struct Solver*)malloc(sizeof(struct Solver));
     self->mesh = mesh;
-    self->primitive = patch_alloc(i0 - 2, j0 - 2, ni + 4, nj + 4);
-    self->conserved = patch_alloc(i0, i0, ni, nj);
-    self->conserved_rk = patch_alloc(i0, j0, ni, nj);
-    self->grad_i = patch_alloc(i0 - 1, j0, ni + 2, nj);
-    self->grad_j = patch_alloc(i0, j0 - 1, ni, nj + 2);
-    self->flux_i = patch_alloc(i0, j0, ni + 1, nj);
-    self->flux_j = patch_alloc(i0, j0, ni, nj + 1);
+    self->primitive = patch_new(i0 - 2, j0 - 2, ni + 4, nj + 4, NULL, BUFFER_MODE_DEVICE);
+    self->conserved = patch_new(i0, i0, ni, nj, NULL, BUFFER_MODE_DEVICE);
+    self->conserved_rk = patch_new(i0, j0, ni, nj, NULL, BUFFER_MODE_DEVICE);
+    self->grad_i = patch_new(i0 - 1, j0, ni + 2, nj, NULL, BUFFER_MODE_DEVICE);
+    self->grad_j = patch_new(i0, j0 - 1, ni, nj + 2, NULL, BUFFER_MODE_DEVICE);
+    self->flux_i = patch_new(i0, j0, ni + 1, nj, NULL, BUFFER_MODE_DEVICE);
+    self->flux_j = patch_new(i0, j0, ni, nj + 1, NULL, BUFFER_MODE_DEVICE);
     return self;
 }
 
@@ -365,32 +379,42 @@ struct Mesh solver_get_mesh(struct Solver *self)
 
 void solver_get_primitive(struct Solver *self, real *primitive_data)
 {
-    struct Patch primitive = patch_view(0, 0, self->mesh.ni, self->mesh.nj, primitive_data);
+    struct Patch primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
 
     FOR_EACH(primitive) {
-        memcpy(GET(primitive, i, j), GET(self->primitive, i, j), NCONS * sizeof(real));
+        compute_memcpy_device_to_host(GET(primitive, i, j), GET(self->primitive, i, j), NCONS * sizeof(real));
     }
 }
 
 void solver_set_primitive(struct Solver *self, real *primitive_data)
 {
-    struct Patch primitive = patch_view(0, 0, self->mesh.ni, self->mesh.nj, primitive_data);
+    struct Patch user_primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
+    struct Patch primitive = patch_new(-2, -2, self->mesh.ni + 4, self->mesh.nj + 4, NULL, BUFFER_MODE_HOST);
+    struct Patch conserved = patch_new(0, 0, self->mesh.ni, self->mesh.nj, NULL, BUFFER_MODE_HOST);
 
     FOR_EACH(self->primitive) {
         int ii = min2(max2(i, 0), self->mesh.ni - 1);
         int jj = min2(max2(j, 0), self->mesh.nj - 1);
 
-        real *pc = GET(self->primitive, i, j);
-        real *uc = GET(self->conserved, ii, jj);
+        real *pc = GET(primitive, i, j);
+        real *uc = GET(conserved, ii, jj);
 
         for (int q = 0; q < NCONS; ++q)
         {
-            pc[q] = GET(primitive, ii, jj)[q];
+            pc[q] = GET(user_primitive, ii, jj)[q];
         }
         primitive_to_conserved(pc, uc);
     }
-}
 
+    compute_memcpy_host_to_device(self->primitive.data, primitive.data, BYTES(primitive));
+    compute_memcpy_host_to_device(self->conserved.data, conserved.data, BYTES(conserved));
+
+    patch_release(primitive);
+    patch_release(conserved);
+}
+#endif
+
+#ifndef __NVCC__
 void solver_advance_rk_cpu(struct Solver *self, real a, real dt)
 {
     struct Patch p = self->primitive;
@@ -407,7 +431,9 @@ void solver_advance_rk_cpu(struct Solver *self, real a, real dt)
     FOR_EACH(flux_j) godunov_j(p, grad_j, flux_j, i, j);
     FOR_EACH(u) update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
 }
+#endif
 
+#ifndef __NVCC__
 void solver_advance_rk_omp(struct Solver *self, real a, real dt)
 {
     struct Patch p = self->primitive;
@@ -456,7 +482,21 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
         update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
     }
 }
+#endif
 
+#ifdef __NVCC__
+extern "C" void solver_advance_rk_gpu(struct Solver *self)
+{
+    (void)self;
+}
+#elif GPU_STUBS
+void solver_advance_rk_gpu(struct Solver* self)
+{
+    (void)self;
+}
+#endif
+
+#ifndef __NVCC__
 void solver_new_timestep_cpu(struct Solver *self)
 {
     struct Patch u = self->conserved;
@@ -466,7 +506,9 @@ void solver_new_timestep_cpu(struct Solver *self)
         memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
     }
 }
+#endif
 
+#ifndef __NVCC__
 void solver_new_timestep_omp(struct Solver *self)
 {
     struct Patch u = self->conserved;
@@ -476,3 +518,16 @@ void solver_new_timestep_omp(struct Solver *self)
         memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
     }
 }
+#endif
+
+#ifdef __NVCC__
+extern "C" void solver_new_timestep_gpu(struct Solver *self)
+{
+    cudaMemcpy(self->conserved_rk.data, self->conserved.data, ELEMENTS(self->conserved), cudaMemcpyDeviceToDevice);
+}
+#elif GPU_STUBS
+void solver_new_timestep_gpu(struct Solver* self)
+{
+    (void)self;
+}
+#endif
