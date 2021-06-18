@@ -4,6 +4,7 @@ use std::fmt::Write;
 #[derive(Debug)]
 pub struct CommandLine {
     pub use_omp: bool,
+    pub use_gpu: bool,
     pub resolution: u32,
     pub fold: usize,
     pub checkpoint_interval: f64,
@@ -15,6 +16,7 @@ pub struct CommandLine {
 
 pub fn parse_command_line() -> Result<CommandLine, Error> {
     let mut c = CommandLine {
+        use_gpu: false,
         use_omp: false,
         resolution: 1024,
         fold: 100,
@@ -58,6 +60,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "usage: sailfish [--version] [--help] <[options]>").unwrap();
                     writeln!(message, "       --version             print the code version number").unwrap();
                     writeln!(message, "       -h|--help             display this help message").unwrap();
+                    #[cfg(feature = "omp")]
                     writeln!(message, "       -p|--use-omp          run with OpenMP [OMP_NUM_THREADS]").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
                     writeln!(message, "       -f|--fold             number of iterations between messages").unwrap();
@@ -68,6 +71,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       --precompute-flux     compute and store Godunov fluxes before update").unwrap();
                     return Err(Error::PrintUserInformation(message));
                 }
+                #[cfg(feature = "omp")]
                 "-p"|"--use-omp" => c.use_omp = true,
                 "-n"|"--res" => state = State::GridResolution,
                 "-f"|"--fold" => state = State::Fold,
