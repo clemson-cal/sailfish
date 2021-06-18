@@ -417,12 +417,44 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
     struct Patch grad_j = self->grad_j;
     struct Patch flux_i = self->flux_i;
     struct Patch flux_j = self->flux_j;
+    int ni = self->mesh.ni;
+    int nj = self->mesh.nj;
 
-    FOR_EACH_OMP(grad_i) gradient_i(p, grad_i, i, j);
-    FOR_EACH_OMP(grad_j) gradient_j(p, grad_j, i, j);
-    FOR_EACH_OMP(flux_i) godunov_i(p, grad_i, flux_i, i, j);
-    FOR_EACH_OMP(flux_j) godunov_j(p, grad_j, flux_j, i, j);
-    FOR_EACH_OMP(u) update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
+    #pragma omp parallel for
+    for (int i = -1; i < ni + 1; ++i)
+    {
+        for (int j = -1; j < nj + 1; ++j)
+        {
+            if (0 <= j && j < nj)
+            {
+                gradient_i(p, grad_i, i, j);
+            }
+            if (0 <= i && i < ni)
+            {
+                gradient_j(p, grad_j, i, j);
+            }
+        }
+    }
+
+    #pragma omp parallel for
+    for (int i = 0; i < ni + 1; ++i)
+    {
+        for (int j = 0; j < nj + 1; ++j)
+        {
+            if (0 <= j && j < nj)
+            {
+                godunov_i(p, grad_i, flux_i, i, j);
+            }
+            if (0 <= i && i < ni)
+            {
+                godunov_j(p, grad_j, flux_j, i, j);
+            }
+        }
+    }
+
+    FOR_EACH_OMP(u) {
+        update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
+    }
 }
 
 void solver_new_timestep_cpu(struct Solver *self)
