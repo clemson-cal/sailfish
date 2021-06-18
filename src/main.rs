@@ -44,15 +44,15 @@ where
 
 fn run() -> Result<(), error::Error> {
     use physics::f64::*;
-    let setup = setup::Shocktube {};
+    let setup = setup::Explosion {};
     let cmdline = cmdline::parse_command_line()?;
     let mesh = Mesh {
         ni: cmdline.resolution,
         nj: cmdline.resolution,
-        x0: -8.0,
-        x1: 8.0,
-        y0: -8.0,
-        y1: 8.0,
+        x0: -1.0,
+        x1: 1.0,
+        y0: -1.0,
+        y1: 1.0,
     };
     let mut solver = build_solver(mesh.clone(), cmdline.use_omp)?;
 
