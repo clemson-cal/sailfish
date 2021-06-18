@@ -436,6 +436,7 @@ void solver_advance_rk_cpu(struct Solver *self, real a, real dt)
 #ifndef __NVCC__
 void solver_advance_rk_omp(struct Solver *self, real a, real dt)
 {
+#ifdef _OPENMP
     struct Patch p = self->primitive;
     struct Patch u = self->conserved;
     struct Patch u0 = self->conserved_rk;
@@ -481,6 +482,11 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
     FOR_EACH_OMP(u) {
         update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
     }
+#else // avoid unused variable warnings
+    (void)self;
+    (void)a;
+    (void)dt;
+#endif
 }
 #endif
 
@@ -511,12 +517,16 @@ void solver_new_timestep_cpu(struct Solver *self)
 #ifndef __NVCC__
 void solver_new_timestep_omp(struct Solver *self)
 {
+#ifdef _OPENMP
     struct Patch u = self->conserved;
     struct Patch u0 = self->conserved_rk;
 
     FOR_EACH_OMP(u0) {
         memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
     }
+#else // avoid unused variable warnings
+    (void)self;
+#endif
 }
 #endif
 
