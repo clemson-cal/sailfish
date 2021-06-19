@@ -16,8 +16,8 @@ fn main() {
             .file("src/physics/hydro.cu")
             .cuda(true)
             .compile("hydro_gpu");
-            println!("cargo:rustc-link-lib=cudart");
-            println!("cargo:rustc-link-lib=cuda");
+
+        println!("cargo:rustc-link-lib=dylib=cudart");
     }
 
     #[cfg(not(feature = "cuda"))]
