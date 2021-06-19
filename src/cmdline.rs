@@ -16,10 +16,10 @@ pub struct CommandLine {
 
 pub fn parse_command_line() -> Result<CommandLine, Error> {
     let mut c = CommandLine {
-        use_gpu: false,
         use_omp: false,
+        use_gpu: false,
         resolution: 1024,
-        fold: 100,
+        fold: 10,
         checkpoint_interval: 1.0,
         end_time: 1.0,
         rk_order: 1,
@@ -62,17 +62,21 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -h|--help             display this help message").unwrap();
                     #[cfg(feature = "omp")]
                     writeln!(message, "       -p|--use-omp          run with OpenMP [OMP_NUM_THREADS]").unwrap();
+                    #[cfg(feature = "cuda")]
+                    writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
-                    writeln!(message, "       -f|--fold             number of iterations between messages").unwrap();
-                    writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints").unwrap();
-                    writeln!(message, "       -e|--end-time         simulation end time").unwrap();
-                    writeln!(message, "       -r|--rk-order         Rnuge-Kutta integration order [1|2|3]").unwrap();
-                    writeln!(message, "       --cfl                 CFL number").unwrap();
+                    writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
+                    writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints [1.0]").unwrap();
+                    writeln!(message, "       -e|--end-time         simulation end time [1.0]").unwrap();
+                    writeln!(message, "       -r|--rk-order         Rnuge-Kutta integration order [(1)|2|3]").unwrap();
+                    writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
                     writeln!(message, "       --precompute-flux     compute and store Godunov fluxes before update").unwrap();
                     return Err(Error::PrintUserInformation(message));
                 }
                 #[cfg(feature = "omp")]
                 "-p"|"--use-omp" => c.use_omp = true,
+                #[cfg(feature = "cuda")]
+                "-g"|"--use-gpu" => c.use_gpu = true,
                 "-n"|"--res" => state = State::GridResolution,
                 "-f"|"--fold" => state = State::Fold,
                 "-c"|"--checkpoint" => state = State::Checkpoint,

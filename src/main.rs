@@ -37,10 +37,10 @@ fn run() -> Result<(), error::Error> {
         dx: 2.0 / cmdline.resolution as f64,
         dy: 2.0 / cmdline.resolution as f64,
     };
-    let mode = if cmdline.use_omp {
-        ExecutionMode::OMP
-    } else {
-        ExecutionMode::CPU
+    let mode = match (cmdline.use_omp, cmdline.use_gpu) {
+        (false, false) => ExecutionMode::CPU,
+        (true, false) => ExecutionMode::OMP,
+        (_, true) => ExecutionMode::GPU,
     };
 
     let mut solver = physics::Solver::new(mesh.clone(), mode);

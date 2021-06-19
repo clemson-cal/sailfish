@@ -1,6 +1,7 @@
 #include <stddef.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdio.h>
 #include <math.h>
 #include <time.h>
 
@@ -368,6 +369,13 @@ EXTERN_C struct Solver *PUBLIC(solver_new)(struct Mesh mesh)
     self->grad_j = patch_new(i0, j0 - 1, ni, nj + 2, NULL, BUFFER_MODE_DEVICE);
     self->flux_i = patch_new(i0, j0, ni + 1, nj, NULL, BUFFER_MODE_DEVICE);
     self->flux_j = patch_new(i0, j0, ni, nj + 1, NULL, BUFFER_MODE_DEVICE);
+
+#ifdef __NVCC__
+    cudaError_t error = cudaGetLastError();
+    if (error)
+        printf("%s\n", cudaGetErrorString(error));
+#endif
+
     return self;
 }
 
@@ -475,10 +483,14 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
 }
 
 #elif defined __NVCC__
-void __global__ kernel_advance_rk_gpu(struct Mesh mesh, struct Patch primitive, real a, real dt)
+void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive, real a, real dt)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (i >= mesh.ni || j >= mesh.nj) {
+        return;
+    }
 
     real *pc = GET(primitive, i, j);
     real *pli = GET(primitive, i - 1, j);
@@ -505,7 +517,7 @@ void __global__ kernel_advance_rk_gpu(struct Mesh mesh, struct Patch primitive, 
     {
         uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
     }
-    __syncthreads();
+    // __syncthreads();
     conserved_to_primitive(uc, pc);
 }
 
@@ -513,7 +525,12 @@ EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
 {
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((self->mesh.ni + bs.x - 1) / bs.x, (self->mesh.nj + bs.y - 1) / bs.y);
-    kernel_advance_rk_gpu<<<bs, bd>>>(self->mesh, self->primitive, a, dt);
+    kernel_advance_rk<<<bd, bs>>>(self->mesh, self->primitive, a, dt);
+    cudaDeviceSynchronize();
+
+    cudaError_t error = cudaGetLastError();
+    if (error)
+        printf("%s\n", cudaGetErrorString(error));
 }
 
 #elif defined GPU_STUBS
