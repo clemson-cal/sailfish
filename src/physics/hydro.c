@@ -396,40 +396,50 @@ EXTERN_C struct Mesh PUBLIC(solver_get_mesh)(struct Solver *self)
     return self->mesh;
 }
 
-EXTERN_C void PUBLIC(solver_get_primitive)(struct Solver *self, real *primitive_data)
+EXTERN_C void PUBLIC(solver_get_primitive)(struct Solver *self, real *data)
 {
-    struct Patch primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
+    struct Patch user_primitive = patch_new( 0,  0, self->mesh.ni + 0, self->mesh.nj + 0, data, BUFFER_MODE_VIEW);
+    struct Patch host_primitive = patch_new(-2, -2, self->mesh.ni + 4, self->mesh.nj + 4, NULL, BUFFER_MODE_HOST);
+    compute_memcpy_device_to_host(host_primitive.data, self->primitive.data, BYTES(host_primitive));
 
-    FOR_EACH(primitive) {
-        compute_memcpy_device_to_host(GET(primitive, i, j), GET(self->primitive, i, j), NCONS * sizeof(real));
-    }
-}
-
-EXTERN_C void PUBLIC(solver_set_primitive)(struct Solver *self, real *primitive_data)
-{
-    struct Patch user_primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
-    struct Patch primitive = patch_new(-2, -2, self->mesh.ni + 4, self->mesh.nj + 4, NULL, BUFFER_MODE_HOST);
-    struct Patch conserved = patch_new(0, 0, self->mesh.ni, self->mesh.nj, NULL, BUFFER_MODE_HOST);
-
-    FOR_EACH(self->primitive) {
-        int ii = min2(max2(i, 0), self->mesh.ni - 1);
-        int jj = min2(max2(j, 0), self->mesh.nj - 1);
-
-        real *pc = GET(primitive, i, j);
-        real *uc = GET(conserved, ii, jj);
+    FOR_EACH(user_primitive) {
+        real *ps = GET(host_primitive, i, j);
+        real *pd = GET(user_primitive, i, j);
 
         for (int q = 0; q < NCONS; ++q)
         {
-            pc[q] = GET(user_primitive, ii, jj)[q];
+            pd[q] = ps[q];
+        }        
+    }
+    patch_release(host_primitive);
+}
+
+EXTERN_C void PUBLIC(solver_set_primitive)(struct Solver *self, real *data)
+{
+    struct Patch user_primitive = patch_new( 0,  0, self->mesh.ni + 0, self->mesh.nj + 0, data, BUFFER_MODE_VIEW);
+    struct Patch host_primitive = patch_new(-2, -2, self->mesh.ni + 4, self->mesh.nj + 4, NULL, BUFFER_MODE_HOST);
+    struct Patch host_conserved = patch_new( 0,  0, self->mesh.ni + 0, self->mesh.nj + 0, NULL, BUFFER_MODE_HOST);
+
+    FOR_EACH(host_primitive) {
+        int ii = min2(max2(i, 0), self->mesh.ni - 1);
+        int jj = min2(max2(j, 0), self->mesh.nj - 1);
+
+        real *ps = GET(user_primitive, ii, jj);
+        real *pd = GET(host_primitive, i, j);
+        real *ud = GET(host_conserved, ii, jj);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            pd[q] = ps[q];
         }
-        primitive_to_conserved(pc, uc);
+        primitive_to_conserved(pd, ud);
     }
 
-    compute_memcpy_host_to_device(self->primitive.data, primitive.data, BYTES(primitive));
-    compute_memcpy_host_to_device(self->conserved.data, conserved.data, BYTES(conserved));
+    compute_memcpy_host_to_device(self->primitive.data, host_primitive.data, BYTES(host_primitive));
+    compute_memcpy_host_to_device(self->conserved.data, host_conserved.data, BYTES(host_conserved));
 
-    patch_release(primitive);
-    patch_release(conserved);
+    patch_release(host_primitive);
+    patch_release(host_conserved);
 }
 
 #ifdef _OPENMP
@@ -517,7 +527,7 @@ void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive, real
     {
         uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
     }
-    // __syncthreads();
+    __syncthreads();
     conserved_to_primitive(uc, pc);
 }
 
