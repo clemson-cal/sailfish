@@ -13,8 +13,9 @@ fn main() {
     #[cfg(feature = "cuda")]
     {
         cc::Build::new()
-            .file("src/physics/hydro.cu")
+            .file("src/physics/hydro.c")
             .cuda(true)
+            .flag("-x=cu")
             .compile("hydro_gpu");
 
         println!("cargo:rustc-link-lib=dylib=cudart");
