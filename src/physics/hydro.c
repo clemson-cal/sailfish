@@ -475,11 +475,45 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
 }
 
 #elif defined __NVCC__
+void __global__ kernel_advance_rk_gpu(struct Mesh mesh, struct Patch primitive, real a, real dt)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+
+    real *pc = GET(primitive, i, j);
+    real *pli = GET(primitive, i - 1, j);
+    real *pri = GET(primitive, i + 1, j);
+    real *plj = GET(primitive, i, j - 1);
+    real *prj = GET(primitive, i, j + 1);
+
+    real fli[NCONS];
+    real fri[NCONS];
+    real flj[NCONS];
+    real frj[NCONS];
+    real uc[NCONS];
+
+    riemann_hlle(pli, pc, fli, 1.0, 0);
+    riemann_hlle(pc, pri, fri, 1.0, 0);
+    riemann_hlle(plj, pc, flj, 1.0, 1);
+    riemann_hlle(pc, prj, frj, 1.0, 1);
+
+    real dx = mesh.dx;
+    real dy = mesh.dy;
+    primitive_to_conserved(pc, uc);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+    }
+    __syncthreads();
+    conserved_to_primitive(uc, pc);
+}
+
 EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
 {
-    (void)self;
-    (void)a;
-    (void)dt;
+    dim3 bs = dim3(8, 8);
+    dim3 bd = dim3((self->mesh.ni + bs.x - 1) / bs.x, (self->mesh.nj + bs.y - 1) / bs.y);
+    kernel_advance_rk_gpu<<<bs, bd>>>(self->mesh, self->primitive, a, dt);
 }
 
 #elif defined GPU_STUBS
