@@ -10,12 +10,16 @@
 #define CONCAT(a, b) a ## _ ## b
 #ifdef _OPENMP
 #define PUBLIC(f) CONCAT(f, omp)
+#define EXTERN_C
 #elif defined __NVCC__
 #define PUBLIC(f) CONCAT(f, gpu)
+#define EXTERN_C extern "C"
 #elif defined GPU_STUBS
 #define PUBLIC(f) CONCAT(f, gpu)
+#define EXTERN_C
 #else
 #define PUBLIC(f) CONCAT(f, cpu)
+#define EXTERN_C
 #endif
 #ifndef __NVCC__
 #define __device__
@@ -170,7 +174,7 @@ static __device__ void conserved_to_primitive(const real *cons, real *prim)
     prim[2] = vy;
 }
 
-static __device__ void primitive_to_conserved(const real *prim, real *cons)
+static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons)
 {
     const real rho = prim[0];
     const real vx = prim[1];
@@ -348,7 +352,7 @@ struct Solver
     struct Patch flux_j;
 };
 
-struct Solver *PUBLIC(solver_new)(struct Mesh mesh)
+EXTERN_C struct Solver *PUBLIC(solver_new)(struct Mesh mesh)
 {
     int i0 = 0;
     int j0 = 0;
@@ -367,7 +371,7 @@ struct Solver *PUBLIC(solver_new)(struct Mesh mesh)
     return self;
 }
 
-void PUBLIC(solver_del)(struct Solver *self)
+EXTERN_C void PUBLIC(solver_del)(struct Solver *self)
 {
     patch_release(self->primitive);
     patch_release(self->conserved);
@@ -379,12 +383,12 @@ void PUBLIC(solver_del)(struct Solver *self)
     free(self);
 }
 
-struct Mesh PUBLIC(solver_get_mesh)(struct Solver *self)
+EXTERN_C struct Mesh PUBLIC(solver_get_mesh)(struct Solver *self)
 {
     return self->mesh;
 }
 
-void PUBLIC(solver_get_primitive)(struct Solver *self, real *primitive_data)
+EXTERN_C void PUBLIC(solver_get_primitive)(struct Solver *self, real *primitive_data)
 {
     struct Patch primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
 
@@ -393,7 +397,7 @@ void PUBLIC(solver_get_primitive)(struct Solver *self, real *primitive_data)
     }
 }
 
-void PUBLIC(solver_set_primitive)(struct Solver *self, real *primitive_data)
+EXTERN_C void PUBLIC(solver_set_primitive)(struct Solver *self, real *primitive_data)
 {
     struct Patch user_primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
     struct Patch primitive = patch_new(-2, -2, self->mesh.ni + 4, self->mesh.nj + 4, NULL, BUFFER_MODE_HOST);
@@ -471,7 +475,7 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
 }
 
 #elif defined __NVCC__
-extern "C" void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
+EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
 {
     (void)self;
     (void)a;
@@ -517,7 +521,7 @@ void solver_new_timestep_omp(struct Solver *self)
 }
 
 #elif defined __NVCC__
-extern "C" void solver_new_timestep_gpu(struct Solver *self)
+EXTERN_C void solver_new_timestep_gpu(struct Solver *self)
 {
     cudaMemcpy(self->conserved_rk.data, self->conserved.data, ELEMENTS(self->conserved), cudaMemcpyDeviceToDevice);
 }
