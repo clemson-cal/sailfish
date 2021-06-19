@@ -45,49 +45,71 @@ pub enum ExecutionMode {
 }
 
 #[repr(C)]
-pub struct Solver(*mut c_void);
+pub struct Solver(*mut c_void, ExecutionMode);
 
 impl Solver {
     /// Creates a new solver instance from a mesh instance.
-    pub fn new(mesh: Mesh) -> Self {
-        unsafe { Self(solver_new(mesh.clone())) }
+    pub fn new(mesh: Mesh, mode: ExecutionMode) -> Self {
+        match mode {
+            ExecutionMode::CPU => Self(unsafe { solver_new_cpu(mesh) }, mode),
+            ExecutionMode::OMP => Self(unsafe { solver_new_omp(mesh) }, mode),
+            ExecutionMode::GPU => Self(unsafe { solver_new_gpu(mesh) }, mode),
+        }
     }
 
     /// Retrieves a copy of the mesh struct used to create this solver
     /// instance.
     pub fn mesh(&self) -> Mesh {
-        unsafe { solver_get_mesh(self.0) }
+        match self.1 {
+            ExecutionMode::CPU => unsafe { solver_get_mesh_cpu(self.0) },
+            ExecutionMode::OMP => unsafe { solver_get_mesh_omp(self.0) },
+            ExecutionMode::GPU => unsafe { solver_get_mesh_gpu(self.0) },
+        }
     }
 
+    /// Retrieves a copy of the primitive variable array.
     pub fn primitive(&self) -> Vec<f64> {
         let mut primitive = vec![0.0; self.mesh().num_total_zones() * 3];
-        unsafe { solver_get_primitive(self.0, primitive.as_mut_ptr()) };
+        match self.1 {
+            ExecutionMode::CPU => unsafe { solver_get_primitive_cpu(self.0, primitive.as_mut_ptr()) }
+            ExecutionMode::OMP => unsafe { solver_get_primitive_omp(self.0, primitive.as_mut_ptr()) }
+            ExecutionMode::GPU => unsafe { solver_get_primitive_gpu(self.0, primitive.as_mut_ptr()) }
+        }
         primitive
     }
 
+    /// Sets the primitive variable array. The data is row-major (the last
+    /// index increases fastest), and each element must contain the same
+    /// number of doubles as there are primitive quantities.
     pub fn set_primitive(&self, primitive: &[f64]) {
         if primitive.len() != self.mesh().num_total_zones() * 3 {
             panic!("wrong number of zones for primitive array")
         }
-        unsafe { solver_set_primitive(self.0, primitive.as_ptr()) };
+        match self.1 {
+            ExecutionMode::CPU => unsafe { solver_set_primitive_cpu(self.0, primitive.as_ptr()) }
+            ExecutionMode::OMP => unsafe { solver_set_primitive_omp(self.0, primitive.as_ptr()) }
+            ExecutionMode::GPU => unsafe { solver_set_primitive_gpu(self.0, primitive.as_ptr()) }
+        }
     }
 
-    pub fn advance(&mut self, rk_order: u32, dt: f64, mode: ExecutionMode) {
+    /// Advances the solution by the given time step, using a low-storage
+    /// Runge-Kutta of the given order (1, 2, or 3).
+    pub fn advance(&mut self, rk_order: u32, dt: f64) {
         match rk_order {
             1 => {
-                self.new_timestep(mode);
-                self.advance_rk(0.0, dt, mode);
+                self.new_timestep();
+                self.advance_rk(0.0, dt);
             }
             2 => {
-                self.new_timestep(mode);
-                self.advance_rk(0./1., dt, mode);
-                self.advance_rk(1./2., dt, mode);
+                self.new_timestep();
+                self.advance_rk(0./1., dt);
+                self.advance_rk(1./2., dt);
             }
             3 => {
-                self.new_timestep(mode);
-                self.advance_rk(0./1., dt, mode);
-                self.advance_rk(3./4., dt, mode);
-                self.advance_rk(1./3., dt, mode);
+                self.new_timestep();
+                self.advance_rk(0./1., dt);
+                self.advance_rk(3./4., dt);
+                self.advance_rk(1./3., dt);
             }
             _ => {
                 panic!("invalid runge-kutta order")
@@ -97,16 +119,16 @@ impl Solver {
 
     /// Caches the conserved variables to the start of the time step to
     /// prepare for RK integration steps.
-    fn new_timestep(&mut self, mode: ExecutionMode) {
-        match mode {
+    fn new_timestep(&mut self) {
+        match self.1 {
             ExecutionMode::CPU => unsafe { solver_new_timestep_cpu(self.0) }
             ExecutionMode::OMP => unsafe { solver_new_timestep_omp(self.0) }
             ExecutionMode::GPU => unsafe { solver_new_timestep_gpu(self.0) }
         }
     }
 
-    fn advance_rk(&mut self, a: f64, dt: f64, mode: ExecutionMode) {
-        match mode {
+    fn advance_rk(&mut self, a: f64, dt: f64) {
+        match self.1 {
             ExecutionMode::CPU => unsafe { solver_advance_rk_cpu(self.0, a, dt) }
             ExecutionMode::OMP => unsafe { solver_advance_rk_omp(self.0, a, dt) }
             ExecutionMode::GPU => unsafe { solver_advance_rk_gpu(self.0, a, dt) }
@@ -116,16 +138,30 @@ impl Solver {
 
 impl Drop for Solver {
     fn drop(&mut self) {
-        unsafe { solver_del(self.0) }
+        match self.1 {
+            ExecutionMode::CPU => unsafe { solver_del_cpu(self.0) }
+            ExecutionMode::OMP => unsafe { solver_del_omp(self.0) }
+            ExecutionMode::GPU => unsafe { solver_del_gpu(self.0) }
+        }
     }
 }
 
 extern "C" {
-    pub(crate) fn solver_new(mesh: Mesh) -> *mut c_void;
-    pub(crate) fn solver_del(solver: *mut c_void);
-    pub(crate) fn solver_get_mesh(solver: *mut c_void) -> Mesh;
-    pub(crate) fn solver_get_primitive(solver: *mut c_void, primitive: *mut f64);
-    pub(crate) fn solver_set_primitive(solver: *mut c_void, primitive: *const f64);
+    pub(crate) fn solver_new_cpu(mesh: Mesh) -> *mut c_void;
+    pub(crate) fn solver_new_omp(mesh: Mesh) -> *mut c_void;
+    pub(crate) fn solver_new_gpu(mesh: Mesh) -> *mut c_void;
+    pub(crate) fn solver_del_cpu(solver: *mut c_void);
+    pub(crate) fn solver_del_omp(solver: *mut c_void);
+    pub(crate) fn solver_del_gpu(solver: *mut c_void);
+    pub(crate) fn solver_get_mesh_cpu(solver: *mut c_void) -> Mesh;
+    pub(crate) fn solver_get_mesh_omp(solver: *mut c_void) -> Mesh;
+    pub(crate) fn solver_get_mesh_gpu(solver: *mut c_void) -> Mesh;
+    pub(crate) fn solver_get_primitive_cpu(solver: *mut c_void, primitive: *mut f64);
+    pub(crate) fn solver_get_primitive_omp(solver: *mut c_void, primitive: *mut f64);
+    pub(crate) fn solver_get_primitive_gpu(solver: *mut c_void, primitive: *mut f64);
+    pub(crate) fn solver_set_primitive_cpu(solver: *mut c_void, primitive: *const f64);
+    pub(crate) fn solver_set_primitive_omp(solver: *mut c_void, primitive: *const f64);
+    pub(crate) fn solver_set_primitive_gpu(solver: *mut c_void, primitive: *const f64);
     pub(crate) fn solver_new_timestep_cpu(solver: *mut c_void);
     pub(crate) fn solver_new_timestep_omp(solver: *mut c_void);
     pub(crate) fn solver_new_timestep_gpu(solver: *mut c_void);

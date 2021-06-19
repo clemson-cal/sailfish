@@ -37,7 +37,13 @@ fn run() -> Result<(), error::Error> {
         dx: 2.0 / cmdline.resolution as f64,
         dy: 2.0 / cmdline.resolution as f64,
     };
-    let mut solver = physics::Solver::new(mesh.clone());
+    let mode = if cmdline.use_omp {
+        ExecutionMode::OMP
+    } else {
+        ExecutionMode::CPU
+    };
+
+    let mut solver = physics::Solver::new(mesh.clone(), mode);
     let setup = setup::Explosion {};
     let [si, sj] = mesh.strides();
     let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
@@ -57,11 +63,6 @@ fn run() -> Result<(), error::Error> {
     let fold = cmdline.fold;
     let checkpoint_interval = cmdline.checkpoint_interval;
     let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
-    let mode = if cmdline.use_omp {
-        ExecutionMode::OMP
-    } else {
-        ExecutionMode::CPU
-    };
 
     let mut time = 0.0;
     let mut iteration = 0;
@@ -78,7 +79,7 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                solver.advance(rk_order, dt, mode);
+                solver.advance(rk_order, dt);
                 time += dt;
                 iteration += 1;
             }

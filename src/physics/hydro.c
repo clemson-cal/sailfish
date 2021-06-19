@@ -7,9 +7,19 @@
 
 // ============================ COMPAT ========================================
 // ============================================================================
+#define CONCAT(a, b) a ## _ ## b
+#ifdef _OPENMP
+#define PUBLIC(f) CONCAT(f, omp)
+#elif defined __NVCC__
+#define PUBLIC(f) CONCAT(f, gpu)
+#elif defined GPU_STUBS
+#define PUBLIC(f) CONCAT(f, gpu)
+#else
+#define PUBLIC(f) CONCAT(f, cpu)
+#endif
 #ifndef __NVCC__
-#define __host__
 #define __device__
+#define __host__
 #endif
 
 
@@ -25,10 +35,10 @@ static void compute_free(void *ptr) { free(ptr); }
 static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
 static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
 #else
-// static void *compute_malloc(size_t count) { void *ptr; cudaMalloc(&ptr, count); return ptr; }
-// static void compute_free(void *ptr) { cudaFree(ptr); }
-// static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice); }
-// static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost); }
+static void *compute_malloc(size_t count) { void *ptr; cudaMalloc(&ptr, count); return ptr; }
+static void compute_free(void *ptr) { cudaFree(ptr); }
+static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice); }
+static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost); }
 #endif
 
 
@@ -90,7 +100,6 @@ struct Patch
     real *data;
 };
 
-#ifndef __NVCC__
 static struct Patch patch_new(int start_i, int start_j, int count_i, int count_j, real *data, int buffer_mode)
 {
     struct Patch self;
@@ -132,7 +141,6 @@ static void patch_release(struct Patch self)
             break;
     }
 }
-#endif
 
 
 // ============================ MESH ==========================================
@@ -340,8 +348,7 @@ struct Solver
     struct Patch flux_j;
 };
 
-#ifndef __NVCC__
-struct Solver *solver_new(struct Mesh mesh)
+struct Solver *PUBLIC(solver_new)(struct Mesh mesh)
 {
     int i0 = 0;
     int j0 = 0;
@@ -360,7 +367,7 @@ struct Solver *solver_new(struct Mesh mesh)
     return self;
 }
 
-void solver_del(struct Solver *self)
+void PUBLIC(solver_del)(struct Solver *self)
 {
     patch_release(self->primitive);
     patch_release(self->conserved);
@@ -372,12 +379,12 @@ void solver_del(struct Solver *self)
     free(self);
 }
 
-struct Mesh solver_get_mesh(struct Solver *self)
+struct Mesh PUBLIC(solver_get_mesh)(struct Solver *self)
 {
     return self->mesh;
 }
 
-void solver_get_primitive(struct Solver *self, real *primitive_data)
+void PUBLIC(solver_get_primitive)(struct Solver *self, real *primitive_data)
 {
     struct Patch primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
 
@@ -386,7 +393,7 @@ void solver_get_primitive(struct Solver *self, real *primitive_data)
     }
 }
 
-void solver_set_primitive(struct Solver *self, real *primitive_data)
+void PUBLIC(solver_set_primitive)(struct Solver *self, real *primitive_data)
 {
     struct Patch user_primitive = patch_new(0, 0, self->mesh.ni, self->mesh.nj, primitive_data, BUFFER_MODE_VIEW);
     struct Patch primitive = patch_new(-2, -2, self->mesh.ni + 4, self->mesh.nj + 4, NULL, BUFFER_MODE_HOST);
@@ -412,31 +419,10 @@ void solver_set_primitive(struct Solver *self, real *primitive_data)
     patch_release(primitive);
     patch_release(conserved);
 }
-#endif
 
-#ifndef __NVCC__
-void solver_advance_rk_cpu(struct Solver *self, real a, real dt)
-{
-    struct Patch p = self->primitive;
-    struct Patch u = self->conserved;
-    struct Patch u0 = self->conserved_rk;
-    struct Patch grad_i = self->grad_i;
-    struct Patch grad_j = self->grad_j;
-    struct Patch flux_i = self->flux_i;
-    struct Patch flux_j = self->flux_j;
-
-    FOR_EACH(grad_i) gradient_i(p, grad_i, i, j);
-    FOR_EACH(grad_j) gradient_j(p, grad_j, i, j);
-    FOR_EACH(flux_i) godunov_i(p, grad_i, flux_i, i, j);
-    FOR_EACH(flux_j) godunov_j(p, grad_j, flux_j, i, j);
-    FOR_EACH(u) update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
-}
-#endif
-
-#ifndef __NVCC__
+#ifdef _OPENMP
 void solver_advance_rk_omp(struct Solver *self, real a, real dt)
 {
-#ifdef _OPENMP
     struct Patch p = self->primitive;
     struct Patch u = self->conserved;
     struct Patch u0 = self->conserved_rk;
@@ -482,27 +468,67 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
     FOR_EACH_OMP(u) {
         update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
     }
-#else // avoid unused variable warnings
+}
+
+#elif defined __NVCC__
+extern "C" void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
+{
     (void)self;
     (void)a;
     (void)dt;
-#endif
+}
+
+#elif defined GPU_STUBS
+void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
+{
+    (void)self;
+    (void)a;
+    (void)dt;
+}
+
+#else
+void solver_advance_rk_cpu(struct Solver *self, real a, real dt)
+{
+    struct Patch p = self->primitive;
+    struct Patch u = self->conserved;
+    struct Patch u0 = self->conserved_rk;
+    struct Patch grad_i = self->grad_i;
+    struct Patch grad_j = self->grad_j;
+    struct Patch flux_i = self->flux_i;
+    struct Patch flux_j = self->flux_j;
+
+    FOR_EACH(grad_i) gradient_i(p, grad_i, i, j);
+    FOR_EACH(grad_j) gradient_j(p, grad_j, i, j);
+    FOR_EACH(flux_i) godunov_i(p, grad_i, flux_i, i, j);
+    FOR_EACH(flux_j) godunov_j(p, grad_j, flux_j, i, j);
+    FOR_EACH(u) update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
 }
 #endif
 
-#ifdef __NVCC__
-extern "C" void solver_advance_rk_gpu(struct Solver *self)
+#ifdef _OPENMP
+void solver_new_timestep_omp(struct Solver *self)
 {
-    (void)self;
-}
-#elif GPU_STUBS
-void solver_advance_rk_gpu(struct Solver* self)
-{
-    (void)self;
-}
-#endif
+    struct Patch u = self->conserved;
+    struct Patch u0 = self->conserved_rk;
 
-#ifndef __NVCC__
+    FOR_EACH_OMP(u0) {
+        memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
+    }
+}
+
+#elif defined __NVCC__
+extern "C" void solver_new_timestep_gpu(struct Solver *self)
+{
+    cudaMemcpy(self->conserved_rk.data, self->conserved.data, ELEMENTS(self->conserved), cudaMemcpyDeviceToDevice);
+}
+
+#elif defined GPU_STUBS
+void solver_new_timestep_gpu(struct Solver* self)
+{
+    (void)self;
+}
+
+#else
 void solver_new_timestep_cpu(struct Solver *self)
 {
     struct Patch u = self->conserved;
@@ -512,32 +538,5 @@ void solver_new_timestep_cpu(struct Solver *self)
         memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
     }
 }
-#endif
 
-#ifndef __NVCC__
-void solver_new_timestep_omp(struct Solver *self)
-{
-#ifdef _OPENMP
-    struct Patch u = self->conserved;
-    struct Patch u0 = self->conserved_rk;
-
-    FOR_EACH_OMP(u0) {
-        memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
-    }
-#else // avoid unused variable warnings
-    (void)self;
-#endif
-}
-#endif
-
-#ifdef __NVCC__
-extern "C" void solver_new_timestep_gpu(struct Solver *self)
-{
-    cudaMemcpy(self->conserved_rk.data, self->conserved.data, ELEMENTS(self->conserved), cudaMemcpyDeviceToDevice);
-}
-#elif GPU_STUBS
-void solver_new_timestep_gpu(struct Solver* self)
-{
-    (void)self;
-}
 #endif
