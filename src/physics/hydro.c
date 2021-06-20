@@ -39,11 +39,13 @@ static void *compute_malloc(size_t count) { return malloc(count); }
 static void compute_free(void *ptr) { free(ptr); }
 static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
 static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
+static void compute_memcpy_device_to_device(void *dst, const void *src, size_t count) { memcpy(dst, src, count); }
 #else
 static void *compute_malloc(size_t count) { void *ptr; cudaMalloc(&ptr, count); return ptr; }
 static void compute_free(void *ptr) { cudaFree(ptr); }
 static void compute_memcpy_host_to_device(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyHostToDevice); }
 static void compute_memcpy_device_to_host(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyDeviceToHost); }
+static void compute_memcpy_device_to_device(void *dst, const void *src, size_t count) { cudaMemcpy(dst, src, count, cudaMemcpyDeviceToDevice); }
 #endif
 
 
@@ -345,6 +347,7 @@ struct Solver
 {
     struct Mesh mesh;
     struct Patch primitive;
+    struct Patch primitive_out;
     struct Patch conserved;
     struct Patch conserved_rk;
     struct Patch grad_i;
@@ -362,7 +365,8 @@ EXTERN_C struct Solver *PUBLIC(solver_new)(struct Mesh mesh)
 
     struct Solver *self = (struct Solver*)malloc(sizeof(struct Solver));
     self->mesh = mesh;
-    self->primitive = patch_new(i0 - 2, j0 - 2, ni + 4, nj + 4, NULL, BUFFER_MODE_DEVICE);
+    self->primitive     = patch_new(i0 - 2, j0 - 2, ni + 4, nj + 4, NULL, BUFFER_MODE_DEVICE);
+    self->primitive_out = patch_new(i0 - 2, j0 - 2, ni + 4, nj + 4, NULL, BUFFER_MODE_DEVICE);
     self->conserved = patch_new(i0, i0, ni, nj, NULL, BUFFER_MODE_DEVICE);
     self->conserved_rk = patch_new(i0, j0, ni, nj, NULL, BUFFER_MODE_DEVICE);
     self->grad_i = patch_new(i0 - 1, j0, ni + 2, nj, NULL, BUFFER_MODE_DEVICE);
@@ -382,6 +386,7 @@ EXTERN_C struct Solver *PUBLIC(solver_new)(struct Mesh mesh)
 EXTERN_C void PUBLIC(solver_del)(struct Solver *self)
 {
     patch_release(self->primitive);
+    patch_release(self->primitive_out);
     patch_release(self->conserved);
     patch_release(self->conserved_rk);
     patch_release(self->grad_i);
@@ -437,6 +442,7 @@ EXTERN_C void PUBLIC(solver_set_primitive)(struct Solver *self, real *data)
 
     compute_memcpy_host_to_device(self->primitive.data, host_primitive.data, BYTES(host_primitive));
     compute_memcpy_host_to_device(self->conserved.data, host_conserved.data, BYTES(host_conserved));
+    compute_memcpy_device_to_device(self->primitive_out.data, self->primitive.data, BYTES(self->primitive));
 
     patch_release(host_primitive);
     patch_release(host_conserved);
@@ -515,7 +521,7 @@ void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive, real
     real flj[NCONS];
     real frj[NCONS];
     real uc[NCONS];
-    real un[NCONS];
+    // real un[NCONS];
 
     riemann_hlle(pli, pc, fli, 1.0, 0);
     riemann_hlle(pc, pri, fri, 1.0, 0);
@@ -525,33 +531,76 @@ void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive, real
 
     for (int q = 0; q < NCONS; ++q)
     {
-        un[q] = uc[q];
+        // un[q] = uc[q];
         uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
     }
     __syncthreads();
     conserved_to_primitive(uc, pc);
 
-    riemann_hlle(pli, pc, fli, 1.0, 0);
-    riemann_hlle(pc, pri, fri, 1.0, 0);
-    riemann_hlle(plj, pc, flj, 1.0, 1);
-    riemann_hlle(pc, prj, frj, 1.0, 1);
+    // riemann_hlle(pli, pc, fli, 1.0, 0);
+    // riemann_hlle(pc, pri, fri, 1.0, 0);
+    // riemann_hlle(plj, pc, flj, 1.0, 1);
+    // riemann_hlle(pc, prj, frj, 1.0, 1);
 
-    real a = 0.5;
+    // real a = 0.5;
+
+    // for (int q = 0; q < NCONS; ++q)
+    // {
+    //     uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+    //     uc[q] = (1.0 - a) * uc[q] + a * un[q];
+    // }
+    // __syncthreads();
+    // conserved_to_primitive(uc, pc);
+}
+
+void __global__ kernel_advance_v2(struct Mesh mesh, struct Patch primitive_in, struct Patch primitive_out, real dt)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    real dx = mesh.dx;
+    real dy = mesh.dy;
+
+    if (i >= mesh.ni || j >= mesh.nj) {
+        return;
+    }
+
+    real *pin = GET(primitive_in, i, j);
+    real *pli = GET(primitive_in, i - 1, j);
+    real *pri = GET(primitive_in, i + 1, j);
+    real *plj = GET(primitive_in, i, j - 1);
+    real *prj = GET(primitive_in, i, j + 1);
+
+    real fli[NCONS];
+    real fri[NCONS];
+    real flj[NCONS];
+    real frj[NCONS];
+    real uc[NCONS];
+
+    riemann_hlle(pli, pin, fli, 1.0, 0);
+    riemann_hlle(pin, pri, fri, 1.0, 0);
+    riemann_hlle(plj, pin, flj, 1.0, 1);
+    riemann_hlle(pin, prj, frj, 1.0, 1);
+    primitive_to_conserved(pin, uc);
 
     for (int q = 0; q < NCONS; ++q)
     {
         uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-        uc[q] = (1.0 - a) * uc[q] + a * un[q];
     }
-    __syncthreads();
-    conserved_to_primitive(uc, pc);
+    real *pout = GET(primitive_out, i, j);
+    __syncthreads(); // it's about 10% faster with the sync, why?
+    conserved_to_primitive(uc, pout);
 }
+
+#define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
 
 EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
 {
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((self->mesh.ni + bs.x - 1) / bs.x, (self->mesh.nj + bs.y - 1) / bs.y);
-    kernel_advance_rk<<<bd, bs>>>(self->mesh, self->primitive, a, dt);
+
+    // kernel_advance_rk<<<bd, bs>>>(self->mesh, self->primitive, a, dt);
+    kernel_advance_v2<<<bd, bs>>>(self->mesh, self->primitive, self->primitive_out, dt);
+    SWAP(self->primitive, self->primitive_out, struct Patch);
     cudaDeviceSynchronize();
 
     cudaError_t error = cudaGetLastError();
