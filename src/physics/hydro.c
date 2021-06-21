@@ -498,62 +498,18 @@ void solver_advance_rk_omp(struct Solver *self, real a, real dt)
     }
 }
 
-#elif defined __NVCC__
-void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive, real a_, real dt)
+void solver_new_timestep_omp(struct Solver *self)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
-    real dx = mesh.dx;
-    real dy = mesh.dy;
+    struct Patch u = self->conserved;
+    struct Patch u0 = self->conserved_rk;
 
-    if (i >= mesh.ni || j >= mesh.nj) {
-        return;
+    FOR_EACH_OMP(u0) {
+        memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
     }
-
-    real *pc = GET(primitive, i, j);
-    real *pli = GET(primitive, i - 1, j);
-    real *pri = GET(primitive, i + 1, j);
-    real *plj = GET(primitive, i, j - 1);
-    real *prj = GET(primitive, i, j + 1);
-
-    real fli[NCONS];
-    real fri[NCONS];
-    real flj[NCONS];
-    real frj[NCONS];
-    real uc[NCONS];
-    // real un[NCONS];
-
-    riemann_hlle(pli, pc, fli, 1.0, 0);
-    riemann_hlle(pc, pri, fri, 1.0, 0);
-    riemann_hlle(plj, pc, flj, 1.0, 1);
-    riemann_hlle(pc, prj, frj, 1.0, 1);
-    primitive_to_conserved(pc, uc);
-
-    for (int q = 0; q < NCONS; ++q)
-    {
-        // un[q] = uc[q];
-        uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-    }
-    __syncthreads();
-    conserved_to_primitive(uc, pc);
-
-    // riemann_hlle(pli, pc, fli, 1.0, 0);
-    // riemann_hlle(pc, pri, fri, 1.0, 0);
-    // riemann_hlle(plj, pc, flj, 1.0, 1);
-    // riemann_hlle(pc, prj, frj, 1.0, 1);
-
-    // real a = 0.5;
-
-    // for (int q = 0; q < NCONS; ++q)
-    // {
-    //     uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-    //     uc[q] = (1.0 - a) * uc[q] + a * un[q];
-    // }
-    // __syncthreads();
-    // conserved_to_primitive(uc, pc);
 }
 
-void __global__ kernel_advance_v2(struct Mesh mesh, struct Patch primitive_in, struct Patch primitive_out, real dt)
+#elif defined __NVCC__
+void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive_in, struct Patch primitive_out, struct Patch conserved_rk, real a, real dt)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
     int j = threadIdx.y + blockIdx.y * blockDim.y;
@@ -564,7 +520,8 @@ void __global__ kernel_advance_v2(struct Mesh mesh, struct Patch primitive_in, s
         return;
     }
 
-    real *pin = GET(primitive_in, i, j);
+    real *un = GET(conserved_rk, i, j);
+    real *pc = GET(primitive_in, i, j);
     real *pli = GET(primitive_in, i - 1, j);
     real *pri = GET(primitive_in, i + 1, j);
     real *plj = GET(primitive_in, i, j - 1);
@@ -576,19 +533,34 @@ void __global__ kernel_advance_v2(struct Mesh mesh, struct Patch primitive_in, s
     real frj[NCONS];
     real uc[NCONS];
 
-    riemann_hlle(pli, pin, fli, 1.0, 0);
-    riemann_hlle(pin, pri, fri, 1.0, 0);
-    riemann_hlle(plj, pin, flj, 1.0, 1);
-    riemann_hlle(pin, prj, frj, 1.0, 1);
-    primitive_to_conserved(pin, uc);
+    riemann_hlle(pli, pc, fli, 1.0, 0);
+    riemann_hlle(pc, pri, fri, 1.0, 0);
+    riemann_hlle(plj, pc, flj, 1.0, 1);
+    riemann_hlle(pc, prj, frj, 1.0, 1);
+    primitive_to_conserved(pc, uc);
 
     for (int q = 0; q < NCONS; ++q)
     {
         uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        uc[q] = (1.0 - a) * uc[q] + a * un[q];
     }
     real *pout = GET(primitive_out, i, j);
     __syncthreads(); // it's about 10% faster with the sync, why?
     conserved_to_primitive(uc, pout);
+}
+
+void __global__ kernel_prim_to_cons(struct Patch primitive, struct Patch conserved)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+
+    if (i >= conserved.count[0] || j >= conserved.count[1]) {
+        return;
+    }
+    real *p = GET(primitive, i, j);
+    real *u = GET(conserved, i, j);
+    __syncthreads();
+    primitive_to_conserved(p, u);
 }
 
 #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
@@ -598,8 +570,7 @@ EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((self->mesh.ni + bs.x - 1) / bs.x, (self->mesh.nj + bs.y - 1) / bs.y);
 
-    // kernel_advance_rk<<<bd, bs>>>(self->mesh, self->primitive, a, dt);
-    kernel_advance_v2<<<bd, bs>>>(self->mesh, self->primitive, self->primitive_out, dt);
+    kernel_advance_rk<<<bd, bs>>>(self->mesh, self->primitive, self->primitive_out, self->conserved_rk, a, dt);
     SWAP(self->primitive, self->primitive_out, struct Patch);
     cudaDeviceSynchronize();
 
@@ -608,12 +579,24 @@ EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
         printf("%s\n", cudaGetErrorString(error));
 }
 
+EXTERN_C void solver_new_timestep_gpu(struct Solver *self)
+{
+    dim3 bs = dim3(8, 8);
+    dim3 bd = dim3((self->mesh.ni + bs.x - 1) / bs.x, (self->mesh.nj + bs.y - 1) / bs.y);
+    kernel_prim_to_cons<<<bd, bs>>>(self->primitive, self->conserved_rk);
+    // cudaMemcpy(self->conserved_rk.data, self->conserved.data, ELEMENTS(self->conserved), cudaMemcpyDeviceToDevice);
+}
+
 #elif defined GPU_STUBS
 void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
 {
     (void)self;
     (void)a;
     (void)dt;
+}
+void solver_new_timestep_gpu(struct Solver* self)
+{
+    (void)self;
 }
 
 #else
@@ -633,32 +616,7 @@ void solver_advance_rk_cpu(struct Solver *self, real a, real dt)
     FOR_EACH(flux_j) godunov_j(p, grad_j, flux_j, i, j);
     FOR_EACH(u) update_conserved_and_primitive(p, u, u0, flux_i, flux_j, self->mesh, a, dt, i, j);
 }
-#endif
 
-#ifdef _OPENMP
-void solver_new_timestep_omp(struct Solver *self)
-{
-    struct Patch u = self->conserved;
-    struct Patch u0 = self->conserved_rk;
-
-    FOR_EACH_OMP(u0) {
-        memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
-    }
-}
-
-#elif defined __NVCC__
-EXTERN_C void solver_new_timestep_gpu(struct Solver *self)
-{
-    cudaMemcpy(self->conserved_rk.data, self->conserved.data, ELEMENTS(self->conserved), cudaMemcpyDeviceToDevice);
-}
-
-#elif defined GPU_STUBS
-void solver_new_timestep_gpu(struct Solver* self)
-{
-    (void)self;
-}
-
-#else
 void solver_new_timestep_cpu(struct Solver *self)
 {
     struct Patch u = self->conserved;
@@ -668,5 +626,4 @@ void solver_new_timestep_cpu(struct Solver *self)
         memcpy(GET(u0, i, j), GET(u, i, j), NCONS * sizeof(real));
     }
 }
-
 #endif

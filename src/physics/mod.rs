@@ -97,7 +97,7 @@ impl Solver {
     pub fn advance(&mut self, rk_order: u32, dt: f64) {
         match rk_order {
             1 => {
-                self.new_timestep();
+                // self.new_timestep();
                 self.advance_rk(0.0, dt);
             }
             2 => {
