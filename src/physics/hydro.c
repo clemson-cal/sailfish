@@ -511,8 +511,8 @@ void solver_new_timestep_omp(struct Solver *self)
 #elif defined __NVCC__
 void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive_in, struct Patch primitive_out, struct Patch conserved_rk, real a, real dt)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
     real dx = mesh.dx;
     real dy = mesh.dy;
 
@@ -526,6 +526,51 @@ void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive_in, s
     real *pri = GET(primitive_in, i + 1, j);
     real *plj = GET(primitive_in, i, j - 1);
     real *prj = GET(primitive_in, i, j + 1);
+    real *pki = GET(primitive_in, i - 2, j);
+    real *pti = GET(primitive_in, i + 2, j);
+    real *pkj = GET(primitive_in, i, j - 2);
+    real *ptj = GET(primitive_in, i, j + 2);
+
+    real gli[NCONS];
+    real gci[NCONS];
+    real gri[NCONS];
+    real glj[NCONS];
+    real gcj[NCONS];
+    real grj[NCONS];
+    real plip[NCONS];
+    real plim[NCONS];
+    real prip[NCONS];
+    real prim[NCONS];
+    real pljp[NCONS];
+    real pljm[NCONS];
+    real prjp[NCONS];
+    real prjm[NCONS];
+
+    plm_gradient(pki, pli, pc, gli);
+    plm_gradient(pli, pc, pri, gci);
+    plm_gradient(pc, pri, pti, gri);
+    plm_gradient(pkj, plj, pc, glj);
+    plm_gradient(plj, pc, prj, gcj);
+    plm_gradient(pc, prj, ptj, grj);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        //      +-------+-------+-------+
+        //      |       |       |       |
+        //  k   |   l  -|+  c  -|+  r   |   t
+        //      |       |       |       |
+        //      +-------+-------+-------|
+
+        plim[q] = pli[q] + 0.5 * gli[q];
+        plip[q] = pc [q] - 0.5 * gci[q];
+        prim[q] = pc [q] + 0.5 * gci[q];
+        prip[q] = pri[q] - 0.5 * gri[q];
+
+        pljm[q] = plj[q] + 0.5 * glj[q];
+        pljp[q] = pc [q] - 0.5 * gcj[q];
+        prjm[q] = pc [q] + 0.5 * gcj[q];
+        prjp[q] = prj[q] - 0.5 * grj[q];
+    }
 
     real fli[NCONS];
     real fri[NCONS];
@@ -533,10 +578,15 @@ void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive_in, s
     real frj[NCONS];
     real uc[NCONS];
 
-    riemann_hlle(pli, pc, fli, 1.0, 0);
-    riemann_hlle(pc, pri, fri, 1.0, 0);
-    riemann_hlle(plj, pc, flj, 1.0, 1);
-    riemann_hlle(pc, prj, frj, 1.0, 1);
+    riemann_hlle(plim, plip, fli, 1.0, 0);
+    riemann_hlle(prim, prip, fri, 1.0, 0);
+    riemann_hlle(pljm, pljp, flj, 1.0, 1);
+    riemann_hlle(prjm, prjp, frj, 1.0, 1);
+
+    // riemann_hlle(pli, pc, fli, 1.0, 0);
+    // riemann_hlle(pc, pri, fri, 1.0, 0);
+    // riemann_hlle(plj, pc, flj, 1.0, 1);
+    // riemann_hlle(pc, prj, frj, 1.0, 1);
     primitive_to_conserved(pc, uc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -545,14 +595,13 @@ void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive_in, s
         uc[q] = (1.0 - a) * uc[q] + a * un[q];
     }
     real *pout = GET(primitive_out, i, j);
-    __syncthreads(); // it's about 10% faster with the sync, why?
     conserved_to_primitive(uc, pout);
 }
 
 void __global__ kernel_prim_to_cons(struct Patch primitive, struct Patch conserved)
 {
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
 
     if (i >= conserved.count[0] || j >= conserved.count[1]) {
         return;
@@ -564,10 +613,11 @@ void __global__ kernel_prim_to_cons(struct Patch primitive, struct Patch conserv
 }
 
 #define SWAP(x, y, T) do { T SWAP = x; x = y; y = SWAP; } while (0)
+#define THREAD_DIM 8
 
 EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
 {
-    dim3 bs = dim3(8, 8);
+    dim3 bs = dim3(THREAD_DIM, THREAD_DIM);
     dim3 bd = dim3((self->mesh.ni + bs.x - 1) / bs.x, (self->mesh.nj + bs.y - 1) / bs.y);
 
     kernel_advance_rk<<<bd, bs>>>(self->mesh, self->primitive, self->primitive_out, self->conserved_rk, a, dt);
@@ -581,10 +631,9 @@ EXTERN_C void solver_advance_rk_gpu(struct Solver *self, real a, real dt)
 
 EXTERN_C void solver_new_timestep_gpu(struct Solver *self)
 {
-    dim3 bs = dim3(8, 8);
+    dim3 bs = dim3(THREAD_DIM, THREAD_DIM);
     dim3 bd = dim3((self->mesh.ni + bs.x - 1) / bs.x, (self->mesh.nj + bs.y - 1) / bs.y);
     kernel_prim_to_cons<<<bd, bs>>>(self->primitive, self->conserved_rk);
-    // cudaMemcpy(self->conserved_rk.data, self->conserved.data, ELEMENTS(self->conserved), cudaMemcpyDeviceToDevice);
 }
 
 #elif defined GPU_STUBS
