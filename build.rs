@@ -29,4 +29,8 @@ fn main() {
             .flag("-Wno-unused-function")
             .compile("hydro_gpu");
     }
+
+    cc::Build::new()
+        .file("src/solver/patch.c")
+        .compile("patch");
 }

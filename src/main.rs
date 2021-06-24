@@ -6,6 +6,7 @@ pub mod cmdline;
 pub mod error;
 pub mod physics;
 pub mod setup;
+pub mod solver;
 
 fn do_output(primitive: &Vec<f64>, output_number: usize) {
     let mut bytes = Vec::new();
