@@ -38,5 +38,12 @@ fn main() {
         .file("src/solver/iso2d.c")
         .define("API_MODE_CPU", None)
         .flag("-Wno-unused-function")
-        .compile("iso2d");
+        .compile("iso2d_cpu");
+
+    cc::Build::new()
+        .file("src/solver/iso2d.c")
+        .cuda(true)
+        .define("API_MODE_GPU", None)
+        .flag("-x=cu")
+        .compile("iso2d_gpu");
 }

@@ -509,7 +509,7 @@ void solver_new_timestep_omp(struct Solver *self)
 }
 
 #elif defined __NVCC__
-void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive_in, struct Patch primitive_out, struct Patch conserved_rk, real a, real dt)
+static void __global__ kernel_advance_rk(struct Mesh mesh, struct Patch primitive_in, struct Patch primitive_out, struct Patch conserved_rk, real a, real dt)
 {
     int j = threadIdx.x + blockIdx.x * blockDim.x;
     int i = threadIdx.y + blockIdx.y * blockDim.y;
