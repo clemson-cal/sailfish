@@ -121,38 +121,49 @@ static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, 
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-void conserved_to_primitive_cpu(struct Patch conserved, struct Patch primitive)
-{
-    int i0 = max2(conserved.start[0], primitive.start[0]);
-    int j0 = max2(conserved.start[1], primitive.start[1]);
-    int i1 = min2(conserved.start[0] + conserved.count[0], primitive.start[0] + conserved.count[0]);
-    int j1 = min2(conserved.start[1] + conserved.count[1], primitive.start[1] + conserved.count[1]);
-
-    for (int i = i0; i < i1; ++i)
-    {
-        for (int j = j0; j < j1; ++j)
-        {
-            real *u = GET(conserved, i, j);
-            real *p = GET(primitive, i, j);
-            conserved_to_primitive(u, p);
-        }
-    }
-}
+#ifdef API_MODE_CPU
 
 void primitive_to_conserved_cpu(struct Patch primitive, struct Patch conserved)
 {
-    int i0 = max2(conserved.start[0], primitive.start[0]);
-    int j0 = max2(conserved.start[1], primitive.start[1]);
-    int i1 = min2(conserved.start[0] + conserved.count[0], primitive.start[0] + conserved.count[0]);
-    int j1 = min2(conserved.start[1] + conserved.count[1], primitive.start[1] + conserved.count[1]);
-
-    for (int i = i0; i < i1; ++i)
-    {
-        for (int j = j0; j < j1; ++j)
-        {
-            real *u = GET(conserved, i, j);
-            real *p = GET(primitive, i, j);
-            primitive_to_conserved(p, u);
-        }
+    FOR_EACH(conserved) {
+        real *u = GET(conserved, i, j);
+        real *p = GET(primitive, i, j);
+        primitive_to_conserved(p, u);
     }
 }
+
+#elif API_MODE_OMP
+
+void primitive_to_conserved_omp(struct Patch primitive, struct Patch conserved)
+{
+    FOR_EACH_OMP(conserved) {
+        real *u = GET(conserved, i, j);
+        real *p = GET(primitive, i, j);
+        primitive_to_conserved(p, u);
+    }
+}
+
+#elif API_MODE_GPU
+
+void __global__ kernel_primitive_to_conserved(struct Patch primitive, struct Patch conserved)
+{
+    int i = conserved.start[0] + threadIdx.y + blockIdx.y * blockDim.y;
+    int j = conserved.start[1] + threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (conserved.start[0] <= i && i < conserved.start[0] + conserved.count[0] &&
+        conserved.start[1] <= j && j < conserved.start[1] + conserved.count[1])
+    {
+        real *p = GET(primitive, i, j);
+        real *u = GET(conserved, i, j);
+        primitive_to_conserved(p, u);
+    }
+}
+
+extern "C" void primitive_to_conserved_gpu(struct Patch primitive, struct Patch conserved)
+{
+    dim3 bs = dim3(8, 8);
+    dim3 bd = dim3((conserved.count[0] + bs.x - 1) / bs.x, (conserved.count[1] + bs.y - 1) / bs.y);
+    kernel_prim_to_cons<<<bd, bs>>>(self->primitive, self->conserved_rk);
+}
+
+#endif

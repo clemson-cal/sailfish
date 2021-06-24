@@ -36,5 +36,7 @@ fn main() {
 
     cc::Build::new()
         .file("src/solver/iso2d.c")
+        .define("API_MODE_CPU", None)
+        .flag("-Wno-unused-function")
         .compile("iso2d");
 }

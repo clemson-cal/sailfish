@@ -1,5 +1,3 @@
-#![allow(unused)]
-
 use super::patch::{device, ffi};
 
 extern "C" {

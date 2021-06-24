@@ -25,6 +25,7 @@ pub mod ffi {
         pub(super) fn patch_del(patch: Patch);
         pub(super) fn patch_clone_to_device(patch: Patch) -> Patch;
         pub(super) fn patch_clone_to_host(patch: Patch) -> Patch;
+        pub(super) fn patch_contains(patch: Patch, other: Patch) -> i32;
     }    
 }
 
@@ -73,6 +74,12 @@ pub mod host {
             self.0.num_fields as usize
         }
 
+        pub fn contains(&self, other: &Self) -> bool {
+            unsafe {
+                ffi::patch_contains(self.0, other.0) != 0
+            }
+        }
+
         pub fn to_device(&self) -> device::Patch {
             unsafe {
                 device::Patch(ffi::patch_clone_to_device(self.0))
@@ -113,6 +120,12 @@ pub mod device {
 
         pub fn num_fields(&self) -> usize {
             self.0.num_fields as usize
+        }
+
+        pub fn contains(&self, other: &Self) -> bool {
+            unsafe {
+                ffi::patch_contains(self.0, other.0) != 0
+            }
         }
 
         pub fn to_host(&self) -> host::Patch {

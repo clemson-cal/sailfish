@@ -6,11 +6,17 @@ typedef double real;
 #define BUFFER_MODE_VIEW 0
 #define BUFFER_MODE_HOST 1
 #define BUFFER_MODE_DEVICE 2
-#define GET(p, i, j) \
-    (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
 #define FOR_EACH(p) \
     for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
     for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define FOR_EACH_OMP(p) \
+_Pragma("omp parallel for") \
+    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define CONTAINS(p, q) \
+        (p.start[0] <= q.start[0] && p.start[0] + p.count[0] >= q.start[0] + q.count[0]) && \
+        (p.start[1] <= q.start[1] && p.start[1] + p.count[1] >= q.start[1] + q.count[1])
+#define GET(p, i, j) (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
 #define ELEMENTS(p) (p.count[0] * p.count[1] * p.num_fields)
 #define BYTES(p) (ELEMENTS(p) * sizeof(real))
 
@@ -81,6 +87,11 @@ PATCH_LINKAGE void patch_del(struct Patch self)
         #endif
             break;
     }
+}
+
+PATCH_LINKAGE int patch_contains(struct Patch self, struct Patch other)
+{
+    return CONTAINS(self, other);
 }
 
 PATCH_LINKAGE struct Patch patch_clone_to_device(struct Patch self)
