@@ -29,6 +29,11 @@ where
 }
 
 fn run() -> Result<(), error::Error> {
+
+    use solver::host;
+
+    let _patch = host::Patch::from_fn([0, 0], [128, 128], |_, _| { [0.0] });
+
     let cmdline = cmdline::parse_command_line()?;
     let mesh = physics::Mesh {
         x0: -1.0,

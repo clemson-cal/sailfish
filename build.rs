@@ -33,4 +33,8 @@ fn main() {
     cc::Build::new()
         .file("src/solver/patch.c")
         .compile("patch");
+
+    cc::Build::new()
+        .file("src/solver/iso2d.c")
+        .compile("iso2d");
 }

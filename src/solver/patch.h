@@ -2,10 +2,6 @@
 #include <stdlib.h>
 #include <string.h>
 
-#ifndef LINKAGE
-#define LINKAGE
-#endif
-
 typedef double real;
 #define BUFFER_MODE_VIEW 0
 #define BUFFER_MODE_HOST 1
@@ -28,7 +24,9 @@ struct Patch
     real *data;
 };
 
-LINKAGE struct Patch patch_new(
+#ifdef PATCH_LINKAGE
+
+PATCH_LINKAGE struct Patch patch_new(
     int start_i,
     int start_j,
     int count_i,
@@ -66,7 +64,7 @@ LINKAGE struct Patch patch_new(
     return self;
 }
 
-LINKAGE void patch_del(struct Patch self)
+PATCH_LINKAGE void patch_del(struct Patch self)
 {
     switch (self.buffer_mode)
     {
@@ -85,7 +83,7 @@ LINKAGE void patch_del(struct Patch self)
     }
 }
 
-LINKAGE struct Patch patch_clone_to_device(struct Patch self)
+PATCH_LINKAGE struct Patch patch_clone_to_device(struct Patch self)
 {
     struct Patch device_patch = self;
     device_patch.buffer_mode = BUFFER_MODE_DEVICE;
@@ -99,7 +97,7 @@ LINKAGE struct Patch patch_clone_to_device(struct Patch self)
     return self;
 }
 
-LINKAGE struct Patch patch_clone_to_host(struct Patch self)
+PATCH_LINKAGE struct Patch patch_clone_to_host(struct Patch self)
 {
     struct Patch host_patch = self;
     host_patch.data = (real*)malloc(BYTES(host_patch));
@@ -111,3 +109,5 @@ LINKAGE struct Patch patch_clone_to_host(struct Patch self)
 #endif
     return self;
 }
+
+#endif
