@@ -1,4 +1,7 @@
-use super::patch::{host, device, ffi};
+use super::patch::{host, ffi};
+
+#[cfg(feature = "cuda")]
+use super::patch::device;
 
 #[repr(C)]
 #[derive(Clone, Copy)]
@@ -17,6 +20,7 @@ mod iso2d_ffi {
     extern "C" {
         pub(super) fn primitive_to_conserved_cpu(primitive: ffi::Patch, conserved: ffi::Patch);
         pub(super) fn primitive_to_conserved_omp(primitive: ffi::Patch, conserved: ffi::Patch);
+        #[cfg(feature = "cuda")]
         pub(super) fn primitive_to_conserved_gpu(primitive: ffi::Patch, conserved: ffi::Patch);
 
         pub(super) fn advance_rk_cpu(
@@ -27,6 +31,7 @@ mod iso2d_ffi {
             a: f64,
             dt: f64);
 
+        #[cfg(feature = "omp")]
         pub(super) fn advance_rk_omp(
             mesh: Mesh,
             conserved_rk: ffi::Patch,
@@ -35,6 +40,7 @@ mod iso2d_ffi {
             a: f64,
             dt: f64);
 
+        #[cfg(feature = "cuda")]
         pub(super) fn advance_rk_gpu(
             mesh: Mesh,
             conserved_rk: ffi::Patch,

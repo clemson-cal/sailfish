@@ -23,14 +23,21 @@ pub mod ffi {
             buffer_mode: i32,
             data: *const f64) -> Patch;
         pub(super) fn patch_del(patch: Patch);
-        pub(super) fn patch_clone_to_device(patch: Patch) -> Patch;
-        pub(super) fn patch_clone_to_host(patch: Patch) -> Patch;
         pub(super) fn patch_contains(patch: Patch, other: Patch) -> i32;
     }    
+
+    #[cfg(feature = "cuda")]
+    extern "C" {
+        pub(super) fn patch_clone_to_device(patch: Patch) -> Patch;
+        pub(super) fn patch_clone_to_host(patch: Patch) -> Patch;
+    }
 }
 
 pub mod host {
-    use super::{ffi, device};
+    use super::ffi;
+    #[cfg(feature = "cuda")]
+    use super::device;
+
     pub struct Patch(pub(crate) ffi::Patch);
 
     impl Patch {
@@ -145,8 +152,4 @@ pub mod device {
             }
         }
     }
-}
-
-#[cfg(not(feature = "cuda"))]
-pub mod device {
 }

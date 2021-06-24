@@ -52,7 +52,7 @@ fn main() {
     {
         cc::Build::new()
             .file("src/solver/patch.c")
-            .define("PATCH_LINKAGE", None)
+            .define("PATCH_LINKAGE", "")
             .compile("patch");        
     }
 
