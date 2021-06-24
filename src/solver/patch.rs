@@ -80,6 +80,7 @@ pub mod host {
             }
         }
 
+        #[cfg(feature = "cuda")]
         pub fn to_device(&self) -> device::Patch {
             unsafe {
                 device::Patch(ffi::patch_clone_to_device(self.0))
@@ -105,8 +106,10 @@ pub mod host {
     }
 }
 
+#[cfg(feature = "cuda")]
 pub mod device {
     use super::{ffi, host};
+
     pub struct Patch(pub(crate) ffi::Patch);
 
     impl Patch {
@@ -142,4 +145,8 @@ pub mod device {
             }
         }
     }
+}
+
+#[cfg(not(feature = "cuda"))]
+pub mod device {
 }

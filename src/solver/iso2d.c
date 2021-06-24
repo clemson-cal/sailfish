@@ -203,8 +203,8 @@ extern "C" void primitive_to_conserved_gpu(struct Patch primitive, struct Patch 
 
 void advance_rk_cpu(
     struct Mesh mesh,
-    struct Patch primitive_in,
-    struct Patch primitive_out,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
     struct Patch conserved_rk,
     real a,
     real dt)
@@ -231,22 +231,22 @@ void advance_rk_cpu(
     //
     //                 kj
     // ------------------------------------------------------------------------
-    FOR_EACH(primitive_out)
+    FOR_EACH(primitive_wr)
     {
         real *un = GET(conserved_rk, i, j);
-        real *pc = GET(primitive_in, i, j);
-        real *pli = GET(primitive_in, i - 1, j);
-        real *pri = GET(primitive_in, i + 1, j);
-        real *plj = GET(primitive_in, i, j - 1);
-        real *prj = GET(primitive_in, i, j + 1);
-        real *pki = GET(primitive_in, i - 2, j);
-        real *pti = GET(primitive_in, i + 2, j);
-        real *pkj = GET(primitive_in, i, j - 2);
-        real *ptj = GET(primitive_in, i, j + 2);
-        real *pll = GET(primitive_in, i - 1, j - 1);
-        real *plr = GET(primitive_in, i - 1, j + 1);
-        real *prl = GET(primitive_in, i + 1, j - 1);
-        real *prr = GET(primitive_in, i + 1, j + 1);
+        real *pc = GET(primitive_rd, i, j);
+        real *pli = GET(primitive_rd, i - 1, j);
+        real *pri = GET(primitive_rd, i + 1, j);
+        real *plj = GET(primitive_rd, i, j - 1);
+        real *prj = GET(primitive_rd, i, j + 1);
+        real *pki = GET(primitive_rd, i - 2, j);
+        real *pti = GET(primitive_rd, i + 2, j);
+        real *pkj = GET(primitive_rd, i, j - 2);
+        real *ptj = GET(primitive_rd, i, j + 2);
+        real *pll = GET(primitive_rd, i - 1, j - 1);
+        real *plr = GET(primitive_rd, i - 1, j + 1);
+        real *prl = GET(primitive_rd, i + 1, j - 1);
+        real *prr = GET(primitive_rd, i + 1, j + 1);
 
         real plip[NCONS];
         real plim[NCONS];
@@ -316,7 +316,7 @@ void advance_rk_cpu(
             uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             uc[q] = (1.0 - a) * uc[q] + a * un[q];
         }
-        real *pout = GET(primitive_out, i, j);
+        real *pout = GET(primitive_wr, i, j);
         conserved_to_primitive(uc, pout);
     }
 }
@@ -325,9 +325,9 @@ void advance_rk_cpu(
 
 void advance_rk_omp(
     struct Mesh mesh,
-    struct Patch primitive_in,
-    struct Patch primitive_out,
     struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
     real a,
     real dt)
 {
@@ -353,22 +353,22 @@ void advance_rk_omp(
     //
     //                 kj
     // ------------------------------------------------------------------------
-    FOR_EACH_OMP(primitive_out)
+    FOR_EACH_OMP(primitive_wr)
     {
         real *un = GET(conserved_rk, i, j);
-        real *pc = GET(primitive_in, i, j);
-        real *pli = GET(primitive_in, i - 1, j);
-        real *pri = GET(primitive_in, i + 1, j);
-        real *plj = GET(primitive_in, i, j - 1);
-        real *prj = GET(primitive_in, i, j + 1);
-        real *pki = GET(primitive_in, i - 2, j);
-        real *pti = GET(primitive_in, i + 2, j);
-        real *pkj = GET(primitive_in, i, j - 2);
-        real *ptj = GET(primitive_in, i, j + 2);
-        real *pll = GET(primitive_in, i - 1, j - 1);
-        real *plr = GET(primitive_in, i - 1, j + 1);
-        real *prl = GET(primitive_in, i + 1, j - 1);
-        real *prr = GET(primitive_in, i + 1, j + 1);
+        real *pc = GET(primitive_rd, i, j);
+        real *pli = GET(primitive_rd, i - 1, j);
+        real *pri = GET(primitive_rd, i + 1, j);
+        real *plj = GET(primitive_rd, i, j - 1);
+        real *prj = GET(primitive_rd, i, j + 1);
+        real *pki = GET(primitive_rd, i - 2, j);
+        real *pti = GET(primitive_rd, i + 2, j);
+        real *pkj = GET(primitive_rd, i, j - 2);
+        real *ptj = GET(primitive_rd, i, j + 2);
+        real *pll = GET(primitive_rd, i - 1, j - 1);
+        real *plr = GET(primitive_rd, i - 1, j + 1);
+        real *prl = GET(primitive_rd, i + 1, j - 1);
+        real *prr = GET(primitive_rd, i + 1, j + 1);
 
         real plip[NCONS];
         real plim[NCONS];
@@ -438,7 +438,7 @@ void advance_rk_omp(
             uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             uc[q] = (1.0 - a) * uc[q] + a * un[q];
         }
-        real *pout = GET(primitive_out, i, j);
+        real *pout = GET(primitive_wr, i, j);
         conserved_to_primitive(uc, pout);
     }
 }
@@ -447,9 +447,9 @@ void advance_rk_omp(
 
 static void __global__ kernel_advance_rk(
     struct Mesh mesh,
-    struct Patch primitive_in,
-    struct Patch primitive_out,
     struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
     real a,
     real dt)
 {
@@ -482,19 +482,19 @@ static void __global__ kernel_advance_rk(
     //                 kj
     // ------------------------------------------------------------------------
     real *un = GET(conserved_rk, i, j);
-    real *pc = GET(primitive_in, i, j);
-    real *pli = GET(primitive_in, i - 1, j);
-    real *pri = GET(primitive_in, i + 1, j);
-    real *plj = GET(primitive_in, i, j - 1);
-    real *prj = GET(primitive_in, i, j + 1);
-    real *pki = GET(primitive_in, i - 2, j);
-    real *pti = GET(primitive_in, i + 2, j);
-    real *pkj = GET(primitive_in, i, j - 2);
-    real *ptj = GET(primitive_in, i, j + 2);
-    real *pll = GET(primitive_in, i - 1, j - 1);
-    real *plr = GET(primitive_in, i - 1, j + 1);
-    real *prl = GET(primitive_in, i + 1, j - 1);
-    real *prr = GET(primitive_in, i + 1, j + 1);
+    real *pc = GET(primitive_rd, i, j);
+    real *pli = GET(primitive_rd, i - 1, j);
+    real *pri = GET(primitive_rd, i + 1, j);
+    real *plj = GET(primitive_rd, i, j - 1);
+    real *prj = GET(primitive_rd, i, j + 1);
+    real *pki = GET(primitive_rd, i - 2, j);
+    real *pti = GET(primitive_rd, i + 2, j);
+    real *pkj = GET(primitive_rd, i, j - 2);
+    real *ptj = GET(primitive_rd, i, j + 2);
+    real *pll = GET(primitive_rd, i - 1, j - 1);
+    real *plr = GET(primitive_rd, i - 1, j + 1);
+    real *prl = GET(primitive_rd, i + 1, j - 1);
+    real *prr = GET(primitive_rd, i + 1, j + 1);
 
     real plip[NCONS];
     real plim[NCONS];
@@ -564,21 +564,21 @@ static void __global__ kernel_advance_rk(
         uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
         uc[q] = (1.0 - a) * uc[q] + a * un[q];
     }
-    real *pout = GET(primitive_out, i, j);
+    real *pout = GET(primitive_wr, i, j);
     conserved_to_primitive(uc, pout);
 }
 
 void advance_rk_gpu(
     struct Mesh mesh,
-    struct Patch primitive_in,
-    struct Patch primitive_out,
     struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
     real a,
     real dt)
 {
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    kernel_advance_rk<<<bd, bs>>>(mesh, primitive_in, primitive_out, conserved_rk, a, dt);
+    kernel_advance_rk<<<bd, bs>>>(mesh, primitive_rd, primitive_wr, conserved_rk, a, dt);
 }
 
 #endif
