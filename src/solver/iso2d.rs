@@ -2,18 +2,7 @@ use super::patch::{host, ffi};
 
 #[cfg(feature = "cuda")]
 use super::patch::device;
-
-#[repr(C)]
-#[derive(Clone, Copy)]
-pub struct Mesh
-{
-    ni: i32,
-    nj: i32,
-    x0: f64,
-    y0: f64,
-    dx: f64,
-    dy: f64,
-}
+use super::Mesh;
 
 mod iso2d_ffi {
     use super::*;

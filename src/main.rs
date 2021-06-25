@@ -1,10 +1,9 @@
-use crate::setup::Setup;
-use crate::physics::ExecutionMode;
+// use crate::solver::ExecutionMode;
+use setup::Setup;
 use std::io::Write;
 
 pub mod cmdline;
 pub mod error;
-pub mod physics;
 pub mod setup;
 pub mod solver;
 
@@ -32,39 +31,24 @@ fn run() -> Result<(), error::Error> {
 
     use solver::host;
 
-    let _patch = host::Patch::from_fn([0, 0], [128, 128], |_, _| { [0.0] });
-
     let cmdline = cmdline::parse_command_line()?;
-    let mesh = physics::Mesh {
-        x0: -1.0,
-        y0: -1.0,
-        ni: cmdline.resolution,
-        nj: cmdline.resolution,
-        dx: 2.0 / cmdline.resolution as f64,
-        dy: 2.0 / cmdline.resolution as f64,
-    };
-    let mode = match (cmdline.use_omp, cmdline.use_gpu) {
-        (false, false) => ExecutionMode::CPU,
-        (true, false) => ExecutionMode::OMP,
-        (_, true) => ExecutionMode::GPU,
-    };
-
-    let mut solver = physics::Solver::new(mesh.clone(), mode);
+    let mesh = solver::Mesh::centered_square(1.0, cmdline.resolution);
+    // let mode = match (cmdline.use_omp, cmdline.use_gpu) {
+    //     (false, false) => ExecutionMode::CPU,
+    //     (true, false) => ExecutionMode::OMP,
+    //     (_, true) => ExecutionMode::GPU,
+    // };
     let setup = setup::Explosion {};
-    let [si, sj] = mesh.strides();
-    let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
-    for i in 0..mesh.ni() {
-        for j in 0..mesh.nj() {
-            let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx;
-            let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy;
-            let n = i * si + j * sj;
-            setup.initial_primitive(x, y, &mut primitive[n..n + 3]);
-        }
-    }
-    solver.set_primitive(&primitive);
+
+    let primitive = host::Patch::from_fn([0, 0], mesh.shape(), |i, j| {
+        let [x, y] = mesh.cell_coordinates(i, j);
+        let mut p = [0.0; 3];
+        setup.initial_primitive(x, y, &mut p);
+        p
+    });
 
     let v_max = 1.0;
-    let rk_order = cmdline.rk_order;
+    // let rk_order = cmdline.rk_order;
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
     let checkpoint_interval = cmdline.checkpoint_interval;
@@ -78,14 +62,14 @@ fn run() -> Result<(), error::Error> {
 
     while time < cmdline.end_time {
         if time >= next_output_time {
-            do_output(&solver.primitive(), output_number);
+            do_output(&primitive.to_vec(), output_number);
             output_number += 1;
             next_output_time += checkpoint_interval;
         }
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                solver.advance(rk_order, dt);
+                // solver.advance(rk_order, dt);
                 time += dt;
                 iteration += 1;
             }
@@ -99,7 +83,7 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
-    do_output(&solver.primitive(), output_number);
+    do_output(&primitive.to_vec(), output_number);
     Ok(())
 }
 

@@ -41,27 +41,27 @@ pub mod host {
     pub struct Patch(pub(crate) ffi::Patch);
 
     impl Patch {
-        pub fn from_fn<F, const N: usize>(start: [usize; 2], count: [usize; 2], f: F) -> Self 
+        pub fn from_fn<F, const N: usize>(start: [i32; 2], count: [u32; 2], f: F) -> Self 
         where
-            F: Fn(usize, usize) -> [f64; N]
+            F: Fn(i32, i32) -> [f64; N]
         {
             Self(unsafe {
                 let c = ffi::patch_new(
-                    start[0] as i32,
-                    start[1] as i32,
+                    start[0],
+                    start[1],
                     count[0] as i32,
                     count[1] as i32,
                     N as i32,
                     ffi::BUFFER_MODE_HOST,
                     std::ptr::null(),
                 );
-                let si = c.jumps[0] as usize;
-                let sj = c.jumps[1] as usize;
-                for i in start[0]..start[0] + count[0] {
-                    for j in start[1]..start[1] + count[1] {
+                let si = c.jumps[0];
+                let sj = c.jumps[1];
+                for i in start[0]..start[0] + count[0] as i32 {
+                    for j in start[1]..start[1] + count[1] as i32 {
                         let x = f(i, j);
                         for q in 0..N {
-                            *c.data.offset((i * si + j * sj + q) as isize) = x[q]
+                            *c.data.offset((i * si + j * sj + q as i32) as isize) = x[q]
                         }
                     }
                 }

@@ -1,4 +1,4 @@
-use crate::physics::{BufferZone, EquationOfState, PointMass};
+use crate::solver::{BufferZone, EquationOfState, PointMass};
 use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup: Sized {
