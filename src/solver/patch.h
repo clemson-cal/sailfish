@@ -117,7 +117,7 @@ PATCH_LINKAGE struct Patch patch_clone(struct Patch self)
         case BUFFER_MODE_DEVICE:
         #ifdef __NVCC__
             cudaMalloc(&patch.data, BYTES(patch));
-            cudaMemcpy(patch.data, self.data, BYTES(patch), cudaDeviceToDevice);
+            cudaMemcpy(patch.data, self.data, BYTES(patch), cudaMemcpyDeviceToDevice);
         #endif
             break;
     }
