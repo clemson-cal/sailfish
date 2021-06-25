@@ -57,11 +57,11 @@ PATCH_LINKAGE struct Patch patch_new(
             self.data = data;
             break;
         case BUFFER_MODE_HOST:
-            self.data = (real*)malloc(num_fields * count_i * count_j * sizeof(real));
+            self.data = (real*)malloc(BYTES(self));
             break;
         case BUFFER_MODE_DEVICE:
         #ifdef __NVCC__
-            cudaMalloc(&self.data, num_fields * count_i * count_j * sizeof(real));
+            cudaMalloc(&self.data, BYTES(self));
         #else
             self.data = NULL;
         #endif
@@ -100,6 +100,28 @@ PATCH_LINKAGE real patch_get(struct Patch self, int i, int j, int q)
 PATCH_LINKAGE int patch_contains(struct Patch self, struct Patch other)
 {
     return CONTAINS(self, other);
+}
+
+PATCH_LINKAGE struct Patch patch_clone(struct Patch self)
+{
+    struct Patch patch = self;
+
+    switch (patch.buffer_mode)
+    {
+        case BUFFER_MODE_VIEW:
+            break;
+        case BUFFER_MODE_HOST:
+            patch.data = (real*)malloc(BYTES(patch));
+            memcpy(patch.data, self.data, BYTES(patch));
+            break;
+        case BUFFER_MODE_DEVICE:
+        #ifdef __NVCC__
+            cudaMalloc(&patch.data, BYTES(patch));
+            cudaMemcpy(patch.data, self.data, BYTES(patch), cudaDeviceToDevice);
+        #endif
+            break;
+    }
+    return patch;
 }
 
 #ifdef __NVCC__

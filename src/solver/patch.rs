@@ -26,6 +26,7 @@ pub mod ffi {
         pub(super) fn patch_set(patch: Patch, i: i32, j: i32, q: i32, y: f64);
         // pub(super) fn patch_get(patch: Patch, i: i32, j: i32, q: i32) -> f64;
         pub(super) fn patch_contains(patch: Patch, other: Patch) -> i32;
+        pub(super) fn patch_clone(patch: Patch) -> Patch;
     }    
 
     #[cfg(feature = "cuda")]
@@ -101,6 +102,14 @@ pub mod host {
                 std::ptr::copy_nonoverlapping(self.0.data, res.as_mut_ptr(), res.len());
             }
             res
+        }
+    }
+
+    impl Clone for Patch {
+        fn clone(&self) -> Self {
+            Self(unsafe {
+                ffi::patch_clone(self.0)
+            })
         }
     }
 
