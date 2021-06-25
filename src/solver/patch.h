@@ -87,6 +87,16 @@ PATCH_LINKAGE void patch_del(struct Patch self)
     }
 }
 
+PATCH_LINKAGE void patch_set(struct Patch self, int i, int j, int q, real y)
+{
+    GET(self, i, j)[q] = y;
+}
+
+PATCH_LINKAGE real patch_get(struct Patch self, int i, int j, int q)
+{
+    return GET(self, i, j)[q];
+}
+
 PATCH_LINKAGE int patch_contains(struct Patch self, struct Patch other)
 {
     return CONTAINS(self, other);

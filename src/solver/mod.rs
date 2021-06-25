@@ -36,13 +36,13 @@ impl Mesh {
             dy: 2.0 * domain_radius / resolution as f64,
         }
     }
-    /// Returns the number of zones on the i-axis as a `usize`.
-    pub fn ni(&self) -> usize {
-        self.ni as usize
+    /// Returns the number of zones on the i-axis as a `u32`.
+    pub fn ni(&self) -> u32 {
+        self.ni as u32
     }
-    /// Returns the number of zones on the j-axis as a `usize`.
-    pub fn nj(&self) -> usize {
-        self.nj as usize
+    /// Returns the number of zones on the j-axis as a `u32`.
+    pub fn nj(&self) -> u32 {
+        self.nj as u32
     }
     /// Returns the number of total zones (`ni * nj`) as a `usize`.
     pub fn num_total_zones(&self) -> usize {

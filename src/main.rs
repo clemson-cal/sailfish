@@ -1,4 +1,3 @@
-// use crate::solver::ExecutionMode;
 use setup::Setup;
 use std::io::Write;
 
@@ -28,27 +27,23 @@ where
 }
 
 fn run() -> Result<(), error::Error> {
-
     use solver::host;
 
     let cmdline = cmdline::parse_command_line()?;
     let mesh = solver::Mesh::centered_square(1.0, cmdline.resolution);
-    // let mode = match (cmdline.use_omp, cmdline.use_gpu) {
-    //     (false, false) => ExecutionMode::CPU,
-    //     (true, false) => ExecutionMode::OMP,
-    //     (_, true) => ExecutionMode::GPU,
-    // };
     let setup = setup::Explosion {};
 
-    let primitive = host::Patch::from_fn([0, 0], mesh.shape(), |i, j| {
+    let mut primitive1 = host::Patch::from_fn([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], |i, j| {
         let [x, y] = mesh.cell_coordinates(i, j);
         let mut p = [0.0; 3];
         setup.initial_primitive(x, y, &mut p);
         p
     });
+    let mut primitive2 = host::Patch::from_fn([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], |_, _| [0.0, 0.0, 0.0]);
+    let mut conserved_rk = host::Patch::from_fn([0, 0], mesh.shape(), |_, _| [0.0, 0.0, 0.0]);
+    solver::iso2d::primitive_to_conserved_cpu(&primitive1, &mut conserved_rk);
 
     let v_max = 1.0;
-    // let rk_order = cmdline.rk_order;
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
     let checkpoint_interval = cmdline.checkpoint_interval;
@@ -62,14 +57,15 @@ fn run() -> Result<(), error::Error> {
 
     while time < cmdline.end_time {
         if time >= next_output_time {
-            do_output(&primitive.to_vec(), output_number);
+            do_output(&primitive1.to_vec(), output_number);
             output_number += 1;
             next_output_time += checkpoint_interval;
         }
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                // solver.advance(rk_order, dt);
+                solver::iso2d::advance_rk_cpu(&mesh, &conserved_rk, &primitive1, &mut primitive2, 0.0, dt);
+                std::mem::swap(&mut primitive1, &mut primitive2);
                 time += dt;
                 iteration += 1;
             }
@@ -83,7 +79,7 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
-    do_output(&primitive.to_vec(), output_number);
+    do_output(&primitive1.to_vec(), output_number);
     Ok(())
 }
 

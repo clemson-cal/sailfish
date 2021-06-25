@@ -23,6 +23,8 @@ pub mod ffi {
             buffer_mode: i32,
             data: *const f64) -> Patch;
         pub(super) fn patch_del(patch: Patch);
+        pub(super) fn patch_set(patch: Patch, i: i32, j: i32, q: i32, y: f64);
+        // pub(super) fn patch_get(patch: Patch, i: i32, j: i32, q: i32) -> f64;
         pub(super) fn patch_contains(patch: Patch, other: Patch) -> i32;
     }    
 
@@ -55,13 +57,11 @@ pub mod host {
                     ffi::BUFFER_MODE_HOST,
                     std::ptr::null(),
                 );
-                let si = c.jumps[0];
-                let sj = c.jumps[1];
                 for i in start[0]..start[0] + count[0] as i32 {
                     for j in start[1]..start[1] + count[1] as i32 {
                         let x = f(i, j);
                         for q in 0..N {
-                            *c.data.offset((i * si + j * sj + q as i32) as isize) = x[q]
+                            ffi::patch_set(c, i, j, q as i32, x[q]);
                         }
                     }
                 }

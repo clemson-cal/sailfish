@@ -203,9 +203,9 @@ extern "C" void primitive_to_conserved_gpu(struct Patch primitive, struct Patch 
 
 void advance_rk_cpu(
     struct Mesh mesh,
+    struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
-    struct Patch conserved_rk,
     real a,
     real dt)
 {
@@ -304,10 +304,10 @@ void advance_rk_cpu(
         riemann_hlle(prjm, prjp, frj, 1.0, 1);
 
         // totally ad-hoc viscous flux, just to force gradients to be used:
-        fli[1] += gxli[2] * 1e-6;
-        flj[2] += gxlj[2] * 1e-6;
-        fri[1] += gyri[1] * 1e-6;
-        frj[2] += gyrj[1] * 1e-6;
+        // fli[1] += gxli[2] * 1e-6;
+        // flj[2] += gxlj[2] * 1e-6;
+        // fri[1] += gyri[1] * 1e-6;
+        // frj[2] += gyrj[1] * 1e-6;
 
         primitive_to_conserved(pc, uc);
 
@@ -426,10 +426,10 @@ void advance_rk_omp(
         riemann_hlle(prjm, prjp, frj, 1.0, 1);
 
         // totally ad-hoc viscous flux, just to force gradients to be used:
-        fli[1] += gxli[2] * 1e-6;
-        flj[2] += gxlj[2] * 1e-6;
-        fri[1] += gyri[1] * 1e-6;
-        frj[2] += gyrj[1] * 1e-6;
+        // fli[1] += gxli[2] * 1e-6;
+        // flj[2] += gxlj[2] * 1e-6;
+        // fri[1] += gyri[1] * 1e-6;
+        // frj[2] += gyrj[1] * 1e-6;
 
         primitive_to_conserved(pc, uc);
 
@@ -552,10 +552,10 @@ static void __global__ kernel_advance_rk(
     riemann_hlle(prjm, prjp, frj, 1.0, 1);
 
     // totally ad-hoc viscous flux, just to force gradients to be used:
-    fli[1] += gxli[2] * 1e-6;
-    flj[2] += gxlj[2] * 1e-6;
-    fri[1] += gyri[1] * 1e-6;
-    frj[2] += gyrj[1] * 1e-6;
+    // fli[1] += gxli[2] * 1e-6;
+    // flj[2] += gxlj[2] * 1e-6;
+    // fri[1] += gyri[1] * 1e-6;
+    // frj[2] += gyrj[1] * 1e-6;
 
     primitive_to_conserved(pc, uc);
 

@@ -61,39 +61,43 @@ pub fn primitive_to_conserved_gpu(primitive: &device::Patch, conserved: &mut dev
 }
 
 pub fn advance_rk_cpu(
-    mesh: Mesh,
+    mesh: &Mesh,
     conserved_rk: &host::Patch,
     primitive_rd: &host::Patch,
     primitive_wr: &mut host::Patch,
     a: f64,
-    dt: f64) {
+    dt: f64)
+{
+    // TODO: validate patch shapes (primitive is the conserved shape plus guard zones)
     unsafe {
-        iso2d_ffi::advance_rk_cpu(mesh, conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
+        iso2d_ffi::advance_rk_cpu(mesh.clone(), conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
     }
 }
 
 #[cfg(feature = "omp")]
 pub fn advance_rk_omp(
-    mesh: Mesh,
+    mesh: &Mesh,
     conserved_rk: &host::Patch,
     primitive_rd: &host::Patch,
     primitive_wr: &mut host::Patch,
     a: f64,
-    dt: f64) {
+    dt: f64)
+{
     unsafe {
-        iso2d_ffi::advance_rk_omp(mesh, conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
+        iso2d_ffi::advance_rk_omp(mesh.clone(), conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
     }
 }
 
 #[cfg(feature = "cuda")]
 pub fn advance_rk_gpu(
-    mesh: Mesh,
+    mesh: &Mesh,
     conserved_rk: &device::Patch,
     primitive_rd: &device::Patch,
     primitive_wr: &mut device::Patch,
     a: f64,
-    dt: f64) {
+    dt: f64)
+{
     unsafe {
-        iso2d_ffi::advance_rk_gpu(mesh, conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
+        iso2d_ffi::advance_rk_gpu(mesh.clone(), conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
     }
 }
