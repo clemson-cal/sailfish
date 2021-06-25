@@ -1,5 +1,6 @@
 use setup::Setup;
 use std::io::Write;
+use solver::Solve;
 
 pub mod cmdline;
 pub mod error;
@@ -27,20 +28,12 @@ where
 }
 
 fn run() -> Result<(), error::Error> {
-    use solver::host;
-
     let cmdline = cmdline::parse_command_line()?;
     let mesh = solver::Mesh::centered_square(1.0, cmdline.resolution);
     let setup = setup::Explosion {};
 
-    let mut primitive1 = host::Patch::from_fn([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], |i, j| {
-        let [x, y] = mesh.cell_coordinates(i, j);
-        let mut p = [0.0; 3];
-        setup.initial_primitive(x, y, &mut p);
-        p
-    });
-    let mut primitive2 = primitive1.clone();
-    let mut conserved = host::Patch::from_fn([0, 0], mesh.shape(), |_, _| [0.0, 0.0, 0.0]);
+    let primitive = setup.initial_primitive_vec(&mesh);
+    let mut solver = solver::cpu::Solver::new(mesh.clone(), primitive);
 
     let v_max = 1.0;
     let cfl = cmdline.cfl_number;
@@ -56,16 +49,14 @@ fn run() -> Result<(), error::Error> {
 
     while time < cmdline.end_time {
         if time >= next_output_time {
-            do_output(&primitive1.to_vec(), output_number);
+            do_output(&solver.primitive(), output_number);
             output_number += 1;
             next_output_time += checkpoint_interval;
         }
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                solver::iso2d::primitive_to_conserved_cpu(&primitive1, &mut conserved);
-                solver::iso2d::advance_rk_cpu(&mesh, &conserved, &primitive1, &mut primitive2, 0.0, dt);
-                std::mem::swap(&mut primitive1, &mut primitive2);
+                solver.advance(1, dt);
                 time += dt;
                 iteration += 1;
             }
@@ -79,7 +70,7 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
-    do_output(&primitive1.to_vec(), output_number);
+    do_output(&solver.primitive(), output_number);
     Ok(())
 }
 

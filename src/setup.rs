@@ -1,4 +1,4 @@
-use crate::solver::{BufferZone, EquationOfState, PointMass};
+use crate::solver::{BufferZone, EquationOfState, Mesh, PointMass};
 use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup: Sized {
@@ -7,6 +7,20 @@ pub trait Setup: Sized {
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
     fn max_signal_speed(&self) -> Option<f64>;
+
+    fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
+        let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
+        let si = 3 * (mesh.nj + 4);
+        let sj = 3;
+        for i in -2..mesh.ni + 2 {
+            for j in -2..mesh.nj + 2 {
+                let n = ((i + 2) * si + (j + 2) * sj) as usize;
+                let [x, y] = mesh.cell_coordinates(i, j);
+                self.initial_primitive(x, y, &mut primitive[n..n + 3])
+            }
+        }
+        primitive
+    }
 }
 
 pub struct Explosion {}

@@ -70,6 +70,48 @@ pub mod host {
             })
         }
 
+        pub fn zeros(start: [i32; 2], count: [u32; 2], num_fields: u32) -> Self {
+            Self(unsafe {
+                let c = ffi::patch_new(
+                    start[0],
+                    start[1],
+                    count[0] as i32,
+                    count[1] as i32,
+                    num_fields as i32,
+                    ffi::BUFFER_MODE_HOST,
+                    std::ptr::null(),
+                );
+                for i in start[0]..start[0] + count[0] as i32 {
+                    for j in start[1]..start[1] + count[1] as i32 {
+                        for q in 0..num_fields {
+                            ffi::patch_set(c, i, j, q as i32, 0.0);
+                        }
+                    }
+                }
+                c
+            })
+        }
+
+        pub fn from_vec(start: [i32; 2], count: [u32; 2], num_fields: u32, data: &Vec<f64>) -> Self {
+            assert!{
+                data.len() == (count[0] * count[1] * num_fields) as usize,
+                "input data has the wrong size for the given count"
+            };
+            Self(unsafe {
+                let c = ffi::patch_new(
+                    start[0],
+                    start[1],
+                    count[0] as i32,
+                    count[1] as i32,
+                    num_fields as i32,
+                    ffi::BUFFER_MODE_HOST,
+                    std::ptr::null(),
+                );
+                std::ptr::copy_nonoverlapping(data.as_ptr(), c.data, data.len());
+                c
+            })
+        }
+
         pub fn start(&self) -> [i32; 2] {
             [self.0.start[0] as i32, self.0.start[1] as i32]
         }

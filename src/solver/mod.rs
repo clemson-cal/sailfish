@@ -103,3 +103,46 @@ pub enum BufferZone {
         onset_width: f64,
     }
 }
+
+pub trait Solve {
+    fn new(mesh: Mesh, primitive: Vec<f64>) -> Self;
+    fn primitive(&self) -> Vec<f64>;
+    fn advance(&mut self, rk_order: usize, dt: f64);
+}
+
+#[allow(unused)]
+pub mod cpu {
+    use super::Solve;
+    use super::Mesh;
+    use super::iso2d;
+    use super::patch::host;
+
+    pub struct Solver {
+        mesh: Mesh,
+        primitive1: host::Patch,
+        primitive2: host::Patch,
+        conserved0: host::Patch,
+    }
+
+    impl Solve for Solver {
+        fn new(mesh: super::Mesh, primitive: Vec<f64>) -> Self {
+            let primitive1 = host::Patch::from_vec([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive);
+            let primitive2 = host::Patch::zeros([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3);
+            let conserved0 = host::Patch::zeros([0, 0], mesh.shape(), 3);
+            Self {
+                mesh, primitive1, primitive2, conserved0,
+            }
+        }
+        fn primitive(&self) -> Vec<f64> {
+            self.primitive1.to_vec()
+        }
+        fn advance(&mut self, rk_order: usize, dt: f64) {
+            if rk_order != 1 {
+                todo!()
+            }
+            iso2d::primitive_to_conserved_cpu(&self.primitive1, &mut self.conserved0);
+            iso2d::advance_rk_cpu(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, 0.0, dt);
+            std::mem::swap(&mut self.primitive1, &mut self.primitive2);
+        }
+    }
+}
