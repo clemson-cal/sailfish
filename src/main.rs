@@ -1,6 +1,6 @@
 use setup::Setup;
 use std::io::Write;
-use solver::{cpu, omp, Solve};
+use solver::{cpu, omp, gpu, Solve};
 
 pub mod cmdline;
 pub mod error;
@@ -36,7 +36,17 @@ fn run() -> Result<(), error::Error> {
     let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
         (false, false) => Box::new(cpu::Solver::new(mesh.clone(), primitive)),
         (true, false) => Box::new(omp::Solver::new(mesh.clone(), primitive)),
-        (_, true) => todo!(),
+        (_, true) => {
+            #[cfg(feature = "cuda")]
+            {
+                Box::new(gpu::Solver::new(mesh.clone(), primitive))
+            }
+
+            #[cfg(not(feature = "cuda"))]
+            {
+                panic!()
+            }
+        }
     };
 
     let v_max = 1.0;

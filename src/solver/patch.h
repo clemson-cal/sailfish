@@ -132,7 +132,7 @@ PATCH_LINKAGE struct Patch patch_clone_to_device(struct Patch self)
     device_patch.buffer_mode = BUFFER_MODE_DEVICE;
     cudaMalloc(&device_patch.data, BYTES(device_patch));
     cudaMemcpy(device_patch.data, self.data, BYTES(self), cudaMemcpyHostToDevice);
-    return self;
+    return device_patch;
 }
 
 PATCH_LINKAGE struct Patch patch_clone_to_host(struct Patch self)
@@ -141,7 +141,7 @@ PATCH_LINKAGE struct Patch patch_clone_to_host(struct Patch self)
     host_patch.data = (real*)malloc(BYTES(host_patch));
     host_patch.buffer_mode = BUFFER_MODE_HOST;
     cudaMemcpy(host_patch.data, self.data, BYTES(self), cudaMemcpyDeviceToHost);
-    return self;
+    return host_patch;
 }
 
 #endif // __NVCC__

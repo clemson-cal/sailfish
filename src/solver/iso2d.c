@@ -568,7 +568,7 @@ static void __global__ kernel_advance_rk(
     conserved_to_primitive(uc, pout);
 }
 
-void advance_rk_gpu(
+extern "C" void advance_rk_gpu(
     struct Mesh mesh,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
@@ -578,7 +578,8 @@ void advance_rk_gpu(
 {
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    kernel_advance_rk<<<bd, bs>>>(mesh, primitive_rd, primitive_wr, conserved_rk, a, dt);
+    kernel_advance_rk<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt);
+    cudaDeviceSynchronize();
 }
 
 #endif

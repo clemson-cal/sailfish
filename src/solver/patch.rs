@@ -196,6 +196,14 @@ pub mod device {
         }
     }
 
+    impl Clone for Patch {
+        fn clone(&self) -> Self {
+            Self(unsafe {
+                ffi::patch_clone(self.0)
+            })
+        }
+    }
+
     impl Drop for Patch {
         fn drop(&mut self) {
             unsafe {

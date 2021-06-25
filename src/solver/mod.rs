@@ -180,3 +180,40 @@ pub mod omp {
         }
     }
 }
+
+#[cfg(feature = "cuda")]
+pub mod gpu {
+    use super::*;
+
+    pub struct Solver {
+        mesh: Mesh,
+        primitive1: device::Patch,
+        primitive2: device::Patch,
+        conserved0: device::Patch,
+    }
+
+    impl Solver {
+        pub fn new(mesh: super::Mesh, primitive: Vec<f64>) -> Self {
+            let primitive1 = host::Patch::from_vec([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive).to_device();
+            let primitive2 = host::Patch::zeros([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3).to_device();
+            let conserved0 = host::Patch::zeros([0, 0], mesh.shape(), 3).to_device();
+            Self {
+                mesh, primitive1, primitive2, conserved0,
+            }
+        }
+    }
+
+    impl Solve for Solver {
+        fn primitive(&self) -> Vec<f64> {
+            self.primitive1.to_host().to_vec()
+        }
+        fn advance(&mut self, rk_order: usize, dt: f64) {
+            if rk_order != 1 {
+                todo!()
+            }
+            iso2d::primitive_to_conserved_gpu(&self.primitive1, &mut self.conserved0);
+            iso2d::advance_rk_gpu(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, 0.0, dt);
+            std::mem::swap(&mut self.primitive1, &mut self.primitive2);
+        }
+    }
+}
