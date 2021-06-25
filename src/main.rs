@@ -1,11 +1,11 @@
+use setup::Setup;
+use std::io::Write;
+use solver::{cpu, omp, Solve};
+
 pub mod cmdline;
 pub mod error;
-pub mod physics;
 pub mod setup;
-
-use crate::setup::Setup;
-use physics::f64::*;
-use std::io::Write;
+pub mod solver;
 
 fn do_output(primitive: &Vec<f64>, output_number: usize) {
     let mut bytes = Vec::new();
@@ -18,21 +18,6 @@ fn do_output(primitive: &Vec<f64>, output_number: usize) {
     println!("write {}", filename);
 }
 
-fn build_solver(mesh: Mesh, use_omp: bool) -> Result<Box<dyn Solve>, error::Error> {
-    if use_omp {
-        #[cfg(feature = "omp")]
-        {
-            Ok(Box::new(iso2d_omp::Solver::new(mesh)))
-        }
-        #[cfg(not(feature = "omp"))]
-        {
-            Err(error::Error::CompiledWithoutOpenMP)
-        }
-    } else {
-        Ok(Box::new(iso2d_cpu::Solver::new(mesh)))
-    }
-}
-
 fn time_exec<F>(mut f: F) -> std::time::Duration
 where
     F: FnMut(),
@@ -43,48 +28,28 @@ where
 }
 
 fn run() -> Result<(), error::Error> {
-    use physics::f64::*;
-    let setup = setup::Explosion {};
     let cmdline = cmdline::parse_command_line()?;
-    let mesh = Mesh {
-        ni: cmdline.resolution,
-        nj: cmdline.resolution,
-        x0: -1.0,
-        x1: 1.0,
-        y0: -1.0,
-        y1: 1.0,
-    };
-    let mut solver = build_solver(mesh.clone(), cmdline.use_omp)?;
+    let mesh = solver::Mesh::centered_square(1.0, cmdline.resolution);
+    let setup = setup::Explosion {};
 
-    let [si, sj] = mesh.strides();
-    let mut primitive: Vec<f64> = vec![0.0; 3 * mesh.num_total_zones()];
-    for i in 0..mesh.ni() {
-        for j in 0..mesh.nj() {
-            let x = mesh.x0 + (i as f64 + 0.5) * mesh.dx();
-            let y = mesh.y0 + (j as f64 + 0.5) * mesh.dy();
-            let n = i * si + j * sj;
-            setup.initial_primitive(x, y, &mut primitive[n..n + 3]);
-        }
-    }
-    solver.set_primitive(&primitive);
+    let primitive = setup.initial_primitive_vec(&mesh);
+    let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
+        (false, false) => Box::new(cpu::Solver::new(mesh.clone(), primitive)),
+        (true, false) => Box::new(omp::Solver::new(mesh.clone(), primitive)),
+        (_, true) => todo!(),
+    };
+
+    let v_max = 1.0;
+    let cfl = cmdline.cfl_number;
+    let fold = cmdline.fold;
+    let checkpoint_interval = cmdline.checkpoint_interval;
+    let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
 
     let mut time = 0.0;
     let mut iteration = 0;
     let mut output_number = 0;
     let mut next_output_time = time;
     let mut mzps_log = vec![];
-
-    let v_max = setup.max_signal_speed().unwrap();
-    let cfl = cmdline.cfl_number;
-    let fold = cmdline.fold;
-    let checkpoint_interval = cmdline.checkpoint_interval;
-    let dt = mesh.dx().min(mesh.dy()) / v_max * cfl;
-
-    let eos = setup.equation_of_state();
-    let buffer = setup.buffer_zone();
-
-    println!("omp enabled: {}", cfg!(feature = "omp"));
-    println!("cuda enabled: {}", cfg!(feature = "cuda"));
 
     while time < cmdline.end_time {
         if time >= next_output_time {
@@ -95,17 +60,12 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                let masses = setup.particles(time);
-
-                if cmdline.precompute_flux {
-                    solver.compute_fluxes(eos, &masses);
-                }
-                solver.advance(eos, buffer, &masses, dt);
-
+                solver.advance(1, dt);
                 time += dt;
                 iteration += 1;
             }
         });
+
         mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
         println!(
             "[{}] t={:.3} Mzps={:.3}",
@@ -115,11 +75,6 @@ fn run() -> Result<(), error::Error> {
         );
     }
     do_output(&solver.primitive(), output_number);
-
-    println!(
-        "average perf: {:.3} Mzps",
-        mzps_log.iter().fold(0.0, |a, b| a + b) / mzps_log.len() as f64
-    );
     Ok(())
 }
 
