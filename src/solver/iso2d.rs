@@ -68,7 +68,12 @@ pub fn advance_rk_cpu(
     a: f64,
     dt: f64)
 {
-    // TODO: validate patch shapes (primitive is the conserved shape plus guard zones)
+    assert!(primitive_rd.start() == [-2, -2]);
+    assert!(primitive_rd.count() == [mesh.ni() + 4, mesh.nj() + 4]);
+    assert!(primitive_rd.start() == primitive_wr.start());
+    assert!(primitive_rd.count() == primitive_wr.count());
+    assert!(conserved_rk.start() == [0, 0]);
+    assert!(conserved_rk.count() == mesh.shape());
     unsafe {
         iso2d_ffi::advance_rk_cpu(mesh.clone(), conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
     }

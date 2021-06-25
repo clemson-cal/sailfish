@@ -41,7 +41,6 @@ fn run() -> Result<(), error::Error> {
     });
     let mut primitive2 = primitive1.clone();
     let mut conserved = host::Patch::from_fn([0, 0], mesh.shape(), |_, _| [0.0, 0.0, 0.0]);
-    solver::iso2d::primitive_to_conserved_cpu(&primitive1, &mut conserved);
 
     let v_max = 1.0;
     let cfl = cmdline.cfl_number;
@@ -64,6 +63,7 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
+                solver::iso2d::primitive_to_conserved_cpu(&primitive1, &mut conserved);
                 solver::iso2d::advance_rk_cpu(&mesh, &conserved, &primitive1, &mut primitive2, 0.0, dt);
                 std::mem::swap(&mut primitive1, &mut primitive2);
                 time += dt;

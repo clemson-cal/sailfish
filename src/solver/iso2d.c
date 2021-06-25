@@ -231,7 +231,7 @@ void advance_rk_cpu(
     //
     //                 kj
     // ------------------------------------------------------------------------
-    FOR_EACH(primitive_wr)
+    FOR_EACH(conserved_rk)
     {
         real *un = GET(conserved_rk, i, j);
         real *pc = GET(primitive_rd, i, j);
@@ -353,7 +353,7 @@ void advance_rk_omp(
     //
     //                 kj
     // ------------------------------------------------------------------------
-    FOR_EACH_OMP(primitive_wr)
+    FOR_EACH_OMP(conserved_rk)
     {
         real *un = GET(conserved_rk, i, j);
         real *pc = GET(primitive_rd, i, j);

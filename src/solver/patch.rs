@@ -70,16 +70,16 @@ pub mod host {
             })
         }
 
-        pub fn start(&self) -> [usize; 2] {
-            [self.0.start[0] as usize, self.0.start[1] as usize]
+        pub fn start(&self) -> [i32; 2] {
+            [self.0.start[0] as i32, self.0.start[1] as i32]
         }
 
-        pub fn count(&self) -> [usize; 2] {
-            [self.0.count[0] as usize, self.0.count[1] as usize]
+        pub fn count(&self) -> [u32; 2] {
+            [self.0.count[0] as u32, self.0.count[1] as u32]
         }
 
-        pub fn num_fields(&self) -> usize {
-            self.0.num_fields as usize
+        pub fn num_fields(&self) -> u32 {
+            self.0.num_fields as u32
         }
 
         pub fn contains(&self, other: &Self) -> bool {
@@ -97,7 +97,7 @@ pub mod host {
 
         pub fn to_vec(&self) -> Vec<f64> {
             let [ni, nj] = self.count();
-            let mut res = vec![0.0; ni * nj * self.num_fields()];
+            let mut res = vec![0.0; (ni * nj * self.num_fields()) as usize];
             unsafe {
                 std::ptr::copy_nonoverlapping(self.0.data, res.as_mut_ptr(), res.len());
             }
