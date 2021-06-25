@@ -7,8 +7,12 @@ use super::Mesh;
 mod iso2d_ffi {
     use super::*;
     extern "C" {
+
         pub(super) fn primitive_to_conserved_cpu(primitive: ffi::Patch, conserved: ffi::Patch);
+
+        #[cfg(feature = "omp")]
         pub(super) fn primitive_to_conserved_omp(primitive: ffi::Patch, conserved: ffi::Patch);
+
         #[cfg(feature = "cuda")]
         pub(super) fn primitive_to_conserved_gpu(primitive: ffi::Patch, conserved: ffi::Patch);
 

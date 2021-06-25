@@ -1,6 +1,6 @@
 use setup::Setup;
 use std::io::Write;
-use solver::Solve;
+use solver::{cpu, omp, Solve};
 
 pub mod cmdline;
 pub mod error;
@@ -33,7 +33,11 @@ fn run() -> Result<(), error::Error> {
     let setup = setup::Explosion {};
 
     let primitive = setup.initial_primitive_vec(&mesh);
-    let mut solver = solver::cpu::Solver::new(mesh.clone(), primitive);
+    let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
+        (false, false) => Box::new(cpu::Solver::new(mesh.clone(), primitive)),
+        (true, false) => Box::new(omp::Solver::new(mesh.clone(), primitive)),
+        (_, true) => todo!(),
+    };
 
     let v_max = 1.0;
     let cfl = cmdline.cfl_number;
