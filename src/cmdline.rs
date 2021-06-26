@@ -50,6 +50,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
             }
         })
     {
+        #[cfg_attr(rustfmt, rustfmt_skip)]
         match state {
             State::Ready => match arg.as_str() {
                 "--version" => {
@@ -146,8 +147,11 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         }
     }
 
-    if !std::matches!(state, State::Ready) {
-        return Err(Error::CommandLineParse("missing argument".to_string()));
+    if c.use_omp && c.use_gpu {
+        Err(Error::CommandLineParse("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
+    } else if !std::matches!(state, State::Ready) {
+        Err(Error::CommandLineParse("missing argument".to_string()))
+    } else {
+        Ok(c)
     }
-    Ok(c)
 }

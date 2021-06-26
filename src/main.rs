@@ -46,15 +46,18 @@ fn run() -> Result<(), error::Error> {
     let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
         (false, false) => Box::new(cpu::Solver::new(mesh, primitive)),
         (true, false) => Box::new(omp::Solver::new(mesh, primitive)),
-        (_, true) => {
+        (false, true) => {
             #[cfg(feature = "cuda")]
             {
                 Box::new(gpu::Solver::new(mesh, primitive))
             }
             #[cfg(not(feature = "cuda"))]
             {
-                panic!()
+                panic!("cuda feature not enabled")
             }
+        }
+        (true, true) => {
+            panic!("omp and gpu cannot be enabled at once")
         }
     };
 
