@@ -173,7 +173,7 @@ void primitive_to_conserved_omp(struct Patch primitive, struct Patch conserved)
 
 #elif API_MODE_GPU
 
-static void __global__ kernel_primitive_to_conserved(struct Patch primitive, struct Patch conserved)
+static void __global__ kernel(struct Patch primitive, struct Patch conserved)
 {
     int i = conserved.start[0] + threadIdx.y + blockIdx.y * blockDim.y;
     int j = conserved.start[1] + threadIdx.x + blockIdx.x * blockDim.x;
@@ -189,9 +189,10 @@ static void __global__ kernel_primitive_to_conserved(struct Patch primitive, str
 
 extern "C" void primitive_to_conserved_gpu(struct Patch primitive, struct Patch conserved)
 {
+
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((conserved.count[0] + bs.x - 1) / bs.x, (conserved.count[1] + bs.y - 1) / bs.y);
-    kernel_primitive_to_conserved<<<bd, bs>>>(primitive, conserved);
+    kernel<<<bd, bs>>>(primitive, conserved);
 }
 
 #endif
@@ -349,7 +350,7 @@ void advance_rk_omp(
 
 #elif API_MODE_GPU
 
-static void __global__ kernel_advance_rk(
+void __global__ kernel(
     struct Mesh mesh,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
@@ -372,7 +373,7 @@ extern "C" void advance_rk_gpu(
 {
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    kernel_advance_rk<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt);
+    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt);
     cudaDeviceSynchronize();
 }
 
