@@ -2,9 +2,11 @@ use super::patch::{ffi, host};
 
 #[cfg(feature = "cuda")]
 use super::patch::device;
-use super::Mesh;
+use super::{BufferZone, EquationOfState, Mesh, PointMass};
 
 mod iso2d_ffi {
+    use crate::solver::{BufferZone, EquationOfState};
+
     use super::*;
     extern "C" {
 
@@ -21,6 +23,10 @@ mod iso2d_ffi {
             conserved_rk: ffi::Patch,
             primitive_rd: ffi::Patch,
             primitive_wr: ffi::Patch,
+            eos: EquationOfState,
+            buffer: BufferZone,
+            masses: *const PointMass,
+            num_masses: i32,
             a: f64,
             dt: f64,
         );
@@ -31,6 +37,10 @@ mod iso2d_ffi {
             conserved_rk: ffi::Patch,
             primitive_rd: ffi::Patch,
             primitive_wr: ffi::Patch,
+            eos: EquationOfState,
+            buffer: BufferZone,
+            masses: *const PointMass,
+            num_masses: i32,
             a: f64,
             dt: f64,
         );
@@ -41,6 +51,10 @@ mod iso2d_ffi {
             conserved_rk: ffi::Patch,
             primitive_rd: ffi::Patch,
             primitive_wr: ffi::Patch,
+            eos: EquationOfState,
+            buffer: BufferZone,
+            masses: *const PointMass,
+            num_masses: i32,
             a: f64,
             dt: f64,
         );
@@ -66,6 +80,9 @@ pub fn advance_rk_cpu(
     conserved_rk: &host::Patch,
     primitive_rd: &host::Patch,
     primitive_wr: &mut host::Patch,
+    eos: EquationOfState,
+    buffer: BufferZone,
+    masses: &[PointMass],
     a: f64,
     dt: f64,
 ) {
@@ -81,6 +98,10 @@ pub fn advance_rk_cpu(
             conserved_rk.0,
             primitive_rd.0,
             primitive_wr.0,
+            eos,
+            buffer,
+            masses.as_ptr(),
+            masses.len() as i32,
             a,
             dt,
         )
@@ -93,6 +114,9 @@ pub fn advance_rk_omp(
     conserved_rk: &host::Patch,
     primitive_rd: &host::Patch,
     primitive_wr: &mut host::Patch,
+    eos: EquationOfState,
+    buffer: BufferZone,
+    masses: &[PointMass],
     a: f64,
     dt: f64,
 ) {
@@ -108,6 +132,10 @@ pub fn advance_rk_omp(
             conserved_rk.0,
             primitive_rd.0,
             primitive_wr.0,
+            eos,
+            buffer,
+            masses.as_ptr(),
+            masses.len() as i32,
             a,
             dt,
         )
@@ -120,6 +148,9 @@ pub fn advance_rk_gpu(
     conserved_rk: &device::Patch,
     primitive_rd: &device::Patch,
     primitive_wr: &mut device::Patch,
+    eos: EquationOfState,
+    buffer: BufferZone,
+    masses: &[PointMass],
     a: f64,
     dt: f64,
 ) {
@@ -135,6 +166,10 @@ pub fn advance_rk_gpu(
             conserved_rk.0,
             primitive_rd.0,
             primitive_wr.0,
+            eos,
+            buffer,
+            masses.as_ptr(),
+            masses.len() as i32,
             a,
             dt,
         )

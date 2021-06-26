@@ -55,6 +55,224 @@ struct Mesh
 #define Y(m, i) (m.y0 + (j) * m.dy)
 
 
+// ============================ PHYSICS =======================================
+// ============================================================================
+struct PointMass
+{
+    real x;
+    real y;
+    real mass;
+    real rate;
+    real radius;
+};
+
+enum EquationOfStateType
+{
+    Isothermal,
+    LocallyIsothermal,
+    GammaLaw,
+};
+
+struct EquationOfState
+{
+    enum EquationOfStateType type;
+
+    union
+    {
+        struct
+        {
+            real sound_speed;
+        } isothermal;
+
+        struct
+        {
+            real mach_number;
+        } locally_isothermal;
+
+        struct
+        {
+            real gamma_law_index;
+        } gamma_law;
+    };
+};
+
+enum BufferZoneType
+{
+    None,
+    Keplerian,
+};
+
+struct BufferZone
+{
+    enum BufferZoneType type;
+
+    union
+    {
+        struct
+        {
+
+        } none;
+
+        struct
+        {
+            real surface_density;
+            real central_mass;
+            real driving_rate;
+            real outer_radius;
+            real onset_width;
+        } keplerian;
+    };
+};
+
+
+// ============================ GRAVITY =======================================
+// ============================================================================
+static __device__ real gravitational_potential(
+    struct PointMass *masses,
+    int num_masses,
+    real x1,
+    real y1)
+{
+    real phi = 0.0;
+
+    for (int p = 0; p < num_masses; ++p)
+    {
+        real x0 = masses[p].x;
+        real y0 = masses[p].y;
+        real mp = masses[p].mass;
+        real rs = masses[p].radius;
+
+        real dx = x1 - x0;
+        real dy = y1 - y0;
+        real r2 = dx * dx + dy * dy;
+        real r2_soft = r2 + rs * rs;
+
+        phi -= mp / sqrt(r2_soft);
+    }
+    return phi;
+}
+
+static __device__ void point_mass_source_term(
+    struct PointMass *mass,
+    real x1,
+    real y1,
+    real dt,
+    real sigma,
+    real *delta_cons)
+{
+    real x0 = mass->x;
+    real y0 = mass->y;
+    real mp = mass->mass;
+    real rs = mass->radius;
+
+    real dx = x1 - x0;
+    real dy = y1 - y0;
+    real r2 = dx * dx + dy * dy;
+    real r2_soft = r2 + rs * rs;
+    real dr = sqrt(r2);
+    real mag = sigma * mp / r2_soft;
+    real fx = -mag * dx / dr;
+    real fy = -mag * dy / dr;
+    real sink_rate = 0.0;
+
+    if (dr < 4.0 * rs)
+    {
+        sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
+    }
+
+    // NOTE: This is a force-free sink.
+    delta_cons[0] = dt * sigma * sink_rate * -1.0;
+    delta_cons[1] = dt * fx;
+    delta_cons[2] = dt * fy;
+}
+
+static __device__ void point_masses_source_term(
+    struct PointMass* masses,
+    int num_masses,
+    real x1,
+    real y1,
+    real dt,
+    real sigma,
+    real *cons)
+{
+    for (int p = 0; p < num_masses; ++p)
+    {
+        real delta_cons[NCONS];
+        point_mass_source_term(&masses[p], x1, y1, dt, sigma, delta_cons);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            cons[q] += delta_cons[q];
+        }
+    }
+}
+
+
+// ============================ EOS AND BUFFER ================================
+// ============================================================================
+static __device__ real sound_speed_squared(
+    struct EquationOfState *eos,
+    real x,
+    real y,
+    struct PointMass *masses,
+    int num_masses)
+{
+    switch (eos->type)
+    {
+        case Isothermal:
+            return pow(eos->isothermal.sound_speed, 2.0);
+        case LocallyIsothermal:
+            return -gravitational_potential(masses, num_masses, x, y) / pow(eos->locally_isothermal.mach_number, 2.0);
+        case GammaLaw:
+            return 1.0; // WARNING
+    }
+    return 0.0;
+}
+
+static __device__ void buffer_source_term(
+    struct BufferZone *buffer,
+    real xc,
+    real yc,
+    real dt,
+    real *cons)
+{
+    switch (buffer->type)
+    {
+        case None:
+        {
+            break;
+        }
+        case Keplerian:
+        {
+            real rc = sqrt(xc * xc + yc * yc);
+            real surface_density = buffer->keplerian.surface_density;
+            real central_mass = buffer->keplerian.central_mass;
+            real driving_rate = buffer->keplerian.driving_rate;
+            real outer_radius = buffer->keplerian.outer_radius;
+            real onset_width = buffer->keplerian.onset_width;
+            real onset_radius = outer_radius - onset_width;
+
+            if (rc > onset_radius)
+            {
+                real pf = surface_density * sqrt(central_mass / rc);
+                real px = pf * (-yc / rc);
+                real py = pf * ( xc / rc);
+                real u0[NCONS] = {surface_density, px, py};
+
+                real omega_outer = sqrt(central_mass / pow(onset_radius, 3.0));
+                real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
+                }
+            }
+            break;
+        }
+    }
+}
+
+
 // ============================ HYDRO =========================================
 // ============================================================================
 static __device__ void conserved_to_primitive(const real *cons, real *prim)
@@ -202,6 +420,10 @@ static __device__ void advance_rk_zone(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
     real a,
     real dt,
     int i,
@@ -323,12 +545,16 @@ void advance_rk_cpu(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
     real a,
     real dt)
 {
     FOR_EACH(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
     }
 }
 
@@ -339,12 +565,16 @@ void advance_rk_omp(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
     real a,
     real dt)
 {
     FOR_EACH_OMP(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
     }
 }
 
@@ -355,12 +585,16 @@ void __global__ kernel(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
     real a,
     real dt)
 {
     int j = threadIdx.x + blockIdx.x * blockDim.x;
     int i = threadIdx.y + blockIdx.y * blockDim.y;
-    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i, j);    
+    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
 }
 
 extern "C" void advance_rk_gpu(

@@ -167,11 +167,18 @@ pub mod cpu {
             iso2d::primitive_to_conserved_cpu(&self.primitive1, &mut self.conserved0);
         }
         fn advance_rk(&mut self, a: f64, dt: f64) {
+            let eos = EquationOfState::Isothermal { sound_speed: 1.0 };
+            let buffer = BufferZone::None;
+            let particles = Vec::new();
+
             iso2d::advance_rk_cpu(
                 &self.mesh,
                 &self.conserved0,
                 &self.primitive1,
                 &mut self.primitive2,
+                eos,
+                buffer,
+                &particles,
                 a,
                 dt,
             );
@@ -210,11 +217,18 @@ pub mod omp {
             iso2d::primitive_to_conserved_omp(&self.primitive1, &mut self.conserved0);
         }
         fn advance_rk(&mut self, a: f64, dt: f64) {
+            let eos = EquationOfState::Isothermal { sound_speed: 1.0 };
+            let buffer = BufferZone::None;
+            let particles = Vec::new();
+
             iso2d::advance_rk_omp(
                 &self.mesh,
                 &self.conserved0,
                 &self.primitive1,
                 &mut self.primitive2,
+                eos,
+                buffer,
+                &particles,
                 a,
                 dt,
             );
@@ -254,11 +268,18 @@ pub mod gpu {
             iso2d::primitive_to_conserved_gpu(&self.primitive1, &mut self.conserved0);
         }
         fn advance_rk(&mut self, a: f64, dt: f64) {
+            let eos = EquationOfState::Isothermal { sound_speed: 1.0 };
+            let buffer = BufferZone::None;
+            let particles = Vec::new();
+
             iso2d::advance_rk_gpu(
                 &self.mesh,
                 &self.conserved0,
                 &self.primitive1,
                 &mut self.primitive2,
+                eos,
+                buffer,
+                &particles,
                 a,
                 dt,
             );
