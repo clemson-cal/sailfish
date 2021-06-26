@@ -13,7 +13,7 @@ fn main() {
         cc::Build::new()
             .file("src/solver/patch.c")
             .define("PATCH_LINKAGE", "")
-            .compile("patch");        
+            .compile("patch");
     }
 
     cc::Build::new()
@@ -39,7 +39,6 @@ fn main() {
             .define("API_MODE_GPU", None)
             .flag("-x=cu")
             .compile("iso2d_gpu");
-
     }
 
     #[cfg(feature = "cuda")]

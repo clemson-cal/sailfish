@@ -29,13 +29,11 @@ impl Setup for Explosion {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
-            primitive[1] = 0.0;
-            primitive[2] = 0.0;
         } else {
             primitive[0] = 0.1;
-            primitive[1] = 0.0;
-            primitive[2] = 0.0;
         }
+        primitive[1] = 0.0;
+        primitive[2] = 0.0;
     }
     fn particles(&self, _time: f64) -> Vec<PointMass> {
         vec![]
@@ -57,6 +55,7 @@ pub struct Binary {
 }
 
 impl Setup for Binary {
+    #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
         let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();

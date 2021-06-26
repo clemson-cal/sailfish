@@ -34,26 +34,26 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Checkpoint,
         EndTime,
         RkOrder,
-        CFL,
+        Cfl,
     }
     let mut state = State::Ready;
 
     for arg in std::env::args()
         .skip(1)
-        .flat_map(|arg| arg.split("=").map(str::to_string).collect::<Vec<_>>())
+        .flat_map(|arg| arg.split('=').map(str::to_string).collect::<Vec<_>>())
         .flat_map(|arg| {
-            if arg.starts_with("-") && !arg.starts_with("--") && arg.len() > 2 {
+            if arg.starts_with('-') && !arg.starts_with("--") && arg.len() > 2 {
                 let (a, b) = arg.split_at(2);
                 vec![a.to_string(), b.to_string()]
             } else {
-                vec![arg.to_string()]
+                vec![arg]
             }
         })
     {
         match state {
             State::Ready => match arg.as_str() {
                 "--version" => {
-                    return Err(Error::PrintUserInformation(format!("sailfish 0.1.0\n")));
+                    return Err(Error::PrintUserInformation("sailfish 0.1.0\n".to_string()));
                 }
                 "-h" | "--help" => {
                     let mut message = String::new();
@@ -82,7 +82,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-c"|"--checkpoint" => state = State::Checkpoint,
                 "-e"|"--end-time" => state = State::EndTime,
                 "-r"|"--rk-order" => state = State::RkOrder,
-                "--cfl" => state = State::CFL,
+                "--cfl" => state = State::Cfl,
                 "--precompute-flux" =>  c.precompute_flux = true,
                 _ => return Err(Error::CommandLineParse(format!("unrecognized option {}", arg))),
             },
@@ -134,7 +134,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
                 }
             },
-            State::CFL => match arg.parse() {
+            State::Cfl => match arg.parse() {
                 Ok(x) => {
                     c.cfl_number = x;
                     state = State::Ready;
@@ -147,7 +147,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
     }
 
     if !std::matches!(state, State::Ready) {
-        return Err(Error::CommandLineParse(format!("missing argument")));
+        return Err(Error::CommandLineParse("missing argument".to_string()));
     }
     Ok(c)
 }

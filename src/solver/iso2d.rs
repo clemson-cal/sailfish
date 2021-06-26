@@ -1,4 +1,4 @@
-use super::patch::{host, ffi};
+use super::patch::{ffi, host};
 
 #[cfg(feature = "cuda")]
 use super::patch::device;
@@ -22,7 +22,8 @@ mod iso2d_ffi {
             primitive_rd: ffi::Patch,
             primitive_wr: ffi::Patch,
             a: f64,
-            dt: f64);
+            dt: f64,
+        );
 
         #[cfg(feature = "omp")]
         pub(super) fn advance_rk_omp(
@@ -31,7 +32,8 @@ mod iso2d_ffi {
             primitive_rd: ffi::Patch,
             primitive_wr: ffi::Patch,
             a: f64,
-            dt: f64);
+            dt: f64,
+        );
 
         #[cfg(feature = "cuda")]
         pub(super) fn advance_rk_gpu(
@@ -40,28 +42,23 @@ mod iso2d_ffi {
             primitive_rd: ffi::Patch,
             primitive_wr: ffi::Patch,
             a: f64,
-            dt: f64);
+            dt: f64,
+        );
     }
 }
 
 pub fn primitive_to_conserved_cpu(primitive: &host::Patch, conserved: &mut host::Patch) {
-    unsafe {
-        iso2d_ffi::primitive_to_conserved_cpu(primitive.0, conserved.0)
-    }
+    unsafe { iso2d_ffi::primitive_to_conserved_cpu(primitive.0, conserved.0) }
 }
 
 #[cfg(feature = "omp")]
 pub fn primitive_to_conserved_omp(primitive: &host::Patch, conserved: &mut host::Patch) {
-    unsafe {
-        iso2d_ffi::primitive_to_conserved_omp(primitive.0, conserved.0)
-    }
+    unsafe { iso2d_ffi::primitive_to_conserved_omp(primitive.0, conserved.0) }
 }
 
 #[cfg(feature = "cuda")]
 pub fn primitive_to_conserved_gpu(primitive: &device::Patch, conserved: &mut device::Patch) {
-    unsafe {
-        iso2d_ffi::primitive_to_conserved_gpu(primitive.0, conserved.0)
-    }
+    unsafe { iso2d_ffi::primitive_to_conserved_gpu(primitive.0, conserved.0) }
 }
 
 pub fn advance_rk_cpu(
@@ -70,8 +67,8 @@ pub fn advance_rk_cpu(
     primitive_rd: &host::Patch,
     primitive_wr: &mut host::Patch,
     a: f64,
-    dt: f64)
-{
+    dt: f64,
+) {
     assert!(primitive_rd.start() == [-2, -2]);
     assert!(primitive_rd.count() == [mesh.ni() + 4, mesh.nj() + 4]);
     assert!(primitive_rd.start() == primitive_wr.start());
@@ -79,7 +76,14 @@ pub fn advance_rk_cpu(
     assert!(conserved_rk.start() == [0, 0]);
     assert!(conserved_rk.count() == mesh.shape());
     unsafe {
-        iso2d_ffi::advance_rk_cpu(mesh.clone(), conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
+        iso2d_ffi::advance_rk_cpu(
+            mesh.clone(),
+            conserved_rk.0,
+            primitive_rd.0,
+            primitive_wr.0,
+            a,
+            dt,
+        )
     }
 }
 
@@ -90,8 +94,8 @@ pub fn advance_rk_omp(
     primitive_rd: &host::Patch,
     primitive_wr: &mut host::Patch,
     a: f64,
-    dt: f64)
-{
+    dt: f64,
+) {
     assert!(primitive_rd.start() == [-2, -2]);
     assert!(primitive_rd.count() == [mesh.ni() + 4, mesh.nj() + 4]);
     assert!(primitive_rd.start() == primitive_wr.start());
@@ -99,7 +103,14 @@ pub fn advance_rk_omp(
     assert!(conserved_rk.start() == [0, 0]);
     assert!(conserved_rk.count() == mesh.shape());
     unsafe {
-        iso2d_ffi::advance_rk_omp(mesh.clone(), conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
+        iso2d_ffi::advance_rk_omp(
+            mesh.clone(),
+            conserved_rk.0,
+            primitive_rd.0,
+            primitive_wr.0,
+            a,
+            dt,
+        )
     }
 }
 
@@ -110,8 +121,8 @@ pub fn advance_rk_gpu(
     primitive_rd: &device::Patch,
     primitive_wr: &mut device::Patch,
     a: f64,
-    dt: f64)
-{
+    dt: f64,
+) {
     assert!(primitive_rd.start() == [-2, -2]);
     assert!(primitive_rd.count() == [mesh.ni() + 4, mesh.nj() + 4]);
     assert!(primitive_rd.start() == primitive_wr.start());
@@ -119,6 +130,13 @@ pub fn advance_rk_gpu(
     assert!(conserved_rk.start() == [0, 0]);
     assert!(conserved_rk.count() == mesh.shape());
     unsafe {
-        iso2d_ffi::advance_rk_gpu(mesh.clone(), conserved_rk.0, primitive_rd.0, primitive_wr.0, a, dt)
+        iso2d_ffi::advance_rk_gpu(
+            mesh.clone(),
+            conserved_rk.0,
+            primitive_rd.0,
+            primitive_wr.0,
+            a,
+            dt,
+        )
     }
 }

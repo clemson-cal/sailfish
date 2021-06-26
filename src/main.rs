@@ -1,6 +1,6 @@
 use setup::Setup;
-use std::io::Write;
 use solver::{cpu, omp, Solve};
+use std::io::Write;
 
 #[cfg(feature = "cuda")]
 use solver::gpu;
@@ -10,7 +10,7 @@ pub mod error;
 pub mod setup;
 pub mod solver;
 
-fn do_output(primitive: &Vec<f64>, output_number: usize) {
+fn do_output(primitive: &[f64], output_number: usize) {
     let mut bytes = Vec::new();
     for x in primitive {
         bytes.extend(x.to_le_bytes().iter());
@@ -44,12 +44,8 @@ fn run() -> Result<(), error::Error> {
 
     let primitive = setup.initial_primitive_vec(&mesh);
     let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
-        (false, false) => {
-            Box::new(cpu::Solver::new(mesh, primitive))
-        }
-        (true, false) => {
-            Box::new(omp::Solver::new(mesh, primitive))
-        }
+        (false, false) => Box::new(cpu::Solver::new(mesh, primitive)),
+        (true, false) => Box::new(omp::Solver::new(mesh, primitive)),
         (_, true) => {
             #[cfg(feature = "cuda")]
             {
