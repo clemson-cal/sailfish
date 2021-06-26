@@ -196,271 +196,18 @@ extern "C" void primitive_to_conserved_gpu(struct Patch primitive, struct Patch 
 
 #endif
 
-
-
-
-#ifdef API_MODE_CPU
-
-void advance_rk_cpu(
+static __device__ void advance_rk_zone(
     struct Mesh mesh,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     real a,
-    real dt)
+    real dt,
+    int i,
+    int j)
 {
     real dx = mesh.dx;
     real dy = mesh.dy;
-
-    // ------------------------------------------------------------------------
-    //                 tj
-    //
-    //      +-------+-------+-------+
-    //      |       |       |       |
-    //      |  lr   |  rj   |   rr  |
-    //      |       |       |       |
-    //      +-------+-------+-------+
-    //      |       |       |       |
-    //  ki  |  li  -|+  c  -|+  ri  |  ti
-    //      |       |       |       |
-    //      +-------+-------+-------+
-    //      |       |       |       |
-    //      |  ll   |  lj   |   rl  |
-    //      |       |       |       |
-    //      +-------+-------+-------+
-    //
-    //                 kj
-    // ------------------------------------------------------------------------
-    FOR_EACH(conserved_rk)
-    {
-        real *un = GET(conserved_rk, i, j);
-        real *pc = GET(primitive_rd, i, j);
-        real *pli = GET(primitive_rd, i - 1, j);
-        real *pri = GET(primitive_rd, i + 1, j);
-        real *plj = GET(primitive_rd, i, j - 1);
-        real *prj = GET(primitive_rd, i, j + 1);
-        real *pki = GET(primitive_rd, i - 2, j);
-        real *pti = GET(primitive_rd, i + 2, j);
-        real *pkj = GET(primitive_rd, i, j - 2);
-        real *ptj = GET(primitive_rd, i, j + 2);
-        real *pll = GET(primitive_rd, i - 1, j - 1);
-        real *plr = GET(primitive_rd, i - 1, j + 1);
-        real *prl = GET(primitive_rd, i + 1, j - 1);
-        real *prr = GET(primitive_rd, i + 1, j + 1);
-
-        real plip[NCONS];
-        real plim[NCONS];
-        real prip[NCONS];
-        real prim[NCONS];
-        real pljp[NCONS];
-        real pljm[NCONS];
-        real prjp[NCONS];
-        real prjm[NCONS];
-
-        real gxli[NCONS];
-        real gxri[NCONS];
-        real gyli[NCONS];
-        real gyri[NCONS];
-        real gxlj[NCONS];
-        real gxrj[NCONS];
-        real gylj[NCONS];
-        real gyrj[NCONS];
-        real gxcc[NCONS];
-        real gycc[NCONS];
-
-        plm_gradient(pki, pli, pc, gxli);
-        plm_gradient(pli, pc, pri, gxcc);
-        plm_gradient(pc, pri, pti, gxri);
-        plm_gradient(pkj, plj, pc, gylj);
-        plm_gradient(plj, pc, prj, gycc);
-        plm_gradient(pc, prj, ptj, gyrj);
-        plm_gradient(pll, pli, plr, gyli);
-        plm_gradient(prl, pri, prr, gyri);
-        plm_gradient(pll, plj, prl, gxlj);
-        plm_gradient(plr, prj, prr, gxrj);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            plim[q] = pli[q] + 0.5 * gxli[q];
-            plip[q] = pc [q] - 0.5 * gxcc[q];
-            prim[q] = pc [q] + 0.5 * gxcc[q];
-            prip[q] = pri[q] - 0.5 * gxri[q];
-
-            pljm[q] = plj[q] + 0.5 * gylj[q];
-            pljp[q] = pc [q] - 0.5 * gycc[q];
-            prjm[q] = pc [q] + 0.5 * gycc[q];
-            prjp[q] = prj[q] - 0.5 * gyrj[q];
-        }
-
-        real fli[NCONS];
-        real fri[NCONS];
-        real flj[NCONS];
-        real frj[NCONS];
-        real uc[NCONS];
-
-        riemann_hlle(plim, plip, fli, 1.0, 0);
-        riemann_hlle(prim, prip, fri, 1.0, 0);
-        riemann_hlle(pljm, pljp, flj, 1.0, 1);
-        riemann_hlle(prjm, prjp, frj, 1.0, 1);
-
-        // totally ad-hoc viscous flux, just to force gradients to be used:
-        // fli[1] += gxli[2] * 1e-6;
-        // flj[2] += gxlj[2] * 1e-6;
-        // fri[1] += gyri[1] * 1e-6;
-        // frj[2] += gyrj[1] * 1e-6;
-
-        primitive_to_conserved(pc, uc);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-            uc[q] = (1.0 - a) * uc[q] + a * un[q];
-        }
-        real *pout = GET(primitive_wr, i, j);
-        conserved_to_primitive(uc, pout);
-    }
-}
-
-#elif API_MODE_OMP
-
-void advance_rk_omp(
-    struct Mesh mesh,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch primitive_wr,
-    real a,
-    real dt)
-{
-    real dx = mesh.dx;
-    real dy = mesh.dy;
-
-    // ------------------------------------------------------------------------
-    //                 tj
-    //
-    //      +-------+-------+-------+
-    //      |       |       |       |
-    //      |  lr   |  rj   |   rr  |
-    //      |       |       |       |
-    //      +-------+-------+-------+
-    //      |       |       |       |
-    //  ki  |  li  -|+  c  -|+  ri  |  ti
-    //      |       |       |       |
-    //      +-------+-------+-------+
-    //      |       |       |       |
-    //      |  ll   |  lj   |   rl  |
-    //      |       |       |       |
-    //      +-------+-------+-------+
-    //
-    //                 kj
-    // ------------------------------------------------------------------------
-    FOR_EACH_OMP(conserved_rk)
-    {
-        real *un = GET(conserved_rk, i, j);
-        real *pc = GET(primitive_rd, i, j);
-        real *pli = GET(primitive_rd, i - 1, j);
-        real *pri = GET(primitive_rd, i + 1, j);
-        real *plj = GET(primitive_rd, i, j - 1);
-        real *prj = GET(primitive_rd, i, j + 1);
-        real *pki = GET(primitive_rd, i - 2, j);
-        real *pti = GET(primitive_rd, i + 2, j);
-        real *pkj = GET(primitive_rd, i, j - 2);
-        real *ptj = GET(primitive_rd, i, j + 2);
-        real *pll = GET(primitive_rd, i - 1, j - 1);
-        real *plr = GET(primitive_rd, i - 1, j + 1);
-        real *prl = GET(primitive_rd, i + 1, j - 1);
-        real *prr = GET(primitive_rd, i + 1, j + 1);
-
-        real plip[NCONS];
-        real plim[NCONS];
-        real prip[NCONS];
-        real prim[NCONS];
-        real pljp[NCONS];
-        real pljm[NCONS];
-        real prjp[NCONS];
-        real prjm[NCONS];
-
-        real gxli[NCONS];
-        real gxri[NCONS];
-        real gyli[NCONS];
-        real gyri[NCONS];
-        real gxlj[NCONS];
-        real gxrj[NCONS];
-        real gylj[NCONS];
-        real gyrj[NCONS];
-        real gxcc[NCONS];
-        real gycc[NCONS];
-
-        plm_gradient(pki, pli, pc, gxli);
-        plm_gradient(pli, pc, pri, gxcc);
-        plm_gradient(pc, pri, pti, gxri);
-        plm_gradient(pkj, plj, pc, gylj);
-        plm_gradient(plj, pc, prj, gycc);
-        plm_gradient(pc, prj, ptj, gyrj);
-        plm_gradient(pll, pli, plr, gyli);
-        plm_gradient(prl, pri, prr, gyri);
-        plm_gradient(pll, plj, prl, gxlj);
-        plm_gradient(plr, prj, prr, gxrj);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            plim[q] = pli[q] + 0.5 * gxli[q];
-            plip[q] = pc [q] - 0.5 * gxcc[q];
-            prim[q] = pc [q] + 0.5 * gxcc[q];
-            prip[q] = pri[q] - 0.5 * gxri[q];
-
-            pljm[q] = plj[q] + 0.5 * gylj[q];
-            pljp[q] = pc [q] - 0.5 * gycc[q];
-            prjm[q] = pc [q] + 0.5 * gycc[q];
-            prjp[q] = prj[q] - 0.5 * gyrj[q];
-        }
-
-        real fli[NCONS];
-        real fri[NCONS];
-        real flj[NCONS];
-        real frj[NCONS];
-        real uc[NCONS];
-
-        riemann_hlle(plim, plip, fli, 1.0, 0);
-        riemann_hlle(prim, prip, fri, 1.0, 0);
-        riemann_hlle(pljm, pljp, flj, 1.0, 1);
-        riemann_hlle(prjm, prjp, frj, 1.0, 1);
-
-        // totally ad-hoc viscous flux, just to force gradients to be used:
-        // fli[1] += gxli[2] * 1e-6;
-        // flj[2] += gxlj[2] * 1e-6;
-        // fri[1] += gyri[1] * 1e-6;
-        // frj[2] += gyrj[1] * 1e-6;
-
-        primitive_to_conserved(pc, uc);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-            uc[q] = (1.0 - a) * uc[q] + a * un[q];
-        }
-        real *pout = GET(primitive_wr, i, j);
-        conserved_to_primitive(uc, pout);
-    }
-}
-
-#elif API_MODE_GPU
-
-static void __global__ kernel_advance_rk(
-    struct Mesh mesh,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch primitive_wr,
-    real a,
-    real dt)
-{
-    int j = threadIdx.x + blockIdx.x * blockDim.x;
-    int i = threadIdx.y + blockIdx.y * blockDim.y;
-    real dx = mesh.dx;
-    real dy = mesh.dy;
-
-    if (i >= mesh.ni || j >= mesh.nj) {
-        return;
-    }
 
     // ------------------------------------------------------------------------
     //                 tj
@@ -566,6 +313,53 @@ static void __global__ kernel_advance_rk(
     }
     real *pout = GET(primitive_wr, i, j);
     conserved_to_primitive(uc, pout);
+}
+
+#ifdef API_MODE_CPU
+
+void advance_rk_cpu(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    real a,
+    real dt)
+{
+    FOR_EACH(conserved_rk)
+    {
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i, j);
+    }
+}
+
+#elif API_MODE_OMP
+
+void advance_rk_omp(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    real a,
+    real dt)
+{
+    FOR_EACH_OMP(conserved_rk)
+    {
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i, j);
+    }
+}
+
+#elif API_MODE_GPU
+
+static void __global__ kernel_advance_rk(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    real a,
+    real dt)
+{
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i, j);    
 }
 
 extern "C" void advance_rk_gpu(
