@@ -602,12 +602,16 @@ extern "C" void advance_rk_gpu(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
     real a,
     real dt)
 {
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt);
+    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt);
     cudaDeviceSynchronize();
 }
 
