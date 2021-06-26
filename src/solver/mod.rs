@@ -106,7 +106,35 @@ pub enum BufferZone {
 
 pub trait Solve {
     fn primitive(&self) -> Vec<f64>;
-    fn advance(&mut self, rk_order: usize, dt: f64);
+    fn primitive_to_conserved(&mut self);
+    fn advance_rk(&mut self, a: f64, dt: f64);
+    fn advance(&mut self, rk_order: u32, dt: f64) {
+        self.primitive_to_conserved();
+        match rk_order {
+            1 => {
+                self.advance_rk(0.0, dt);
+            }
+            2 => {
+                self.advance_rk(0.0, dt);
+                self.advance_rk(0.5, dt);
+            }
+            3 => {
+                self.advance_rk(0./1., dt);
+                self.advance_rk(3./4., dt);
+                self.advance_rk(1./3., dt);
+            }
+            _ => {
+                panic!("invalid RK order")
+            }
+        }
+    }
+}
+
+fn make_host_patches(mesh: &Mesh, primitive: Vec<f64>) -> (host::Patch, host::Patch, host::Patch) {
+    let primitive1 = host::Patch::from_vec([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive);
+    let primitive2 = host::Patch::zeros([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3);
+    let conserved0 = host::Patch::zeros([0, 0], mesh.shape(), 3);
+    (primitive1, primitive2, conserved0)
 }
 
 pub mod cpu {
@@ -121,12 +149,8 @@ pub mod cpu {
 
     impl Solver {
         pub fn new(mesh: super::Mesh, primitive: Vec<f64>) -> Self {
-            let primitive1 = host::Patch::from_vec([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive);
-            let primitive2 = host::Patch::zeros([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3);
-            let conserved0 = host::Patch::zeros([0, 0], mesh.shape(), 3);
-            Self {
-                mesh, primitive1, primitive2, conserved0,
-            }
+            let (primitive1, primitive2, conserved0) = make_host_patches(&mesh, primitive);
+            Self { mesh, primitive1, primitive2, conserved0 }
         }
     }
 
@@ -134,12 +158,11 @@ pub mod cpu {
         fn primitive(&self) -> Vec<f64> {
             self.primitive1.to_vec()
         }
-        fn advance(&mut self, rk_order: usize, dt: f64) {
-            if rk_order != 1 {
-                todo!()
-            }
+        fn primitive_to_conserved(&mut self) {
             iso2d::primitive_to_conserved_cpu(&self.primitive1, &mut self.conserved0);
-            iso2d::advance_rk_cpu(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, 0.0, dt);
+        }
+        fn advance_rk(&mut self, a: f64, dt: f64) {
+            iso2d::advance_rk_cpu(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, a, dt);
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
     }
@@ -157,12 +180,8 @@ pub mod omp {
 
     impl Solver {
         pub fn new(mesh: super::Mesh, primitive: Vec<f64>) -> Self {
-            let primitive1 = host::Patch::from_vec([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive);
-            let primitive2 = host::Patch::zeros([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3);
-            let conserved0 = host::Patch::zeros([0, 0], mesh.shape(), 3);
-            Self {
-                mesh, primitive1, primitive2, conserved0,
-            }
+            let (primitive1, primitive2, conserved0) = make_host_patches(&mesh, primitive);
+            Self { mesh, primitive1, primitive2, conserved0 }
         }
     }
 
@@ -170,12 +189,11 @@ pub mod omp {
         fn primitive(&self) -> Vec<f64> {
             self.primitive1.to_vec()
         }
-        fn advance(&mut self, rk_order: usize, dt: f64) {
-            if rk_order != 1 {
-                todo!()
-            }
-            iso2d::primitive_to_conserved_omp(&self.primitive1, &mut self.conserved0);
-            iso2d::advance_rk_omp(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, 0.0, dt);
+        fn primitive_to_conserved(&mut self) {
+            iso2d::primitive_to_conserved_omp(&self.primitive1, &mut self.conserved0);            
+        }
+        fn advance_rk(&mut self, a: f64, dt: f64) {
+            iso2d::advance_rk_omp(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, a, dt);
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
     }
@@ -194,11 +212,12 @@ pub mod gpu {
 
     impl Solver {
         pub fn new(mesh: super::Mesh, primitive: Vec<f64>) -> Self {
-            let primitive1 = host::Patch::from_vec([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive).to_device();
-            let primitive2 = host::Patch::zeros([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3).to_device();
-            let conserved0 = host::Patch::zeros([0, 0], mesh.shape(), 3).to_device();
+            let (primitive1, primitive2, conserved0) = make_host_patches(&mesh, primitive);
             Self {
-                mesh, primitive1, primitive2, conserved0,
+                mesh,
+                primitive1: primitive1.to_device(),
+                primitive2: primitive2.to_device(),
+                conserved0: conserved0.to_device()
             }
         }
     }
@@ -207,12 +226,11 @@ pub mod gpu {
         fn primitive(&self) -> Vec<f64> {
             self.primitive1.to_host().to_vec()
         }
-        fn advance(&mut self, rk_order: usize, dt: f64) {
-            if rk_order != 1 {
-                todo!()
-            }
-            iso2d::primitive_to_conserved_gpu(&self.primitive1, &mut self.conserved0);
-            iso2d::advance_rk_gpu(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, 0.0, dt);
+        fn primitive_to_conserved(&mut self) {
+            iso2d::primitive_to_conserved_gpu(&self.primitive1, &mut self.conserved0);            
+        }
+        fn advance_rk(&mut self, a: f64, dt: f64) {
+            iso2d::advance_rk_gpu(&self.mesh, &self.conserved0, &self.primitive1, &mut self.primitive2, a, dt);
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
     }

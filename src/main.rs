@@ -1,6 +1,9 @@
 use setup::Setup;
 use std::io::Write;
-use solver::{cpu, omp, gpu, Solve};
+use solver::{cpu, omp, Solve};
+
+#[cfg(feature = "cuda")]
+use solver::gpu;
 
 pub mod cmdline;
 pub mod error;
@@ -32,28 +35,32 @@ fn run() -> Result<(), error::Error> {
     let mesh = solver::Mesh::centered_square(1.0, cmdline.resolution);
     let setup = setup::Explosion {};
 
+    let v_max = 1.0;
+    let cfl = cmdline.cfl_number;
+    let fold = cmdline.fold;
+    let checkpoint_interval = cmdline.checkpoint_interval;
+    let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
+    let total_num_zones = mesh.num_total_zones();
+
     let primitive = setup.initial_primitive_vec(&mesh);
     let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
-        (false, false) => Box::new(cpu::Solver::new(mesh.clone(), primitive)),
-        (true, false) => Box::new(omp::Solver::new(mesh.clone(), primitive)),
+        (false, false) => {
+            Box::new(cpu::Solver::new(mesh, primitive))
+        }
+        (true, false) => {
+            Box::new(omp::Solver::new(mesh, primitive))
+        }
         (_, true) => {
             #[cfg(feature = "cuda")]
             {
-                Box::new(gpu::Solver::new(mesh.clone(), primitive))
+                Box::new(gpu::Solver::new(mesh, primitive))
             }
-
             #[cfg(not(feature = "cuda"))]
             {
                 panic!()
             }
         }
     };
-
-    let v_max = 1.0;
-    let cfl = cmdline.cfl_number;
-    let fold = cmdline.fold;
-    let checkpoint_interval = cmdline.checkpoint_interval;
-    let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
 
     let mut time = 0.0;
     let mut iteration = 0;
@@ -70,13 +77,13 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                solver.advance(1, dt);
+                solver.advance(cmdline.rk_order, dt);
                 time += dt;
                 iteration += 1;
             }
         });
 
-        mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
+        mzps_log.push((total_num_zones * fold) as f64 / 1e6 / elapsed.as_secs_f64());
         println!(
             "[{}] t={:.3} Mzps={:.3}",
             iteration,
