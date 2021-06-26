@@ -107,21 +107,21 @@ pub enum BufferZone {
 pub trait Solve {
     fn primitive(&self) -> Vec<f64>;
     fn primitive_to_conserved(&mut self);
-    fn advance_rk(&mut self, a: f64, dt: f64);
-    fn advance(&mut self, rk_order: u32, dt: f64) {
+    fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64);
+    fn advance(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], rk_order: u32, dt: f64) {
         self.primitive_to_conserved();
         match rk_order {
             1 => {
-                self.advance_rk(0.0, dt);
+                self.advance_rk(eos, buffer, masses, 0.0, dt);
             }
             2 => {
-                self.advance_rk(0.0, dt);
-                self.advance_rk(0.5, dt);
+                self.advance_rk(eos, buffer, masses, 0.0, dt);
+                self.advance_rk(eos, buffer, masses, 0.5, dt);
             }
             3 => {
-                self.advance_rk(0. / 1., dt);
-                self.advance_rk(3. / 4., dt);
-                self.advance_rk(1. / 3., dt);
+                self.advance_rk(eos, buffer, masses, 0. / 1., dt);
+                self.advance_rk(eos, buffer, masses, 3. / 4., dt);
+                self.advance_rk(eos, buffer, masses, 1. / 3., dt);
             }
             _ => {
                 panic!("invalid RK order")
@@ -166,19 +166,15 @@ pub mod cpu {
         fn primitive_to_conserved(&mut self) {
             iso2d::primitive_to_conserved_cpu(&self.primitive1, &mut self.conserved0);
         }
-        fn advance_rk(&mut self, a: f64, dt: f64) {
-            let eos = EquationOfState::Isothermal { sound_speed_squared: 1.0 };
-            let buffer = BufferZone::None;
-            let particles = Vec::new();
-
+        fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
             iso2d::advance_rk_cpu(
                 &self.mesh,
                 &self.conserved0,
                 &self.primitive1,
                 &mut self.primitive2,
-                eos,
-                buffer,
-                &particles,
+                *eos,
+                *buffer,
+                masses,
                 a,
                 dt,
             );
@@ -216,19 +212,15 @@ pub mod omp {
         fn primitive_to_conserved(&mut self) {
             iso2d::primitive_to_conserved_omp(&self.primitive1, &mut self.conserved0);
         }
-        fn advance_rk(&mut self, a: f64, dt: f64) {
-            let eos = EquationOfState::Isothermal { sound_speed_squared: 1.0 };
-            let buffer = BufferZone::None;
-            let particles = Vec::new();
-
+        fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
             iso2d::advance_rk_omp(
                 &self.mesh,
                 &self.conserved0,
                 &self.primitive1,
                 &mut self.primitive2,
-                eos,
-                buffer,
-                &particles,
+                *eos,
+                *buffer,
+                masses,
                 a,
                 dt,
             );
@@ -267,21 +259,15 @@ pub mod gpu {
         fn primitive_to_conserved(&mut self) {
             iso2d::primitive_to_conserved_gpu(&self.primitive1, &mut self.conserved0);
         }
-        fn advance_rk(&mut self, a: f64, dt: f64) {
-            let eos = EquationOfState::LocallyIsothermal { mach_number_squared: 100.0 };
-            let buffer = BufferZone::None;
-            let particles = vec![
-                PointMass { x: 0.0, y: 0.0, mass: 1.0, rate: 1.0, radius: 0.05 },
-                PointMass { x: 0.0, y: 0.0, mass: 1.0, rate: 1.0, radius: 0.05 }];
-
+        fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
             iso2d::advance_rk_gpu(
                 &self.mesh,
                 &self.conserved0,
                 &self.primitive1,
                 &mut self.primitive2,
-                eos,
-                buffer,
-                &particles,
+                *eos,
+                *buffer,
+                masses,
                 a,
                 dt,
             );

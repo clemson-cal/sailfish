@@ -3,7 +3,7 @@ use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup: Sized {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
-    fn particles(&self, time: f64) -> Vec<PointMass>;
+    fn masses(&self, time: f64) -> Vec<PointMass>;
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
     fn max_signal_speed(&self) -> Option<f64>;
@@ -35,7 +35,7 @@ impl Setup for Explosion {
         primitive[1] = 0.0;
         primitive[2] = 0.0;
     }
-    fn particles(&self, _time: f64) -> Vec<PointMass> {
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
         vec![]
     }
     fn equation_of_state(&self) -> EquationOfState {
@@ -50,8 +50,8 @@ impl Setup for Explosion {
 }
 
 pub struct Binary {
-    sink_radius: f64,
-    sink_rate: f64,
+    pub sink_radius: f64,
+    pub sink_rate: f64,
 }
 
 impl Setup for Binary {
@@ -68,7 +68,7 @@ impl Setup for Binary {
         primitive[1] = u;
         primitive[2] = v;
     }
-    fn particles(&self, time: f64) -> Vec<PointMass> {
+    fn masses(&self, time: f64) -> Vec<PointMass> {
         let a: f64 = 1.0;
         let m: f64 = 1.0;
         let q: f64 = 1.0;

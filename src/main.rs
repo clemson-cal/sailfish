@@ -32,10 +32,16 @@ where
 
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
-    let mesh = solver::Mesh::centered_square(1.0, cmdline.resolution);
-    let setup = setup::Explosion {};
+    let mesh = solver::Mesh::centered_square(8.0, cmdline.resolution);
+    // let setup = setup::Explosion {};
+    let setup = setup::Binary {
+        sink_radius: 0.015,
+        sink_rate: 10.0,
+    };
 
-    let v_max = 1.0;
+    let eos = setup.equation_of_state();
+    let buffer = setup.buffer_zone();
+    let v_max = setup.max_signal_speed().unwrap();
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
     let checkpoint_interval = cmdline.checkpoint_interval;
@@ -76,7 +82,8 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                solver.advance(cmdline.rk_order, dt);
+                let masses = setup.masses(time); // TODO: account for RK
+                solver.advance(&eos, &buffer, &masses, cmdline.rk_order, dt);
                 time += dt;
                 iteration += 1;
             }
