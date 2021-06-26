@@ -39,7 +39,7 @@ impl Setup for Explosion {
         vec![]
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::Isothermal { sound_speed: 1.0 }
+        EquationOfState::Isothermal { sound_speed_squared: 1.0 }
     }
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None
@@ -92,7 +92,7 @@ impl Setup for Binary {
         vec![mass0, mass1]
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::LocallyIsothermal { mach_number: 10.0 }
+        EquationOfState::LocallyIsothermal { mach_number_squared: 10.0f64.powi(2) }
     }
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None

@@ -81,12 +81,12 @@ struct EquationOfState
     {
         struct
         {
-            real sound_speed;
+            real sound_speed_squared;
         } isothermal;
 
         struct
         {
-            real mach_number;
+            real mach_number_squared;
         } locally_isothermal;
 
         struct
@@ -220,9 +220,9 @@ static __device__ real sound_speed_squared(
     switch (eos->type)
     {
         case Isothermal:
-            return pow(eos->isothermal.sound_speed, 2.0);
+            return eos->isothermal.sound_speed_squared;
         case LocallyIsothermal:
-            return -gravitational_potential(masses, num_masses, x, y) / pow(eos->locally_isothermal.mach_number, 2.0);
+            return -gravitational_potential(masses, num_masses, x, y) / eos->locally_isothermal.mach_number_squared;
         case GammaLaw:
             return 1.0; // WARNING
     }
@@ -431,6 +431,12 @@ static __device__ void advance_rk_zone(
 {
     real dx = mesh.dx;
     real dy = mesh.dy;
+    real xl = mesh.x0 + (i + 0.0) * dx;
+    real xc = mesh.x0 + (i + 0.5) * dx;
+    real xr = mesh.x0 + (i + 1.0) * dx;
+    real yl = mesh.y0 + (j + 0.0) * dy;
+    real yc = mesh.y0 + (j + 0.5) * dy;
+    real yr = mesh.y0 + (j + 1.0) * dy;
 
     // ------------------------------------------------------------------------
     //                 tj
@@ -516,10 +522,15 @@ static __device__ void advance_rk_zone(
     real frj[NCONS];
     real uc[NCONS];
 
-    riemann_hlle(plim, plip, fli, 1.0, 0);
-    riemann_hlle(prim, prip, fri, 1.0, 0);
-    riemann_hlle(pljm, pljp, flj, 1.0, 1);
-    riemann_hlle(prjm, prjp, frj, 1.0, 1);
+    real cs2li = sound_speed_squared(&eos, xl, yc, masses, num_masses);
+    real cs2ri = sound_speed_squared(&eos, xr, yc, masses, num_masses);
+    real cs2lj = sound_speed_squared(&eos, xc, yl, masses, num_masses);
+    real cs2rj = sound_speed_squared(&eos, xc, yr, masses, num_masses);
+
+    riemann_hlle(plim, plip, fli, cs2li, 0);
+    riemann_hlle(prim, prip, fri, cs2ri, 0);
+    riemann_hlle(pljm, pljp, flj, cs2lj, 1);
+    riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
     // totally ad-hoc viscous flux, just to force gradients to be used:
     // fli[1] += gxli[2] * 1e-6;
@@ -528,6 +539,8 @@ static __device__ void advance_rk_zone(
     // frj[2] += gyrj[1] * 1e-6;
 
     primitive_to_conserved(pc, uc);
+    buffer_source_term(&buffer, xc, yc, dt, uc);
+    point_masses_source_term(masses, num_masses, xc, yc, dt, pc[0], uc);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -611,7 +624,11 @@ extern "C" void advance_rk_gpu(
 {
     dim3 bs = dim3(8, 8);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt);
+    struct PointMass *device_masses;
+    cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
+    cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
+    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, a, dt);
+    cudaFree(device_masses);
     cudaDeviceSynchronize();
 }
 

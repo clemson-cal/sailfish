@@ -76,8 +76,8 @@ pub enum ExecutionMode {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum EquationOfState {
-    Isothermal { sound_speed: f64 },
-    LocallyIsothermal { mach_number: f64 },
+    Isothermal { sound_speed_squared: f64 },
+    LocallyIsothermal { mach_number_squared: f64 },
     GammaLaw { gamma_law_index: f64 },
 }
 
@@ -167,7 +167,7 @@ pub mod cpu {
             iso2d::primitive_to_conserved_cpu(&self.primitive1, &mut self.conserved0);
         }
         fn advance_rk(&mut self, a: f64, dt: f64) {
-            let eos = EquationOfState::Isothermal { sound_speed: 1.0 };
+            let eos = EquationOfState::Isothermal { sound_speed_squared: 1.0 };
             let buffer = BufferZone::None;
             let particles = Vec::new();
 
@@ -217,7 +217,7 @@ pub mod omp {
             iso2d::primitive_to_conserved_omp(&self.primitive1, &mut self.conserved0);
         }
         fn advance_rk(&mut self, a: f64, dt: f64) {
-            let eos = EquationOfState::Isothermal { sound_speed: 1.0 };
+            let eos = EquationOfState::Isothermal { sound_speed_squared: 1.0 };
             let buffer = BufferZone::None;
             let particles = Vec::new();
 
@@ -268,9 +268,11 @@ pub mod gpu {
             iso2d::primitive_to_conserved_gpu(&self.primitive1, &mut self.conserved0);
         }
         fn advance_rk(&mut self, a: f64, dt: f64) {
-            let eos = EquationOfState::Isothermal { sound_speed: 1.0 };
+            let eos = EquationOfState::LocallyIsothermal { mach_number_squared: 100.0 };
             let buffer = BufferZone::None;
-            let particles = Vec::new();
+            let particles = vec![
+                PointMass { x: 0.0, y: 0.0, mass: 1.0, rate: 1.0, radius: 0.05 },
+                PointMass { x: 0.0, y: 0.0, mass: 1.0, rate: 1.0, radius: 0.05 }];
 
             iso2d::advance_rk_gpu(
                 &self.mesh,
