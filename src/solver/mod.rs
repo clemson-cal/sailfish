@@ -1,10 +1,10 @@
 pub mod iso2d;
-mod patch;
-
-pub use patch::{ffi, host};
+pub mod patch;
 
 #[cfg(feature = "cuda")]
 pub use patch::device;
+pub use patch::ffi;
+pub use patch::host;
 
 #[repr(C)]
 #[derive(Debug, Clone)]
@@ -51,11 +51,6 @@ impl Mesh {
     /// Returns the number of zones in each direction
     pub fn shape(&self) -> [u32; 2] {
         [self.ni as u32, self.nj as u32]
-    }
-    /// Returns the row-major memory strides. Assumes 3 conserved
-    /// quantities.
-    pub fn strides(&self) -> [usize; 2] {
-        [self.nj as usize * 3, 3]
     }
     /// Returns the cell-center [x, y] coordinate at a given index.
     /// Out-of-bounds indexes are allowed.
@@ -105,9 +100,21 @@ pub enum BufferZone {
 }
 
 pub trait Solve {
+    /// Returns the primitive variable array for this solver. The data is
+    /// row-major with contiguous primitive variable components. The array
+    /// includes guard zones.
     fn primitive(&self) -> Vec<f64>;
+
+    /// Convert the internal primitive variable array to a conserved variable
+    /// array, and store that array in the solver's conserved variable buffer.
     fn primitive_to_conserved(&mut self);
+
+    /// Advance the primitive variable array by one low-storage Runge-Kutta
+    /// sub-stup.
     fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64);
+
+    /// Provided method to advance the primitive variable array using first,
+    /// second, or third-order Runge-Kutta time stepping.
     fn advance(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], rk_order: u32, dt: f64) {
         self.primitive_to_conserved();
         match rk_order {
