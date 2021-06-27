@@ -272,6 +272,17 @@ static __device__ void buffer_source_term(
     }
 }
 
+static __device__ void shear_strain(const real *gx, const real *gy, real dx, real dy, real *s)
+{
+    real sxx = 4.0 / 3.0 * gx[1] / dx - 2.0 / 3.0 * gy[2] / dy;
+    real sxy = 1.0 / 1.0 * gx[2] / dx + 1.0 / 1.0 * gy[1] / dy;
+    real syx = 1.0 / 1.0 * gx[2] / dx + 1.0 / 1.0 * gy[1] / dy;
+    real syy =-2.0 / 3.0 * gy[1] / dx + 4.0 / 3.0 * gy[2] / dy;
+    s[0] = sxx;
+    s[1] = sxy;
+    s[2] = syx;
+    s[3] = syy;
+}
 
 // ============================ HYDRO =========================================
 // ============================================================================
@@ -458,7 +469,7 @@ static __device__ void advance_rk_zone(
     //                 kj
     // ------------------------------------------------------------------------
     real *un = GET(conserved_rk, i, j);
-    real *pc = GET(primitive_rd, i, j);
+    real *pcc = GET(primitive_rd, i, j);
     real *pli = GET(primitive_rd, i - 1, j);
     real *pri = GET(primitive_rd, i + 1, j);
     real *plj = GET(primitive_rd, i, j - 1);
@@ -492,12 +503,12 @@ static __device__ void advance_rk_zone(
     real gxcc[NCONS];
     real gycc[NCONS];
 
-    plm_gradient(pki, pli, pc, gxli);
-    plm_gradient(pli, pc, pri, gxcc);
-    plm_gradient(pc, pri, pti, gxri);
-    plm_gradient(pkj, plj, pc, gylj);
-    plm_gradient(plj, pc, prj, gycc);
-    plm_gradient(pc, prj, ptj, gyrj);
+    plm_gradient(pki, pli, pcc, gxli);
+    plm_gradient(pli, pcc, pri, gxcc);
+    plm_gradient(pcc, pri, pti, gxri);
+    plm_gradient(pkj, plj, pcc, gylj);
+    plm_gradient(plj, pcc, prj, gycc);
+    plm_gradient(pcc, prj, ptj, gyrj);
     plm_gradient(pll, pli, plr, gyli);
     plm_gradient(prl, pri, prr, gyri);
     plm_gradient(pll, plj, prl, gxlj);
@@ -506,13 +517,13 @@ static __device__ void advance_rk_zone(
     for (int q = 0; q < NCONS; ++q)
     {
         plim[q] = pli[q] + 0.5 * gxli[q];
-        plip[q] = pc [q] - 0.5 * gxcc[q];
-        prim[q] = pc [q] + 0.5 * gxcc[q];
+        plip[q] = pcc[q] - 0.5 * gxcc[q];
+        prim[q] = pcc[q] + 0.5 * gxcc[q];
         prip[q] = pri[q] - 0.5 * gxri[q];
 
         pljm[q] = plj[q] + 0.5 * gylj[q];
-        pljp[q] = pc [q] - 0.5 * gycc[q];
-        prjm[q] = pc [q] + 0.5 * gycc[q];
+        pljp[q] = pcc[q] - 0.5 * gycc[q];
+        prjm[q] = pcc[q] + 0.5 * gycc[q];
         prjp[q] = prj[q] - 0.5 * gyrj[q];
     }
 
@@ -520,7 +531,7 @@ static __device__ void advance_rk_zone(
     real fri[NCONS];
     real flj[NCONS];
     real frj[NCONS];
-    real uc[NCONS];
+    real ucc[NCONS];
 
     real cs2li = sound_speed_squared(&eos, xl, yc, masses, num_masses);
     real cs2ri = sound_speed_squared(&eos, xr, yc, masses, num_masses);
@@ -532,23 +543,40 @@ static __device__ void advance_rk_zone(
     riemann_hlle(pljm, pljp, flj, cs2lj, 1);
     riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-    // totally ad-hoc viscous flux, just to force gradients to be used:
-    // fli[1] += gxli[2] * 1e-6;
-    // flj[2] += gxlj[2] * 1e-6;
-    // fri[1] += gyri[1] * 1e-6;
-    // frj[2] += gyrj[1] * 1e-6;
+    real sli[4];
+    real sri[4];
+    real slj[4];
+    real srj[4];
+    real scc[4];
 
-    primitive_to_conserved(pc, uc);
-    buffer_source_term(&buffer, xc, yc, dt, uc);
-    point_masses_source_term(masses, num_masses, xc, yc, dt, pc[0], uc);
+    shear_strain(gxli, gyli, dx, dy, sli);
+    shear_strain(gxri, gyri, dx, dy, sri);
+    shear_strain(gxlj, gylj, dx, dy, slj);
+    shear_strain(gxrj, gyrj, dx, dy, srj);
+    shear_strain(gxcc, gycc, dx, dy, scc);
+
+    real nu = 1e-3; // kinematic viscosity
+
+    fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+    fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+    fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+    fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+    flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+    flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+    frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+    frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+
+    primitive_to_conserved(pcc, ucc);
+    buffer_source_term(&buffer, xc, yc, dt, ucc);
+    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc[0], ucc);
 
     for (int q = 0; q < NCONS; ++q)
     {
-        uc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-        uc[q] = (1.0 - a) * uc[q] + a * un[q];
+        ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i, j);
-    conserved_to_primitive(uc, pout);
+    conserved_to_primitive(ucc, pout);
 }
 
 #ifdef API_MODE_CPU

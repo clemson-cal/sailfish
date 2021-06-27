@@ -1,9 +1,10 @@
 use setup::Setup;
-use solver::{cpu, omp, Solve};
-use std::io::Write;
-
+use solver::cpu;
 #[cfg(feature = "cuda")]
 use solver::gpu;
+use solver::omp;
+use solver::Solve;
+use std::io::Write;
 
 pub mod cmdline;
 pub mod error;
@@ -44,6 +45,7 @@ fn run() -> Result<(), error::Error> {
     let v_max = setup.max_signal_speed().unwrap();
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
+    let rk_order = cmdline.rk_order;
     let checkpoint_interval = cmdline.checkpoint_interval;
     let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
     let total_num_zones = mesh.num_total_zones();
@@ -83,7 +85,7 @@ fn run() -> Result<(), error::Error> {
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 let masses = setup.masses(time); // TODO: account for RK
-                solver.advance(&eos, &buffer, &masses, cmdline.rk_order, dt);
+                solver.advance(&eos, &buffer, &masses, rk_order, dt);
                 time += dt;
                 iteration += 1;
             }
