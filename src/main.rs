@@ -1,10 +1,13 @@
+use std::fmt::Write as FmtWrite;
+use std::io::Write as IoWrite;
+use std::str::FromStr;
+use error::Error::*;
 use setup::Setup;
 use solver::cpu;
 #[cfg(feature = "cuda")]
 use solver::gpu;
 use solver::omp;
 use solver::Solve;
-use std::io::Write;
 
 pub mod cmdline;
 pub mod error;
@@ -16,7 +19,7 @@ fn do_output(primitive: &[f64], outdir: &str, output_number: usize) -> Result<()
     for x in primitive {
         bytes.extend(x.to_le_bytes().iter());
     }
-    std::fs::create_dir_all(outdir).map_err(error::Error::IOError)?;
+    std::fs::create_dir_all(outdir).map_err(IOError)?;
     let filename = format!("{}/sailfish.{:04}.bin", outdir, output_number);
     let mut file = std::fs::File::create(&filename).unwrap();
     file.write_all(&bytes).unwrap();
@@ -35,13 +38,31 @@ where
 
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
-    let mesh = solver::Mesh::centered_square(8.0, cmdline.resolution);
-    // let setup = setup::Explosion {};
-    let setup = setup::Binary {
-        sink_radius: 0.015,
-        sink_rate: 10.0,
+
+    let (setup_name, parameters) = cmdline.setup.as_ref().map_or((None, None), |s| {
+        let mut a = s.as_str().splitn(2, ":");
+        let n = a.next();
+        let p = a.next();
+        (n, p)
+    });
+
+    let setup: Box<dyn Setup> = match setup_name {
+        Some("binary") => {
+            Box::new(setup::Binary::from_str(parameters.unwrap_or(""))?)
+        }
+        Some("explosion") => {
+            Box::new(setup::Explosion::from_str(parameters.unwrap_or(""))?)
+        }
+        Some(_) | None => {
+            let mut message = String::new();
+            writeln!(message, "provide setup:").unwrap();
+            writeln!(message, "    binary").unwrap();
+            writeln!(message, "    explosion").unwrap();
+            return Err(PrintUserInformation(message))
+        }
     };
 
+    let mesh = setup.mesh(cmdline.resolution);
     let eos = setup.equation_of_state();
     let buffer = setup.buffer_zone();
     let v_max = setup.max_signal_speed().unwrap();

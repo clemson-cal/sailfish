@@ -7,6 +7,7 @@ pub enum Error {
     CompiledWithoutOpenMP,
     PrintUserInformation(String),
     Cmdline(String),
+    InvalidSetup(String),
     IOError(std::io::Error),
 }
 
@@ -21,6 +22,9 @@ impl Display for Error {
             }
             Self::Cmdline(message) => {
                 writeln!(fmt, "error: {}", message)
+            }
+            Self::InvalidSetup(info) => {
+                writeln!(fmt, "invalid setup: {}", info)
             }
             Self::IOError(error) => {
                 error.fmt(fmt)

@@ -5,6 +5,7 @@ use std::fmt::Write;
 pub struct CommandLine {
     pub use_omp: bool,
     pub use_gpu: bool,
+    pub setup: Option<String>,
     pub resolution: u32,
     pub fold: usize,
     pub checkpoint_interval: f64,
@@ -23,6 +24,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         resolution: 1024,
         fold: 10,
         checkpoint_interval: 1.0,
+        setup: None,
         outdir: String::from("."),
         end_time: 1.0,
         rk_order: 1,
@@ -61,7 +63,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 }
                 "-h" | "--help" => {
                     let mut message = String::new();
-                    writeln!(message, "usage: sailfish [--version] [--help] <[options]>").unwrap();
+                    writeln!(message, "usage: sailfish [setup|chkpt] [--version] [--help] <[options]>").unwrap();
                     writeln!(message, "       --version             print the code version number").unwrap();
                     writeln!(message, "       -h|--help             display this help message").unwrap();
                     #[cfg(feature = "omp")]
@@ -81,14 +83,22 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-p" | "--use-omp" => c.use_omp = true,
                 #[cfg(feature = "cuda")]
                 "-g" | "--use-gpu" => c.use_gpu = true,
-                "-n" | "--res" => state = State::GridResolution,
+                "-n" | "--resolution" => state = State::GridResolution,
                 "-f" | "--fold" => state = State::Fold,
                 "-c" | "--checkpoint" => state = State::Checkpoint,
                 "-o" | "--outdir" => state = State::Outdir,
                 "-e" | "--end-time" => state = State::EndTime,
                 "-r" | "--rk-order" => state = State::RkOrder,
                 "--cfl" => state = State::Cfl,
-                _ => return Err(Cmdline(format!("unrecognized option {}", arg))),
+                _ => {
+                    if arg.starts_with("-") {
+                        return Err(Cmdline(format!("unrecognized option {}", arg)))
+                    } else if c.setup.is_some() {
+                        return Err(Cmdline(format!("extra positional argument {}", arg)))
+                    } else {
+                        c.setup = Some(arg)
+                    }
+                }
             },
             State::GridResolution => {
                 c.resolution = arg.parse().map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?;

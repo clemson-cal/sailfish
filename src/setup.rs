@@ -1,13 +1,16 @@
 use crate::solver::{BufferZone, EquationOfState, Mesh, PointMass};
+use crate::error;
 use kepler_two_body::{OrbitalElements, OrbitalState};
+use error::Error::*;
 
-pub trait Setup: Sized {
+pub trait Setup {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
     fn masses(&self, time: f64) -> Vec<PointMass>;
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
     fn max_signal_speed(&self) -> Option<f64>;
-
+    fn viscosity(&self) -> Option<f64>;
+    fn mesh(&self, resolution: u32) -> Mesh;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
         let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
         let si = 3 * (mesh.nj + 4);
@@ -24,6 +27,17 @@ pub trait Setup: Sized {
 }
 
 pub struct Explosion {}
+
+impl std::str::FromStr for Explosion {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self {})
+        } else {
+            Err(InvalidSetup("explosion problem does not take any parameters".to_string()))
+        }
+    }
+}
 
 impl Setup for Explosion {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
@@ -47,11 +61,31 @@ impl Setup for Explosion {
     fn max_signal_speed(&self) -> Option<f64> {
         Some(1.0)
     }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::centered_square(1.0, resolution)
+    }
 }
 
 pub struct Binary {
     pub sink_radius: f64,
     pub sink_rate: f64,
+}
+
+impl std::str::FromStr for Binary {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self {
+                sink_radius: 0.015,
+                sink_rate: 10.0,
+            })
+        } else {
+            Err(InvalidSetup("binary problem does not take any parameters".to_string()))
+        }
+    }
 }
 
 impl Setup for Binary {
@@ -99,5 +133,11 @@ impl Setup for Binary {
     }
     fn max_signal_speed(&self) -> Option<f64> {
         Some(1.0 / self.sink_radius.sqrt())
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::centered_square(8.0, resolution)
     }
 }
