@@ -11,15 +11,17 @@ pub mod error;
 pub mod setup;
 pub mod solver;
 
-fn do_output(primitive: &[f64], output_number: usize) {
+fn do_output(primitive: &[f64], outdir: &str, output_number: usize) -> Result<(), error::Error> {
     let mut bytes = Vec::new();
     for x in primitive {
         bytes.extend(x.to_le_bytes().iter());
     }
-    let filename = format!("sailfish.{:04}.bin", output_number);
+    std::fs::create_dir_all(outdir).map_err(error::Error::IOError)?;
+    let filename = format!("{}/sailfish.{:04}.bin", outdir, output_number);
     let mut file = std::fs::File::create(&filename).unwrap();
     file.write_all(&bytes).unwrap();
     println!("write {}", filename);
+    Ok(())
 }
 
 fn time_exec<F>(mut f: F) -> std::time::Duration
@@ -47,6 +49,7 @@ fn run() -> Result<(), error::Error> {
     let fold = cmdline.fold;
     let rk_order = cmdline.rk_order;
     let checkpoint_interval = cmdline.checkpoint_interval;
+    let outdir = &cmdline.outdir;
     let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
     let total_num_zones = mesh.num_total_zones();
 
@@ -77,7 +80,7 @@ fn run() -> Result<(), error::Error> {
 
     while time < cmdline.end_time {
         if time >= next_output_time {
-            do_output(&solver.primitive(), output_number);
+            do_output(&solver.primitive(), outdir, output_number)?;
             output_number += 1;
             next_output_time += checkpoint_interval;
         }
@@ -99,8 +102,7 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
-    do_output(&solver.primitive(), output_number);
-    Ok(())
+    do_output(&solver.primitive(), outdir, output_number)
 }
 
 fn main() {

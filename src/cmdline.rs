@@ -8,10 +8,10 @@ pub struct CommandLine {
     pub resolution: u32,
     pub fold: usize,
     pub checkpoint_interval: f64,
+    pub outdir: String,
     pub end_time: f64,
     pub rk_order: u32,
     pub cfl_number: f64,
-    pub precompute_flux: bool,
 }
 
 pub fn parse_command_line() -> Result<CommandLine, Error> {
@@ -21,10 +21,10 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         resolution: 1024,
         fold: 10,
         checkpoint_interval: 1.0,
+        outdir: String::from("."),
         end_time: 1.0,
         rk_order: 1,
         cfl_number: 0.2,
-        precompute_flux: false,
     };
 
     enum State {
@@ -35,6 +35,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         EndTime,
         RkOrder,
         Cfl,
+        Outdir,
     }
     let mut state = State::Ready;
 
@@ -62,16 +63,16 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       --version             print the code version number").unwrap();
                     writeln!(message, "       -h|--help             display this help message").unwrap();
                     #[cfg(feature = "omp")]
-                    writeln!(message, "       -p|--use-omp          run with OpenMP [OMP_NUM_THREADS]").unwrap();
+                    writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
                     #[cfg(feature = "cuda")]
                     writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
                     writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
                     writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints [1.0]").unwrap();
+                    writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
                     writeln!(message, "       -e|--end-time         simulation end time [1.0]").unwrap();
-                    writeln!(message, "       -r|--rk-order         Rnuge-Kutta integration order [(1)|2|3]").unwrap();
+                    writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
-                    writeln!(message, "       --precompute-flux     compute and store Godunov fluxes before update").unwrap();
                     return Err(Error::PrintUserInformation(message));
                 }
                 #[cfg(feature = "omp")]
@@ -84,7 +85,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-e"|"--end-time" => state = State::EndTime,
                 "-r"|"--rk-order" => state = State::RkOrder,
                 "--cfl" => state = State::Cfl,
-                "--precompute-flux" =>  c.precompute_flux = true,
+                "-o"|"--outdir" => state = State::Outdir,
                 _ => return Err(Error::CommandLineParse(format!("unrecognized option {}", arg))),
             },
             State::GridResolution => match arg.parse() {
@@ -113,6 +114,10 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 Err(e) => {
                     return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
                 }
+            },
+            State::Outdir => {
+                c.outdir = arg;
+                state = State::Ready;
             },
             State::RkOrder => match arg.parse() {
                 Ok(x) => {

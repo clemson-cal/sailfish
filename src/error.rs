@@ -7,6 +7,7 @@ pub enum Error {
     CompiledWithoutOpenMP,
     PrintUserInformation(String),
     CommandLineParse(String),
+    IOError(std::io::Error),
 }
 
 impl Display for Error {
@@ -20,6 +21,9 @@ impl Display for Error {
             }
             Self::CommandLineParse(message) => {
                 writeln!(fmt, "error: {}", message)
+            }
+            Self::IOError(error) => {
+                error.fmt(fmt)
             }
         }
     }
