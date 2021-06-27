@@ -139,7 +139,7 @@ pub trait Solve {
 
 fn make_host_patches(mesh: &Mesh, primitive: Vec<f64>) -> (host::Patch, host::Patch, host::Patch) {
     let primitive1 = host::Patch::from_slice([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive);
-    let primitive2 = host::Patch::zeros([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3);
+    let primitive2 = primitive1.clone();
     let conserved0 = host::Patch::zeros([0, 0], mesh.shape(), 3);
     (primitive1, primitive2, conserved0)
 }
