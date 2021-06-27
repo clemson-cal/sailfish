@@ -45,7 +45,13 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
 
     for arg in std::env::args()
         .skip(1)
-        .flat_map(|arg| arg.split('=').map(str::to_string).collect::<Vec<_>>())
+        .flat_map(|arg| {
+            if arg.starts_with('-') {
+                arg.split('=').map(str::to_string).collect::<Vec<_>>()
+            } else {
+                vec![arg]
+            }
+        })
         .flat_map(|arg| {
             if arg.starts_with('-') && !arg.starts_with("--") && arg.len() > 2 {
                 let (a, b) = arg.split_at(2);

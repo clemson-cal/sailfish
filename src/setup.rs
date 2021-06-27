@@ -77,14 +77,21 @@ pub struct Binary {
 impl std::str::FromStr for Binary {
     type Err = error::Error;
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
-        if parameters.is_empty() {
-            Ok(Self {
-                sink_radius: 0.015,
-                sink_rate: 10.0,
-            })
-        } else {
-            Err(InvalidSetup("binary problem does not take any parameters".to_string()))
+
+        let form = kind_config::Form::new()
+            .item("sink_radius", 0.05, "sink kernel radius [a]")
+            .item("sink_rate", 10.0, "rate of mass subtraction in the sink [Omega]")
+            .merge_string_args(parameters.split(':'))
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        for (key, val) in &form {
+            println!("{:.<20} {:<10} {}", key, val.value, val.about)
         }
+
+        Ok(Self {
+            sink_radius: form.get("sink_radius").into(),
+            sink_rate: form.get("sink_rate").into(),
+        })
     }
 }
 

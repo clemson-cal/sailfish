@@ -14,9 +14,16 @@ version = "0.1.0"
 source = "git+https://github.com/clemson-cal/kepler-two-body#2d8a0f5374052ab7f4f60c5bbbc37c4e5283b4a4"
 
 [[package]]
+name = "kind-config"
+version = "0.2.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f27663292f08bd170c2cc44e86719fedae8cd06a222c9dbe8855272dd4c15330"
+
+[[package]]
 name = "sailfish"
 version = "0.1.0"
 dependencies = [
  "cc",
  "kepler-two-body",
+ "kind-config",
 ]
