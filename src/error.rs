@@ -6,7 +6,7 @@ use std::fmt::Display;
 pub enum Error {
     CompiledWithoutOpenMP,
     PrintUserInformation(String),
-    CommandLineParse(String),
+    Cmdline(String),
     IOError(std::io::Error),
 }
 
@@ -19,7 +19,7 @@ impl Display for Error {
             Self::CompiledWithoutOpenMP => {
                 writeln!(fmt, "error: compiled without OpenMP support")
             }
-            Self::CommandLineParse(message) => {
+            Self::Cmdline(message) => {
                 writeln!(fmt, "error: {}", message)
             }
             Self::IOError(error) => {

@@ -15,6 +15,8 @@ pub struct CommandLine {
 }
 
 pub fn parse_command_line() -> Result<CommandLine, Error> {
+    use Error::*;
+
     let mut c = CommandLine {
         use_omp: false,
         use_gpu: false,
@@ -55,7 +57,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         match state {
             State::Ready => match arg.as_str() {
                 "--version" => {
-                    return Err(Error::PrintUserInformation("sailfish 0.1.0\n".to_string()));
+                    return Err(PrintUserInformation("sailfish 0.1.0\n".to_string()));
                 }
                 "-h" | "--help" => {
                     let mut message = String::new();
@@ -73,89 +75,58 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -e|--end-time         simulation end time [1.0]").unwrap();
                     writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
-                    return Err(Error::PrintUserInformation(message));
+                    return Err(PrintUserInformation(message));
                 }
                 #[cfg(feature = "omp")]
-                "-p"|"--use-omp" => c.use_omp = true,
+                "-p" | "--use-omp" => c.use_omp = true,
                 #[cfg(feature = "cuda")]
-                "-g"|"--use-gpu" => c.use_gpu = true,
-                "-n"|"--res" => state = State::GridResolution,
-                "-f"|"--fold" => state = State::Fold,
-                "-c"|"--checkpoint" => state = State::Checkpoint,
-                "-e"|"--end-time" => state = State::EndTime,
-                "-r"|"--rk-order" => state = State::RkOrder,
+                "-g" | "--use-gpu" => c.use_gpu = true,
+                "-n" | "--res" => state = State::GridResolution,
+                "-f" | "--fold" => state = State::Fold,
+                "-c" | "--checkpoint" => state = State::Checkpoint,
+                "-o" | "--outdir" => state = State::Outdir,
+                "-e" | "--end-time" => state = State::EndTime,
+                "-r" | "--rk-order" => state = State::RkOrder,
                 "--cfl" => state = State::Cfl,
-                "-o"|"--outdir" => state = State::Outdir,
-                _ => return Err(Error::CommandLineParse(format!("unrecognized option {}", arg))),
+                _ => return Err(Cmdline(format!("unrecognized option {}", arg))),
             },
-            State::GridResolution => match arg.parse() {
-                Ok(x) => {
-                    c.resolution = x;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    return Err(Error::CommandLineParse(format!("resolution {}: {}", arg, e)));
-                }
-            },
-            State::Fold => match arg.parse() {
-                Ok(x) => {
-                    c.fold = x;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    return Err(Error::CommandLineParse(format!("fold {}: {}", arg, e)));
-                }
-            },
-            State::Checkpoint => match arg.parse() {
-                Ok(x) => {
-                    c.checkpoint_interval = x;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
-                }
-            },
+            State::GridResolution => {
+                c.resolution = arg.parse().map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
+            State::Fold => {
+                c.fold = arg.parse().map_err(|e| Cmdline(format!("fold {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
+            State::Checkpoint => {
+                c.checkpoint_interval = arg.parse().map_err(|e| Cmdline(format!("checkpoint {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
             State::Outdir => {
                 c.outdir = arg;
                 state = State::Ready;
-            },
-            State::RkOrder => match arg.parse() {
-                Ok(x) => {
-                    if !(1..=3).contains(&x) {
-                        return Err(Error::CommandLineParse("rk-order must be 1, 2, or 3".into()))
-                    }
-                    c.rk_order = x;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    return Err(Error::CommandLineParse(format!("rk-order {}: {}", arg, e)));
-                }
-            },
-            State::EndTime => match arg.parse() {
-                Ok(x) => {
-                    c.end_time = x;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
-                }
-            },
-            State::Cfl => match arg.parse() {
-                Ok(x) => {
-                    c.cfl_number = x;
-                    state = State::Ready;
-                }
-                Err(e) => {
-                    return Err(Error::CommandLineParse(format!("checkpoint {}: {}", arg, e)));
-                }
-            },
+            }
+            State::RkOrder => {
+                c.rk_order = arg.parse().map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
+            State::EndTime => {
+                c.end_time = arg.parse().map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
+            State::Cfl => {
+                c.cfl_number = arg.parse().map_err(|e| Cmdline(format!("cfl {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
         }
     }
 
     if c.use_omp && c.use_gpu {
-        Err(Error::CommandLineParse("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
+        Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
+    } else if !(1..=3).contains(&c.rk_order) {
+        return Err(Cmdline("rk-order must be 1, 2, or 3".into()))
     } else if !std::matches!(state, State::Ready) {
-        Err(Error::CommandLineParse("missing argument".to_string()))
+        Err(Cmdline("missing argument".to_string()))
     } else {
         Ok(c)
     }
