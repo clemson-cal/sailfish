@@ -151,6 +151,6 @@ impl Setup for Binary {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::centered_square(8.0, resolution)
+        Mesh::centered_square(self.domain_radius, resolution)
     }
 }
