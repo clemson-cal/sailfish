@@ -9,7 +9,6 @@ mod iso2d_ffi {
 
     use super::*;
     extern "C" {
-
         pub(super) fn primitive_to_conserved_cpu(primitive: ffi::Patch, conserved: ffi::Patch);
 
         #[cfg(feature = "omp")]
@@ -78,6 +77,17 @@ pub fn primitive_to_conserved_gpu(primitive: &device::Patch, conserved: &mut dev
     unsafe { iso2d_ffi::primitive_to_conserved_gpu(primitive.0, conserved.0) }
 }
 
+macro_rules! validate_shapes {
+    ($mesh:ident, $conserved_rk:ident, $primitive_rd:ident, $primitive_wr:ident) => {
+        assert!($primitive_rd.start() == [-2, -2]);
+        assert!($primitive_rd.count() == [$mesh.ni() + 4, $mesh.nj() + 4]);
+        assert!($primitive_rd.start() == $primitive_wr.start());
+        assert!($primitive_rd.count() == $primitive_wr.count());
+        assert!($conserved_rk.start() == [0, 0]);
+        assert!($conserved_rk.count() == $mesh.shape());        
+    };
+}
+
 pub fn advance_rk_cpu(
     mesh: &Mesh,
     conserved_rk: &host::Patch,
@@ -90,12 +100,7 @@ pub fn advance_rk_cpu(
     a: f64,
     dt: f64,
 ) {
-    assert!(primitive_rd.start() == [-2, -2]);
-    assert!(primitive_rd.count() == [mesh.ni() + 4, mesh.nj() + 4]);
-    assert!(primitive_rd.start() == primitive_wr.start());
-    assert!(primitive_rd.count() == primitive_wr.count());
-    assert!(conserved_rk.start() == [0, 0]);
-    assert!(conserved_rk.count() == mesh.shape());
+    validate_shapes!(mesh, conserved_rk, primitive_rd, primitive_wr);
     unsafe {
         iso2d_ffi::advance_rk_cpu(
             mesh.clone(),
@@ -126,12 +131,7 @@ pub fn advance_rk_omp(
     a: f64,
     dt: f64,
 ) {
-    assert!(primitive_rd.start() == [-2, -2]);
-    assert!(primitive_rd.count() == [mesh.ni() + 4, mesh.nj() + 4]);
-    assert!(primitive_rd.start() == primitive_wr.start());
-    assert!(primitive_rd.count() == primitive_wr.count());
-    assert!(conserved_rk.start() == [0, 0]);
-    assert!(conserved_rk.count() == mesh.shape());
+    validate_shapes!(mesh, conserved_rk, primitive_rd, primitive_wr);
     unsafe {
         iso2d_ffi::advance_rk_omp(
             mesh.clone(),
@@ -162,12 +162,7 @@ pub fn advance_rk_gpu(
     a: f64,
     dt: f64,
 ) {
-    assert!(primitive_rd.start() == [-2, -2]);
-    assert!(primitive_rd.count() == [mesh.ni() + 4, mesh.nj() + 4]);
-    assert!(primitive_rd.start() == primitive_wr.start());
-    assert!(primitive_rd.count() == primitive_wr.count());
-    assert!(conserved_rk.start() == [0, 0]);
-    assert!(conserved_rk.count() == mesh.shape());
+    validate_shapes!(mesh, conserved_rk, primitive_rd, primitive_wr);
     unsafe {
         iso2d_ffi::advance_rk_gpu(
             mesh.clone(),
