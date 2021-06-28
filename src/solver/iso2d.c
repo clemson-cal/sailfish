@@ -418,8 +418,7 @@ static void __global__ kernel(struct Patch primitive, struct Patch conserved)
 
 extern "C" void primitive_to_conserved_gpu(struct Patch primitive, struct Patch conserved)
 {
-
-    dim3 bs = dim3(8, 8);
+    dim3 bs = dim3(16, 16);
     dim3 bd = dim3((conserved.count[0] + bs.x - 1) / bs.x, (conserved.count[1] + bs.y - 1) / bs.y);
     kernel<<<bd, bs>>>(primitive, conserved);
 }
@@ -656,7 +655,7 @@ extern "C" void advance_rk_gpu(
     real a,
     real dt)
 {
-    dim3 bs = dim3(8, 8);
+    dim3 bs = dim3(16, 16);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
     struct PointMass *device_masses;
     cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));

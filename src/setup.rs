@@ -88,8 +88,8 @@ impl std::str::FromStr for Binary {
             .merge_string_args(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        for (key, val) in &form {
-            println!("{:.<20} {:<10} {}", key, val.value, val.about)
+        for key in form.sorted_keys() {
+            println!("{:.<20} {:<10} {}", key, form.get(&key), form.about(&key));
         }
 
         Ok(Self {
