@@ -435,6 +435,7 @@ static __device__ void advance_rk_zone(
     struct BufferZone buffer,
     struct PointMass *masses,
     int num_masses,
+    real nu,
     real a,
     real dt,
     int i,
@@ -543,28 +544,29 @@ static __device__ void advance_rk_zone(
     riemann_hlle(pljm, pljp, flj, cs2lj, 1);
     riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-    real sli[4];
-    real sri[4];
-    real slj[4];
-    real srj[4];
-    real scc[4];
+    if (nu > 0.0)
+    {
+        real sli[4];
+        real sri[4];
+        real slj[4];
+        real srj[4];
+        real scc[4];
 
-    shear_strain(gxli, gyli, dx, dy, sli);
-    shear_strain(gxri, gyri, dx, dy, sri);
-    shear_strain(gxlj, gylj, dx, dy, slj);
-    shear_strain(gxrj, gyrj, dx, dy, srj);
-    shear_strain(gxcc, gycc, dx, dy, scc);
+        shear_strain(gxli, gyli, dx, dy, sli);
+        shear_strain(gxri, gyri, dx, dy, sri);
+        shear_strain(gxlj, gylj, dx, dy, slj);
+        shear_strain(gxrj, gyrj, dx, dy, srj);
+        shear_strain(gxcc, gycc, dx, dy, scc);
 
-    real nu = 1e-3; // kinematic viscosity
-
-    fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-    fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-    fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-    fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-    flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-    flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-    frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-    frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+        fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+        fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+        fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+        fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+        flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+        flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+        frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+        frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+    }
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
@@ -590,12 +592,13 @@ void advance_rk_cpu(
     struct BufferZone buffer,
     struct PointMass *masses,
     int num_masses,
+    real nu,
     real a,
     real dt)
 {
     FOR_EACH(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
     }
 }
 
@@ -610,12 +613,13 @@ void advance_rk_omp(
     struct BufferZone buffer,
     struct PointMass *masses,
     int num_masses,
+    real nu,
     real a,
     real dt)
 {
     FOR_EACH_OMP(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
     }
 }
 
@@ -630,12 +634,13 @@ void __global__ kernel(
     struct BufferZone buffer,
     struct PointMass *masses,
     int num_masses,
+    real nu,
     real a,
     real dt)
 {
     int j = threadIdx.x + blockIdx.x * blockDim.x;
     int i = threadIdx.y + blockIdx.y * blockDim.y;
-    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
 }
 
 extern "C" void advance_rk_gpu(
@@ -647,6 +652,7 @@ extern "C" void advance_rk_gpu(
     struct BufferZone buffer,
     struct PointMass *masses,
     int num_masses,
+    real nu,
     real a,
     real dt)
 {
@@ -655,7 +661,7 @@ extern "C" void advance_rk_gpu(
     struct PointMass *device_masses;
     cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
     cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
-    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, a, dt);
+    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, nu, a, dt);
     cudaFree(device_masses);
     cudaDeviceSynchronize();
 }

@@ -70,6 +70,8 @@ impl Setup for Explosion {
 }
 
 pub struct Binary {
+    pub domain_radius: f64,
+    pub nu: f64,
     pub sink_radius: f64,
     pub sink_rate: f64,
 }
@@ -79,9 +81,11 @@ impl std::str::FromStr for Binary {
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
 
         let form = kind_config::Form::new()
+            .item("domain_radius", 12.0, "half-size of the simulation domain [a]")
+            .item("nu", 1e-3, "kinematic viscosity coefficient [Omega a^2]")
             .item("sink_radius", 0.05, "sink kernel radius [a]")
             .item("sink_rate", 10.0, "rate of mass subtraction in the sink [Omega]")
-            .merge_string_args(parameters.split(':'))
+            .merge_string_args(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         for (key, val) in &form {
@@ -89,6 +93,8 @@ impl std::str::FromStr for Binary {
         }
 
         Ok(Self {
+            domain_radius: form.get("domain_radius").into(),
+            nu: form.get("nu").into(),
             sink_radius: form.get("sink_radius").into(),
             sink_rate: form.get("sink_rate").into(),
         })

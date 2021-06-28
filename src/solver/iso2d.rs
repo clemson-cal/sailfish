@@ -27,6 +27,7 @@ mod iso2d_ffi {
             buffer: BufferZone,
             masses: *const PointMass,
             num_masses: i32,
+            nu: f64,
             a: f64,
             dt: f64,
         );
@@ -41,6 +42,7 @@ mod iso2d_ffi {
             buffer: BufferZone,
             masses: *const PointMass,
             num_masses: i32,
+            nu: f64,
             a: f64,
             dt: f64,
         );
@@ -55,6 +57,7 @@ mod iso2d_ffi {
             buffer: BufferZone,
             masses: *const PointMass,
             num_masses: i32,
+            nu: f64,
             a: f64,
             dt: f64,
         );
@@ -83,6 +86,7 @@ pub fn advance_rk_cpu(
     eos: EquationOfState,
     buffer: BufferZone,
     masses: &[PointMass],
+    nu: f64,
     a: f64,
     dt: f64,
 ) {
@@ -102,6 +106,7 @@ pub fn advance_rk_cpu(
             buffer,
             masses.as_ptr(),
             masses.len() as i32,
+            nu,
             a,
             dt,
         )
@@ -117,6 +122,7 @@ pub fn advance_rk_omp(
     eos: EquationOfState,
     buffer: BufferZone,
     masses: &[PointMass],
+    nu: f64,
     a: f64,
     dt: f64,
 ) {
@@ -136,6 +142,7 @@ pub fn advance_rk_omp(
             buffer,
             masses.as_ptr(),
             masses.len() as i32,
+            nu,
             a,
             dt,
         )
@@ -151,6 +158,7 @@ pub fn advance_rk_gpu(
     eos: EquationOfState,
     buffer: BufferZone,
     masses: &[PointMass],
+    nu: f64,
     a: f64,
     dt: f64,
 ) {
@@ -170,6 +178,7 @@ pub fn advance_rk_gpu(
             buffer,
             masses.as_ptr(),
             masses.len() as i32,
+            nu,
             a,
             dt,
         )

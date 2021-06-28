@@ -63,6 +63,7 @@ fn run() -> Result<(), error::Error> {
     };
 
     let mesh = setup.mesh(cmdline.resolution);
+    let nu = setup.viscosity().unwrap_or(0.0);
     let eos = setup.equation_of_state();
     let buffer = setup.buffer_zone();
     let v_max = setup.max_signal_speed().unwrap();
@@ -109,7 +110,7 @@ fn run() -> Result<(), error::Error> {
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 let masses = setup.masses(time); // TODO: account for RK
-                solver.advance(&eos, &buffer, &masses, rk_order, dt);
+                solver.advance(&eos, &buffer, &masses, nu, rk_order, dt);
                 time += dt;
                 iteration += 1;
             }

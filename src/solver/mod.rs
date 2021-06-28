@@ -111,24 +111,24 @@ pub trait Solve {
 
     /// Advance the primitive variable array by one low-storage Runge-Kutta
     /// sub-stup.
-    fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64);
+    fn advance_rk(&mut self, nu: f64, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64);
 
     /// Provided method to advance the primitive variable array using first,
     /// second, or third-order Runge-Kutta time stepping.
-    fn advance(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], rk_order: u32, dt: f64) {
+    fn advance(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], nu: f64, rk_order: u32, dt: f64) {
         self.primitive_to_conserved();
         match rk_order {
             1 => {
-                self.advance_rk(eos, buffer, masses, 0.0, dt);
+                self.advance_rk(nu, eos, buffer, masses, 0.0, dt);
             }
             2 => {
-                self.advance_rk(eos, buffer, masses, 0.0, dt);
-                self.advance_rk(eos, buffer, masses, 0.5, dt);
+                self.advance_rk(nu, eos, buffer, masses, 0.0, dt);
+                self.advance_rk(nu, eos, buffer, masses, 0.5, dt);
             }
             3 => {
-                self.advance_rk(eos, buffer, masses, 0. / 1., dt);
-                self.advance_rk(eos, buffer, masses, 3. / 4., dt);
-                self.advance_rk(eos, buffer, masses, 1. / 3., dt);
+                self.advance_rk(nu, eos, buffer, masses, 0. / 1., dt);
+                self.advance_rk(nu, eos, buffer, masses, 3. / 4., dt);
+                self.advance_rk(nu, eos, buffer, masses, 1. / 3., dt);
             }
             _ => {
                 panic!("invalid RK order")
@@ -173,7 +173,7 @@ pub mod cpu {
         fn primitive_to_conserved(&mut self) {
             iso2d::primitive_to_conserved_cpu(&self.primitive1, &mut self.conserved0);
         }
-        fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
+        fn advance_rk(&mut self, nu: f64, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
             iso2d::advance_rk_cpu(
                 &self.mesh,
                 &self.conserved0,
@@ -182,6 +182,7 @@ pub mod cpu {
                 *eos,
                 *buffer,
                 masses,
+                nu,
                 a,
                 dt,
             );
@@ -219,7 +220,7 @@ pub mod omp {
         fn primitive_to_conserved(&mut self) {
             iso2d::primitive_to_conserved_omp(&self.primitive1, &mut self.conserved0);
         }
-        fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
+        fn advance_rk(&mut self, nu: f64, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
             iso2d::advance_rk_omp(
                 &self.mesh,
                 &self.conserved0,
@@ -228,6 +229,7 @@ pub mod omp {
                 *eos,
                 *buffer,
                 masses,
+                nu,
                 a,
                 dt,
             );
@@ -266,7 +268,7 @@ pub mod gpu {
         fn primitive_to_conserved(&mut self) {
             iso2d::primitive_to_conserved_gpu(&self.primitive1, &mut self.conserved0);
         }
-        fn advance_rk(&mut self, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
+        fn advance_rk(&mut self, nu: f64, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64) {
             iso2d::advance_rk_gpu(
                 &self.mesh,
                 &self.conserved0,
@@ -275,6 +277,7 @@ pub mod gpu {
                 *eos,
                 *buffer,
                 masses,
+                nu,
                 a,
                 dt,
             );
