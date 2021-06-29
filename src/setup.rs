@@ -148,7 +148,7 @@ impl Setup for Binary {
         Some(1.0 / self.sink_radius.sqrt())
     }
     fn viscosity(&self) -> Option<f64> {
-        None
+        Some(self.nu)
     }
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::centered_square(self.domain_radius, resolution)
