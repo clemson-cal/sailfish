@@ -7,10 +7,12 @@ description = "fast code to simulate binary accretion"
 
 [dependencies]
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
-kind-config = "*"
+kind-config = "0.2"
+serde = { version = "1.0", features = ["derive"] }
+rmp-serde = "0.15"
 
 [build-dependencies]
-cc = "*"
+cc = "1.0"
 
 [features]
 default = ["omp"]

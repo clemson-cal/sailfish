@@ -149,7 +149,6 @@ pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
     }
 }
 
-
 fn make_host_patches(mesh: &Mesh, primitive: Vec<f64>) -> (host::Patch, host::Patch, host::Patch) {
     let primitive1 = host::Patch::from_slice([-2, -2], [mesh.ni() + 4, mesh.nj() + 4], 3, &primitive);
     let primitive2 = primitive1.clone();

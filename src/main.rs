@@ -1,5 +1,4 @@
-use std::fmt::Write as FmtWrite;
-use std::io::Write as IoWrite;
+use std::fmt::Write;
 use std::str::FromStr;
 use error::Error::*;
 use setup::Setup;
@@ -13,19 +12,7 @@ pub mod cmdline;
 pub mod error;
 pub mod setup;
 pub mod solver;
-
-fn do_output(primitive: &[f64], outdir: &str, output_number: usize) -> Result<(), error::Error> {
-    let mut bytes = Vec::new();
-    for x in primitive {
-        bytes.extend(x.to_le_bytes().iter());
-    }
-    std::fs::create_dir_all(outdir).map_err(IOError)?;
-    let filename = format!("{}/sailfish.{:04}.bin", outdir, output_number);
-    let mut file = std::fs::File::create(&filename).unwrap();
-    file.write_all(&bytes).unwrap();
-    println!("write {}", filename);
-    Ok(())
-}
+pub mod state;
 
 fn time_exec<F>(mut f: F) -> std::time::Duration
 where
@@ -55,7 +42,7 @@ fn run() -> Result<(), error::Error> {
         }
         Some(_) | None => {
             let mut message = String::new();
-            writeln!(message, "provide setup:").unwrap();
+            writeln!(message, "specify setup:").unwrap();
             writeln!(message, "    binary").unwrap();
             writeln!(message, "    explosion").unwrap();
             return Err(PrintUserInformation(message))
@@ -74,6 +61,8 @@ fn run() -> Result<(), error::Error> {
     let outdir = &cmdline.outdir;
     let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
     let total_num_zones = mesh.num_total_zones();
+
+    let mut checkpoint = state::RecurringTask { number: 0, next_time: 0.0 };
 
     let primitive = setup.initial_primitive_vec(&mesh);
     let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
@@ -96,15 +85,19 @@ fn run() -> Result<(), error::Error> {
 
     let mut time = 0.0;
     let mut iteration = 0;
-    let mut output_number = 0;
-    let mut next_output_time = time;
     let mut mzps_log = vec![];
 
     while time < cmdline.end_time {
-        if time >= next_output_time {
-            do_output(&solver.primitive(), outdir, output_number)?;
-            output_number += 1;
-            next_output_time += checkpoint_interval;
+        if time >= checkpoint.next_time {
+            checkpoint.next(checkpoint_interval);
+            let state = state::State {
+                iteration,
+                time,
+                primitive: solver.primitive(),
+                checkpoint: checkpoint.clone(),
+                setup: cmdline.setup.clone().unwrap(),
+            };
+            state::write_checkpoint(&state, outdir, checkpoint.number - 1)?;
         }
 
         let elapsed = time_exec(|| {
@@ -123,7 +116,16 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
-    do_output(&solver.primitive(), outdir, output_number)
+
+    checkpoint.next(checkpoint_interval);
+    let state = state::State {
+        iteration,
+        time,
+        primitive: solver.primitive(),
+        checkpoint: checkpoint.clone(),
+        setup: cmdline.setup.clone().unwrap(),
+    };
+    state::write_checkpoint(&state, outdir, checkpoint.number - 1)
 }
 
 fn main() {
