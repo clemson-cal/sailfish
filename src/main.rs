@@ -109,8 +109,7 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                let masses = setup.masses(time); // TODO: account for RK
-                solver.advance(&eos, &buffer, &masses, nu, rk_order, dt);
+                solver::advance(&mut solver, &eos, &buffer, |t| setup.masses(t), nu, rk_order, time, dt);
                 time += dt;
                 iteration += 1;
             }
