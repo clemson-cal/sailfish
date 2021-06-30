@@ -81,6 +81,8 @@ pub enum EquationOfState {
 pub struct PointMass {
     pub x: f64,
     pub y: f64,
+    pub vx: f64,
+    pub vy: f64,
     pub mass: f64,
     pub rate: f64,
     pub radius: f64,

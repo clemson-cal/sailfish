@@ -131,6 +131,8 @@ impl Setup for Binary {
         let mass0 = PointMass {
             x: mass0.position_x(),
             y: mass0.position_y(),
+            vx: mass0.velocity_x(),
+            vy: mass0.velocity_y(),
             mass: mass0.mass(),
             rate: self.sink_rate,
             radius: self.sink_radius,
@@ -138,6 +140,8 @@ impl Setup for Binary {
         let mass1 = PointMass {
             x: mass1.position_x(),
             y: mass1.position_y(),
+            vx: mass1.velocity_x(),
+            vy: mass1.velocity_y(),
             mass: mass1.mass(),
             rate: self.sink_rate,
             radius: self.sink_radius,

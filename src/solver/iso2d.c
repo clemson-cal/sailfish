@@ -61,6 +61,8 @@ struct PointMass
 {
     real x;
     real y;
+    real vx;
+    real vy;
     real mass;
     real rate;
     real radius;
