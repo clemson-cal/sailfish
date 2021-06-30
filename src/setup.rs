@@ -4,6 +4,7 @@ use kepler_two_body::{OrbitalElements, OrbitalState};
 use error::Error::*;
 
 pub trait Setup {
+    fn print_parameters(&self);
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
     fn masses(&self, time: f64) -> Vec<PointMass>;
     fn equation_of_state(&self) -> EquationOfState;
@@ -40,6 +41,8 @@ impl std::str::FromStr for Explosion {
 }
 
 impl Setup for Explosion {
+    fn print_parameters(&self) {
+    }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
@@ -74,34 +77,37 @@ pub struct Binary {
     pub nu: f64,
     pub sink_radius: f64,
     pub sink_rate: f64,
+    form: kind_config::Form,
 }
 
 impl std::str::FromStr for Binary {
     type Err = error::Error;
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
-
         let form = kind_config::Form::new()
             .item("domain_radius", 12.0, "half-size of the simulation domain [a]")
             .item("nu", 1e-3, "kinematic viscosity coefficient [Omega a^2]")
             .item("sink_radius", 0.05, "sink kernel radius [a]")
             .item("sink_rate", 10.0, "rate of mass subtraction in the sink [Omega]")
-            .merge_string_args(parameters.split(':').filter(|s| !s.is_empty()))
+            .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
-
-        for key in form.sorted_keys() {
-            println!("{:.<20} {:<10} {}", key, form.get(&key), form.about(&key));
-        }
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             sink_radius: form.get("sink_radius").into(),
             sink_rate: form.get("sink_rate").into(),
+            form,
         })
     }
 }
 
 impl Setup for Binary {
+    fn print_parameters(&self) {
+        for key in self.form.sorted_keys() {
+            println!("{:.<20} {:<10} {}", key, self.form.get(&key), self.form.about(&key));
+        }
+    }
+
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();

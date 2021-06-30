@@ -27,9 +27,9 @@ source = "git+https://github.com/clemson-cal/kepler-two-body#2d8a0f5374052ab7f4f
 
 [[package]]
 name = "kind-config"
-version = "0.2.3"
+version = "0.2.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "f27663292f08bd170c2cc44e86719fedae8cd06a222c9dbe8855272dd4c15330"
+checksum = "f005ac57892d1c6cd74acc0866b06a2249f980cbbc20fbe24f8b037a60cf20b3"
 
 [[package]]
 name = "num-traits"

@@ -8,6 +8,7 @@ pub enum Error {
     PrintUserInformation(String),
     Cmdline(String),
     InvalidSetup(String),
+    InvalidCheckpoint(String),
     IOError(std::io::Error),
 }
 
@@ -26,8 +27,11 @@ impl Display for Error {
             Self::InvalidSetup(info) => {
                 writeln!(fmt, "invalid setup: {}", info)
             }
+            Self::InvalidCheckpoint(info) => {
+                writeln!(fmt, "invalid checkpoint: {}", info)
+            }
             Self::IOError(error) => {
-                error.fmt(fmt)
+                writeln!(fmt, "{}", error)
             }
         }
     }

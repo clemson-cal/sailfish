@@ -1,15 +1,19 @@
-use serde::{Serialize, Deserialize};
-use std::io::Write;
 use crate::error;
+use serde::{Deserialize, Serialize};
+use std::fs::{create_dir_all, File};
+use std::io::prelude::*;
+use std::io::Write;
 
 #[derive(Clone, Serialize, Deserialize)]
-pub struct RecurringTask
-{
+pub struct RecurringTask {
     pub number: u64,
     pub next_time: f64,
 }
 
 impl RecurringTask {
+    pub fn new() -> Self {
+        Self { number: 0, next_time: 0.0 }
+    }
     pub fn next(&mut self, interval: f64) {
         self.next_time += interval;
         self.number += 1;
@@ -17,27 +21,44 @@ impl RecurringTask {
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
-pub struct State
-{
-    pub setup: String,
+pub struct State {
+    pub setup_name: String,
+    pub parameters: String,
     pub primitive: Vec<f64>,
     pub time: f64,
     pub iteration: u64,
     pub checkpoint: RecurringTask,
 }
 
-pub fn write_checkpoint(state: &State, outdir: &str, output_number: u64) -> Result<(), error::Error> {
+impl State {
+    pub fn from_checkpoint(filename: &str, new_parameters: &str) -> Result<State, error::Error> {
+        let mut f = File::open(filename).map_err(error::Error::IOError)?;
 
-    // let mut bytes = Vec::new();
-    // for x in &state.primitive {
-    //     bytes.extend(x.to_le_bytes().iter());
-    // }
-    let bytes = rmp_serde::to_vec_named(&state).unwrap();
+        let mut bytes = Vec::new();
+        f.read_to_end(&mut bytes).map_err(error::Error::IOError)?;
 
-    std::fs::create_dir_all(outdir).map_err(error::Error::IOError)?;
-    let filename = format!("{}/chkpt.{:04}.sf", outdir, output_number);
-    let mut file = std::fs::File::create(&filename).unwrap();
-    file.write_all(&bytes).unwrap();
-    println!("write {}", filename);
-    Ok(())
+        let mut state: State = rmp_serde::from_read_ref(&bytes)
+            .map_err(|e| error::Error::InvalidCheckpoint(format!("{}", e)))?;
+
+        state.parameters += ":";
+        state.parameters += new_parameters;
+
+        println!("read {}", filename);
+        Ok(state)
+    }
+
+    pub fn write_checkpoint(
+        &mut self,
+        checkpoint_interval: f64,
+        outdir: &str,
+    ) -> Result<(), error::Error> {
+        self.checkpoint.next(checkpoint_interval);
+        create_dir_all(outdir).map_err(error::Error::IOError)?;
+        let bytes = rmp_serde::to_vec_named(self).unwrap();
+        let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);
+        let mut file = File::create(&filename).unwrap();
+        file.write_all(&bytes).unwrap();
+        println!("write {}", filename);
+        Ok(())
+    }
 }
