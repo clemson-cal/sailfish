@@ -111,7 +111,8 @@ fn run() -> Result<(), error::Error> {
     };
 
     while state.time < cmdline.end_time {
-        if state.time >= state.checkpoint.next_time {
+        if state.checkpoint.last_time.is_none() || 
+           state.time >= state.checkpoint.last_time.unwrap() + cmdline.checkpoint_interval {
             state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)?;
         }
     

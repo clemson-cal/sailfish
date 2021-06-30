@@ -7,15 +7,19 @@ use std::io::Write;
 #[derive(Clone, Serialize, Deserialize)]
 pub struct RecurringTask {
     pub number: u64,
-    pub next_time: f64,
+    pub last_time: Option<f64>,
 }
 
 impl RecurringTask {
     pub fn new() -> Self {
-        Self { number: 0, next_time: 0.0 }
+        Self { number: 0, last_time: None }
     }
     pub fn next(&mut self, interval: f64) {
-        self.next_time += interval;
+        if self.last_time.is_none() {
+            self.last_time = Some(0.0);
+        } else {
+            self.last_time = Some(self.last_time.unwrap() + interval);
+        }
         self.number += 1;
     }
 }
