@@ -275,14 +275,15 @@ static __device__ void buffer_source_term(
 static __device__ void shear_strain(const real *gx, const real *gy, real dx, real dy, real *s)
 {
     real sxx = 4.0 / 3.0 * gx[1] / dx - 2.0 / 3.0 * gy[2] / dy;
-    real sxy = 1.0 / 1.0 * gx[2] / dx + 1.0 / 1.0 * gy[1] / dy;
-    real syx = 1.0 / 1.0 * gx[2] / dx + 1.0 / 1.0 * gy[1] / dy;
     real syy =-2.0 / 3.0 * gx[1] / dx + 4.0 / 3.0 * gy[2] / dy;
+    real sxy = 1.0 / 1.0 * gx[2] / dx + 1.0 / 1.0 * gy[1] / dy;
+    real syx = sxy;
     s[0] = sxx;
     s[1] = sxy;
     s[2] = syx;
     s[3] = syy;
 }
+
 
 // ============================ HYDRO =========================================
 // ============================================================================
