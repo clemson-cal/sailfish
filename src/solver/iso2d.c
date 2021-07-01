@@ -291,11 +291,11 @@ static __device__ void shear_strain(const real *gx, const real *gy, real dx, rea
 // ============================================================================
 static __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
-    const real rho = cons[0];
-    const real px = cons[1];
-    const real py = cons[2];
-    const real vx = px / rho;
-    const real vy = py / rho;
+    real rho = cons[0];
+    real px = cons[1];
+    real py = cons[2];
+    real vx = px / rho;
+    real vy = py / rho;
 
     prim[0] = rho;
     prim[1] = vx;
@@ -304,11 +304,11 @@ static __device__ void conserved_to_primitive(const real *cons, real *prim)
 
 static __device__ void primitive_to_conserved(const real *prim, real *cons)
 {
-    const real rho = prim[0];
-    const real vx = prim[1];
-    const real vy = prim[2];
-    const real px = vx * rho;
-    const real py = vy * rho;
+    real rho = prim[0];
+    real vx = prim[1];
+    real vy = prim[2];
+    real px = vx * rho;
+    real py = vy * rho;
 
     cons[0] = rho;
     cons[1] = px;
@@ -332,9 +332,9 @@ static __device__ void primitive_to_flux(
     real cs2,
     int direction)
 {
-    const real vn = primitive_to_velocity(prim, direction);
-    const real rho = prim[0];
-    const real pressure = rho * cs2;
+    real vn = primitive_to_velocity(prim, direction);
+    real rho = prim[0];
+    real pressure = rho * cs2;
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pressure * (direction == 0);
@@ -347,10 +347,20 @@ static __device__ void primitive_to_outer_wavespeeds(
     real cs2,
     int direction)
 {
-    const real cs = sqrt(cs2);
-    const real vn = primitive_to_velocity(prim, direction);
+    real cs = sqrt(cs2);
+    real vn = primitive_to_velocity(prim, direction);
     wavespeeds[0] = vn - cs;
     wavespeeds[1] = vn + cs;
+}
+
+static __device__ real primitive_max_wavespeed(const real *prim, real cs2)
+{
+    real cs = sqrt(cs2);
+    real vx = prim[1];
+    real vy = prim[2];
+    real ax = max2(fabs(vx - cs), fabs(vx + cs));
+    real ay = max2(fabs(vy - cs), fabs(vy + cs));
+    return max2(ax, ay);
 }
 
 static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
@@ -433,6 +443,7 @@ static __device__ void advance_rk_zone(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct Patch wavespeed,
     struct EquationOfState eos,
     struct BufferZone buffer,
     struct PointMass *masses,
@@ -598,9 +609,13 @@ void advance_rk_cpu(
     real a,
     real dt)
 {
+    struct Patch wavespeeds = {
+        {0, 0}, {mesh.nj, mesh.nj}, {3 * mesh.nj, 3}, 3, 0, NULL, // TODO
+    };
+
     FOR_EACH(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, wavespeeds, eos, buffer, masses, num_masses, nu, a, dt, i, j);
     }
 }
 
@@ -619,9 +634,13 @@ void advance_rk_omp(
     real a,
     real dt)
 {
+    struct Patch wavespeeds = {
+        {0, 0}, {mesh.nj, mesh.nj}, {3 * mesh.nj, 3}, 3, 0, NULL, // TODO
+    };
+
     FOR_EACH_OMP(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, wavespeeds, eos, buffer, masses, num_masses, nu, a, dt, i, j);
     }
 }
 
@@ -640,9 +659,21 @@ void __global__ kernel(
     real a,
     real dt)
 {
-    int j = threadIdx.x + blockIdx.x * blockDim.x;
+    extern __shared__ real lds[];
+
+    struct Patch wavespeeds = {
+        {0, 0}, {(int)blockDim.y, (int)blockDim.x}, {3 * (int)blockDim.y, 3}, 3, 0, lds,
+    };
+
     int i = threadIdx.y + blockIdx.y * blockDim.y;
-    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, wavespeeds, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+
+    __syncthreads();
+
+    if (i == 0 && j == 0) {
+        // find max signal speed and write it to global array with shape gridDim
+    }
 }
 
 extern "C" void advance_rk_gpu(
@@ -660,12 +691,63 @@ extern "C" void advance_rk_gpu(
 {
     dim3 bs = dim3(16, 16);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+    int lds_size = bs.x * bs.y * sizeof(real);
     struct PointMass *device_masses;
     cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
     cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
-    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, nu, a, dt);
+    kernel<<<bd, bs, lds_size>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, nu, a, dt);
     cudaFree(device_masses);
     cudaDeviceSynchronize();
+}
+
+#endif
+
+#ifdef API_MODE_CPU
+
+real max_wavespeed_cpu(
+    struct Mesh mesh,
+    struct EquationOfState eos,
+    struct Patch primitive,
+    struct PointMass *masses,
+    int num_masses)
+{
+    real a_max = 0.0;
+
+    FOR_EACH(primitive) {
+        real *pc = GET(primitive, i, j);
+        real x = mesh.x0 + (i + 0.5) * mesh.dx;
+        real y = mesh.y0 + (j + 0.5) * mesh.dy;
+        real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
+        real a = primitive_max_wavespeed(pc, cs2);
+        a_max = max2(a_max, a);
+    }
+    return a_max;
+}
+
+#elif API_MODE_OMP
+
+
+real max_wavespeed_omp(
+    struct Mesh mesh,
+    struct EquationOfState eos,
+    struct Patch primitive,
+    struct PointMass *masses,
+    int num_masses)
+{
+    return 0.0;
+}
+
+#elif API_MODE_GPU
+
+
+extern "C" real max_wavespeed_gpu(
+    struct Mesh mesh,
+    struct EquationOfState eos,
+    struct Patch primitive,
+    struct PointMass *masses,
+    int num_masses)
+{
+    return 0.0;
 }
 
 #endif

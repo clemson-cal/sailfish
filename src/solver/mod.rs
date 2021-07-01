@@ -107,13 +107,17 @@ pub trait Solve {
     /// includes guard zones.
     fn primitive(&self) -> Vec<f64>;
 
-    /// Convert the internal primitive variable array to a conserved variable
+    /// Converts the internal primitive variable array to a conserved variable
     /// array, and store that array in the solver's conserved variable buffer.
     fn primitive_to_conserved(&mut self);
 
-    /// Advance the primitive variable array by one low-storage Runge-Kutta
+    /// Advances the primitive variable array by one low-storage Runge-Kutta
     /// sub-stup.
     fn advance_rk(&mut self, nu: f64, eos: &EquationOfState, buffer: &BufferZone, masses: &[PointMass], a: f64, dt: f64);
+
+    /// Returns the largest wavespeed among the zones in the solver's current
+    /// primitive array.
+    fn max_wavespeed(&self, eos: &EquationOfState, masses: &[PointMass]) -> f64;
 }
 
 /// Provided method to advance the primitive variable array using first,
@@ -202,6 +206,9 @@ pub mod cpu {
             );
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
+        fn max_wavespeed(&self, &eos: &EquationOfState, masses: &[PointMass]) -> f64 {
+            iso2d::max_wavespeed_cpu(&self.mesh, eos, &self.primitive1, masses)
+        }
     }
 }
 
@@ -248,6 +255,9 @@ pub mod omp {
                 dt,
             );
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
+        }
+        fn max_wavespeed(&self, &eos: &EquationOfState, masses: &[PointMass]) -> f64 {
+            iso2d::max_wavespeed_omp(&self.mesh, eos, &self.primitive1, masses)
         }
     }
 }
@@ -296,6 +306,9 @@ pub mod gpu {
                 dt,
             );
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
+        }
+        fn max_wavespeed(&self, &eos: &EquationOfState, masses: &[PointMass]) -> f64 {
+            iso2d::max_wavespeed_gpu(&self.mesh, eos, &self.primitive1, masses)
         }
     }
 }

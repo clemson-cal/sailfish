@@ -19,6 +19,7 @@ fn main() {
     cc::Build::new()
         .file("src/solver/iso2d.c")
         .define("API_MODE_CPU", None)
+        .flag("-Wno-unused-function")
         .compile("iso2d_cpu");
 
     #[cfg(feature = "omp")]
@@ -26,6 +27,7 @@ fn main() {
         cc::Build::new()
             .file("src/solver/iso2d.c")
             .define("API_MODE_OMP", None)
+            .flag("-Wno-unused-function")
             .flag("-Xpreprocessor")
             .flag("-fopenmp")
             .compile("iso2d_omp");

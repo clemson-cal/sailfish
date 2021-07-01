@@ -82,11 +82,11 @@ fn run() -> Result<(), error::Error> {
     let nu = setup.viscosity().unwrap_or(0.0);
     let eos = setup.equation_of_state();
     let buffer = setup.buffer_zone();
-    let v_max = setup.max_signal_speed().unwrap();
+    // let v_max = setup.max_signal_speed().unwrap();
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
     let rk_order = cmdline.rk_order;
-    let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
+    // let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
 
     setup.print_parameters();
 
@@ -118,6 +118,10 @@ fn run() -> Result<(), error::Error> {
     
         let elapsed = time_exec(|| {
             for _ in 0..fold {
+                let a_max = solver.max_wavespeed(&eos, &setup.masses(state.time));
+                let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
+                println!("{}", dt);
+
                 solver::advance(
                     &mut solver,
                     &eos,

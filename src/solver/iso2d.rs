@@ -1,3 +1,4 @@
+#![allow(unused)]
 use super::patch::{ffi, host};
 
 #[cfg(feature = "cuda")]
@@ -60,6 +61,30 @@ mod iso2d_ffi {
             a: f64,
             dt: f64,
         );
+
+        pub(super) fn max_wavespeed_cpu(
+            mesh: Mesh,
+            eos: EquationOfState,
+            primitive_rd: ffi::Patch,
+            masses: *const PointMass,
+            num_masses: i32,
+        ) -> f64;
+
+        pub(super) fn max_wavespeed_omp(
+            mesh: Mesh,
+            eos: EquationOfState,
+            primitive_rd: ffi::Patch,
+            masses: *const PointMass,
+            num_masses: i32,
+        ) -> f64;
+
+        pub(super) fn max_wavespeed_gpu(
+            mesh: Mesh,
+            eos: EquationOfState,
+            primitive_rd: ffi::Patch,
+            masses: *const PointMass,
+            num_masses: i32,
+        ) -> f64;
     }
 }
 
@@ -177,5 +202,41 @@ pub fn advance_rk_gpu(
             a,
             dt,
         )
+    }
+}
+
+pub fn max_wavespeed_cpu(
+    mesh: &Mesh,
+    eos: EquationOfState,
+    primitive: &host::Patch,
+    masses: &[PointMass],
+) -> f64
+{
+    unsafe {
+        iso2d_ffi::max_wavespeed_cpu(mesh.clone(), eos, primitive.0, masses.as_ptr(), masses.len() as i32)
+    }
+}
+
+pub fn max_wavespeed_omp(
+    mesh: &Mesh,
+    eos: EquationOfState,
+    primitive: &host::Patch,
+    masses: &[PointMass],
+) -> f64
+{
+    unsafe {
+        iso2d_ffi::max_wavespeed_omp(mesh.clone(), eos, primitive.0, masses.as_ptr(), masses.len() as i32)
+    }
+}
+
+pub fn max_wavespeed_gpu(
+    mesh: &Mesh,
+    eos: EquationOfState,
+    primitive: &device::Patch,
+    masses: &[PointMass],
+) -> f64
+{
+    unsafe {
+        iso2d_ffi::max_wavespeed_gpu(mesh.clone(), eos, primitive.0, masses.as_ptr(), masses.len() as i32)
     }
 }
