@@ -744,7 +744,7 @@ real max_wavespeed_omp(
 
 #elif API_MODE_GPU
 
-void __global__ wavespeed_kernel(
+static __global__ void wavespeed_kernel(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
@@ -774,15 +774,10 @@ extern "C" real max_wavespeed_gpu(
     struct PointMass *device_masses;
     cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
     cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
-    
-    wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, masses, num_masses, wavespeeds);
-
-    real a_max = 0.0;//compute_max(wavespeeds, ELEMENTS(wavespeeds));
-
+    wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, device_masses, num_masses, wavespeeds);
     cudaFree(device_masses);
-    cudaDeviceSynchronize();
 
-    return a_max;
+    return 0.0;
 }
 
 #endif

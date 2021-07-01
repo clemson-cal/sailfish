@@ -307,9 +307,16 @@ pub mod gpu {
             );
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, _eos: &EquationOfState, _masses: &[PointMass]) -> f64 {
-            todo!()
-            // iso2d::max_wavespeed_gpu(&self.mesh, eos, &self.primitive1, masses)
+        fn max_wavespeed(&self, eos: &EquationOfState, masses: &[PointMass]) -> f64 {
+            let mut wavespeeds = host::Patch::zeros([0, 0], self.mesh.shape(), 1).to_device();
+            iso2d::max_wavespeed_gpu(&self.mesh, *eos, &self.primitive1, masses, &mut wavespeeds);
+            let wavespeeds = wavespeeds.to_host();
+
+            let mut a_max: f64 = 0.0;
+            for a in wavespeeds.to_vec() {
+                a_max = a_max.max(a)
+            }
+            a_max
         }
     }
 }
