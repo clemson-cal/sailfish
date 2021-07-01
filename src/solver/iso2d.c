@@ -669,7 +669,6 @@ extern "C" void advance_rk_gpu(
 {
     dim3 bs = dim3(16, 16);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    // int lds_size = bs.x * bs.y * sizeof(real);
     struct PointMass *device_masses;
     cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
     cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
@@ -679,6 +678,23 @@ extern "C" void advance_rk_gpu(
 }
 
 #endif
+
+static __device__ real wavespeed_zone(
+    struct Mesh mesh,
+    struct EquationOfState eos,
+    struct Patch primitive,
+    struct PointMass *masses,
+    int num_masses,
+    int i,
+    int j)
+{
+    real *pc = GET(primitive, i, j);
+    real x = mesh.x0 + (i + 0.5) * mesh.dx;
+    real y = mesh.y0 + (j + 0.5) * mesh.dy;
+    real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
+    real a = primitive_max_wavespeed(pc, cs2);
+    return a;
+}
 
 #ifdef API_MODE_CPU
 
@@ -695,11 +711,7 @@ real max_wavespeed_cpu(
     {
         for (int j = 0; j < mesh.nj; ++j)
         {
-            real *pc = GET(primitive, i, j);
-            real x = mesh.x0 + (i + 0.5) * mesh.dx;
-            real y = mesh.y0 + (j + 0.5) * mesh.dy;
-            real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
-            real a = primitive_max_wavespeed(pc, cs2);
+            real a = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
             a_max = max2(a_max, a);
         }
     }
@@ -723,11 +735,7 @@ real max_wavespeed_omp(
     {
         for (int j = 0; j < mesh.nj; ++j)
         {
-            real *pc = GET(primitive, i, j);
-            real x = mesh.x0 + (i + 0.5) * mesh.dx;
-            real y = mesh.y0 + (j + 0.5) * mesh.dy;
-            real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
-            real a = primitive_max_wavespeed(pc, cs2);
+            real a = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
             a_max = max2(a_max, a);
         }
     }
@@ -736,15 +744,45 @@ real max_wavespeed_omp(
 
 #elif API_MODE_GPU
 
+void __global__ wavespeed_kernel(
+    struct Mesh mesh,
+    struct EquationOfState eos,
+    struct Patch primitive,
+    struct PointMass *masses,
+    int num_masses,
+    struct Patch wavespeeds)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    real a = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+
+    *GET(wavespeeds, i, j) = a;
+}
 
 extern "C" real max_wavespeed_gpu(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
     struct PointMass *masses,
+    struct Patch wavespeeds,
     int num_masses)
 {
-    return 0.0;
+    dim3 bs = dim3(16, 16);
+    dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+
+    struct PointMass *device_masses;
+    cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
+    cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
+    
+    wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, masses, num_masses, wavespeeds);
+
+    real a_max = 0.0;//compute_max(wavespeeds, ELEMENTS(wavespeeds));
+
+    cudaFree(device_masses);
+    cudaDeviceSynchronize();
+
+    return a_max;
 }
 
 #endif

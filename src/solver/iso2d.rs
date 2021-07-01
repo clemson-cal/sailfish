@@ -86,6 +86,7 @@ mod iso2d_ffi {
             primitive_rd: ffi::Patch,
             masses: *const PointMass,
             num_masses: i32,
+            wavespeeds: ffi::Patch,
         ) -> f64;
     }
 }
@@ -238,9 +239,10 @@ pub fn max_wavespeed_gpu(
     eos: EquationOfState,
     primitive: &device::Patch,
     masses: &[PointMass],
+    wavespeeds: &mut device::Patch,
 ) -> f64
 {
     unsafe {
-        iso2d_ffi::max_wavespeed_gpu(mesh.clone(), eos, primitive.0, masses.as_ptr(), masses.len() as i32)
+        iso2d_ffi::max_wavespeed_gpu(mesh.clone(), eos, primitive.0, masses.as_ptr(), masses.len() as i32, wavespeeds.0)
     }
 }

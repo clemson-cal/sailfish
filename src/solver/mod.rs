@@ -206,8 +206,8 @@ pub mod cpu {
             );
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, &eos: &EquationOfState, masses: &[PointMass]) -> f64 {
-            iso2d::max_wavespeed_cpu(&self.mesh, eos, &self.primitive1, masses)
+        fn max_wavespeed(&self, eos: &EquationOfState, masses: &[PointMass]) -> f64 {
+            iso2d::max_wavespeed_cpu(&self.mesh, *eos, &self.primitive1, masses)
         }
     }
 }
@@ -256,8 +256,8 @@ pub mod omp {
             );
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, &eos: &EquationOfState, masses: &[PointMass]) -> f64 {
-            iso2d::max_wavespeed_omp(&self.mesh, eos, &self.primitive1, masses)
+        fn max_wavespeed(&self, eos: &EquationOfState, masses: &[PointMass]) -> f64 {
+            iso2d::max_wavespeed_omp(&self.mesh, *eos, &self.primitive1, masses)
         }
     }
 }
@@ -307,8 +307,9 @@ pub mod gpu {
             );
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, &eos: &EquationOfState, masses: &[PointMass]) -> f64 {
-            iso2d::max_wavespeed_gpu(&self.mesh, eos, &self.primitive1, masses)
+        fn max_wavespeed(&self, _eos: &EquationOfState, _masses: &[PointMass]) -> f64 {
+            todo!()
+            // iso2d::max_wavespeed_gpu(&self.mesh, eos, &self.primitive1, masses)
         }
     }
 }
