@@ -120,6 +120,7 @@ fn run() -> Result<(), error::Error> {
             for _ in 0..fold {
                 let a_max = solver.max_wavespeed(&eos, &setup.masses(state.time));
                 let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
+
                 println!("{}", dt);
 
                 solver::advance(

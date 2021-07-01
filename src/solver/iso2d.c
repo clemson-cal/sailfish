@@ -417,11 +417,10 @@ void primitive_to_conserved_omp(struct Patch primitive, struct Patch conserved)
 
 static void __global__ kernel(struct Patch primitive, struct Patch conserved)
 {
-    int i = conserved.start[0] + threadIdx.y + blockIdx.y * blockDim.y;
-    int j = conserved.start[1] + threadIdx.x + blockIdx.x * blockDim.x;
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (conserved.start[0] <= i && i < conserved.start[0] + conserved.count[0] &&
-        conserved.start[1] <= j && j < conserved.start[1] + conserved.count[1])
+    if (i < conserved.count[0] && j < conserved.count[1])
     {
         real *p = GET(primitive, i, j);
         real *u = GET(conserved, i, j);
@@ -443,7 +442,6 @@ static __device__ void advance_rk_zone(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
-    struct Patch wavespeed,
     struct EquationOfState eos,
     struct BufferZone buffer,
     struct PointMass *masses,
@@ -609,13 +607,9 @@ void advance_rk_cpu(
     real a,
     real dt)
 {
-    struct Patch wavespeeds = {
-        {0, 0}, {mesh.nj, mesh.nj}, {3 * mesh.nj, 3}, 3, 0, NULL, // TODO
-    };
-
     FOR_EACH(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, wavespeeds, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
     }
 }
 
@@ -634,13 +628,9 @@ void advance_rk_omp(
     real a,
     real dt)
 {
-    struct Patch wavespeeds = {
-        {0, 0}, {mesh.nj, mesh.nj}, {3 * mesh.nj, 3}, 3, 0, NULL, // TODO
-    };
-
     FOR_EACH_OMP(conserved_rk)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, wavespeeds, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
     }
 }
 
@@ -659,21 +649,9 @@ void __global__ kernel(
     real a,
     real dt)
 {
-    extern __shared__ real lds[];
-
-    struct Patch wavespeeds = {
-        {0, 0}, {(int)blockDim.y, (int)blockDim.x}, {3 * (int)blockDim.y, 3}, 3, 0, lds,
-    };
-
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
-    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, wavespeeds, eos, buffer, masses, num_masses, nu, a, dt, i, j);
-
-    __syncthreads();
-
-    if (i == 0 && j == 0) {
-        // find max signal speed and write it to global array with shape gridDim
-    }
+    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
 }
 
 extern "C" void advance_rk_gpu(
@@ -691,11 +669,11 @@ extern "C" void advance_rk_gpu(
 {
     dim3 bs = dim3(16, 16);
     dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    int lds_size = bs.x * bs.y * sizeof(real);
+    // int lds_size = bs.x * bs.y * sizeof(real);
     struct PointMass *device_masses;
     cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
     cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
-    kernel<<<bd, bs, lds_size>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, nu, a, dt);
+    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, nu, a, dt);
     cudaFree(device_masses);
     cudaDeviceSynchronize();
 }
@@ -713,13 +691,17 @@ real max_wavespeed_cpu(
 {
     real a_max = 0.0;
 
-    FOR_EACH(primitive) {
-        real *pc = GET(primitive, i, j);
-        real x = mesh.x0 + (i + 0.5) * mesh.dx;
-        real y = mesh.y0 + (j + 0.5) * mesh.dy;
-        real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
-        real a = primitive_max_wavespeed(pc, cs2);
-        a_max = max2(a_max, a);
+    for (int i = 0; i < mesh.ni; ++i)
+    {
+        for (int j = 0; j < mesh.nj; ++j)
+        {
+            real *pc = GET(primitive, i, j);
+            real x = mesh.x0 + (i + 0.5) * mesh.dx;
+            real y = mesh.y0 + (j + 0.5) * mesh.dy;
+            real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
+            real a = primitive_max_wavespeed(pc, cs2);
+            a_max = max2(a_max, a);
+        }
     }
     return a_max;
 }
@@ -734,7 +716,22 @@ real max_wavespeed_omp(
     struct PointMass *masses,
     int num_masses)
 {
-    return 0.0;
+    real a_max = 0.0;
+
+    #pragma omp parallel for reduction(max:a_max)
+    for (int i = 0; i < mesh.ni; ++i)
+    {
+        for (int j = 0; j < mesh.nj; ++j)
+        {
+            real *pc = GET(primitive, i, j);
+            real x = mesh.x0 + (i + 0.5) * mesh.dx;
+            real y = mesh.y0 + (j + 0.5) * mesh.dy;
+            real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
+            real a = primitive_max_wavespeed(pc, cs2);
+            a_max = max2(a_max, a);
+        }
+    }
+    return a_max;
 }
 
 #elif API_MODE_GPU

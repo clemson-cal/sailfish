@@ -70,6 +70,7 @@ mod iso2d_ffi {
             num_masses: i32,
         ) -> f64;
 
+        #[cfg(feature = "omp")]
         pub(super) fn max_wavespeed_omp(
             mesh: Mesh,
             eos: EquationOfState,
@@ -78,6 +79,7 @@ mod iso2d_ffi {
             num_masses: i32,
         ) -> f64;
 
+        #[cfg(feature = "cuda")]
         pub(super) fn max_wavespeed_gpu(
             mesh: Mesh,
             eos: EquationOfState,
@@ -217,6 +219,7 @@ pub fn max_wavespeed_cpu(
     }
 }
 
+#[cfg(feature = "omp")]
 pub fn max_wavespeed_omp(
     mesh: &Mesh,
     eos: EquationOfState,
@@ -229,6 +232,7 @@ pub fn max_wavespeed_omp(
     }
 }
 
+#[cfg(feature = "cuda")]
 pub fn max_wavespeed_gpu(
     mesh: &Mesh,
     eos: EquationOfState,
