@@ -112,8 +112,8 @@ impl Setup for Binary {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
         let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
-        let phi_hat_x = -y / r;
-        let phi_hat_y = x / r;
+        let phi_hat_x = -y / r.max(1e-12);
+        let phi_hat_y = x / r.max(1e-12);
         let d = 1.0;
         let u = phi_hat_x / rs.sqrt();
         let v = phi_hat_y / rs.sqrt();

@@ -144,6 +144,7 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
+    state.set_primitive(solver.primitive());
     state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)
 }
 
