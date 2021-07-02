@@ -51,6 +51,12 @@ impl State {
         Ok(state)
     }
 
+    pub fn set_primitive(&mut self, primitive: Vec<f64>) {
+        assert!(primitive.len() == self.primitive.len(),
+            "new and old primitive array sizes must match");
+        self.primitive = primitive;
+    }
+
     pub fn write_checkpoint(
         &mut self,
         checkpoint_interval: f64,
