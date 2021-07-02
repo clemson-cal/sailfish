@@ -651,7 +651,10 @@ void __global__ kernel(
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
-    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+
+    if (i < mesh.ni && j < mesh.nj) {
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+    }
 }
 
 extern "C" void advance_rk_gpu(
@@ -755,9 +758,9 @@ static __global__ void wavespeed_kernel(
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-    real a = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
-
-    *GET(wavespeeds, i, j) = a;
+    if (i < mesh.ni && j < mesh.nj) {
+        *GET(wavespeeds, i, j) = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+    }
 }
 
 extern "C" real max_wavespeed_gpu(
