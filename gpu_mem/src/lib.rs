@@ -1,3 +1,4 @@
+use std::iter::FromIterator;
 use std::os::raw::{c_void, c_ulong};
 use std::mem;
 
@@ -84,6 +85,13 @@ impl<T: Copy> Clone for DeviceVec<T> {
     }
 }
 
+impl<T: Copy> FromIterator<T> for DeviceVec<T> {
+    fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
+        let hvec: Vec<T> = iter.into_iter().collect();
+        DeviceVec::from(&hvec)
+    }
+}
+
 pub trait Reduce {
     type Item: Copy;
     fn maximum(&self) -> Option<Self::Item>;
@@ -118,8 +126,7 @@ mod tests {
     #[test]
     fn reduce() {
         for n in 0..1000 {
-            let hvec: Vec<f64> = (0..n).map(|i| i as f64).collect();
-            let dvec = DeviceVec::from(&hvec);
+            let dvec: DeviceVec<_> = (0..n).map(|i| i as f64).collect();
             assert_eq!(dvec.maximum(), if n == 0 { None } else { Some((n - 1) as f64) })
         }
     }

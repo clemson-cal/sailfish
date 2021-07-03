@@ -1,6 +1,8 @@
 #include <math.h>
 
-extern "C" void *gpu_malloc(unsigned long size)
+typedef unsigned long ulong;
+
+extern "C" void *gpu_malloc(ulong size)
 {
     void *ptr;
     cudaMalloc(&ptr, size);
@@ -12,21 +14,20 @@ extern "C" void gpu_free(void *ptr)
     cudaFree(&ptr);
 }
 
-extern "C" void gpu_memcpy_htod(void *dst, const void *src, unsigned long size)
+extern "C" void gpu_memcpy_htod(void *dst, const void *src, ulong size)
 {
     cudaMemcpy(dst, src, size, cudaMemcpyHostToDevice);
 }
 
-extern "C" void gpu_memcpy_dtoh(void *dst, const void *src, unsigned long size)
+extern "C" void gpu_memcpy_dtoh(void *dst, const void *src, ulong size)
 {
     cudaMemcpy(dst, src, size, cudaMemcpyDeviceToHost);
 }
 
-extern "C" void gpu_memcpy_dtod(void *dst, const void *src, unsigned long size)
+extern "C" void gpu_memcpy_dtod(void *dst, const void *src, ulong size)
 {
     cudaMemcpy(dst, src, size, cudaMemcpyDeviceToDevice);
 }
-
 
 // Adapted from:
 // https://sodocumentation.net/cuda/topic/6566/parallel-reduction--e-g--how-to-sum-an-array
@@ -34,15 +35,15 @@ extern "C" void gpu_memcpy_dtod(void *dst, const void *src, unsigned long size)
 #define REDUCE_BLOCK_SIZE 1024
 #define REDUCE_GRID_SIZE 24
 
-static __global__ void vec_max_f64_kernel(const double *in, unsigned long N, double *out)
+static __global__ void vec_max_f64_kernel(const double *in, ulong N, double *out)
 {
     __shared__ double lds[REDUCE_BLOCK_SIZE];
 
-    unsigned long start = threadIdx.x + blockIdx.x * REDUCE_BLOCK_SIZE;
-    unsigned long gsize = gridDim.x * REDUCE_BLOCK_SIZE;
+    ulong start = threadIdx.x + blockIdx.x * REDUCE_BLOCK_SIZE;
+    ulong gsize = gridDim.x * REDUCE_BLOCK_SIZE;
     double max = in[0];
 
-    for (unsigned long i = start; i < N; i += gsize)
+    for (ulong i = start; i < N; i += gsize)
     {
         max = fmax(max, in[i]);
     }
@@ -50,7 +51,7 @@ static __global__ void vec_max_f64_kernel(const double *in, unsigned long N, dou
 
     __syncthreads();
 
-    for (unsigned long size = REDUCE_BLOCK_SIZE / 2; size > 0; size /= 2)
+    for (ulong size = REDUCE_BLOCK_SIZE / 2; size > 0; size /= 2)
     {
         if (threadIdx.x < size)
         {
@@ -64,7 +65,7 @@ static __global__ void vec_max_f64_kernel(const double *in, unsigned long N, dou
     }
 }
 
-extern "C" void gpu_vec_max_f64(const double *vec, unsigned long size, double *result)
+extern "C" void gpu_vec_max_f64(const double *vec, ulong size, double *result)
 {
     double* block_max;
     cudaMalloc(&block_max, sizeof(double) * REDUCE_GRID_SIZE);
