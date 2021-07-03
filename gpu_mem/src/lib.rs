@@ -7,6 +7,8 @@ extern "C" {
     pub fn gpu_memcpy_htod(dst: *mut c_void, src: *const c_void, size: c_ulong);
     pub fn gpu_memcpy_dtoh(dst: *mut c_void, src: *const c_void, size: c_ulong);
     pub fn gpu_memcpy_dtod(dst: *mut c_void, src: *const c_void, size: c_ulong);
+
+    pub fn gpu_vec_max_f64(vec: *const f64, size: c_ulong, result: *mut f64);
 }
 
 pub struct DeviceVec<T: Copy> {
@@ -15,6 +17,9 @@ pub struct DeviceVec<T: Copy> {
 }
 
 impl<T: Copy> DeviceVec<T> {
+    pub fn is_empty(&self) -> bool {
+        self.len == 0
+    }
     pub fn len(&self) -> usize {
         self.len
     }
@@ -75,6 +80,26 @@ impl<T: Copy> Clone for DeviceVec<T> {
                 ptr: ptr as *mut T,
                 len: self.len,
             }            
+        }
+    }
+}
+
+pub trait Reduce {
+    type Item: Copy;
+    fn maximum(&self) -> Option<Self::Item>;
+}
+
+impl Reduce for DeviceVec<f64> {
+    type Item = f64;
+    fn maximum(&self) -> Option<Self::Item> {
+        if self.is_empty() {
+            None
+        } else {
+            let mut result = DeviceVec::from(&vec![0.0]);
+            unsafe {
+                gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr())
+            };
+            Some(Vec::from(&result)[0])
         }
     }
 }

@@ -126,8 +126,8 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                // let a_max = solver.max_wavespeed(&eos, &setup.masses(state.time));
-                let a_max = setup.max_signal_speed().unwrap();
+                let a_max = solver.max_wavespeed(eos, &setup.masses(state.time));
+                // let a_max = setup.max_signal_speed().unwrap();
                 let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
 
                 iso2d::advance(

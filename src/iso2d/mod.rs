@@ -260,8 +260,26 @@ pub mod gpu {
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, _eos: EquationOfState, _masses: &[PointMass]) -> f64 {
-            todo!()
+        fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64 {
+            // use gpu_mem::Reduce;
+
+            let masses = DeviceVec::from(masses);
+            let mut wavespeeds = DeviceVec::from(&vec![0.0; self.mesh.num_total_zones()]);
+
+            unsafe {
+                iso2d_wavespeed(
+                    self.mesh,
+                    self.primitive1.as_device_ptr(),
+                    wavespeeds.as_mut_device_ptr(),
+                    eos,
+                    masses.as_device_ptr(),
+                    masses.len() as i32,
+                    ExecutionMode::GPU,
+                )
+            };
+            // wavespeeds.maximum().unwrap()
+            let wavespeeds = Vec::from(&wavespeeds);
+            wavespeeds.iter().cloned().fold(0.0, f64::max)
         }
     }
 }

@@ -517,10 +517,11 @@ static __host__ __device__ void advance_rk_zone(
     conserved_to_primitive(ucc, pout);
 }
 
-static __host__ __device__ real wavespeed_zone(
+static __host__ __device__ void wavespeed_zone(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
+    struct Patch wavespeed,
     struct PointMass *masses,
     int num_masses,
     int i,
@@ -531,7 +532,7 @@ static __host__ __device__ real wavespeed_zone(
     real y = mesh.y0 + (j + 0.5) * mesh.dy;
     real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
     real a = primitive_max_wavespeed(pc, cs2);
-    return a;
+    GET(wavespeed, i, j)[0] = a;
 }
 
 
@@ -579,6 +580,7 @@ static void __global__ wavespeed_kernel(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
+    struct Patch wavespeed,
     struct PointMass *masses,
     int num_masses)
 {
@@ -587,7 +589,7 @@ static void __global__ wavespeed_kernel(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+        wavespeed_zone(mesh, eos, primitive, wavespeed, masses, num_masses, i, j);
     }
 }
 
@@ -732,7 +734,7 @@ EXTERN_C void iso2d_wavespeed(
     switch (mode) {
         case CPU: {
             FOR_EACH(wavespeed) {
-                wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+                wavespeed_zone(mesh, eos, primitive, wavespeed, masses, num_masses, i, j);
             }
             break;
         }
@@ -740,7 +742,7 @@ EXTERN_C void iso2d_wavespeed(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(wavespeed) {
-                wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+                wavespeed_zone(mesh, eos, primitive, wavespeed, masses, num_masses, i, j);
             }
             #endif
             break;
@@ -750,7 +752,7 @@ EXTERN_C void iso2d_wavespeed(
             #ifdef __NVCC__
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, masses, num_masses);
+            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed, masses, num_masses);
             #endif
             break;
         }
