@@ -15,6 +15,7 @@ pub struct CommandLine {
     pub cfl_number: f64,
 }
 
+#[rustfmt::skip]
 pub fn parse_command_line() -> Result<CommandLine, Error> {
     use Error::*;
 
@@ -61,7 +62,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
             }
         })
     {
-        #[cfg_attr(rustfmt, rustfmt_skip)]
         match state {
             State::Ready => match arg.as_str() {
                 "--version" => {
@@ -97,7 +97,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-r" | "--rk-order" => state = State::RkOrder,
                 "--cfl" => state = State::Cfl,
                 _ => {
-                    if arg.starts_with("-") {
+                    if arg.starts_with('-') {
                         return Err(Cmdline(format!("unrecognized option {}", arg)))
                     } else if c.setup.is_some() {
                         return Err(Cmdline(format!("extra positional argument {}", arg)))
@@ -140,7 +140,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
     if c.use_omp && c.use_gpu {
         Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
     } else if !(1..=3).contains(&c.rk_order) {
-        return Err(Cmdline("rk-order must be 1, 2, or 3".into()))
+        Err(Cmdline("rk-order must be 1, 2, or 3".into()))
     } else if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
     } else {

@@ -12,6 +12,12 @@ pub struct RecurringTask {
     pub last_time: Option<f64>,
 }
 
+impl Default for RecurringTask {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl RecurringTask {
     pub fn new() -> Self {
         Self { number: 0, last_time: None }

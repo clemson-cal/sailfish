@@ -27,7 +27,7 @@ where
 }
 
 fn split_at_first_colon(string: &str) -> (&str, &str) {
-    let mut a = string.splitn(2, ":");
+    let mut a = string.splitn(2, ':');
     let n = a.next().unwrap_or("");
     let p = a.next().unwrap_or("");
     (n, p)
@@ -120,12 +120,12 @@ fn run() -> Result<(), error::Error> {
     setup.print_parameters();
 
     while state.time < cmdline.end_time {
-        if state.checkpoint.last_time.is_none() || 
+        if state.checkpoint.last_time.is_none() ||
            state.time >= state.checkpoint.last_time.unwrap() + cmdline.checkpoint_interval {
             state.set_primitive(solver.primitive());
             state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)?;
         }
-    
+
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 // let a_max = solver.max_wavespeed(&eos, &setup.masses(state.time));
