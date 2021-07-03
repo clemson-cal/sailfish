@@ -50,14 +50,13 @@ fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dy
     if cmdline.use_gpu {
         cfg_if! {
             if #[cfg(feature = "cuda")] {
-                panic!()
-                // Box::new(iso2d::gpu::Solver::new(mesh, primitive))
+                Box::new(iso2d::gpu::Solver::new(mesh, primitive))
             } else {
                 panic!()
             }
         }
     }
-    if cmdline.use_omp {
+    else if cmdline.use_omp {
         cfg_if! {
             if #[cfg(feature = "omp")] {
                 Box::new(iso2d::omp::Solver::new(mesh, primitive))
