@@ -527,9 +527,9 @@ static __device__ real wavespeed_zone(
 /**
  * Converts an array of primitive data to an array of conserved data. The
  * array index space must follow the descriptions below.
- * @param mesh               The mesh (ni, nj)
- * @param primitive_ptr[in]  Start(-2, -2) count(ni + 4, nj + 4)
- * @param conserved_ptr[out] Start(0, 0) count(ni, nj)
+ * @param mesh               The mesh [ni, nj]
+ * @param primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [3]
  * @param mode               The execution mode
  */
 void iso2d_primitive_to_conserved(
@@ -551,17 +551,18 @@ void iso2d_primitive_to_conserved(
 /**
  * Updates an array of primitive data by advancing it a single Runge-Kutta
  * step.
- * @param mesh             The mesh (ni, nj)
- * @param conserved_rk_ptr [description]
- * @param primitive_rd_ptr [description]
- * @param primitive_wr_ptr [description]
- * @param eos              [description]
- * @param buffer           [description]
- * @param masses           [description]
- * @param num_masses       [description]
- * @param nu               [description]
- * @param a                [description]
- * @param dt               [description]
+ * @param mesh                  The mesh [ni, nj]
+ * @param conserved_rk_ptr[in]  [ 0,  0] [ni,     nj]     [3]
+ * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [3]
+ * @param eos                   The EOS
+ * @param buffer                The buffer region
+ * @param masses[in]            A pointer a list of point mass objects
+ * @param num_masses            The number of point masses
+ * @param nu                    The viscosity coefficient
+ * @param a                     The RK averaging parameter
+ * @param dt                    The time step
+ * @param mode                  The execution mode
  */
 void iso2d_advance_rk(
     struct Mesh mesh,
@@ -590,14 +591,13 @@ void iso2d_advance_rk(
 
 /**
  * [iso2d_wavespeed description]
- * @param  mesh          [description]
- * @param  primitive_ptr [description]
- * @param  wavespeed_ptr [description]
- * @param  eos           [description]
- * @param  masses        [description]
- * @param  num_masses    [description]
- * @param  mode          [description]
- * @return               [description]
+ * @param  mesh               The mesh [ni, nj]
+ * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param  wavespeed_ptr[out] [-2, -2] [ni + 4, nj + 4] [1]
+ * @param eos                 The EOS
+ * @param masses[in]          A pointer a list of point mass objects
+ * @param num_masses          The number of point masses
+ * @param mode                The execution mode
  */
 void iso2d_wavespeed(
     struct Mesh mesh,
