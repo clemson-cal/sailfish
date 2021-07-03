@@ -347,6 +347,18 @@ static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real 
 
 // ============================ SCHEME ========================================
 // ============================================================================
+
+static __device__ void primitive_to_conserved_zone(
+        struct Patch primitive,
+        struct Patch conserved,
+        int i,
+        int j)
+{
+    real *p = GET(primitive, i, j);
+    real *u = GET(conserved, i, j);
+    primitive_to_conserved(p, u);
+}
+
 static __device__ void advance_rk_zone(
     struct Mesh mesh,
     struct Patch conserved_rk,
@@ -520,6 +532,62 @@ static __device__ real wavespeed_zone(
 }
 
 
+// ============================ KERNELS =======================================
+// ============================================================================
+#ifdef __NVCC__
+
+static void __global__ primitive_to_conserved_kernel(struct Patch primitive, struct Patch conserved)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        primitive_to_conserved_zone(primitive, conserved, i, j);
+    }
+}
+
+static void advance_rk_kernel(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
+    real nu,
+    real a,
+    real dt)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        primitive_to_conserved_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt);
+    }
+}
+
+static void __global__ wavespeed_kernel(
+    struct Mesh mesh,
+    struct EquationOfState eos,
+    struct Patch primitive,
+    struct PointMass *masses,
+    int num_masses)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+    }
+}
+
+#endif
+
+
 // ============================ PUBLIC API ====================================
 // ============================================================================
 
@@ -527,7 +595,7 @@ static __device__ real wavespeed_zone(
 /**
  * Converts an array of primitive data to an array of conserved data. The
  * array index space must follow the descriptions below.
- * @param mesh               The mesh [ni, nj]
+ * @param mesh               The mesh [ni,     nj]
  * @param primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
  * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [3]
  * @param mode               The execution mode
@@ -544,9 +612,7 @@ void iso2d_primitive_to_conserved(
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved) {
-                real *u = GET(conserved, i, j);
-                real *p = GET(primitive, i, j);
-                primitive_to_conserved(p, u);
+                primitive_to_conserved_zone(primitive, conserved, i, j);
             }
             break;
         }
@@ -554,9 +620,7 @@ void iso2d_primitive_to_conserved(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved) {
-                real *u = GET(conserved, i, j);
-                real *p = GET(primitive, i, j);
-                primitive_to_conserved(p, u);
+                primitive_to_conserved_zone(primitive, conserved, i, j);
             }
             #endif
             break;
@@ -564,7 +628,9 @@ void iso2d_primitive_to_conserved(
 
         case GPU: {
             #ifdef __NVCC__
-            // TODO
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            primitive_to_conserved_kernel<<<bd, bs>>>(primitive, conserved);
             #endif
             break;
         }
@@ -575,7 +641,7 @@ void iso2d_primitive_to_conserved(
 /**
  * Updates an array of primitive data by advancing it a single Runge-Kutta
  * step.
- * @param mesh                  The mesh [ni, nj]
+ * @param mesh                  The mesh [ni,     nj]
  * @param conserved_rk_ptr[in]  [ 0,  0] [ni,     nj]     [3]
  * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
  * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [3]
@@ -625,7 +691,9 @@ void iso2d_advance_rk(
 
         case GPU: {
             #ifdef __NVCC__
-            // TODO
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt);
             #endif
             break;
         }
@@ -635,9 +703,9 @@ void iso2d_advance_rk(
 
 /**
  * [iso2d_wavespeed description]
- * @param  mesh               The mesh [ni, nj]
+ * @param  mesh               The mesh [ni,     nj]
  * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
- * @param  wavespeed_ptr[out] [-2, -2] [ni + 4, nj + 4] [1]
+ * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
  * @param eos                 The EOS
  * @param masses[in]          A pointer a list of point mass objects
  * @param num_masses          The number of point masses
@@ -655,7 +723,30 @@ void iso2d_wavespeed(
     struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
     struct Patch wavespeed = patch(mesh, 1, 0, wavespeed_ptr);
 
-    FOR_EACH(wavespeed) {    
-        wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(wavespeed) {
+                wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(wavespeed) {
+                wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #ifdef __NVCC__
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, masses, num_masses);
+            #endif
+            break;
+        }
     }
 }
