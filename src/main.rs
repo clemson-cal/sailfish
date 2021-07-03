@@ -1,6 +1,8 @@
+use cmdline::CommandLine;
 use error::Error::*;
 use setup::Setup;
 use solver::cpu;
+use solver::Mesh;
 #[cfg(feature = "cuda")]
 use solver::gpu;
 use solver::omp;
@@ -47,6 +49,26 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
     }
 }
 
+fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
+    match (cmdline.use_omp, cmdline.use_gpu) {
+        (false, false) => Box::new(cpu::Solver::new(mesh, primitive)),
+        (true, false) => Box::new(omp::Solver::new(mesh, primitive)),
+        (false, true) => {
+            #[cfg(feature = "cuda")]
+            {
+                Box::new(gpu::Solver::new(mesh, primitive))
+            }
+            #[cfg(not(feature = "cuda"))]
+            {
+                panic!("cuda feature not enabled")
+            }
+        }
+        (true, true) => {
+            panic!("omp and gpu cannot be enabled at once")
+        }
+    }
+}
+
 fn new_state(resolution: u32, setup_name: &str, parameters: &str) -> Result<State, error::Error> {
     let setup = make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(resolution);
@@ -63,20 +85,18 @@ fn new_state(resolution: u32, setup_name: &str, parameters: &str) -> Result<Stat
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
 
-    let (setup, mut state): (Box<dyn Setup>, State) = if let Some(setup_string) = cmdline.setup {
+    let mut state = if let Some(ref setup_string) = cmdline.setup {
         let (name, parameters) = split_at_first_colon(&setup_string);
         if name.ends_with(".sf") {
-            let state = state::State::from_checkpoint(name, parameters)?;
-            let setup = make_setup(&state.setup_name, &state.parameters)?;
-            (setup, state)
+            state::State::from_checkpoint(name, parameters)?
         } else {
-            let state = new_state(cmdline.resolution, name, parameters)?;
-            let setup = make_setup(name, parameters)?;
-            (setup, state)
+            new_state(cmdline.resolution, name, parameters)?
         }
     } else {
         return Err(possible_setups_info());
     };
+    let setup = make_setup(&state.setup_name, &state.parameters)?;
+    setup.print_parameters();
 
     let mesh = setup.mesh(cmdline.resolution);
     let nu = setup.viscosity().unwrap_or(0.0);
@@ -85,28 +105,8 @@ fn run() -> Result<(), error::Error> {
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
     let rk_order = cmdline.rk_order;
-
-    setup.print_parameters();
-
-    let primitive = setup.initial_primitive_vec(&mesh);
     let mut mzps_log = vec![];
-    let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
-        (false, false) => Box::new(cpu::Solver::new(mesh.clone(), primitive)),
-        (true, false) => Box::new(omp::Solver::new(mesh.clone(), primitive)),
-        (false, true) => {
-            #[cfg(feature = "cuda")]
-            {
-                Box::new(gpu::Solver::new(mesh.clone(), primitive))
-            }
-            #[cfg(not(feature = "cuda"))]
-            {
-                panic!("cuda feature not enabled")
-            }
-        }
-        (true, true) => {
-            panic!("omp and gpu cannot be enabled at once")
-        }
-    };
+    let mut solver = make_solver(&cmdline, mesh.clone(), state.primitive.clone());
 
     while state.time < cmdline.end_time {
         if state.checkpoint.last_time.is_none() || 
