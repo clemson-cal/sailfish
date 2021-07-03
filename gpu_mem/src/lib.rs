@@ -114,4 +114,13 @@ mod tests {
         let dvec = DeviceVec::from(&hvec);
         assert_eq!(hvec, Vec::from(&dvec));
     }
+
+    #[test]
+    fn reduce() {
+        for n in 0..1000 {
+            let hvec: Vec<f64> = (0..n).map(|i| i as f64).collect();
+            let dvec = DeviceVec::from(&hvec);
+            assert_eq!(dvec.maximum(), if n == 0 { None } else { Some((n - 1) as f64) })
+        }
+    }
 }
