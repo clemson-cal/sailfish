@@ -35,7 +35,7 @@ impl std::str::FromStr for Explosion {
         if parameters.is_empty() {
             Ok(Self {})
         } else {
-            Err(InvalidSetup("explosion problem does not take any parameters".to_string()))
+            Err(InvalidSetup(format!("explosion problem does not take any parameters, got {}", parameters)))
         }
     }
 }

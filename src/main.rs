@@ -52,7 +52,16 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
 fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
     match (cmdline.use_omp, cmdline.use_gpu) {
         (false, false) => Box::new(cpu::Solver::new(mesh, primitive)),
-        (true, false) => Box::new(omp::Solver::new(mesh, primitive)),
+        (true, false) => {
+            #[cfg(feature = "omp")]
+            {
+                Box::new(omp::Solver::new(mesh, primitive))
+            }
+            #[cfg(not(feature = "omp"))]
+            {
+                panic!("omp feature not enabled")
+            }
+        }
         (false, true) => {
             #[cfg(feature = "cuda")]
             {
@@ -73,6 +82,7 @@ fn new_state(resolution: u32, setup_name: &str, parameters: &str) -> Result<Stat
     let setup = make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(resolution);
     Ok(State {
+        mesh: mesh.clone(),
         iteration: 0,
         time: 0.0,
         primitive: setup.initial_primitive_vec(&mesh),
@@ -96,9 +106,7 @@ fn run() -> Result<(), error::Error> {
         return Err(possible_setups_info());
     };
     let setup = make_setup(&state.setup_name, &state.parameters)?;
-    setup.print_parameters();
-
-    let mesh = setup.mesh(cmdline.resolution);
+    let mesh = state.mesh.clone();
     let nu = setup.viscosity().unwrap_or(0.0);
     let eos = setup.equation_of_state();
     let buffer = setup.buffer_zone();
@@ -107,6 +115,8 @@ fn run() -> Result<(), error::Error> {
     let rk_order = cmdline.rk_order;
     let mut mzps_log = vec![];
     let mut solver = make_solver(&cmdline, mesh.clone(), state.primitive.clone());
+
+    setup.print_parameters();
 
     while state.time < cmdline.end_time {
         if state.checkpoint.last_time.is_none() || 

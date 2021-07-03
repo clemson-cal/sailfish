@@ -7,7 +7,7 @@ pub use patch::ffi;
 pub use patch::host;
 
 #[repr(C)]
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct Mesh {
     /// Number of zones on the i-axis
     pub ni: i32,

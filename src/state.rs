@@ -1,4 +1,5 @@
 use crate::error;
+use crate::solver::Mesh;
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
@@ -26,6 +27,7 @@ impl RecurringTask {
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct State {
+    pub mesh: Mesh,
     pub setup_name: String,
     pub parameters: String,
     pub primitive: Vec<f64>,
@@ -44,8 +46,10 @@ impl State {
         let mut state: State = rmp_serde::from_read_ref(&bytes)
             .map_err(|e| error::Error::InvalidCheckpoint(format!("{}", e)))?;
 
-        state.parameters += ":";
-        state.parameters += new_parameters;
+        if !state.parameters.is_empty() && !new_parameters.is_empty() {
+            state.parameters += ":";
+        }
+        state.parameters += new_parameters;            
 
         println!("read {}", filename);
         Ok(state)
