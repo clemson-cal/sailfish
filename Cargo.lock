@@ -21,6 +21,12 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "4a72c244c1ff497a746a7e1fb3d14bd08420ecda70c8f25c7112f2781652d787"
 
 [[package]]
+name = "cfg-if"
+version = "1.0.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
+
+[[package]]
 name = "kepler-two-body"
 version = "0.1.0"
 source = "git+https://github.com/clemson-cal/kepler-two-body#2d8a0f5374052ab7f4f60c5bbbc37c4e5283b4a4"
@@ -84,6 +90,7 @@ name = "sailfish"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "cfg-if",
  "kepler-two-body",
  "kind-config",
  "rmp-serde",

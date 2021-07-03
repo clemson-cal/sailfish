@@ -1,12 +1,9 @@
-use cmdline::CommandLine;
-use error::Error::*;
-use setup::Setup;
-// #[cfg(feature = "cuda")]
-// use solver::gpu;
-// use solver::omp;
-// use solver::Solve;
-use sailfish::{Mesh, Solve};
-use state::State;
+use crate::cmdline::CommandLine;
+use crate::error::Error::*;
+use crate::sailfish::{Mesh, Solve};
+use crate::setup::Setup;
+use crate::state::State;
+use cfg_if::cfg_if;
 use std::fmt::Write;
 use std::str::FromStr;
 
@@ -49,40 +46,38 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
     }
 }
 
-fn make_solver(_cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
-    Box::new(iso2d::cpu::Solver::new(mesh, primitive))
-    // match (cmdline.use_omp, cmdline.use_gpu) {
-    //     (false, false) => Box::new(cpu::Solver::new(mesh, primitive)),
-    //     (true, false) => {
-    //         #[cfg(feature = "omp")]
-    //         {
-    //             Box::new(omp::Solver::new(mesh, primitive))
-    //         }
-    //         #[cfg(not(feature = "omp"))]
-    //         {
-    //             panic!("omp feature not enabled")
-    //         }
-    //     }
-    //     (false, true) => {
-    //         #[cfg(feature = "cuda")]
-    //         {
-    //             Box::new(gpu::Solver::new(mesh, primitive))
-    //         }
-    //         #[cfg(not(feature = "cuda"))]
-    //         {
-    //             panic!("cuda feature not enabled")
-    //         }
-    //     }
-    //     (true, true) => {
-    //         panic!("omp and gpu cannot be enabled at once")
-    //     }
-    // }
+fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
+    if cmdline.use_gpu {
+        cfg_if! {
+            if #[cfg(feature = "cuda")] {
+                Box::new(iso2d::gpu::Solver::new(mesh, primitive))
+            } else {
+                panic!()
+            }
+        }
+    }
+    if cmdline.use_omp {
+        cfg_if! {
+            if #[cfg(feature = "omp")] {
+                Box::new(iso2d::omp::Solver::new(mesh, primitive))
+            } else {
+                panic!()
+            }
+        }
+    } else {
+        Box::new(iso2d::cpu::Solver::new(mesh, primitive))
+    }
 }
 
-fn new_state(command_line: CommandLine, setup_name: &str, parameters: &str) -> Result<State, error::Error> {
+fn new_state(
+    command_line: CommandLine,
+    setup_name: &str,
+    parameters: &str,
+) -> Result<State, error::Error> {
     let setup = make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(command_line.resolution);
-    Ok(State {
+
+    let state = State {
         command_line,
         mesh: mesh.clone(),
         iteration: 0,
@@ -91,7 +86,8 @@ fn new_state(command_line: CommandLine, setup_name: &str, parameters: &str) -> R
         checkpoint: state::RecurringTask::new(),
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
-    })
+    };
+    Ok(state)
 }
 
 fn run() -> Result<(), error::Error> {
@@ -121,8 +117,9 @@ fn run() -> Result<(), error::Error> {
     setup.print_parameters();
 
     while state.time < cmdline.end_time {
-        if state.checkpoint.last_time.is_none() ||
-           state.time >= state.checkpoint.last_time.unwrap() + cmdline.checkpoint_interval {
+        if state.checkpoint.last_time.is_none()
+            || state.time >= state.checkpoint.last_time.unwrap() + cmdline.checkpoint_interval
+        {
             state.set_primitive(solver.primitive());
             state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)?;
         }

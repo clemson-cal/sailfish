@@ -1,14 +1,14 @@
 use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, Mesh, PointMass, Solve};
 
 extern "C" {
-    pub fn iso2d_primitive_to_conserved(
+    fn iso2d_primitive_to_conserved(
         mesh: Mesh,
         primitive_ptr: *const f64,
         conserved_ptr: *mut f64,
         mode: ExecutionMode,
     );
 
-    pub fn iso2d_advance_rk(
+    fn iso2d_advance_rk(
         mesh: Mesh,
         conserved_rk_ptr: *const f64,
         primitive_rd_ptr: *const f64,
@@ -23,7 +23,7 @@ extern "C" {
         mode: ExecutionMode,
     );
 
-    pub fn iso2d_wavespeed(
+    fn iso2d_wavespeed(
         mesh: Mesh,
         primitive_ptr: *const f64,
         wavespeed_ptr: *mut f64,
@@ -44,8 +44,8 @@ pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
     nu: f64,
     rk_order: u32,
     time: f64,
-    dt: f64)
-{
+    dt: f64,
+) {
     solver.primitive_to_conserved();
 
     match rk_order {
@@ -76,16 +76,21 @@ pub mod cpu {
         primitive1: Vec<f64>,
         primitive2: Vec<f64>,
         conserved0: Vec<f64>,
+        pub(super) mode: ExecutionMode,
     }
 
     impl Solver {
         pub fn new(mesh: Mesh, primitive: Vec<f64>) -> Self {
-            assert_eq!(primitive.len(), (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3);
+            assert_eq!(
+                primitive.len(),
+                (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
+            );
             Self {
                 mesh,
                 primitive1: primitive.clone(),
                 primitive2: primitive.clone(),
                 conserved0: vec![0.0; mesh.num_total_zones() * 3],
+                mode: ExecutionMode::CPU,
             }
         }
     }
@@ -100,11 +105,19 @@ pub mod cpu {
                     self.mesh,
                     self.primitive1.as_ptr(),
                     self.conserved0.as_mut_ptr(),
-                    ExecutionMode::CPU,
+                    self.mode,
                 );
             }
         }
-        fn advance_rk(&mut self, nu: f64, eos: EquationOfState, buffer: BufferZone, masses: &[PointMass], a: f64, dt: f64) {
+        fn advance_rk(
+            &mut self,
+            nu: f64,
+            eos: EquationOfState,
+            buffer: BufferZone,
+            masses: &[PointMass],
+            a: f64,
+            dt: f64,
+        ) {
             unsafe {
                 iso2d_advance_rk(
                     self.mesh,
@@ -118,7 +131,7 @@ pub mod cpu {
                     nu,
                     a,
                     dt,
-                    ExecutionMode::CPU,
+                    self.mode,
                 )
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
@@ -133,13 +146,46 @@ pub mod cpu {
                     eos,
                     masses.as_ptr(),
                     masses.len() as i32,
-                    ExecutionMode::CPU,
+                    self.mode,
                 )
             };
-            wavespeeds
-                .iter()
-                .cloned()
-                .fold(0.0, f64::max)
+            wavespeeds.iter().cloned().fold(0.0, f64::max)
+        }
+    }
+}
+
+pub mod omp {
+    use super::*;
+    pub struct Solver(cpu::Solver);
+
+    impl Solver {
+        pub fn new(mesh: Mesh, primitive: Vec<f64>) -> Self {
+            let mut solver = cpu::Solver::new(mesh, primitive);
+            solver.mode = ExecutionMode::OMP;
+            Self(solver)
+        }
+    }
+
+    impl Solve for Solver {
+        fn primitive(&self) -> Vec<f64> {
+            self.0.primitive()
+        }
+        fn primitive_to_conserved(&mut self) {
+            self.0.primitive_to_conserved()
+        }
+        fn advance_rk(
+            &mut self,
+            nu: f64,
+            eos: EquationOfState,
+            buffer: BufferZone,
+            masses: &[PointMass],
+            a: f64,
+            dt: f64,
+        ) {
+            self.0.advance_rk(nu, eos, buffer, masses, a, dt)
+        }
+        fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64 {
+            self.0.max_wavespeed(eos, masses)
         }
     }
 }

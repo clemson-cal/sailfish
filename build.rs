@@ -59,5 +59,7 @@ fn main() {
         .file("src/iso2d/mod.c")
         .flag("-Wno-unused-function")
         .flag("-Wno-unused-parameter")
+        .flag("-Xpreprocessor")
+        .flag("-fopenmp")
         .compile("iso2d_mod");
 }

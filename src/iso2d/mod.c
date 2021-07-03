@@ -540,10 +540,34 @@ void iso2d_primitive_to_conserved(
 {
     struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
     struct Patch conserved = patch(mesh, 3, 0, conserved_ptr);    
-    FOR_EACH(conserved) {
-        real *u = GET(conserved, i, j);
-        real *p = GET(primitive, i, j);
-        primitive_to_conserved(p, u);
+
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(conserved) {
+                real *u = GET(conserved, i, j);
+                real *p = GET(primitive, i, j);
+                primitive_to_conserved(p, u);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(conserved) {
+                real *u = GET(conserved, i, j);
+                real *p = GET(primitive, i, j);
+                primitive_to_conserved(p, u);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #ifdef __NVCC__
+            // TODO
+            #endif
+            break;
+        }
     }
 }
 
@@ -582,9 +606,29 @@ void iso2d_advance_rk(
     struct Patch primitive_rd = patch(mesh, 3, 2, primitive_rd_ptr);
     struct Patch primitive_wr = patch(mesh, 3, 2, primitive_wr_ptr);
 
-    FOR_EACH(conserved_rk)
-    {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(conserved_rk) {
+                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(conserved_rk) {
+                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #ifdef __NVCC__
+            // TODO
+            #endif
+            break;
+        }
     }
 }
 
