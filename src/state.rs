@@ -1,3 +1,4 @@
+use crate::cmdline::CommandLine;
 use crate::error;
 use crate::solver::Mesh;
 use serde::{Deserialize, Serialize};
@@ -27,6 +28,7 @@ impl RecurringTask {
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct State {
+    pub command_line: CommandLine,
     pub mesh: Mesh,
     pub setup_name: String,
     pub parameters: String,

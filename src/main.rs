@@ -78,10 +78,11 @@ fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dy
     }
 }
 
-fn new_state(resolution: u32, setup_name: &str, parameters: &str) -> Result<State, error::Error> {
+fn new_state(command_line: CommandLine, setup_name: &str, parameters: &str) -> Result<State, error::Error> {
     let setup = make_setup(setup_name, parameters)?;
-    let mesh = setup.mesh(resolution);
+    let mesh = setup.mesh(command_line.resolution);
     Ok(State {
+        command_line,
         mesh: mesh.clone(),
         iteration: 0,
         time: 0.0,
@@ -100,7 +101,7 @@ fn run() -> Result<(), error::Error> {
         if name.ends_with(".sf") {
             state::State::from_checkpoint(name, parameters)?
         } else {
-            new_state(cmdline.resolution, name, parameters)?
+            new_state(cmdline.clone(), name, parameters)?
         }
     } else {
         return Err(possible_setups_info());

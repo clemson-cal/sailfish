@@ -1,7 +1,7 @@
 use crate::error::Error;
 use std::fmt::Write;
 
-#[derive(Debug)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CommandLine {
     pub use_omp: bool,
     pub use_gpu: bool,
