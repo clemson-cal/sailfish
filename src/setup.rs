@@ -1,4 +1,4 @@
-use crate::solver::{BufferZone, EquationOfState, Mesh, PointMass};
+use crate::sailfish::{BufferZone, EquationOfState, Mesh, PointMass};
 use crate::error;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use error::Error::*;

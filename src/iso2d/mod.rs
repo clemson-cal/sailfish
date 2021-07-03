@@ -34,6 +34,41 @@ extern "C" {
     );
 }
 
+/// Primitive variable array in a solver using first, second, or third-order
+/// Runge-Kutta time stepping.
+pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
+    solver: &mut Box<dyn Solve>,
+    eos: EquationOfState,
+    buffer: BufferZone,
+    masses: M,
+    nu: f64,
+    rk_order: u32,
+    time: f64,
+    dt: f64)
+{
+    solver.primitive_to_conserved();
+
+    match rk_order {
+        1 => {
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt);
+        }
+        2 => {
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 0.5, dt);
+        }
+        3 => {
+            // t1 = a1 * tn + (1 - a1) * (tn + dt) =     tn +     (      dt) = tn +     dt [a1 = 0]
+            // t2 = a2 * tn + (1 - a2) * (t1 + dt) = 3/4 tn + 1/4 (tn + 2dt) = tn + 1/2 dt [a2 = 3/4]
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0. / 1., dt);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 3. / 4., dt);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.5 * dt), 1. / 3., dt);
+        }
+        _ => {
+            panic!("invalid RK order")
+        }
+    }
+}
+
 pub mod cpu {
     use super::*;
     pub struct Solver {

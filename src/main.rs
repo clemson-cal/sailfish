@@ -1,12 +1,11 @@
 use cmdline::CommandLine;
 use error::Error::*;
 use setup::Setup;
-use solver::cpu;
-use solver::Mesh;
-#[cfg(feature = "cuda")]
-use solver::gpu;
-use solver::omp;
-use solver::Solve;
+// #[cfg(feature = "cuda")]
+// use solver::gpu;
+// use solver::omp;
+// use solver::Solve;
+use sailfish::{Mesh, Solve};
 use state::State;
 use std::fmt::Write;
 use std::str::FromStr;
@@ -16,7 +15,6 @@ pub mod error;
 pub mod iso2d;
 pub mod sailfish;
 pub mod setup;
-pub mod solver;
 pub mod state;
 
 fn time_exec<F>(mut f: F) -> std::time::Duration
@@ -51,33 +49,34 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
     }
 }
 
-fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
-    match (cmdline.use_omp, cmdline.use_gpu) {
-        (false, false) => Box::new(cpu::Solver::new(mesh, primitive)),
-        (true, false) => {
-            #[cfg(feature = "omp")]
-            {
-                Box::new(omp::Solver::new(mesh, primitive))
-            }
-            #[cfg(not(feature = "omp"))]
-            {
-                panic!("omp feature not enabled")
-            }
-        }
-        (false, true) => {
-            #[cfg(feature = "cuda")]
-            {
-                Box::new(gpu::Solver::new(mesh, primitive))
-            }
-            #[cfg(not(feature = "cuda"))]
-            {
-                panic!("cuda feature not enabled")
-            }
-        }
-        (true, true) => {
-            panic!("omp and gpu cannot be enabled at once")
-        }
-    }
+fn make_solver(_cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
+    Box::new(iso2d::cpu::Solver::new(mesh, primitive))
+    // match (cmdline.use_omp, cmdline.use_gpu) {
+    //     (false, false) => Box::new(cpu::Solver::new(mesh, primitive)),
+    //     (true, false) => {
+    //         #[cfg(feature = "omp")]
+    //         {
+    //             Box::new(omp::Solver::new(mesh, primitive))
+    //         }
+    //         #[cfg(not(feature = "omp"))]
+    //         {
+    //             panic!("omp feature not enabled")
+    //         }
+    //     }
+    //     (false, true) => {
+    //         #[cfg(feature = "cuda")]
+    //         {
+    //             Box::new(gpu::Solver::new(mesh, primitive))
+    //         }
+    //         #[cfg(not(feature = "cuda"))]
+    //         {
+    //             panic!("cuda feature not enabled")
+    //         }
+    //     }
+    //     (true, true) => {
+    //         panic!("omp and gpu cannot be enabled at once")
+    //     }
+    // }
 }
 
 fn new_state(command_line: CommandLine, setup_name: &str, parameters: &str) -> Result<State, error::Error> {
@@ -134,10 +133,10 @@ fn run() -> Result<(), error::Error> {
                 let a_max = setup.max_signal_speed().unwrap();
                 let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
 
-                solver::advance(
+                iso2d::advance(
                     &mut solver,
-                    &eos,
-                    &buffer,
+                    eos,
+                    buffer,
                     |t| setup.masses(t),
                     nu,
                     rk_order,

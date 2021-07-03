@@ -41,6 +41,7 @@ pub enum BufferZone {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+#[derive(serde::Serialize, serde::Deserialize)]
 pub struct Mesh {
     /// Number of zones on the i-axis
     pub ni: i32,

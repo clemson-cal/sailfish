@@ -1,6 +1,6 @@
 use crate::cmdline::CommandLine;
 use crate::error;
-use crate::solver::Mesh;
+use crate::sailfish::Mesh;
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
