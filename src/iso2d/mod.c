@@ -323,45 +323,295 @@ _Pragma("omp parallel for") \
 
 struct Patch
 {
-    int num_fields;
     int start[2];
     int count[2];
     int jumps[2];
+    int num_fields;
     real *data;
 };
 
-static struct Patch patch(struct Mesh mesh, int num_guard, real *data)
+static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real *data)
 {
     struct Patch patch;
-    patch.num_fields = NCONS;
     patch.start[0] = -num_guard;
     patch.start[1] = -num_guard;
     patch.count[0] = mesh.ni + 2 * num_guard;
     patch.count[1] = mesh.nj + 2 * num_guard;
-    patch.jumps[0] = patch.num_fields * patch.count[1];
-    patch.jumps[1] = patch.num_fields;
+    patch.jumps[0] = num_fields * patch.count[1];
+    patch.jumps[1] = num_fields;
+    patch.num_fields = num_fields;
     patch.data = data;
     return patch;
 }
 
+
+// ============================ SCHEME ========================================
+// ============================================================================
+static __device__ void advance_rk_zone(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
+    real nu,
+    real a,
+    real dt,
+    int i,
+    int j)
+{
+    real dx = mesh.dx;
+    real dy = mesh.dy;
+    real xl = mesh.x0 + (i + 0.0) * dx;
+    real xc = mesh.x0 + (i + 0.5) * dx;
+    real xr = mesh.x0 + (i + 1.0) * dx;
+    real yl = mesh.y0 + (j + 0.0) * dy;
+    real yc = mesh.y0 + (j + 0.5) * dy;
+    real yr = mesh.y0 + (j + 1.0) * dy;
+
+    // ------------------------------------------------------------------------
+    //                 tj
+    //
+    //      +-------+-------+-------+
+    //      |       |       |       |
+    //      |  lr   |  rj   |   rr  |
+    //      |       |       |       |
+    //      +-------+-------+-------+
+    //      |       |       |       |
+    //  ki  |  li  -|+  c  -|+  ri  |  ti
+    //      |       |       |       |
+    //      +-------+-------+-------+
+    //      |       |       |       |
+    //      |  ll   |  lj   |   rl  |
+    //      |       |       |       |
+    //      +-------+-------+-------+
+    //
+    //                 kj
+    // ------------------------------------------------------------------------
+    real *un = GET(conserved_rk, i, j);
+    real *pcc = GET(primitive_rd, i, j);
+    real *pli = GET(primitive_rd, i - 1, j);
+    real *pri = GET(primitive_rd, i + 1, j);
+    real *plj = GET(primitive_rd, i, j - 1);
+    real *prj = GET(primitive_rd, i, j + 1);
+    real *pki = GET(primitive_rd, i - 2, j);
+    real *pti = GET(primitive_rd, i + 2, j);
+    real *pkj = GET(primitive_rd, i, j - 2);
+    real *ptj = GET(primitive_rd, i, j + 2);
+    real *pll = GET(primitive_rd, i - 1, j - 1);
+    real *plr = GET(primitive_rd, i - 1, j + 1);
+    real *prl = GET(primitive_rd, i + 1, j - 1);
+    real *prr = GET(primitive_rd, i + 1, j + 1);
+
+    real plip[NCONS];
+    real plim[NCONS];
+    real prip[NCONS];
+    real prim[NCONS];
+    real pljp[NCONS];
+    real pljm[NCONS];
+    real prjp[NCONS];
+    real prjm[NCONS];
+
+    real gxli[NCONS];
+    real gxri[NCONS];
+    real gyli[NCONS];
+    real gyri[NCONS];
+    real gxlj[NCONS];
+    real gxrj[NCONS];
+    real gylj[NCONS];
+    real gyrj[NCONS];
+    real gxcc[NCONS];
+    real gycc[NCONS];
+
+    plm_gradient(pki, pli, pcc, gxli);
+    plm_gradient(pli, pcc, pri, gxcc);
+    plm_gradient(pcc, pri, pti, gxri);
+    plm_gradient(pkj, plj, pcc, gylj);
+    plm_gradient(plj, pcc, prj, gycc);
+    plm_gradient(pcc, prj, ptj, gyrj);
+    plm_gradient(pll, pli, plr, gyli);
+    plm_gradient(prl, pri, prr, gyri);
+    plm_gradient(pll, plj, prl, gxlj);
+    plm_gradient(plr, prj, prr, gxrj);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        plim[q] = pli[q] + 0.5 * gxli[q];
+        plip[q] = pcc[q] - 0.5 * gxcc[q];
+        prim[q] = pcc[q] + 0.5 * gxcc[q];
+        prip[q] = pri[q] - 0.5 * gxri[q];
+
+        pljm[q] = plj[q] + 0.5 * gylj[q];
+        pljp[q] = pcc[q] - 0.5 * gycc[q];
+        prjm[q] = pcc[q] + 0.5 * gycc[q];
+        prjp[q] = prj[q] - 0.5 * gyrj[q];
+    }
+
+    real fli[NCONS];
+    real fri[NCONS];
+    real flj[NCONS];
+    real frj[NCONS];
+    real ucc[NCONS];
+
+    real cs2li = sound_speed_squared(&eos, xl, yc, masses, num_masses);
+    real cs2ri = sound_speed_squared(&eos, xr, yc, masses, num_masses);
+    real cs2lj = sound_speed_squared(&eos, xc, yl, masses, num_masses);
+    real cs2rj = sound_speed_squared(&eos, xc, yr, masses, num_masses);
+
+    riemann_hlle(plim, plip, fli, cs2li, 0);
+    riemann_hlle(prim, prip, fri, cs2ri, 0);
+    riemann_hlle(pljm, pljp, flj, cs2lj, 1);
+    riemann_hlle(prjm, prjp, frj, cs2rj, 1);
+
+    if (nu > 0.0)
+    {
+        real sli[4];
+        real sri[4];
+        real slj[4];
+        real srj[4];
+        real scc[4];
+
+        shear_strain(gxli, gyli, dx, dy, sli);
+        shear_strain(gxri, gyri, dx, dy, sri);
+        shear_strain(gxlj, gylj, dx, dy, slj);
+        shear_strain(gxrj, gyrj, dx, dy, srj);
+        shear_strain(gxcc, gycc, dx, dy, scc);
+
+        fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+        fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+        fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+        fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+        flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+        flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+        frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+        frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+    }
+
+    primitive_to_conserved(pcc, ucc);
+    buffer_source_term(&buffer, xc, yc, dt, ucc);
+    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc[0], ucc);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
+    }
+    real *pout = GET(primitive_wr, i, j);
+    conserved_to_primitive(ucc, pout);
+}
+
+static __device__ real wavespeed_zone(
+    struct Mesh mesh,
+    struct EquationOfState eos,
+    struct Patch primitive,
+    struct PointMass *masses,
+    int num_masses,
+    int i,
+    int j)
+{
+    real *pc = GET(primitive, i, j);
+    real x = mesh.x0 + (i + 0.5) * mesh.dx;
+    real y = mesh.y0 + (j + 0.5) * mesh.dy;
+    real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
+    real a = primitive_max_wavespeed(pc, cs2);
+    return a;
+}
+
+
 // ============================ PUBLIC API ====================================
 // ============================================================================
+
 
 /**
  * Converts an array of primitive data to an array of conserved data. The
  * array index space must follow the descriptions below.
- * @param mesh          The mesh (ni, nj)
- * @param primitive_ptr Array of primitive data: start(-2, -2) count(ni + 4, nj + 4)
- * @param conserved_ptr Array of conserved data: start(0, 0) count(ni, nj)
- * @param mode          The execution mode
+ * @param mesh               The mesh (ni, nj)
+ * @param primitive_ptr[in]  Start(-2, -2) count(ni + 4, nj + 4)
+ * @param conserved_ptr[out] Start(0, 0) count(ni, nj)
+ * @param mode               The execution mode
  */
-void iso2d_primitive_to_conserved(struct Mesh mesh, real *primitive_ptr, real *conserved_ptr, enum ExecutionMode mode)
+void iso2d_primitive_to_conserved(
+    struct Mesh mesh,
+    real *primitive_ptr,
+    real *conserved_ptr,
+    enum ExecutionMode mode)
 {
-    struct Patch primitive = patch(mesh, 2, primitive_ptr);
-    struct Patch conserved = patch(mesh, 0, conserved_ptr);    
+    struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
+    struct Patch conserved = patch(mesh, 3, 0, conserved_ptr);    
     FOR_EACH(conserved) {
         real *u = GET(conserved, i, j);
         real *p = GET(primitive, i, j);
         primitive_to_conserved(p, u);
+    }
+}
+
+
+/**
+ * Updates an array of primitive data by advancing it a single Runge-Kutta
+ * step.
+ * @param mesh             The mesh (ni, nj)
+ * @param conserved_rk_ptr [description]
+ * @param primitive_rd_ptr [description]
+ * @param primitive_wr_ptr [description]
+ * @param eos              [description]
+ * @param buffer           [description]
+ * @param masses           [description]
+ * @param num_masses       [description]
+ * @param nu               [description]
+ * @param a                [description]
+ * @param dt               [description]
+ */
+void iso2d_advance_rk(
+    struct Mesh mesh,
+    real *conserved_rk_ptr,
+    real *primitive_rd_ptr,
+    real *primitive_wr_ptr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
+    real nu,
+    real a,
+    real dt,
+    enum ExecutionMode mode)
+{
+    struct Patch conserved_rk = patch(mesh, 3, 0, conserved_rk_ptr);
+    struct Patch primitive_rd = patch(mesh, 3, 2, primitive_rd_ptr);
+    struct Patch primitive_wr = patch(mesh, 3, 2, primitive_wr_ptr);
+
+    FOR_EACH(conserved_rk)
+    {
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+    }
+}
+
+
+/**
+ * [iso2d_wavespeed description]
+ * @param  mesh          [description]
+ * @param  primitive_ptr [description]
+ * @param  wavespeed_ptr [description]
+ * @param  eos           [description]
+ * @param  masses        [description]
+ * @param  num_masses    [description]
+ * @param  mode          [description]
+ * @return               [description]
+ */
+void iso2d_wavespeed(
+    struct Mesh mesh,
+    real *primitive_ptr,
+    real *wavespeed_ptr,
+    struct EquationOfState eos,
+    struct PointMass *masses,
+    int num_masses,
+    enum ExecutionMode mode)
+{
+    struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
+    struct Patch wavespeed = patch(mesh, 1, 0, wavespeed_ptr);
+
+    FOR_EACH(wavespeed) {    
+        wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
     }
 }

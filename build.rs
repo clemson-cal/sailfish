@@ -58,5 +58,6 @@ fn main() {
     cc::Build::new()
         .file("src/iso2d/mod.c")
         .flag("-Wno-unused-function")
+        .flag("-Wno-unused-parameter")
         .compile("iso2d_mod");
 }
