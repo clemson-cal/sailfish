@@ -200,6 +200,7 @@ pub mod gpu {
         primitive1: DeviceVec<f64>,
         primitive2: DeviceVec<f64>,
         conserved0: DeviceVec<f64>,
+        wavespeeds: DeviceVec<f64>,
     }
 
     impl Solver {
@@ -213,6 +214,7 @@ pub mod gpu {
                 primitive1: DeviceVec::from(&primitive),
                 primitive2: DeviceVec::from(&primitive),
                 conserved0: DeviceVec::from(&vec![0.0; mesh.num_total_zones() * 3]),
+                wavespeeds: DeviceVec::from(&vec![0.0; mesh.num_total_zones()]),
             }
         }
     }
@@ -261,25 +263,21 @@ pub mod gpu {
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
         fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64 {
-            // use gpu_mem::Reduce;
-
+            use gpu_mem::Reduce;
             let masses = DeviceVec::from(masses);
-            let mut wavespeeds = DeviceVec::from(&vec![0.0; self.mesh.num_total_zones()]);
 
             unsafe {
                 iso2d_wavespeed(
                     self.mesh,
                     self.primitive1.as_device_ptr(),
-                    wavespeeds.as_mut_device_ptr(),
+                    self.wavespeeds.as_device_ptr() as *mut f64,
                     eos,
                     masses.as_device_ptr(),
                     masses.len() as i32,
                     ExecutionMode::GPU,
                 )
             };
-            // wavespeeds.maximum().unwrap()
-            let wavespeeds = Vec::from(&wavespeeds);
-            wavespeeds.iter().cloned().fold(0.0, f64::max)
+            self.wavespeeds.maximum().unwrap()
         }
     }
 }
