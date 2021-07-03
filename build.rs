@@ -45,4 +45,18 @@ fn main() {
 
     #[cfg(feature = "cuda")]
     println!("cargo:rustc-link-lib=dylib=cudart");
+
+
+
+
+
+
+
+
+
+
+    cc::Build::new()
+        .file("src/iso2d/mod.c")
+        .flag("-Wno-unused-function")
+        .compile("iso2d_mod");
 }
