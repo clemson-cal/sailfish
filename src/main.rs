@@ -50,7 +50,8 @@ fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dy
     if cmdline.use_gpu {
         cfg_if! {
             if #[cfg(feature = "cuda")] {
-                Box::new(iso2d::gpu::Solver::new(mesh, primitive))
+                panic!()
+                // Box::new(iso2d::gpu::Solver::new(mesh, primitive))
             } else {
                 panic!()
             }

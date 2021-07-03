@@ -7,6 +7,9 @@
 #ifndef __NVCC__
 #define __device__
 #define __host__
+#define EXTERN_C
+#else
+#define EXTERN_C extern "C"
 #endif
 
 
@@ -26,7 +29,7 @@
 #define sign(x) copysign(1.0, x)
 #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
 
-static __device__ real plm_gradient_scalar(real yl, real y0, real yr)
+static __host__ __device__ real plm_gradient_scalar(real yl, real y0, real yr)
 {
     real a = (y0 - yl) * PLM_THETA;
     real b = (yr - yl) * 0.5;
@@ -34,7 +37,7 @@ static __device__ real plm_gradient_scalar(real yl, real y0, real yr)
     return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
 }
 
-static __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
+static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 {
     for (int q = 0; q < NCONS; ++q)
     {
@@ -45,7 +48,7 @@ static __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 
 // ============================ GRAVITY =======================================
 // ============================================================================
-static __device__ real gravitational_potential(
+static __host__ __device__ real gravitational_potential(
     struct PointMass *masses,
     int num_masses,
     real x1,
@@ -70,7 +73,7 @@ static __device__ real gravitational_potential(
     return phi;
 }
 
-static __device__ void point_mass_source_term(
+static __host__ __device__ void point_mass_source_term(
     struct PointMass *mass,
     real x1,
     real y1,
@@ -104,7 +107,7 @@ static __device__ void point_mass_source_term(
     delta_cons[2] = dt * fy;
 }
 
-static __device__ void point_masses_source_term(
+static __host__ __device__ void point_masses_source_term(
     struct PointMass* masses,
     int num_masses,
     real x1,
@@ -128,7 +131,7 @@ static __device__ void point_masses_source_term(
 
 // ============================ EOS AND BUFFER ================================
 // ============================================================================
-static __device__ real sound_speed_squared(
+static __host__ __device__ real sound_speed_squared(
     struct EquationOfState *eos,
     real x,
     real y,
@@ -147,7 +150,7 @@ static __device__ real sound_speed_squared(
     return 0.0;
 }
 
-static __device__ void buffer_source_term(
+static __host__ __device__ void buffer_source_term(
     struct BufferZone *buffer,
     real xc,
     real yc,
@@ -190,7 +193,7 @@ static __device__ void buffer_source_term(
     }
 }
 
-static __device__ void shear_strain(const real *gx, const real *gy, real dx, real dy, real *s)
+static __host__ __device__ void shear_strain(const real *gx, const real *gy, real dx, real dy, real *s)
 {
     real sxx = 4.0 / 3.0 * gx[1] / dx - 2.0 / 3.0 * gy[2] / dy;
     real syy =-2.0 / 3.0 * gx[1] / dx + 4.0 / 3.0 * gy[2] / dy;
@@ -205,7 +208,7 @@ static __device__ void shear_strain(const real *gx, const real *gy, real dx, rea
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __device__ void conserved_to_primitive(const real *cons, real *prim)
+static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
     real rho = cons[0];
     real px = cons[1];
@@ -218,7 +221,7 @@ static __device__ void conserved_to_primitive(const real *cons, real *prim)
     prim[2] = vy;
 }
 
-static __device__ void primitive_to_conserved(const real *prim, real *cons)
+static __host__ __device__ void primitive_to_conserved(const real *prim, real *cons)
 {
     real rho = prim[0];
     real vx = prim[1];
@@ -231,7 +234,7 @@ static __device__ void primitive_to_conserved(const real *prim, real *cons)
     cons[2] = py;
 }
 
-static __device__ real primitive_to_velocity(const real *prim, int direction)
+static __host__ __device__ real primitive_to_velocity(const real *prim, int direction)
 {
     switch (direction)
     {
@@ -241,7 +244,7 @@ static __device__ real primitive_to_velocity(const real *prim, int direction)
     }
 }
 
-static __device__ void primitive_to_flux(
+static __host__ __device__ void primitive_to_flux(
     const real *prim,
     const real *cons,
     real *flux,
@@ -257,7 +260,7 @@ static __device__ void primitive_to_flux(
     flux[2] = vn * cons[2] + pressure * (direction == 1);
 }
 
-static __device__ void primitive_to_outer_wavespeeds(
+static __host__ __device__ void primitive_to_outer_wavespeeds(
     const real *prim,
     real *wavespeeds,
     real cs2,
@@ -269,7 +272,7 @@ static __device__ void primitive_to_outer_wavespeeds(
     wavespeeds[1] = vn + cs;
 }
 
-static __device__ real primitive_max_wavespeed(const real *prim, real cs2)
+static __host__ __device__ real primitive_max_wavespeed(const real *prim, real cs2)
 {
     real cs = sqrt(cs2);
     real vx = prim[1];
@@ -279,7 +282,7 @@ static __device__ real primitive_max_wavespeed(const real *prim, real cs2)
     return max2(ax, ay);
 }
 
-static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
+static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
 {
     real ul[NCONS];
     real ur[NCONS];
@@ -348,7 +351,7 @@ static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real 
 // ============================ SCHEME ========================================
 // ============================================================================
 
-static __device__ void primitive_to_conserved_zone(
+static __host__ __device__ void primitive_to_conserved_zone(
         struct Patch primitive,
         struct Patch conserved,
         int i,
@@ -359,7 +362,7 @@ static __device__ void primitive_to_conserved_zone(
     primitive_to_conserved(p, u);
 }
 
-static __device__ void advance_rk_zone(
+static __host__ __device__ void advance_rk_zone(
     struct Mesh mesh,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
@@ -514,7 +517,7 @@ static __device__ void advance_rk_zone(
     conserved_to_primitive(ucc, pout);
 }
 
-static __device__ real wavespeed_zone(
+static __host__ __device__ real wavespeed_zone(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
@@ -536,7 +539,10 @@ static __device__ real wavespeed_zone(
 // ============================================================================
 #ifdef __NVCC__
 
-static void __global__ primitive_to_conserved_kernel(struct Patch primitive, struct Patch conserved)
+static void __global__ primitive_to_conserved_kernel(
+    struct Mesh mesh,
+    struct Patch primitive,
+    struct Patch conserved)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -547,7 +553,7 @@ static void __global__ primitive_to_conserved_kernel(struct Patch primitive, str
     }
 }
 
-static void advance_rk_kernel(
+static void __global__ advance_rk_kernel(
     struct Mesh mesh,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
@@ -565,7 +571,7 @@ static void advance_rk_kernel(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        primitive_to_conserved_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
     }
 }
 
@@ -600,7 +606,7 @@ static void __global__ wavespeed_kernel(
  * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [3]
  * @param mode               The execution mode
  */
-void iso2d_primitive_to_conserved(
+EXTERN_C void iso2d_primitive_to_conserved(
     struct Mesh mesh,
     real *primitive_ptr,
     real *conserved_ptr,
@@ -630,7 +636,7 @@ void iso2d_primitive_to_conserved(
             #ifdef __NVCC__
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-            primitive_to_conserved_kernel<<<bd, bs>>>(primitive, conserved);
+            primitive_to_conserved_kernel<<<bd, bs>>>(mesh, primitive, conserved);
             #endif
             break;
         }
@@ -654,7 +660,7 @@ void iso2d_primitive_to_conserved(
  * @param dt                    The time step
  * @param mode                  The execution mode
  */
-void iso2d_advance_rk(
+EXTERN_C void iso2d_advance_rk(
     struct Mesh mesh,
     real *conserved_rk_ptr,
     real *primitive_rd_ptr,
@@ -711,7 +717,7 @@ void iso2d_advance_rk(
  * @param num_masses          The number of point masses
  * @param mode                The execution mode
  */
-void iso2d_wavespeed(
+EXTERN_C void iso2d_wavespeed(
     struct Mesh mesh,
     real *primitive_ptr,
     real *wavespeed_ptr,
