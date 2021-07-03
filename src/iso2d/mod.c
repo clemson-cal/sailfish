@@ -708,7 +708,7 @@ EXTERN_C void iso2d_advance_rk(
 
 
 /**
- * [iso2d_wavespeed description]
+ * Fill a buffer with the maximum wavespeed in each zone.
  * @param  mesh               The mesh [ni,     nj]
  * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
  * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
