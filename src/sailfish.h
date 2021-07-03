@@ -6,15 +6,6 @@ enum ExecutionMode {
     GPU,
 };
 
-struct Mesh
-{
-    int ni, nj;
-    real x0, y0;
-    real dx, dy;
-};
-#define MESH_X(m, i) (m.x0 + (i) * m.dx)
-#define MESH_Y(m, i) (m.y0 + (j) * m.dy)
-
 struct PointMass
 {
     real x;
@@ -83,3 +74,12 @@ struct BufferZone
         } keplerian;
     };
 };
+
+struct Mesh
+{
+    int ni, nj;
+    real x0, y0;
+    real dx, dy;
+};
+#define MESH_X(m, i) (m.x0 + (i) * m.dx)
+#define MESH_Y(m, i) (m.y0 + (j) * m.dy)
