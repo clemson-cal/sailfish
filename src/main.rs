@@ -1,18 +1,17 @@
-use error::Error::*;
-use setup::Setup;
-use solver::cpu;
-#[cfg(feature = "cuda")]
-use solver::gpu;
-use solver::omp;
-use solver::Solve;
-use state::State;
+use crate::cmdline::CommandLine;
+use crate::error::Error::*;
+use crate::sailfish::{Mesh, Solve};
+use crate::setup::Setup;
+use crate::state::State;
+use cfg_if::cfg_if;
 use std::fmt::Write;
 use std::str::FromStr;
 
 pub mod cmdline;
 pub mod error;
+pub mod iso2d;
+pub mod sailfish;
 pub mod setup;
-pub mod solver;
 pub mod state;
 
 fn time_exec<F>(mut f: F) -> std::time::Duration
@@ -25,7 +24,7 @@ where
 }
 
 fn split_at_first_colon(string: &str) -> (&str, &str) {
-    let mut a = string.splitn(2, ":");
+    let mut a = string.splitn(2, ':');
     let n = a.next().unwrap_or("");
     let p = a.next().unwrap_or("");
     (n, p)
@@ -47,86 +46,94 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
     }
 }
 
-fn new_state(resolution: u32, setup_name: &str, parameters: &str) -> Result<State, error::Error> {
+fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
+    if cmdline.use_gpu {
+        cfg_if! {
+            if #[cfg(feature = "cuda")] {
+                Box::new(iso2d::gpu::Solver::new(mesh, primitive))
+            } else {
+                panic!()
+            }
+        }
+    }
+    else if cmdline.use_omp {
+        cfg_if! {
+            if #[cfg(feature = "omp")] {
+                Box::new(iso2d::omp::Solver::new(mesh, primitive))
+            } else {
+                panic!()
+            }
+        }
+    } else {
+        Box::new(iso2d::cpu::Solver::new(mesh, primitive))
+    }
+}
+
+fn new_state(
+    command_line: CommandLine,
+    setup_name: &str,
+    parameters: &str,
+) -> Result<State, error::Error> {
     let setup = make_setup(setup_name, parameters)?;
-    let mesh = setup.mesh(resolution);
-    Ok(State {
+    let mesh = setup.mesh(command_line.resolution);
+
+    let state = State {
+        command_line,
+        mesh: mesh.clone(),
         iteration: 0,
         time: 0.0,
         primitive: setup.initial_primitive_vec(&mesh),
         checkpoint: state::RecurringTask::new(),
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
-    })
+    };
+    Ok(state)
 }
 
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
 
-    let (setup, mut state): (Box<dyn Setup>, State) = if let Some(setup_string) = cmdline.setup {
+    let mut state = if let Some(ref setup_string) = cmdline.setup {
         let (name, parameters) = split_at_first_colon(&setup_string);
         if name.ends_with(".sf") {
-            let state = state::State::from_checkpoint(name, parameters)?;
-            let setup = make_setup(&state.setup_name, &state.parameters)?;
-            (setup, state)
+            state::State::from_checkpoint(name, parameters)?
         } else {
-            let state = new_state(cmdline.resolution, name, parameters)?;
-            let setup = make_setup(name, parameters)?;
-            (setup, state)
+            new_state(cmdline.clone(), name, parameters)?
         }
     } else {
         return Err(possible_setups_info());
     };
-
-    let mesh = setup.mesh(cmdline.resolution);
+    let setup = make_setup(&state.setup_name, &state.parameters)?;
+    let mesh = state.mesh.clone();
     let nu = setup.viscosity().unwrap_or(0.0);
     let eos = setup.equation_of_state();
     let buffer = setup.buffer_zone();
-    // let v_max = setup.max_signal_speed().unwrap();
     let cfl = cmdline.cfl_number;
     let fold = cmdline.fold;
     let rk_order = cmdline.rk_order;
-    // let dt = f64::min(mesh.dx, mesh.dy) / v_max * cfl;
+    let mut mzps_log = vec![];
+    let mut solver = make_solver(&cmdline, mesh.clone(), state.primitive.clone());
 
     setup.print_parameters();
 
-    let primitive = setup.initial_primitive_vec(&mesh);
-    let mut mzps_log = vec![];
-    let mut solver: Box<dyn Solve> = match (cmdline.use_omp, cmdline.use_gpu) {
-        (false, false) => Box::new(cpu::Solver::new(mesh.clone(), primitive)),
-        (true, false) => Box::new(omp::Solver::new(mesh.clone(), primitive)),
-        (false, true) => {
-            #[cfg(feature = "cuda")]
-            {
-                Box::new(gpu::Solver::new(mesh.clone(), primitive))
-            }
-            #[cfg(not(feature = "cuda"))]
-            {
-                panic!("cuda feature not enabled")
-            }
-        }
-        (true, true) => {
-            panic!("omp and gpu cannot be enabled at once")
-        }
-    };
-
     while state.time < cmdline.end_time {
-        if state.checkpoint.last_time.is_none() || 
-           state.time >= state.checkpoint.last_time.unwrap() + cmdline.checkpoint_interval {
+        if state.checkpoint.last_time.is_none()
+            || state.time >= state.checkpoint.last_time.unwrap() + cmdline.checkpoint_interval
+        {
+            state.set_primitive(solver.primitive());
             state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)?;
         }
-    
+
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                let a_max = solver.max_wavespeed(&eos, &setup.masses(state.time));
+                let a_max = solver.max_wavespeed(eos, &setup.masses(state.time));
+                // let a_max = setup.max_signal_speed().unwrap();
                 let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
 
-                println!("{}", dt);
-
-                solver::advance(
+                iso2d::advance(
                     &mut solver,
-                    &eos,
-                    &buffer,
+                    eos,
+                    buffer,
                     |t| setup.masses(t),
                     nu,
                     rk_order,
@@ -146,6 +153,7 @@ fn run() -> Result<(), error::Error> {
             mzps_log.last().unwrap()
         );
     }
+    state.set_primitive(solver.primitive());
     state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)
 }
 

@@ -6,15 +6,18 @@ authors = ["J. Zrake <jzrake@clemson.edu>", "A. MacFadyen <macfadyen@nyu.edu>"]
 description = "fast code to simulate binary accretion"
 
 [dependencies]
+cfg-if = "1.0"
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
 kind-config = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 rmp-serde = "0.15"
+gpu_mem = { path = "gpu_mem", optional = true }
 
 [build-dependencies]
+cfg-if = "1.0"
 cc = "1.0"
 
 [features]
 default = ["omp"]
 omp = []
-cuda = []
+cuda = ["gpu_mem"]

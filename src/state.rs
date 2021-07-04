@@ -1,4 +1,6 @@
+use crate::cmdline::CommandLine;
 use crate::error;
+use crate::sailfish::Mesh;
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
@@ -8,6 +10,12 @@ use std::io::Write;
 pub struct RecurringTask {
     pub number: u64,
     pub last_time: Option<f64>,
+}
+
+impl Default for RecurringTask {
+    fn default() -> Self {
+        Self::new()
+    }
 }
 
 impl RecurringTask {
@@ -26,6 +34,8 @@ impl RecurringTask {
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct State {
+    pub command_line: CommandLine,
+    pub mesh: Mesh,
     pub setup_name: String,
     pub parameters: String,
     pub primitive: Vec<f64>,
@@ -44,11 +54,19 @@ impl State {
         let mut state: State = rmp_serde::from_read_ref(&bytes)
             .map_err(|e| error::Error::InvalidCheckpoint(format!("{}", e)))?;
 
-        state.parameters += ":";
-        state.parameters += new_parameters;
+        if !state.parameters.is_empty() && !new_parameters.is_empty() {
+            state.parameters += ":";
+        }
+        state.parameters += new_parameters;            
 
         println!("read {}", filename);
         Ok(state)
+    }
+
+    pub fn set_primitive(&mut self, primitive: Vec<f64>) {
+        assert!(primitive.len() == self.primitive.len(),
+            "new and old primitive array sizes must match");
+        self.primitive = primitive;
     }
 
     pub fn write_checkpoint(

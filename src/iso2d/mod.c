@@ -1,5 +1,5 @@
 #include <math.h>
-#include "patch.h"
+#include "../sailfish.h"
 
 
 // ============================ COMPAT ========================================
@@ -7,6 +7,9 @@
 #ifndef __NVCC__
 #define __device__
 #define __host__
+#define EXTERN_C
+#else
+#define EXTERN_C extern "C"
 #endif
 
 
@@ -26,7 +29,7 @@
 #define sign(x) copysign(1.0, x)
 #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
 
-static __device__ real plm_gradient_scalar(real yl, real y0, real yr)
+static __host__ __device__ real plm_gradient_scalar(real yl, real y0, real yr)
 {
     real a = (y0 - yl) * PLM_THETA;
     real b = (yr - yl) * 0.5;
@@ -34,7 +37,7 @@ static __device__ real plm_gradient_scalar(real yl, real y0, real yr)
     return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
 }
 
-static __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
+static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 {
     for (int q = 0; q < NCONS; ++q)
     {
@@ -43,93 +46,9 @@ static __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 }
 
 
-// ============================ MESH ==========================================
-// ============================================================================
-struct Mesh
-{
-    int ni, nj;
-    real x0, y0;
-    real dx, dy;
-};
-#define X(m, i) (m.x0 + (i) * m.dx)
-#define Y(m, i) (m.y0 + (j) * m.dy)
-
-
-// ============================ PHYSICS =======================================
-// ============================================================================
-struct PointMass
-{
-    real x;
-    real y;
-    real vx;
-    real vy;
-    real mass;
-    real rate;
-    real radius;
-};
-
-enum EquationOfStateType
-{
-    Isothermal,
-    LocallyIsothermal,
-    GammaLaw,
-};
-
-struct EquationOfState
-{
-    enum EquationOfStateType type;
-
-    union
-    {
-        struct
-        {
-            real sound_speed_squared;
-        } isothermal;
-
-        struct
-        {
-            real mach_number_squared;
-        } locally_isothermal;
-
-        struct
-        {
-            real gamma_law_index;
-        } gamma_law;
-    };
-};
-
-enum BufferZoneType
-{
-    None,
-    Keplerian,
-};
-
-struct BufferZone
-{
-    enum BufferZoneType type;
-
-    union
-    {
-        struct
-        {
-
-        } none;
-
-        struct
-        {
-            real surface_density;
-            real central_mass;
-            real driving_rate;
-            real outer_radius;
-            real onset_width;
-        } keplerian;
-    };
-};
-
-
 // ============================ GRAVITY =======================================
 // ============================================================================
-static __device__ real gravitational_potential(
+static __host__ __device__ real gravitational_potential(
     struct PointMass *masses,
     int num_masses,
     real x1,
@@ -154,7 +73,7 @@ static __device__ real gravitational_potential(
     return phi;
 }
 
-static __device__ void point_mass_source_term(
+static __host__ __device__ void point_mass_source_term(
     struct PointMass *mass,
     real x1,
     real y1,
@@ -188,7 +107,7 @@ static __device__ void point_mass_source_term(
     delta_cons[2] = dt * fy;
 }
 
-static __device__ void point_masses_source_term(
+static __host__ __device__ void point_masses_source_term(
     struct PointMass* masses,
     int num_masses,
     real x1,
@@ -212,7 +131,7 @@ static __device__ void point_masses_source_term(
 
 // ============================ EOS AND BUFFER ================================
 // ============================================================================
-static __device__ real sound_speed_squared(
+static __host__ __device__ real sound_speed_squared(
     struct EquationOfState *eos,
     real x,
     real y,
@@ -231,7 +150,7 @@ static __device__ real sound_speed_squared(
     return 0.0;
 }
 
-static __device__ void buffer_source_term(
+static __host__ __device__ void buffer_source_term(
     struct BufferZone *buffer,
     real xc,
     real yc,
@@ -274,7 +193,7 @@ static __device__ void buffer_source_term(
     }
 }
 
-static __device__ void shear_strain(const real *gx, const real *gy, real dx, real dy, real *s)
+static __host__ __device__ void shear_strain(const real *gx, const real *gy, real dx, real dy, real *s)
 {
     real sxx = 4.0 / 3.0 * gx[1] / dx - 2.0 / 3.0 * gy[2] / dy;
     real syy =-2.0 / 3.0 * gx[1] / dx + 4.0 / 3.0 * gy[2] / dy;
@@ -289,7 +208,7 @@ static __device__ void shear_strain(const real *gx, const real *gy, real dx, rea
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __device__ void conserved_to_primitive(const real *cons, real *prim)
+static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
     real rho = cons[0];
     real px = cons[1];
@@ -302,7 +221,7 @@ static __device__ void conserved_to_primitive(const real *cons, real *prim)
     prim[2] = vy;
 }
 
-static __device__ void primitive_to_conserved(const real *prim, real *cons)
+static __host__ __device__ void primitive_to_conserved(const real *prim, real *cons)
 {
     real rho = prim[0];
     real vx = prim[1];
@@ -315,7 +234,7 @@ static __device__ void primitive_to_conserved(const real *prim, real *cons)
     cons[2] = py;
 }
 
-static __device__ real primitive_to_velocity(const real *prim, int direction)
+static __host__ __device__ real primitive_to_velocity(const real *prim, int direction)
 {
     switch (direction)
     {
@@ -325,7 +244,7 @@ static __device__ real primitive_to_velocity(const real *prim, int direction)
     }
 }
 
-static __device__ void primitive_to_flux(
+static __host__ __device__ void primitive_to_flux(
     const real *prim,
     const real *cons,
     real *flux,
@@ -341,7 +260,7 @@ static __device__ void primitive_to_flux(
     flux[2] = vn * cons[2] + pressure * (direction == 1);
 }
 
-static __device__ void primitive_to_outer_wavespeeds(
+static __host__ __device__ void primitive_to_outer_wavespeeds(
     const real *prim,
     real *wavespeeds,
     real cs2,
@@ -353,7 +272,7 @@ static __device__ void primitive_to_outer_wavespeeds(
     wavespeeds[1] = vn + cs;
 }
 
-static __device__ real primitive_max_wavespeed(const real *prim, real cs2)
+static __host__ __device__ real primitive_max_wavespeed(const real *prim, real cs2)
 {
     real cs = sqrt(cs2);
     real vx = prim[1];
@@ -363,7 +282,7 @@ static __device__ real primitive_max_wavespeed(const real *prim, real cs2)
     return max2(ax, ay);
 }
 
-static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
+static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
 {
     real ul[NCONS];
     real ur[NCONS];
@@ -389,55 +308,61 @@ static __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, 
 }
 
 
-// ============================ PUBLIC API ====================================
+// ============================ PATCH =========================================
 // ============================================================================
-#ifdef API_MODE_CPU
+#define FOR_EACH(p) \
+    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define FOR_EACH_OMP(p) \
+_Pragma("omp parallel for") \
+    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define CONTAINS(p, q) \
+        (p.start[0] <= q.start[0] && p.start[0] + p.count[0] >= q.start[0] + q.count[0]) && \
+        (p.start[1] <= q.start[1] && p.start[1] + p.count[1] >= q.start[1] + q.count[1])
+#define GET(p, i, j) (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
+#define ELEMENTS(p) (p.count[0] * p.count[1] * p.num_fields)
+#define BYTES(p) (ELEMENTS(p) * sizeof(real))
 
-void primitive_to_conserved_cpu(struct Patch primitive, struct Patch conserved)
+struct Patch
 {
-    FOR_EACH(conserved) {
-        real *u = GET(conserved, i, j);
-        real *p = GET(primitive, i, j);
-        primitive_to_conserved(p, u);
-    }
+    int start[2];
+    int count[2];
+    int jumps[2];
+    int num_fields;
+    real *data;
+};
+
+static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real *data)
+{
+    struct Patch patch;
+    patch.start[0] = -num_guard;
+    patch.start[1] = -num_guard;
+    patch.count[0] = mesh.ni + 2 * num_guard;
+    patch.count[1] = mesh.nj + 2 * num_guard;
+    patch.jumps[0] = num_fields * patch.count[1];
+    patch.jumps[1] = num_fields;
+    patch.num_fields = num_fields;
+    patch.data = data;
+    return patch;
 }
 
-#elif API_MODE_OMP
 
-void primitive_to_conserved_omp(struct Patch primitive, struct Patch conserved)
+// ============================ SCHEME ========================================
+// ============================================================================
+
+static __host__ __device__ void primitive_to_conserved_zone(
+        struct Patch primitive,
+        struct Patch conserved,
+        int i,
+        int j)
 {
-    FOR_EACH_OMP(conserved) {
-        real *u = GET(conserved, i, j);
-        real *p = GET(primitive, i, j);
-        primitive_to_conserved(p, u);
-    }
+    real *p = GET(primitive, i, j);
+    real *u = GET(conserved, i, j);
+    primitive_to_conserved(p, u);
 }
 
-#elif API_MODE_GPU
-
-static void __global__ kernel(struct Patch primitive, struct Patch conserved)
-{
-    int i = threadIdx.y + blockIdx.y * blockDim.y;
-    int j = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (i < conserved.count[0] && j < conserved.count[1])
-    {
-        real *p = GET(primitive, i, j);
-        real *u = GET(conserved, i, j);
-        primitive_to_conserved(p, u);
-    }
-}
-
-extern "C" void primitive_to_conserved_gpu(struct Patch primitive, struct Patch conserved)
-{
-    dim3 bs = dim3(16, 16);
-    dim3 bd = dim3((conserved.count[0] + bs.x - 1) / bs.x, (conserved.count[1] + bs.y - 1) / bs.y);
-    kernel<<<bd, bs>>>(primitive, conserved);
-}
-
-#endif
-
-static __device__ void advance_rk_zone(
+static __host__ __device__ void advance_rk_zone(
     struct Mesh mesh,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
@@ -592,97 +517,11 @@ static __device__ void advance_rk_zone(
     conserved_to_primitive(ucc, pout);
 }
 
-#ifdef API_MODE_CPU
-
-void advance_rk_cpu(
-    struct Mesh mesh,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch primitive_wr,
-    struct EquationOfState eos,
-    struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
-    real nu,
-    real a,
-    real dt)
-{
-    FOR_EACH(conserved_rk)
-    {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
-    }
-}
-
-#elif API_MODE_OMP
-
-void advance_rk_omp(
-    struct Mesh mesh,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch primitive_wr,
-    struct EquationOfState eos,
-    struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
-    real nu,
-    real a,
-    real dt)
-{
-    FOR_EACH_OMP(conserved_rk)
-    {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
-    }
-}
-
-#elif API_MODE_GPU
-
-void __global__ kernel(
-    struct Mesh mesh,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch primitive_wr,
-    struct EquationOfState eos,
-    struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
-    real nu,
-    real a,
-    real dt)
-{
-    int i = threadIdx.y + blockIdx.y * blockDim.y;
-    int j = threadIdx.x + blockIdx.x * blockDim.x;
-    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
-}
-
-extern "C" void advance_rk_gpu(
-    struct Mesh mesh,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch primitive_wr,
-    struct EquationOfState eos,
-    struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
-    real nu,
-    real a,
-    real dt)
-{
-    dim3 bs = dim3(16, 16);
-    dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-    struct PointMass *device_masses;
-    cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
-    cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
-    kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, device_masses, num_masses, nu, a, dt);
-    cudaFree(device_masses);
-    cudaDeviceSynchronize();
-}
-
-#endif
-
-static __device__ real wavespeed_zone(
+static __host__ __device__ void wavespeed_zone(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
+    struct Patch wavespeed,
     struct PointMass *masses,
     int num_masses,
     int i,
@@ -693,91 +532,229 @@ static __device__ real wavespeed_zone(
     real y = mesh.y0 + (j + 0.5) * mesh.dy;
     real cs2 = sound_speed_squared(&eos, x, y, masses, num_masses);
     real a = primitive_max_wavespeed(pc, cs2);
-    return a;
+    GET(wavespeed, i, j)[0] = a;
 }
 
-#ifdef API_MODE_CPU
 
-real max_wavespeed_cpu(
+// ============================ KERNELS =======================================
+// ============================================================================
+#ifdef __NVCC__
+
+static void __global__ primitive_to_conserved_kernel(
     struct Mesh mesh,
-    struct EquationOfState eos,
     struct Patch primitive,
-    struct PointMass *masses,
-    int num_masses)
-{
-    real a_max = 0.0;
-
-    for (int i = 0; i < mesh.ni; ++i)
-    {
-        for (int j = 0; j < mesh.nj; ++j)
-        {
-            real a = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
-            a_max = max2(a_max, a);
-        }
-    }
-    return a_max;
-}
-
-#elif API_MODE_OMP
-
-
-real max_wavespeed_omp(
-    struct Mesh mesh,
-    struct EquationOfState eos,
-    struct Patch primitive,
-    struct PointMass *masses,
-    int num_masses)
-{
-    real a_max = 0.0;
-
-    #pragma omp parallel for reduction(max:a_max)
-    for (int i = 0; i < mesh.ni; ++i)
-    {
-        for (int j = 0; j < mesh.nj; ++j)
-        {
-            real a = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
-            a_max = max2(a_max, a);
-        }
-    }
-    return a_max;
-}
-
-#elif API_MODE_GPU
-
-static __global__ void wavespeed_kernel(
-    struct Mesh mesh,
-    struct EquationOfState eos,
-    struct Patch primitive,
-    struct PointMass *masses,
-    int num_masses,
-    struct Patch wavespeeds)
+    struct Patch conserved)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-    real a = wavespeed_zone(mesh, eos, primitive, masses, num_masses, i, j);
-
-    *GET(wavespeeds, i, j) = a;
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        primitive_to_conserved_zone(primitive, conserved, i, j);
+    }
 }
 
-extern "C" real max_wavespeed_gpu(
+static void __global__ advance_rk_kernel(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
+    real nu,
+    real a,
+    real dt)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+    }
+}
+
+static void __global__ wavespeed_kernel(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
+    struct Patch wavespeed,
     struct PointMass *masses,
-    struct Patch wavespeeds,
     int num_masses)
 {
-    dim3 bs = dim3(16, 16);
-    dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-    struct PointMass *device_masses;
-    cudaMalloc(&device_masses, num_masses * sizeof(struct PointMass));
-    cudaMemcpy(device_masses, masses, num_masses * sizeof(struct PointMass), cudaMemcpyHostToDevice);
-    wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, device_masses, num_masses, wavespeeds);
-    cudaFree(device_masses);
-
-    return 0.0;
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        wavespeed_zone(mesh, eos, primitive, wavespeed, masses, num_masses, i, j);
+    }
 }
 
 #endif
+
+
+// ============================ PUBLIC API ====================================
+// ============================================================================
+
+
+/**
+ * Converts an array of primitive data to an array of conserved data. The
+ * array index space must follow the descriptions below.
+ * @param mesh               The mesh [ni,     nj]
+ * @param primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [3]
+ * @param mode               The execution mode
+ */
+EXTERN_C void iso2d_primitive_to_conserved(
+    struct Mesh mesh,
+    real *primitive_ptr,
+    real *conserved_ptr,
+    enum ExecutionMode mode)
+{
+    struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
+    struct Patch conserved = patch(mesh, 3, 0, conserved_ptr);    
+
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(conserved) {
+                primitive_to_conserved_zone(primitive, conserved, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(conserved) {
+                primitive_to_conserved_zone(primitive, conserved, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #ifdef __NVCC__
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            primitive_to_conserved_kernel<<<bd, bs>>>(mesh, primitive, conserved);
+            #endif
+            break;
+        }
+    }
+}
+
+
+/**
+ * Updates an array of primitive data by advancing it a single Runge-Kutta
+ * step.
+ * @param mesh                  The mesh [ni,     nj]
+ * @param conserved_rk_ptr[in]  [ 0,  0] [ni,     nj]     [3]
+ * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [3]
+ * @param eos                   The EOS
+ * @param buffer                The buffer region
+ * @param masses[in]            A pointer a list of point mass objects
+ * @param num_masses            The number of point masses
+ * @param nu                    The viscosity coefficient
+ * @param a                     The RK averaging parameter
+ * @param dt                    The time step
+ * @param mode                  The execution mode
+ */
+EXTERN_C void iso2d_advance_rk(
+    struct Mesh mesh,
+    real *conserved_rk_ptr,
+    real *primitive_rd_ptr,
+    real *primitive_wr_ptr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
+    real nu,
+    real a,
+    real dt,
+    enum ExecutionMode mode)
+{
+    struct Patch conserved_rk = patch(mesh, 3, 0, conserved_rk_ptr);
+    struct Patch primitive_rd = patch(mesh, 3, 2, primitive_rd_ptr);
+    struct Patch primitive_wr = patch(mesh, 3, 2, primitive_wr_ptr);
+
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(conserved_rk) {
+                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(conserved_rk) {
+                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #ifdef __NVCC__
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt);
+            #endif
+            break;
+        }
+    }
+}
+
+
+/**
+ * Fill a buffer with the maximum wavespeed in each zone.
+ * @param  mesh               The mesh [ni,     nj]
+ * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
+ * @param eos                 The EOS
+ * @param masses[in]          A pointer a list of point mass objects
+ * @param num_masses          The number of point masses
+ * @param mode                The execution mode
+ */
+EXTERN_C void iso2d_wavespeed(
+    struct Mesh mesh,
+    real *primitive_ptr,
+    real *wavespeed_ptr,
+    struct EquationOfState eos,
+    struct PointMass *masses,
+    int num_masses,
+    enum ExecutionMode mode)
+{
+    struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
+    struct Patch wavespeed = patch(mesh, 1, 0, wavespeed_ptr);
+
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(wavespeed) {
+                wavespeed_zone(mesh, eos, primitive, wavespeed, masses, num_masses, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(wavespeed) {
+                wavespeed_zone(mesh, eos, primitive, wavespeed, masses, num_masses, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #ifdef __NVCC__
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed, masses, num_masses);
+            #endif
+            break;
+        }
+    }
+}
