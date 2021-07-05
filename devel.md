@@ -7,7 +7,7 @@
 - [ ] Multi-GPU
 - [ ] Physics
       - [ ] PLM runtime parameter
-      - [ ] Sink prescription
+      - [x] Sink prescription
       - [ ] Alpha visc
       - [ ] Lambda / bulk visc term
 - [x] Max signal speed mode: a_max

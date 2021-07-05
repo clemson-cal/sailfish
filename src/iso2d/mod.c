@@ -104,20 +104,21 @@ static __host__ __device__ void point_mass_source_term(
     real mdot = sigma * sink_rate * -1.0;
 
     switch (mass->model) {
-        case Inactive:
-            break;
         case AccelerationFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
             break;
+        // TODO: case TorqueFree
         case ForceFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * fx;
             delta_cons[2] = dt * fy;
             break;
-        case TorqueFree:
-            // TODO!
+        default:
+            delta_cons[0] = 0.0;
+            delta_cons[1] = 0.0;
+            delta_cons[2] = 0.0;
             break;
     }
 }
