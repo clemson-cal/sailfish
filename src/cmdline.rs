@@ -5,6 +5,7 @@ use std::fmt::Write;
 pub struct CommandLine {
     pub use_omp: bool,
     pub use_gpu: bool,
+    #[serde(default)]
     pub upsample: bool,
     pub setup: Option<String>,
     pub resolution: Option<u32>,
