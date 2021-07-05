@@ -6,11 +6,11 @@ pub struct CommandLine {
     pub use_omp: bool,
     pub use_gpu: bool,
     pub setup: Option<String>,
-    pub resolution: u32,
+    pub resolution: Option<u32>,
     pub fold: usize,
     pub checkpoint_interval: f64,
-    pub outdir: String,
-    pub end_time: f64,
+    pub outdir: Option<String>,
+    pub end_time: Option<f64>,
     pub rk_order: u32,
     pub cfl_number: f64,
 }
@@ -22,12 +22,12 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
     let mut c = CommandLine {
         use_omp: false,
         use_gpu: false,
-        resolution: 1024,
+        resolution: None,
         fold: 10,
         checkpoint_interval: 1.0,
         setup: None,
-        outdir: String::from("."),
-        end_time: 1.0,
+        outdir: None,
+        end_time: None,
         rk_order: 1,
         cfl_number: 0.2,
     };
@@ -80,7 +80,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
                     writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints [1.0]").unwrap();
                     writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
-                    writeln!(message, "       -e|--end-time         simulation end time [1.0]").unwrap();
+                    writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
                     writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
                     return Err(PrintUserInformation(message));
@@ -107,7 +107,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 }
             },
             State::GridResolution => {
-                c.resolution = arg.parse().map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?;
+                c.resolution = Some(arg.parse().map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?);
                 state = State::Ready;
             }
             State::Fold => {
@@ -119,7 +119,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 state = State::Ready;
             }
             State::Outdir => {
-                c.outdir = arg;
+                c.outdir = Some(arg);
                 state = State::Ready;
             }
             State::RkOrder => {
@@ -127,7 +127,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 state = State::Ready;
             }
             State::EndTime => {
-                c.end_time = arg.parse().map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?;
+                c.end_time = Some(arg.parse().map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?);
                 state = State::Ready;
             }
             State::Cfl => {

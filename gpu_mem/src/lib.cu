@@ -67,6 +67,9 @@ static __global__ void vec_max_f64_kernel(const double *in, ulong N, double *out
 
 extern "C" void gpu_vec_max_f64(const double *vec, ulong size, double *result)
 {
+    if (size == 0) {
+        return;
+    }
     double* block_max;
     cudaMalloc(&block_max, sizeof(double) * REDUCE_GRID_SIZE);
 

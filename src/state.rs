@@ -30,11 +30,15 @@ impl RecurringTask {
         }
         self.number += 1;
     }
+    pub fn is_due(&self, time: f64, interval: f64) -> bool {
+        self.last_time.map_or(true, |last_time| time >= last_time + interval)
+    }
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct State {
     pub command_line: CommandLine,
+    pub restart_file: Option<String>,
     pub mesh: Mesh,
     pub setup_name: String,
     pub parameters: String,
@@ -57,7 +61,8 @@ impl State {
         if !state.parameters.is_empty() && !new_parameters.is_empty() {
             state.parameters += ":";
         }
-        state.parameters += new_parameters;            
+        state.parameters += new_parameters;
+        state.restart_file = Some(filename.to_string());
 
         println!("read {}", filename);
         Ok(state)

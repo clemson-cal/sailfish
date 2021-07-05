@@ -5,6 +5,7 @@ use crate::setup::Setup;
 use crate::state::State;
 use cfg_if::cfg_if;
 use std::fmt::Write;
+use std::path::Path;
 use std::str::FromStr;
 
 pub mod cmdline;
@@ -55,8 +56,7 @@ fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dy
                 panic!()
             }
         }
-    }
-    else if cmdline.use_omp {
+    } else if cmdline.use_omp {
         cfg_if! {
             if #[cfg(feature = "omp")] {
                 Box::new(iso2d::omp::Solver::new(mesh, primitive))
@@ -75,11 +75,11 @@ fn new_state(
     parameters: &str,
 ) -> Result<State, error::Error> {
     let setup = make_setup(setup_name, parameters)?;
-    let mesh = setup.mesh(command_line.resolution);
-
+    let mesh = setup.mesh(command_line.resolution.unwrap_or(1024));
     let state = State {
         command_line,
-        mesh: mesh.clone(),
+        mesh,
+        restart_file: None,
         iteration: 0,
         time: 0.0,
         primitive: setup.initial_primitive_vec(&mesh),
@@ -90,44 +90,71 @@ fn new_state(
     Ok(state)
 }
 
+fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
+    if let Some(ref setup_string) = cmdline.setup {
+        let (name, parameters) = split_at_first_colon(&setup_string);
+        if name.ends_with(".sf") {
+            state::State::from_checkpoint(name, parameters)
+        } else {
+            new_state(cmdline.clone(), name, parameters)
+        }
+    } else {
+        Err(possible_setups_info())
+    }
+}
+
+fn parent_dir(path: &str) -> Option<&str> {
+    Path::new(path).parent().and_then(Path::to_str)
+}
+
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
 
-    let mut state = if let Some(ref setup_string) = cmdline.setup {
-        let (name, parameters) = split_at_first_colon(&setup_string);
-        if name.ends_with(".sf") {
-            state::State::from_checkpoint(name, parameters)?
-        } else {
-            new_state(cmdline.clone(), name, parameters)?
-        }
-    } else {
-        return Err(possible_setups_info());
-    };
-    let setup = make_setup(&state.setup_name, &state.parameters)?;
-    let mesh = state.mesh.clone();
-    let nu = setup.viscosity().unwrap_or(0.0);
-    let eos = setup.equation_of_state();
-    let buffer = setup.buffer_zone();
-    let cfl = cmdline.cfl_number;
-    let fold = cmdline.fold;
-    let rk_order = cmdline.rk_order;
+    let mut state = make_state(&cmdline)?;
+    let mut solver = make_solver(&cmdline, state.mesh, state.primitive.clone());
     let mut mzps_log = vec![];
-    let mut solver = make_solver(&cmdline, mesh.clone(), state.primitive.clone());
 
+    let setup = make_setup(&state.setup_name, &state.parameters)?;
+    let (mesh, nu, eos, buffer, cfl, fold, chkpt_interval, rk_order, outdir) = (
+        state.mesh,
+        setup.viscosity().unwrap_or(0.0),
+        setup.equation_of_state(),
+        setup.buffer_zone(),
+        cmdline.cfl_number,
+        cmdline.fold,
+        cmdline.checkpoint_interval,
+        cmdline.rk_order,
+        cmdline
+            .outdir
+            .or_else(|| {
+                state
+                    .restart_file
+                    .as_deref()
+                    .and_then(parent_dir)
+                    .map(String::from)
+            })
+            .unwrap_or(String::from(".")),
+    );
+
+    if let Some(resolution) = cmdline.resolution {
+        if setup.mesh(resolution) != mesh {
+            return Err(InvalidSetup(
+                "cannot override domain parameters on restart".to_string(),
+            ));
+        }
+    }
+    println!("outdir: {}", outdir);
     setup.print_parameters();
 
-    while state.time < cmdline.end_time {
-        if state.checkpoint.last_time.is_none()
-            || state.time >= state.checkpoint.last_time.unwrap() + cmdline.checkpoint_interval
-        {
+    while state.time < cmdline.end_time.unwrap_or(f64::MAX) {
+        if state.checkpoint.is_due(state.time, chkpt_interval) {
             state.set_primitive(solver.primitive());
-            state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)?;
+            state.write_checkpoint(chkpt_interval, &outdir)?;
         }
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 let a_max = solver.max_wavespeed(eos, &setup.masses(state.time));
-                // let a_max = setup.max_signal_speed().unwrap();
                 let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
 
                 iso2d::advance(
@@ -154,7 +181,7 @@ fn run() -> Result<(), error::Error> {
         );
     }
     state.set_primitive(solver.primitive());
-    state.write_checkpoint(cmdline.checkpoint_interval, &cmdline.outdir)
+    state.write_checkpoint(chkpt_interval, &outdir)
 }
 
 fn main() {
