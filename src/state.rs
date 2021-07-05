@@ -50,8 +50,9 @@ pub struct State {
 
 impl State {
     pub fn from_checkpoint(filename: &str, new_parameters: &str) -> Result<State, error::Error> {
-        let mut f = File::open(filename).map_err(error::Error::IOError)?;
+        println!("read {}", filename);
 
+        let mut f = File::open(filename).map_err(error::Error::IOError)?;
         let mut bytes = Vec::new();
         f.read_to_end(&mut bytes).map_err(error::Error::IOError)?;
 
@@ -64,7 +65,6 @@ impl State {
         state.parameters += new_parameters;
         state.restart_file = Some(filename.to_string());
 
-        println!("read {}", filename);
         Ok(state)
     }
 
@@ -84,8 +84,8 @@ impl State {
         let bytes = rmp_serde::to_vec_named(self).unwrap();
         let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);
         let mut file = File::create(&filename).unwrap();
-        file.write_all(&bytes).unwrap();
         println!("write {}", filename);
+        file.write_all(&bytes).unwrap();
         Ok(())
     }
 }

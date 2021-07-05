@@ -6,6 +6,13 @@ enum ExecutionMode {
     GPU,
 };
 
+enum SinkModel {
+    Inactive,
+    AccelerationFree,
+    TorqueFree,
+    ForceFree,
+};
+
 struct PointMass
 {
     real x;
@@ -15,6 +22,7 @@ struct PointMass
     real mass;
     real rate;
     real radius;
+    enum SinkModel model;
 };
 
 enum EquationOfStateType

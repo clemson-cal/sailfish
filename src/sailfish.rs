@@ -8,6 +8,15 @@ pub enum ExecutionMode {
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
+pub enum SinkModel {
+    Inactive,
+    AccelerationFree,
+    TorqueFree,
+    ForceFree,
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
 pub enum EquationOfState {
     Isothermal { sound_speed_squared: f64 },
     LocallyIsothermal { mach_number_squared: f64 },
@@ -24,6 +33,7 @@ pub struct PointMass {
     pub mass: f64,
     pub rate: f64,
     pub radius: f64,
+    pub model: SinkModel,
 }
 
 #[repr(C)]

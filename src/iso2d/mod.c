@@ -78,13 +78,14 @@ static __host__ __device__ void point_mass_source_term(
     real x1,
     real y1,
     real dt,
-    real sigma,
+    real *prim,
     real *delta_cons)
 {
     real x0 = mass->x;
     real y0 = mass->y;
     real mp = mass->mass;
     real rs = mass->radius;
+    real sigma = prim[0];
 
     real dx = x1 - x0;
     real dy = y1 - y0;
@@ -100,11 +101,25 @@ static __host__ __device__ void point_mass_source_term(
     {
         sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
     }
+    real mdot = sigma * sink_rate * -1.0;
 
-    // NOTE: This is a force-free sink.
-    delta_cons[0] = dt * sigma * sink_rate * -1.0;
-    delta_cons[1] = dt * fx;
-    delta_cons[2] = dt * fy;
+    switch (mass->model) {
+        case Inactive:
+            break;
+        case AccelerationFree:
+            delta_cons[0] = dt * mdot;
+            delta_cons[1] = dt * mdot * prim[1] + dt * fx;
+            delta_cons[2] = dt * mdot * prim[2] + dt * fy;
+            break;
+        case ForceFree:
+            delta_cons[0] = dt * mdot;
+            delta_cons[1] = dt * fx;
+            delta_cons[2] = dt * fy;
+            break;
+        case TorqueFree:
+            // TODO!
+            break;
+    }
 }
 
 static __host__ __device__ void point_masses_source_term(
@@ -113,13 +128,13 @@ static __host__ __device__ void point_masses_source_term(
     real x1,
     real y1,
     real dt,
-    real sigma,
+    real *prim,
     real *cons)
 {
     for (int p = 0; p < num_masses; ++p)
     {
         real delta_cons[NCONS];
-        point_mass_source_term(&masses[p], x1, y1, dt, sigma, delta_cons);
+        point_mass_source_term(&masses[p], x1, y1, dt, prim, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -506,7 +521,7 @@ static __host__ __device__ void advance_rk_zone(
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc[0], ucc);
+    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
     {
