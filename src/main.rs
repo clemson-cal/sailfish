@@ -76,6 +76,7 @@ fn new_state(
 ) -> Result<State, error::Error> {
     let setup = make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(command_line.resolution.unwrap_or(1024));
+
     let state = State {
         command_line,
         mesh,
@@ -91,15 +92,20 @@ fn new_state(
 }
 
 fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
-    if let Some(ref setup_string) = cmdline.setup {
+    let state = if let Some(ref setup_string) = cmdline.setup {
         let (name, parameters) = split_at_first_colon(&setup_string);
         if name.ends_with(".sf") {
-            state::State::from_checkpoint(name, parameters)
+            state::State::from_checkpoint(name, parameters)?
         } else {
-            new_state(cmdline.clone(), name, parameters)
+            new_state(cmdline.clone(), name, parameters)?
         }
     } else {
-        Err(possible_setups_info())
+        return Err(possible_setups_info());
+    };
+    if cmdline.upsample {
+        Ok(state.upsample())
+    } else {
+        Ok(state)
     }
 }
 
@@ -136,7 +142,10 @@ fn run() -> Result<(), error::Error> {
             .unwrap_or(String::from(".")),
     );
 
-    if let Some(resolution) = cmdline.resolution {
+    if let Some(mut resolution) = cmdline.resolution {
+        if cmdline.upsample {
+            resolution *= 2
+        }
         if setup.mesh(resolution) != mesh {
             return Err(InvalidSetup(
                 "cannot override domain parameters on restart".to_string(),
