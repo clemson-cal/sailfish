@@ -114,8 +114,8 @@ static __host__ __device__ void point_mass_source_term(
             real vy        = prim[2];
             real vx0       = mass->vx;
             real vy0       = mass->vy;
-            real rhatx     = dx/dr;
-            real rhaty     = dy/dr;
+            real rhatx     = dx / dr;
+            real rhaty     = dy / dr;
             real dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
             real vxstar    = dvdotrhat * rhatx + vx0;
             real vystar    = dvdotrhat * rhaty + vy0;

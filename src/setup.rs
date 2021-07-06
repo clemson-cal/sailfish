@@ -9,7 +9,6 @@ pub trait Setup {
     fn masses(&self, time: f64) -> Vec<PointMass>;
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
-    fn max_signal_speed(&self) -> Option<f64>;
     fn viscosity(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
@@ -61,9 +60,6 @@ impl Setup for Explosion {
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None
     }
-    fn max_signal_speed(&self) -> Option<f64> {
-        Some(1.0)
-    }
     fn viscosity(&self) -> Option<f64> {
         None
     }
@@ -105,7 +101,6 @@ impl std::str::FromStr for Binary {
                 "none" => SinkModel::Inactive,
                 "af" => SinkModel::AccelerationFree,
                 "tf" => SinkModel::TorqueFree,
-//return Err(InvalidSetup("torque-free sink is not impemented yet".into())),
                 "ff" => SinkModel::ForceFree,
                 _ => return Err(InvalidSetup("invalid sink_model".into())),
             },
@@ -168,9 +163,6 @@ impl Setup for Binary {
     }
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None
-    }
-    fn max_signal_speed(&self) -> Option<f64> {
-        Some(1.0 / self.sink_radius.sqrt())
     }
     fn viscosity(&self) -> Option<f64> {
         Some(self.nu)

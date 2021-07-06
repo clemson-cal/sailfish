@@ -36,6 +36,7 @@ extern "C" {
 
 /// Primitive variable array in a solver using first, second, or third-order
 /// Runge-Kutta time stepping.
+#[allow(clippy::too_many_arguments)]
 pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
     solver: &mut Box<dyn Solve>,
     eos: EquationOfState,
@@ -88,7 +89,7 @@ pub mod cpu {
             Self {
                 mesh,
                 primitive1: primitive.clone(),
-                primitive2: primitive.clone(),
+                primitive2: primitive,
                 conserved0: vec![0.0; mesh.num_total_zones() * 3],
                 mode: ExecutionMode::CPU,
             }

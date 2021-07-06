@@ -50,8 +50,7 @@ pub enum BufferZone {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq)]
-#[derive(serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Mesh {
     /// Number of zones on the i-axis
     pub ni: i32,
@@ -112,12 +111,20 @@ pub trait Solve {
     fn primitive(&self) -> Vec<f64>;
 
     /// Converts the internal primitive variable array to a conserved variable
-    /// array, and store that array in the solver's conserved variable buffer.
+    /// array, and stores that array in the solver's conserved variable buffer.
     fn primitive_to_conserved(&mut self);
 
     /// Advances the primitive variable array by one low-storage Runge-Kutta
     /// sub-stup.
-    fn advance_rk(&mut self, nu: f64, eos: EquationOfState, buffer: BufferZone, masses: &[PointMass], a: f64, dt: f64);
+    fn advance_rk(
+        &mut self,
+        nu: f64,
+        eos: EquationOfState,
+        buffer: BufferZone,
+        masses: &[PointMass],
+        a: f64,
+        dt: f64,
+    );
 
     /// Returns the largest wavespeed among the zones in the solver's current
     /// primitive array.

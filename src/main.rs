@@ -139,7 +139,7 @@ fn run() -> Result<(), error::Error> {
                     .and_then(parent_dir)
                     .map(String::from)
             })
-            .unwrap_or(String::from(".")),
+            .unwrap_or_else(|| String::from(".")),
     );
 
     if let Some(mut resolution) = cmdline.resolution {
