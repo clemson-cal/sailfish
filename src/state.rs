@@ -30,11 +30,15 @@ impl RecurringTask {
         }
         self.number += 1;
     }
+    pub fn is_due(&self, time: f64, interval: f64) -> bool {
+        self.last_time.map_or(true, |last_time| time >= last_time + interval)
+    }
 }
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct State {
     pub command_line: CommandLine,
+    pub restart_file: Option<String>,
     pub mesh: Mesh,
     pub setup_name: String,
     pub parameters: String,
@@ -46,8 +50,9 @@ pub struct State {
 
 impl State {
     pub fn from_checkpoint(filename: &str, new_parameters: &str) -> Result<State, error::Error> {
-        let mut f = File::open(filename).map_err(error::Error::IOError)?;
+        println!("read {}", filename);
 
+        let mut f = File::open(filename).map_err(error::Error::IOError)?;
         let mut bytes = Vec::new();
         f.read_to_end(&mut bytes).map_err(error::Error::IOError)?;
 
@@ -57,9 +62,9 @@ impl State {
         if !state.parameters.is_empty() && !new_parameters.is_empty() {
             state.parameters += ":";
         }
-        state.parameters += new_parameters;            
+        state.parameters += new_parameters;
+        state.restart_file = Some(filename.to_string());
 
-        println!("read {}", filename);
         Ok(state)
     }
 
@@ -79,8 +84,48 @@ impl State {
         let bytes = rmp_serde::to_vec_named(self).unwrap();
         let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);
         let mut file = File::create(&filename).unwrap();
-        file.write_all(&bytes).unwrap();
         println!("write {}", filename);
+        file.write_all(&bytes).unwrap();
         Ok(())
+    }
+
+    pub fn upsample(mut self) -> Self {
+        let ni = self.mesh.ni;
+        let nj = self.mesh.nj;
+        let mi = 2 * ni;
+        let mj = 2 * nj;
+        let mut new_primitive = vec![0.0; (mi as usize + 4) * (mj as usize + 4) * 3];
+
+        for i in -2..ni + 2 {
+            for j in -2..nj + 2 {
+                let i0 = 2 * i;
+                let i1 = 2 * i + 1;
+                let j0 = 2 * j;
+                let j1 = 2 * j + 1;
+
+                for q in 0..3 {
+                    let p = self.primitive[(i + 2) as usize * (nj as usize + 4) * 3 + (j + 2) as usize * 3 + q];
+
+                    if (-2..mi + 2).contains(&i0) && (-2..mj + 2).contains(&j0) {
+                        new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3 + (j0 + 2) as usize * 3 + q] = p;
+                    }
+                    if (-2..mi + 2).contains(&i0) && (-2..mj + 2).contains(&j1) {
+                        new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3 + (j1 + 2) as usize * 3 + q] = p;
+                    }
+                    if (-2..mi + 2).contains(&i1) && (-2..mj + 2).contains(&j0) {
+                        new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3 + (j0 + 2) as usize * 3 + q] = p;
+                    }
+                    if (-2..mi + 2).contains(&i1) && (-2..mj + 2).contains(&j1) {
+                        new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3 + (j1 + 2) as usize * 3 + q] = p;
+                    }
+                }
+            }
+        }
+        self.primitive = new_primitive;
+        self.mesh.ni *= 2;
+        self.mesh.nj *= 2;
+        self.mesh.dx *= 0.5;
+        self.mesh.dy *= 0.5;
+        self
     }
 }

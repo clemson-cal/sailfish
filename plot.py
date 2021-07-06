@@ -10,8 +10,8 @@ for filename in sys.argv[1:]:
     nj = chkpt['mesh']['nj']
     x0 = chkpt['mesh']['x0']
     y0 = chkpt['mesh']['y0']
-    x1 = chkpt['mesh']['dx'] + x0
-    y1 = chkpt['mesh']['dy'] + y0
+    x1 = chkpt['mesh']['dx'] * chkpt['mesh']['ni'] + x0
+    y1 = chkpt['mesh']['dy'] * chkpt['mesh']['nj'] + y0
     primitive = np.reshape(chkpt['primitive'], (ni + 4, nj + 4, 3))[2:-2,2:-2]
     plt.figure(figsize=[12, 9.5])
     plt.imshow(primitive[:,:,0].T**0.25, origin='lower', cmap='plasma', extent=[x0, x1, y0, y1])

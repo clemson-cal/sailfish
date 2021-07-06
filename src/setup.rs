@@ -1,4 +1,4 @@
-use crate::sailfish::{BufferZone, EquationOfState, Mesh, PointMass};
+use crate::sailfish::{BufferZone, EquationOfState, Mesh, PointMass, SinkModel};
 use crate::error;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use error::Error::*;
@@ -77,6 +77,7 @@ pub struct Binary {
     pub nu: f64,
     pub sink_radius: f64,
     pub sink_rate: f64,
+    pub sink_model: SinkModel,
     form: kind_config::Form,
 }
 
@@ -88,6 +89,7 @@ impl std::str::FromStr for Binary {
             .item("nu", 1e-3, "kinematic viscosity coefficient [Omega a^2]")
             .item("sink_radius", 0.05, "sink kernel radius [a]")
             .item("sink_rate", 10.0, "rate of mass subtraction in the sink [Omega]")
+            .item("sink_model", "af", "sink prescription: [none|af|tf|ff]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -96,6 +98,13 @@ impl std::str::FromStr for Binary {
             nu: form.get("nu").into(),
             sink_radius: form.get("sink_radius").into(),
             sink_rate: form.get("sink_rate").into(),
+            sink_model: match form.get("sink_model").to_string().as_str() {
+                "none" => SinkModel::Inactive,
+                "af" => SinkModel::AccelerationFree,
+                "tf" => return Err(InvalidSetup("torque-free sink is not impemented yet".into())),
+                "ff" => SinkModel::ForceFree,
+                _ => return Err(InvalidSetup("invalid sink_model".into())),
+            },
             form,
         })
     }
@@ -136,6 +145,7 @@ impl Setup for Binary {
             mass: mass0.mass(),
             rate: self.sink_rate,
             radius: self.sink_radius,
+            model: self.sink_model,
         };
         let mass1 = PointMass {
             x: mass1.position_x(),
@@ -145,6 +155,7 @@ impl Setup for Binary {
             mass: mass1.mass(),
             rate: self.sink_rate,
             radius: self.sink_radius,
+            model: self.sink_model,
         };
         vec![mass0, mass1]
     }
