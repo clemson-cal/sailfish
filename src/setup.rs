@@ -104,7 +104,8 @@ impl std::str::FromStr for Binary {
             sink_model: match form.get("sink_model").to_string().as_str() {
                 "none" => SinkModel::Inactive,
                 "af" => SinkModel::AccelerationFree,
-                "tf" => return Err(InvalidSetup("torque-free sink is not impemented yet".into())),
+                "tf" => SinkModel::TorqueFree,
+//return Err(InvalidSetup("torque-free sink is not impemented yet".into())),
                 "ff" => SinkModel::ForceFree,
                 _ => return Err(InvalidSetup("invalid sink_model".into())),
             },
