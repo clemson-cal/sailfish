@@ -163,7 +163,7 @@ impl Setup for Binary {
         vec![mass0, mass1]
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::LocallyIsothermal { mach_number_squared: 10.0f64.powi(2) }
+        EquationOfState::LocallyIsothermal { mach_number_squared: self.mach_number.powi(2) }
     }
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None
