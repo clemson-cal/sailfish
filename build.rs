@@ -1,33 +1,41 @@
 use cfg_if::cfg_if;
 
-fn main() {
+fn compile_c_mod(mod_name: &str) {
+    let src = format!("src/{}/mod.c", mod_name);
+    let lib = format!("{}_mod", mod_name);
+
     cfg_if! {
         if #[cfg(all(feature = "omp", feature = "cuda"))] {
             cc::Build::new()
-                .file("src/iso2d/mod.c")
+                .file(&src)
                 .cuda(true)
                 .flag("-x=cu")
                 .flag("-Xcompiler")
                 .flag("-fopenmp")
-                .compile("iso2d_mod");
+                .compile(&lib);
         } else if #[cfg(all(feature = "omp", not(feature = "cuda")))] {
             cc::Build::new()
-                .file("src/iso2d/mod.c")
+                .file(&src)
                 .flag("-Xpreprocessor")
                 .flag("-fopenmp")
-                .compile("iso2d_mod");
+                .compile(&lib);
         } else if #[cfg(all(not(feature = "omp"), feature = "cuda"))] {
             cc::Build::new()
-                .file("src/iso2d/mod.c")
+                .file(&src)
                 .cuda(true)
                 .flag("-x=cu")
-                .compile("iso2d_mod");
+                .compile(&lib);
         } else {
             cc::Build::new()
-                .file("src/iso2d/mod.c")
-                .compile("iso2d_mod");
+                .file(&src)
+                .compile(&lib);
         }
-    }
+    }    
+}
+
+fn main() {
+    compile_c_mod("iso2d");
+    compile_c_mod("euler1d");
     cfg_if! {
         if #[cfg(feature = "cuda")] {
             println!("cargo:rustc-link-lib=dylib=cudart");            

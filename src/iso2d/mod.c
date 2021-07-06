@@ -174,10 +174,9 @@ static __host__ __device__ real sound_speed_squared(
             return eos->isothermal.sound_speed_squared;
         case LocallyIsothermal:
             return -gravitational_potential(masses, num_masses, x, y) / eos->locally_isothermal.mach_number_squared;
-        case GammaLaw:
+        default:
             return 1.0; // WARNING
     }
-    return 0.0;
 }
 
 static __host__ __device__ void buffer_source_term(
@@ -380,7 +379,6 @@ static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real 
 
 // ============================ SCHEME ========================================
 // ============================================================================
-
 static __host__ __device__ void primitive_to_conserved_zone(
         struct Patch primitive,
         struct Patch conserved,
@@ -644,8 +642,8 @@ EXTERN_C void iso2d_primitive_to_conserved(
     real *conserved_ptr,
     enum ExecutionMode mode)
 {
-    struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
-    struct Patch conserved = patch(mesh, 3, 0, conserved_ptr);    
+    struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
+    struct Patch conserved = patch(mesh, NCONS, 0, conserved_ptr);    
 
     switch (mode) {
         case CPU: {
@@ -706,9 +704,9 @@ EXTERN_C void iso2d_advance_rk(
     real dt,
     enum ExecutionMode mode)
 {
-    struct Patch conserved_rk = patch(mesh, 3, 0, conserved_rk_ptr);
-    struct Patch primitive_rd = patch(mesh, 3, 2, primitive_rd_ptr);
-    struct Patch primitive_wr = patch(mesh, 3, 2, primitive_wr_ptr);
+    struct Patch conserved_rk = patch(mesh, NCONS, 0, conserved_rk_ptr);
+    struct Patch primitive_rd = patch(mesh, NCONS, 2, primitive_rd_ptr);
+    struct Patch primitive_wr = patch(mesh, NCONS, 2, primitive_wr_ptr);
 
     switch (mode) {
         case CPU: {
@@ -758,8 +756,8 @@ EXTERN_C void iso2d_wavespeed(
     int num_masses,
     enum ExecutionMode mode)
 {
-    struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
-    struct Patch wavespeed = patch(mesh, 1, 0, wavespeed_ptr);
+    struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
+    struct Patch wavespeed = patch(mesh, 1,     0, wavespeed_ptr);
 
     switch (mode) {
         case CPU: {
