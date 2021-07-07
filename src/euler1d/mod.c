@@ -187,7 +187,7 @@ static __host__ __device__ void primitive_to_conserved_zone(
 }
 
 static __host__ __device__ void advance_rk_zone(
-    struct FaceLocations mesh,
+    struct Patch face_positions,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
@@ -195,10 +195,10 @@ static __host__ __device__ void advance_rk_zone(
     real dt,
     int i)
 {
-    real dx = mesh.face_positions[1] - mesh.face_positions[0]; // TODO!
-    // real xl = mesh.x0 + (i + 0.0) * dx;
-    // real xc = mesh.x0 + (i + 0.5) * dx;
-    // real xr = mesh.x0 + (i + 1.0) * dx;
+    real dx = GET(face_positions, 1)[0] - GET(face_positions, 0)[0]; // TODO!
+    // real xl = faces.x0 + (i + 0.0) * dx;
+    // real xc = faces.x0 + (i + 0.5) * dx;
+    // real xr = faces.x0 + (i + 1.0) * dx;
 
     real *un = GET(conserved_rk, i);
     real *pcc = GET(primitive_rd, i);
@@ -265,14 +265,14 @@ static void __global__ primitive_to_conserved_kernel(
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < mesh.ni)
+    if (i < faces.ni)
     {
         primitive_to_conserved_zone(primitive, conserved, i);
     }
 }
 
 static void __global__ advance_rk_kernel(
-    struct FaceLocations mesh,
+    struct FacePositions faces,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
@@ -281,9 +281,9 @@ static void __global__ advance_rk_kernel(
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < mesh.ni)
+    if (i < faces.ni)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
+        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
     }
 }
 
@@ -293,7 +293,7 @@ static void __global__ wavespeed_kernel(
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < mesh.ni)
+    if (i < faces.ni)
     {
         wavespeed_zone(primitive, wavespeed, i);
     }
@@ -309,19 +309,19 @@ static void __global__ wavespeed_kernel(
 /**
  * Converts an array of primitive data to an array of conserved data. The
  * array index space must follow the descriptions below.
- * @param mesh               The mesh [ni = mesh.num_faces - 1]
+ * @param faces              The faces [ni = num_zones]
  * @param conserved_ptr[in]  [0] [ni] [3]
  * @param primitive_ptr[out] [0] [ni] [3]
  * @param mode               The execution mode
  */
 EXTERN_C void euler1d_primitive_to_conserved(
-    struct FaceLocations mesh,
+    int num_zones,
     real *primitive_ptr,
     real *conserved_ptr,
     enum ExecutionMode mode)
 {
-    struct Patch primitive = patch(mesh.num_faces - 1, NCONS, primitive_ptr);
-    struct Patch conserved = patch(mesh.num_faces - 1, NCONS, conserved_ptr);    
+    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
+    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);    
 
     switch (mode) {
         case CPU: {
@@ -343,8 +343,8 @@ EXTERN_C void euler1d_primitive_to_conserved(
         case GPU: {
             #ifdef __NVCC__
             dim3 bs = dim3(256);
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x);
-            primitive_to_conserved_kernel<<<bd, bs>>>(mesh, primitive, conserved);
+            dim3 bd = dim3((faces.ni + bs.x - 1) / bs.x);
+            primitive_to_conserved_kernel<<<bd, bs>>>(faces, primitive, conserved);
             #endif
             break;
         }
@@ -355,21 +355,17 @@ EXTERN_C void euler1d_primitive_to_conserved(
 /**
  * Updates an array of primitive data by advancing it a single Runge-Kutta
  * step.
- * @param mesh                  The mesh [ni = mesh.num_faces - 1]
- * @param conserved_rk_ptr[in]  [0] [ni] [3]
- * @param primitive_rd_ptr[in]  [0] [ni] [3]
- * @param primitive_wr_ptr[out] [0] [ni] [3]
- * @param eos                   The EOS
- * @param buffer                The buffer region
- * @param masses[in]            A pointer a list of point mass objects
- * @param num_masses            The number of point masses
- * @param nu                    The viscosity coefficient
- * @param a                     The RK averaging parameter
- * @param dt                    The time step
- * @param mode                  The execution mode
+ * @param face_positions_ptr[in] [num_zones + 1] [1]
+ * @param conserved_rk_ptr[in]   [num_zones] [3]
+ * @param primitive_rd_ptr[in]   [num_zones] [3]
+ * @param primitive_wr_ptr[out]  [num_zones] [3]
+ * @param a                      The RK averaging parameter
+ * @param dt                     The time step
+ * @param mode                   The execution mode
  */
 EXTERN_C void euler1d_advance_rk(
-    struct FaceLocations mesh,
+    int num_zones,
+    real *face_positions_ptr,
     real *conserved_rk_ptr,
     real *primitive_rd_ptr,
     real *primitive_wr_ptr,
@@ -377,14 +373,15 @@ EXTERN_C void euler1d_advance_rk(
     real dt,
     enum ExecutionMode mode)
 {
-    struct Patch conserved_rk = patch(mesh.num_faces - 1, NCONS, conserved_rk_ptr);
-    struct Patch primitive_rd = patch(mesh.num_faces - 1, NCONS, primitive_rd_ptr);
-    struct Patch primitive_wr = patch(mesh.num_faces - 1, NCONS, primitive_wr_ptr);
+    struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
+    struct Patch conserved_rk = patch(num_zones, NCONS, conserved_rk_ptr);
+    struct Patch primitive_rd = patch(num_zones, NCONS, primitive_rd_ptr);
+    struct Patch primitive_wr = patch(num_zones, NCONS, primitive_wr_ptr);
 
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved_rk) {
-                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
             }
             break;
         }
@@ -392,7 +389,7 @@ EXTERN_C void euler1d_advance_rk(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
             }
             #endif
             break;
@@ -401,8 +398,8 @@ EXTERN_C void euler1d_advance_rk(
         case GPU: {
             #ifdef __NVCC__
             dim3 bs = dim3(256);
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x);
-            advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, a, dt);
+            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
+            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, a, dt);
             #endif
             break;
         }
@@ -412,19 +409,18 @@ EXTERN_C void euler1d_advance_rk(
 
 /**
  * Fill a buffer with the maximum wavespeed in each zone.
- * @param  mesh               The mesh [ni = mesh.num_faces - 1]
- * @param  primitive_ptr[in]  [0] [ni] [3]
- * @param  wavespeed_ptr[out] [0] [ni] [1]
+ * @param primitive_ptr[in]   [num_zones] [3]
+ * @param wavespeed_ptr[out]  [num_zones] [1]
  * @param mode                The execution mode
  */
 EXTERN_C void euler1d_wavespeed(
-    struct FaceLocations mesh,
+    int num_zones,
     real *primitive_ptr,
     real *wavespeed_ptr,
     enum ExecutionMode mode)
 {
-    struct Patch primitive = patch(mesh.num_faces - 1, NCONS, primitive_ptr);
-    struct Patch wavespeed = patch(mesh.num_faces - 1, 1,     wavespeed_ptr);
+    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
+    struct Patch wavespeed = patch(num_zones, 1,     wavespeed_ptr);
 
     switch (mode) {
         case CPU: {
@@ -446,7 +442,7 @@ EXTERN_C void euler1d_wavespeed(
         case GPU: {
             #ifdef __NVCC__
             dim3 bs = dim3(256);
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x);
+            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
             wavespeed_kernel<<<bd, bs>>>(primitive, wavespeed);
             #endif
             break;

@@ -91,9 +91,3 @@ struct Mesh
 };
 #define MESH_X(m, i) (m.x0 + (i) * m.dx)
 #define MESH_Y(m, i) (m.y0 + (j) * m.dy)
-
-struct FaceLocations
-{
-    int num_faces;
-    real *face_positions;
-};

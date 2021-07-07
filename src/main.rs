@@ -10,6 +10,7 @@ use std::str::FromStr;
 
 pub mod cmdline;
 pub mod error;
+pub mod euler1d;
 pub mod iso2d;
 pub mod sailfish;
 pub mod setup;
