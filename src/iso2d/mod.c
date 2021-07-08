@@ -510,29 +510,125 @@ static __host__ __device__ void advance_rk_zone(
     riemann_hlle(pljm, pljp, flj, cs2lj, 1);
     riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-    if (nu > 0.0)
+    real sli[4];
+    real sri[4];
+    real slj[4];
+    real srj[4];
+    real scc[4];
+
+    shear_strain(gxli, gyli, dx, dy, sli);
+    shear_strain(gxri, gyri, dx, dy, sri);
+    shear_strain(gxlj, gylj, dx, dy, slj);
+    shear_strain(gxrj, gyrj, dx, dy, srj);
+    shear_strain(gxcc, gycc, dx, dy, scc);
+
+    fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+    fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+    fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+    fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+    flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+    flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+    frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+    frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+
+    primitive_to_conserved(pcc, ucc);
+    buffer_source_term(&buffer, xc, yc, dt, ucc);
+    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc, ucc);
+
+    for (int q = 0; q < NCONS; ++q)
     {
-        real sli[4];
-        real sri[4];
-        real slj[4];
-        real srj[4];
-        real scc[4];
-
-        shear_strain(gxli, gyli, dx, dy, sli);
-        shear_strain(gxri, gyri, dx, dy, sri);
-        shear_strain(gxlj, gylj, dx, dy, slj);
-        shear_strain(gxrj, gyrj, dx, dy, srj);
-        shear_strain(gxcc, gycc, dx, dy, scc);
-
-        fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-        fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-        fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-        fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-        flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-        flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-        frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-        frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+        ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
+    real *pout = GET(primitive_wr, i, j);
+    conserved_to_primitive(ucc, pout);
+}
+
+static __host__ __device__ void advance_rk_zone_inviscid(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
+    real a,
+    real dt,
+    int i,
+    int j)
+{
+    real dx = mesh.dx;
+    real dy = mesh.dy;
+    real xl = mesh.x0 + (i + 0.0) * dx;
+    real xc = mesh.x0 + (i + 0.5) * dx;
+    real xr = mesh.x0 + (i + 1.0) * dx;
+    real yl = mesh.y0 + (j + 0.0) * dy;
+    real yc = mesh.y0 + (j + 0.5) * dy;
+    real yr = mesh.y0 + (j + 1.0) * dy;
+
+    real *un = GET(conserved_rk, i, j);
+    real *pcc = GET(primitive_rd, i, j);
+    real *pli = GET(primitive_rd, i - 1, j);
+    real *pri = GET(primitive_rd, i + 1, j);
+    real *plj = GET(primitive_rd, i, j - 1);
+    real *prj = GET(primitive_rd, i, j + 1);
+    real *pki = GET(primitive_rd, i - 2, j);
+    real *pti = GET(primitive_rd, i + 2, j);
+    real *pkj = GET(primitive_rd, i, j - 2);
+    real *ptj = GET(primitive_rd, i, j + 2);
+
+    real plip[NCONS];
+    real plim[NCONS];
+    real prip[NCONS];
+    real prim[NCONS];
+    real pljp[NCONS];
+    real pljm[NCONS];
+    real prjp[NCONS];
+    real prjm[NCONS];
+
+    real gxli[NCONS];
+    real gxri[NCONS];
+    real gylj[NCONS];
+    real gyrj[NCONS];
+    real gxcc[NCONS];
+    real gycc[NCONS];
+
+    plm_gradient(pki, pli, pcc, gxli);
+    plm_gradient(pli, pcc, pri, gxcc);
+    plm_gradient(pcc, pri, pti, gxri);
+    plm_gradient(pkj, plj, pcc, gylj);
+    plm_gradient(plj, pcc, prj, gycc);
+    plm_gradient(pcc, prj, ptj, gyrj);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        plim[q] = pli[q] + 0.5 * gxli[q];
+        plip[q] = pcc[q] - 0.5 * gxcc[q];
+        prim[q] = pcc[q] + 0.5 * gxcc[q];
+        prip[q] = pri[q] - 0.5 * gxri[q];
+
+        pljm[q] = plj[q] + 0.5 * gylj[q];
+        pljp[q] = pcc[q] - 0.5 * gycc[q];
+        prjm[q] = pcc[q] + 0.5 * gycc[q];
+        prjp[q] = prj[q] - 0.5 * gyrj[q];
+    }
+
+    real fli[NCONS];
+    real fri[NCONS];
+    real flj[NCONS];
+    real frj[NCONS];
+    real ucc[NCONS];
+
+    real cs2li = sound_speed_squared(&eos, xl, yc, masses, num_masses);
+    real cs2ri = sound_speed_squared(&eos, xr, yc, masses, num_masses);
+    real cs2lj = sound_speed_squared(&eos, xc, yl, masses, num_masses);
+    real cs2rj = sound_speed_squared(&eos, xc, yr, masses, num_masses);
+
+    riemann_hlle(plim, plip, fli, cs2li, 0);
+    riemann_hlle(prim, prip, fri, cs2ri, 0);
+    riemann_hlle(pljm, pljp, flj, cs2lj, 1);
+    riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
@@ -606,6 +702,27 @@ static void __global__ advance_rk_kernel(
     }
 }
 
+static void __global__ advance_rk_kernel_inviscid(
+    struct Mesh mesh,
+    struct Patch conserved_rk,
+    struct Patch primitive_rd,
+    struct Patch primitive_wr,
+    struct EquationOfState eos,
+    struct BufferZone buffer,
+    struct PointMass *masses,
+    int num_masses,
+    real a,
+    real dt)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+    }
+}
+
 static void __global__ wavespeed_kernel(
     struct Mesh mesh,
     struct EquationOfState eos,
@@ -645,7 +762,7 @@ EXTERN_C void iso2d_primitive_to_conserved(
     enum ExecutionMode mode)
 {
     struct Patch primitive = patch(mesh, 3, 2, primitive_ptr);
-    struct Patch conserved = patch(mesh, 3, 0, conserved_ptr);    
+    struct Patch conserved = patch(mesh, 3, 0, conserved_ptr);
 
     switch (mode) {
         case CPU: {
@@ -712,17 +829,30 @@ EXTERN_C void iso2d_advance_rk(
 
     switch (mode) {
         case CPU: {
-            FOR_EACH(conserved_rk) {
-                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+            if (nu == 0.0) {
+                FOR_EACH(conserved_rk) {
+                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+                }
+            } else {
+                FOR_EACH(conserved_rk) {
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+                }
             }
             break;
         }
 
         case OMP: {
             #ifdef _OPENMP
-            FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+            if (nu == 0.0) {
+                FOR_EACH_OMP(conserved_rk) {
+                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+                }
+            } else {
+                FOR_EACH_OMP(conserved_rk) {
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+                }
             }
+            break;
             #endif
             break;
         }
@@ -731,7 +861,11 @@ EXTERN_C void iso2d_advance_rk(
             #ifdef __NVCC__
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-            advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt);
+            if (nu == 0.0) {
+                advance_rk_kernel_inviscid<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt);
+            } else {
+                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt);
+            }
             #endif
             break;
         }
