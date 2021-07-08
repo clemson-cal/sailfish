@@ -1,4 +1,5 @@
 use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, Mesh, PointMass, Solve};
+use cfg_if::cfg_if;
 
 extern "C" {
     fn iso2d_primitive_to_conserved(
@@ -66,6 +67,30 @@ pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
         }
         _ => {
             panic!("invalid RK order")
+        }
+    }
+}
+
+pub fn solver(mode: ExecutionMode, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
+    match mode {
+        ExecutionMode::CPU => Box::new(cpu::Solver::new(mesh, primitive)),
+        ExecutionMode::OMP => {
+            cfg_if! {
+                if #[cfg(feature = "omp")] {
+                    Box::new(omp::Solver::new(mesh, primitive))
+                } else {
+                    panic!()
+                }
+            }
+        }
+        ExecutionMode::GPU => {
+            cfg_if! {
+                if #[cfg(feature = "cuda")] {
+                    Box::new(gpu::Solver::new(mesh, primitive))
+                } else {
+                    panic!()
+                }
+            }
         }
     }
 }

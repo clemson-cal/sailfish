@@ -1,9 +1,8 @@
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
-use crate::sailfish::{Mesh, Solve};
 use crate::setup::Setup;
 use crate::state::State;
-use cfg_if::cfg_if;
+
 use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
@@ -45,28 +44,6 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
         "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
-    }
-}
-
-fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
-    if cmdline.use_gpu {
-        cfg_if! {
-            if #[cfg(feature = "cuda")] {
-                Box::new(iso2d::gpu::Solver::new(mesh, primitive))
-            } else {
-                panic!()
-            }
-        }
-    } else if cmdline.use_omp {
-        cfg_if! {
-            if #[cfg(feature = "omp")] {
-                Box::new(iso2d::omp::Solver::new(mesh, primitive))
-            } else {
-                panic!()
-            }
-        }
-    } else {
-        Box::new(iso2d::cpu::Solver::new(mesh, primitive))
     }
 }
 
@@ -118,7 +95,11 @@ fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
 
     let mut state = make_state(&cmdline)?;
-    let mut solver = make_solver(&cmdline, state.mesh, state.primitive.clone());
+    let mut solver = iso2d::solver(
+        cmdline.execution_mode(),
+        state.mesh,
+        state.primitive.clone(),
+    );
     let mut mzps_log = vec![];
 
     let setup = make_setup(&state.setup_name, &state.parameters)?;

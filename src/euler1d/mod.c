@@ -146,9 +146,6 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 #define FOR_EACH_OMP(p) \
 _Pragma("omp parallel for") \
     for (int i = p.start; i < p.start + p.count; ++i)
-#define CONTAINS(p, q) \
-        (p.start <= q.start && p.start + p.count >= q.start + q.count) && \
-        (p.start <= q.start && p.start + p.count >= q.start + q.count)
 #define GET(p, i) (p.data + p.jumps * ((i) - p.start))
 #define ELEMENTS(p) (p.count * p.count * p.num_fields)
 #define BYTES(p) (ELEMENTS(p) * sizeof(real))
