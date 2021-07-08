@@ -1,6 +1,7 @@
 use crate::sailfish;
 
 #[derive(Clone, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
+#[serde(untagged)]
 pub enum Mesh {
     Structured(sailfish::StructuredMesh),
     FacePositions1D(Vec<f64>),

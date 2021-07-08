@@ -1,3 +1,5 @@
+use crate::Setup;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub enum ExecutionMode {
@@ -130,5 +132,5 @@ pub trait Solve {
 
     /// Returns the largest wavespeed among the zones in the solver's current
     /// primitive array.
-    fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64;
+    fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64;
 }

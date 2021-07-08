@@ -6,12 +6,13 @@ import msgpack
 
 for filename in sys.argv[1:]:
     chkpt = msgpack.load(open(filename, 'rb'))
-    ni = chkpt['mesh']['ni']
-    nj = chkpt['mesh']['nj']
-    x0 = chkpt['mesh']['x0']
-    y0 = chkpt['mesh']['y0']
-    x1 = chkpt['mesh']['dx'] * chkpt['mesh']['ni'] + x0
-    y1 = chkpt['mesh']['dy'] * chkpt['mesh']['nj'] + y0
+    mesh = chkpt['mesh']
+    ni = mesh['ni']
+    nj = mesh['nj']
+    x0 = mesh['x0']
+    y0 = mesh['y0']
+    x1 = mesh['dx'] * mesh['ni'] + x0
+    y1 = mesh['dy'] * mesh['nj'] + y0
     primitive = np.reshape(chkpt['primitive'], (ni + 4, nj + 4, 3))[2:-2,2:-2]
     plt.figure(figsize=[12, 9.5])
     plt.imshow(primitive[:,:,0].T**0.25, origin='lower', cmap='plasma', extent=[x0, x1, y0, y1])

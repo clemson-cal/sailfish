@@ -25,7 +25,9 @@ extern "C" {
 }
 
 pub mod cpu {
+    use crate::Setup;
     use super::*;
+
     pub struct Solver {
         face_positions: Vec<f64>,
         primitive1: Vec<f64>,
@@ -92,7 +94,7 @@ pub mod cpu {
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, _eos: EquationOfState, _masses: &[PointMass]) -> f64 {
+        fn max_wavespeed(&self, _time: f64, _setup: &Box<dyn Setup>) -> f64 {
             let mut wavespeeds = vec![0.0; self.num_zones()];
             unsafe {
                 euler1d_wavespeed(

@@ -1,3 +1,4 @@
+use crate::Setup;
 use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, StructuredMesh, PointMass, Solve};
 use cfg_if::cfg_if;
 
@@ -38,17 +39,18 @@ extern "C" {
 /// Primitive variable array in a solver using first, second, or third-order
 /// Runge-Kutta time stepping.
 #[allow(clippy::too_many_arguments)]
-pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
+pub fn advance(
     solver: &mut Box<dyn Solve>,
-    eos: EquationOfState,
-    buffer: BufferZone,
-    masses: M,
-    nu: f64,
+    setup: &Box<dyn Setup>,
     rk_order: u32,
     time: f64,
     dt: f64,
 ) {
     solver.primitive_to_conserved();
+    let buffer = setup.buffer_zone();
+    let eos = setup.equation_of_state();
+    let nu = setup.viscosity().unwrap_or(0.0);
+    let masses = |t| setup.masses(t);
 
     match rk_order {
         1 => {
@@ -162,7 +164,9 @@ pub mod cpu {
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64 {
+        fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
+            let eos = setup.equation_of_state();
+            let masses = setup.masses(time);
             let mut wavespeeds = vec![0.0; self.mesh.num_total_zones()];
             unsafe {
                 iso2d_wavespeed(
@@ -210,8 +214,8 @@ pub mod omp {
         ) {
             self.0.advance_rk(nu, eos, buffer, masses, a, dt)
         }
-        fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64 {
-            self.0.max_wavespeed(eos, masses)
+        fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
+            self.0.max_wavespeed(time, setup)
         }
     }
 }
@@ -288,7 +292,9 @@ pub mod gpu {
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64 {
+        fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
+            let eos = setup.equation_of_state();
+            let masses = setup.masses(t);
             use gpu_mem::Reduce;
             let masses = DeviceVec::from(masses);
 

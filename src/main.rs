@@ -107,11 +107,8 @@ fn run() -> Result<(), error::Error> {
     let mut mzps_log = vec![];
 
     let setup = make_setup(&state.setup_name, &state.parameters)?;
-    let (mesh, nu, eos, buffer, cfl, fold, chkpt_interval, rk_order, outdir) = (
+    let (mesh, cfl, fold, chkpt_interval, rk_order, outdir) = (
         state.mesh.clone(),
-        setup.viscosity().unwrap_or(0.0),
-        setup.equation_of_state(),
-        setup.buffer_zone(),
         cmdline.cfl_number,
         cmdline.fold,
         cmdline.checkpoint_interval,
@@ -149,15 +146,12 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                let a_max = solver.max_wavespeed(eos, &setup.masses(state.time));
+                let a_max = solver.max_wavespeed(state.time, &setup);
                 let dt = mesh.min_spacing() / a_max * cfl;
 
                 iso2d::advance(
                     &mut solver,
-                    eos,
-                    buffer,
-                    |t| setup.masses(t),
-                    nu,
+                    &setup,
                     rk_order,
                     state.time,
                     dt,
