@@ -9,7 +9,6 @@ pub trait Setup {
     fn masses(&self, time: f64) -> Vec<PointMass>;
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
-    fn max_signal_speed(&self) -> Option<f64>;
     fn viscosity(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
@@ -61,9 +60,6 @@ impl Setup for Explosion {
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None
     }
-    fn max_signal_speed(&self) -> Option<f64> {
-        Some(1.0)
-    }
     fn viscosity(&self) -> Option<f64> {
         None
     }
@@ -75,6 +71,7 @@ impl Setup for Explosion {
 pub struct Binary {
     pub domain_radius: f64,
     pub nu: f64,
+    pub mach_number: f64,
     pub sink_radius: f64,
     pub sink_rate: f64,
     pub sink_model: SinkModel,
@@ -87,6 +84,7 @@ impl std::str::FromStr for Binary {
         let form = kind_config::Form::new()
             .item("domain_radius", 12.0, "half-size of the simulation domain [a]")
             .item("nu", 1e-3, "kinematic viscosity coefficient [Omega a^2]")
+            .item("mach_number", 10.0, "mach number for locally isothermal EOS")
             .item("sink_radius", 0.05, "sink kernel radius [a]")
             .item("sink_rate", 10.0, "rate of mass subtraction in the sink [Omega]")
             .item("sink_model", "af", "sink prescription: [none|af|tf|ff]")
@@ -96,12 +94,13 @@ impl std::str::FromStr for Binary {
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
+            mach_number: form.get("mach_number").into(),
             sink_radius: form.get("sink_radius").into(),
             sink_rate: form.get("sink_rate").into(),
             sink_model: match form.get("sink_model").to_string().as_str() {
                 "none" => SinkModel::Inactive,
                 "af" => SinkModel::AccelerationFree,
-                "tf" => return Err(InvalidSetup("torque-free sink is not impemented yet".into())),
+                "tf" => SinkModel::TorqueFree,
                 "ff" => SinkModel::ForceFree,
                 _ => return Err(InvalidSetup("invalid sink_model".into())),
             },
@@ -160,13 +159,10 @@ impl Setup for Binary {
         vec![mass0, mass1]
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::LocallyIsothermal { mach_number_squared: 10.0f64.powi(2) }
+        EquationOfState::LocallyIsothermal { mach_number_squared: self.mach_number.powi(2) }
     }
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::None
-    }
-    fn max_signal_speed(&self) -> Option<f64> {
-        Some(1.0 / self.sink_radius.sqrt())
     }
     fn viscosity(&self) -> Option<f64> {
         Some(self.nu)

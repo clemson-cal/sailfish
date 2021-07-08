@@ -2,7 +2,7 @@
 
 - [ ] Orbital evolution
 - [ ] Time series
-- [ ] Upsampling
+- [x] Upsampling
 - [ ] HIP / ROCm port
 - [ ] Multi-GPU
 - [ ] Physics
@@ -11,10 +11,6 @@
       - [ ] Alpha visc
       - [ ] Lambda / bulk visc term
 - [x] Max signal speed mode: a_max
-      - [x] Predicted: setup defines a fixed a_max
-      - [x] Discovered: driver computes a_max on the grid
-      - [ ] Problem may define fixed a_max, a_ceiling, or both. If define,
-        computed signal speed will be at most a_ceiling.
 - [ ] Energy-conserving mode
 - [ ] Safety features
       - [ ] Density / pressure floors

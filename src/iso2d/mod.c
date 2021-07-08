@@ -109,7 +109,21 @@ static __host__ __device__ void point_mass_source_term(
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
             break;
-        // TODO: case TorqueFree
+        case TorqueFree: {
+            real vx        = prim[1];
+            real vy        = prim[2];
+            real vx0       = mass->vx;
+            real vy0       = mass->vy;
+            real rhatx     = dx / dr;
+            real rhaty     = dy / dr;
+            real dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
+            real vxstar    = dvdotrhat * rhatx + vx0;
+            real vystar    = dvdotrhat * rhaty + vy0;
+            delta_cons[0] = dt * mdot;
+            delta_cons[1] = dt * mdot * vxstar + dt * fx;
+            delta_cons[2] = dt * mdot * vystar + dt * fy;
+            break;
+        }
         case ForceFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * fx;
