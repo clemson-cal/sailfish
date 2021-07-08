@@ -49,9 +49,11 @@ pub enum BufferZone {
     },
 }
 
+/// A logically cartesian 2d mesh with uniform grid spacing. C equivalent is
+/// defined in sailfish.h.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Mesh {
+#[derive(Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct StructuredMesh {
     /// Number of zones on the i-axis
     pub ni: i32,
     /// Number of zones on the j-axis
@@ -66,7 +68,7 @@ pub struct Mesh {
     pub dy: f64,
 }
 
-impl Mesh {
+impl StructuredMesh {
     /// Creates a square mesh that is centered on the origin, with the given
     /// number of zones on each side.
     pub fn centered_square(domain_radius: f64, resolution: u32) -> Self {

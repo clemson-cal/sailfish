@@ -1,16 +1,16 @@
-use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, Mesh, PointMass, Solve};
+use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, StructuredMesh, PointMass, Solve};
 use cfg_if::cfg_if;
 
 extern "C" {
     fn iso2d_primitive_to_conserved(
-        mesh: Mesh,
+        mesh: StructuredMesh,
         primitive_ptr: *const f64,
         conserved_ptr: *mut f64,
         mode: ExecutionMode,
     );
 
     fn iso2d_advance_rk(
-        mesh: Mesh,
+        mesh: StructuredMesh,
         conserved_rk_ptr: *const f64,
         primitive_rd_ptr: *const f64,
         primitive_wr_ptr: *mut f64,
@@ -25,7 +25,7 @@ extern "C" {
     );
 
     fn iso2d_wavespeed(
-        mesh: Mesh,
+        mesh: StructuredMesh,
         primitive_ptr: *const f64,
         wavespeed_ptr: *mut f64,
         eos: EquationOfState,
@@ -71,7 +71,7 @@ pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
     }
 }
 
-pub fn solver(mode: ExecutionMode, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
+pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: Vec<f64>) -> Box<dyn Solve> {
     match mode {
         ExecutionMode::CPU => Box::new(cpu::Solver::new(mesh, primitive)),
         ExecutionMode::OMP => {
@@ -98,7 +98,7 @@ pub fn solver(mode: ExecutionMode, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn S
 pub mod cpu {
     use super::*;
     pub struct Solver {
-        mesh: Mesh,
+        mesh: StructuredMesh,
         primitive1: Vec<f64>,
         primitive2: Vec<f64>,
         conserved0: Vec<f64>,
@@ -106,7 +106,7 @@ pub mod cpu {
     }
 
     impl Solver {
-        pub fn new(mesh: Mesh, primitive: Vec<f64>) -> Self {
+        pub fn new(mesh: StructuredMesh, primitive: Vec<f64>) -> Self {
             assert_eq!(
                 primitive.len(),
                 (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
@@ -185,7 +185,7 @@ pub mod omp {
     pub struct Solver(cpu::Solver);
 
     impl Solver {
-        pub fn new(mesh: Mesh, primitive: Vec<f64>) -> Self {
+        pub fn new(mesh: StructuredMesh, primitive: Vec<f64>) -> Self {
             let mut solver = cpu::Solver::new(mesh, primitive);
             solver.mode = ExecutionMode::OMP;
             Self(solver)
@@ -222,7 +222,7 @@ pub mod gpu {
     use gpu_mem::DeviceVec;
 
     pub struct Solver {
-        mesh: Mesh,
+        mesh: StructuredMesh,
         primitive1: DeviceVec<f64>,
         primitive2: DeviceVec<f64>,
         conserved0: DeviceVec<f64>,
@@ -230,7 +230,7 @@ pub mod gpu {
     }
 
     impl Solver {
-        pub fn new(mesh: Mesh, primitive: Vec<f64>) -> Self {
+        pub fn new(mesh: StructuredMesh, primitive: Vec<f64>) -> Self {
             assert_eq!(
                 primitive.len(),
                 (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3

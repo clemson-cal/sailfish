@@ -1,6 +1,6 @@
 use crate::cmdline::CommandLine;
 use crate::error;
-use crate::sailfish::Mesh;
+use crate::mesh;
 use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
@@ -39,7 +39,7 @@ impl RecurringTask {
 pub struct State {
     pub command_line: CommandLine,
     pub restart_file: Option<String>,
-    pub mesh: Mesh,
+    pub mesh: mesh::Mesh,
     pub setup_name: String,
     pub parameters: String,
     pub primitive: Vec<f64>,
@@ -90,8 +90,12 @@ impl State {
     }
 
     pub fn upsample(mut self) -> Self {
-        let ni = self.mesh.ni;
-        let nj = self.mesh.nj;
+        let mut mesh = match self.mesh {
+            mesh::Mesh::Structured(ref mut mesh) => mesh,
+            _ => panic!("can only upsample structured mesh")
+        };
+        let ni = mesh.ni;
+        let nj = mesh.nj;
         let mi = 2 * ni;
         let mj = 2 * nj;
         let mut new_primitive = vec![0.0; (mi as usize + 4) * (mj as usize + 4) * 3];
@@ -122,10 +126,10 @@ impl State {
             }
         }
         self.primitive = new_primitive;
-        self.mesh.ni *= 2;
-        self.mesh.nj *= 2;
-        self.mesh.dx *= 0.5;
-        self.mesh.dy *= 0.5;
+        mesh.ni *= 2;
+        mesh.nj *= 2;
+        mesh.dx *= 0.5;
+        mesh.dy *= 0.5;
         self
     }
 }

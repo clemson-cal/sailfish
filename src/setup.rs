@@ -1,5 +1,6 @@
-use crate::sailfish::{BufferZone, EquationOfState, Mesh, PointMass, SinkModel};
+use crate::sailfish::{BufferZone, EquationOfState, PointMass, SinkModel, StructuredMesh};
 use crate::error;
+use crate::mesh::Mesh;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use error::Error::*;
 
@@ -12,17 +13,24 @@ pub trait Setup {
     fn viscosity(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
-        let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
-        let si = 3 * (mesh.nj + 4);
-        let sj = 3;
-        for i in -2..mesh.ni + 2 {
-            for j in -2..mesh.nj + 2 {
-                let n = ((i + 2) * si + (j + 2) * sj) as usize;
-                let [x, y] = mesh.cell_coordinates(i, j);
-                self.initial_primitive(x, y, &mut primitive[n..n + 3])
+        match mesh {
+            Mesh::Structured(mesh) => {
+                let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
+                let si = 3 * (mesh.nj + 4);
+                let sj = 3;
+                for i in -2i32..mesh.ni + 2 {
+                    for j in -2i32..mesh.nj + 2 {
+                        let n = ((i + 2) * si + (j + 2) * sj) as usize;
+                        let [x, y] = mesh.cell_coordinates(i, j);
+                        self.initial_primitive(x, y, &mut primitive[n..n + 3])
+                    }
+                }
+                primitive                
+            }
+            Mesh::FacePositions1D(_faces) => {
+                todo!()
             }
         }
-        primitive
     }
 }
 
@@ -64,7 +72,7 @@ impl Setup for Explosion {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::centered_square(1.0, resolution)
+        Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
     }
 }
 
@@ -168,6 +176,6 @@ impl Setup for Binary {
         Some(self.nu)
     }
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::centered_square(self.domain_radius, resolution)
+        Mesh::Structured(StructuredMesh::centered_square(self.domain_radius, resolution))
     }
 }

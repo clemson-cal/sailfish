@@ -11,6 +11,7 @@ pub mod cmdline;
 pub mod error;
 pub mod euler1d;
 pub mod iso2d;
+pub mod mesh;
 pub mod sailfish;
 pub mod setup;
 pub mod state;
@@ -57,7 +58,7 @@ fn new_state(
 
     let state = State {
         command_line,
-        mesh,
+        mesh: mesh.clone(),
         restart_file: None,
         iteration: 0,
         time: 0.0,
@@ -97,14 +98,17 @@ fn run() -> Result<(), error::Error> {
     let mut state = make_state(&cmdline)?;
     let mut solver = iso2d::solver(
         cmdline.execution_mode(),
-        state.mesh,
+        match state.mesh {
+            mesh::Mesh::Structured(mesh) => mesh,
+            _ => panic!("wrong mesh type")
+        },
         state.primitive.clone(),
     );
     let mut mzps_log = vec![];
 
     let setup = make_setup(&state.setup_name, &state.parameters)?;
     let (mesh, nu, eos, buffer, cfl, fold, chkpt_interval, rk_order, outdir) = (
-        state.mesh,
+        state.mesh.clone(),
         setup.viscosity().unwrap_or(0.0),
         setup.equation_of_state(),
         setup.buffer_zone(),
@@ -146,7 +150,7 @@ fn run() -> Result<(), error::Error> {
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 let a_max = solver.max_wavespeed(eos, &setup.masses(state.time));
-                let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
+                let dt = mesh.min_spacing() / a_max * cfl;
 
                 iso2d::advance(
                     &mut solver,
