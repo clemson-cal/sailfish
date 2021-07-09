@@ -1,6 +1,6 @@
 use std::iter::FromIterator;
-use std::os::raw::{c_void, c_ulong};
 use std::mem;
+use std::os::raw::{c_ulong, c_void};
 
 extern "C" {
     pub fn gpu_malloc(size: c_ulong) -> *mut c_void;
@@ -52,12 +52,19 @@ impl<T: Copy> From<&Vec<T>> for DeviceVec<T> {
     }
 }
 
-impl<T: Copy> From<&DeviceVec<T>> for Vec<T> where T: Default {
+impl<T: Copy> From<&DeviceVec<T>> for Vec<T>
+where
+    T: Default,
+{
     fn from(dvec: &DeviceVec<T>) -> Self {
         let mut hvec = vec![T::default(); dvec.len()];
         let bytes = (dvec.len() * mem::size_of::<T>()) as c_ulong;
         unsafe {
-            gpu_memcpy_dtoh(hvec.as_mut_ptr() as *mut c_void, dvec.ptr as *const c_void, bytes)
+            gpu_memcpy_dtoh(
+                hvec.as_mut_ptr() as *mut c_void,
+                dvec.ptr as *const c_void,
+                bytes,
+            )
         };
         hvec
     }
@@ -65,9 +72,7 @@ impl<T: Copy> From<&DeviceVec<T>> for Vec<T> where T: Default {
 
 impl<T: Copy> Drop for DeviceVec<T> {
     fn drop(&mut self) {
-        unsafe {
-            gpu_free(self.ptr as *mut c_void)
-        }
+        unsafe { gpu_free(self.ptr as *mut c_void) }
     }
 }
 
@@ -80,13 +85,13 @@ impl<T: Copy> Clone for DeviceVec<T> {
             Self {
                 ptr: ptr as *mut T,
                 len: self.len,
-            }            
+            }
         }
     }
 }
 
 impl<T: Copy> FromIterator<T> for DeviceVec<T> {
-    fn from_iter<I: IntoIterator<Item=T>>(iter: I) -> Self {
+    fn from_iter<I: IntoIterator<Item = T>>(iter: I) -> Self {
         let hvec: Vec<T> = iter.into_iter().collect();
         DeviceVec::from(&hvec)
     }
@@ -104,9 +109,7 @@ impl Reduce for DeviceVec<f64> {
             None
         } else {
             let mut result = DeviceVec::from(&vec![0.0]);
-            unsafe {
-                gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr())
-            };
+            unsafe { gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr()) };
             Some(Vec::from(&result)[0])
         }
     }
@@ -127,7 +130,10 @@ mod tests {
     fn reduce() {
         for n in 0..1000 {
             let dvec: DeviceVec<_> = (0..n).map(|i| i as f64).collect();
-            assert_eq!(dvec.maximum(), if n == 0 { None } else { Some((n - 1) as f64) })
+            assert_eq!(
+                dvec.maximum(),
+                if n == 0 { None } else { Some((n - 1) as f64) }
+            )
         }
     }
 }
