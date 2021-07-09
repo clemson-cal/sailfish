@@ -21,6 +21,11 @@ where
 {
     let start = std::time::Instant::now();
     f();
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            gpu_mem::device_synchronize();
+        }
+    }
     start.elapsed()
 }
 
@@ -50,7 +55,7 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
 fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
     if cmdline.use_gpu {
         cfg_if! {
-            if #[cfg(feature = "cuda")] {
+            if #[cfg(feature = "gpu")] {
                 Box::new(iso2d::gpu::Solver::new(mesh, primitive))
             } else {
                 panic!()

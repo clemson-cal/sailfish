@@ -4,7 +4,11 @@
 
 // ============================ COMPAT ========================================
 // ============================================================================
-#ifndef __NVCC__
+#ifdef __ROCM__
+#include <hip/hip_runtime.h>
+#endif
+
+#if !defined(__NVCC__) && !defined(__ROCM__)
 #define __device__
 #define __host__
 #define EXTERN_C
@@ -666,7 +670,7 @@ static __host__ __device__ void wavespeed_zone(
 
 // ============================ KERNELS =======================================
 // ============================================================================
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__ROCM__)
 
 static void __global__ primitive_to_conserved_kernel(
     struct Mesh mesh,
@@ -786,7 +790,7 @@ EXTERN_C void iso2d_primitive_to_conserved(
         }
 
         case GPU: {
-            #ifdef __NVCC__
+            #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
             primitive_to_conserved_kernel<<<bd, bs>>>(mesh, primitive, conserved);
@@ -863,7 +867,7 @@ EXTERN_C void iso2d_advance_rk(
         }
 
         case GPU: {
-            #ifdef __NVCC__
+            #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
             if (nu == 0.0) {
@@ -918,7 +922,7 @@ EXTERN_C void iso2d_wavespeed(
         }
 
         case GPU: {
-            #ifdef __NVCC__
+            #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
             wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed, masses, num_masses);

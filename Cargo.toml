@@ -20,4 +20,4 @@ cc = "1.0"
 [features]
 default = ["omp"]
 omp = []
-cuda = ["gpu_mem"]
+gpu = ["gpu_mem"]
