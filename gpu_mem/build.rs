@@ -13,22 +13,35 @@ fn is_program_in_path(program: &str) -> bool {
     false
 }
 
-fn main() {
+fn gpu_build(src: &str) -> cc::Build {
     if is_program_in_path("nvcc") {
         cc::Build::new()
-            .file("src/lib.cu")
+            .file(src)
             .cuda(true)
             .flag("-x=cu")
-            .compile("lib");
-        println!("cargo:rustc-link-lib=dylib=cudart");
+            .clone()
     } else if is_program_in_path("hipcc") {
         cc::Build::new()
-            .file("src/lib.cu")
+            .file(src)
             .compiler("hipcc")
-            .compile("lib");
+            .clone()
+    } else {
+        panic!("neither nvcc nor hipcc is installed");        
+    }
+}
+
+fn gpu_link_flags() {
+    if is_program_in_path("nvcc") {
+        println!("cargo:rustc-link-lib=dylib=cudart");
+    } else if is_program_in_path("hipcc") {
         println!("cargo:rustc-link-search=native=/opt/rocm/lib");
         println!("cargo:rustc-link-lib=dylib=amdhip64");
     } else {
-        panic!("nvcc is not installed");
+        panic!("neither nvcc nor hipcc is installed");        
     }
+}
+
+fn main() {
+    gpu_build("src/lib.cu").compile("lib");
+    gpu_link_flags();
 }
