@@ -20,6 +20,7 @@ extern "C" {
         nu: f64,
         a: f64,
         dt: f64,
+        velocity_ceiling: f64,
         mode: ExecutionMode,
     );
 
@@ -46,23 +47,24 @@ pub fn advance<M: Fn(f64) -> Vec<PointMass>>(
     rk_order: u32,
     time: f64,
     dt: f64,
+    velocity_ceiling: f64,
 ) {
     solver.primitive_to_conserved();
 
     match rk_order {
         1 => {
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt, velocity_ceiling);
         }
         2 => {
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt);
-            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 0.5, dt);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt, velocity_ceiling);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 0.5, dt, velocity_ceiling);
         }
         3 => {
             // t1 = a1 * tn + (1 - a1) * (tn + dt) =     tn +     (      dt) = tn +     dt [a1 = 0]
             // t2 = a2 * tn + (1 - a2) * (t1 + dt) = 3/4 tn + 1/4 (tn + 2dt) = tn + 1/2 dt [a2 = 3/4]
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0. / 1., dt);
-            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 3. / 4., dt);
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.5 * dt), 1. / 3., dt);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0. / 1., dt, velocity_ceiling);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 3. / 4., dt, velocity_ceiling);
+            solver.advance_rk(nu, eos, buffer, &masses(time + 0.5 * dt), 1. / 3., dt, velocity_ceiling);
         }
         _ => {
             panic!("invalid RK order")
@@ -118,6 +120,7 @@ pub mod cpu {
             masses: &[PointMass],
             a: f64,
             dt: f64,
+            velocity_ceiling: f64,
         ) {
             unsafe {
                 iso2d_advance_rk(
@@ -132,6 +135,7 @@ pub mod cpu {
                     nu,
                     a,
                     dt,
+                    velocity_ceiling,
                     self.mode,
                 )
             };
@@ -182,8 +186,9 @@ pub mod omp {
             masses: &[PointMass],
             a: f64,
             dt: f64,
+            velocity_ceiling: f64,
         ) {
-            self.0.advance_rk(nu, eos, buffer, masses, a, dt)
+            self.0.advance_rk(nu, eos, buffer, masses, a, dt, velocity_ceiling)
         }
         fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64 {
             self.0.max_wavespeed(eos, masses)
@@ -242,6 +247,7 @@ pub mod gpu {
             masses: &[PointMass],
             a: f64,
             dt: f64,
+            velocity_ceiling: f64,
         ) {
             let masses = DeviceVec::from(masses);
 
@@ -258,6 +264,7 @@ pub mod gpu {
                     nu,
                     a,
                     dt,
+                    velocity_ceiling,
                     ExecutionMode::GPU,
                 )
             };

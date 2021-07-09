@@ -124,6 +124,7 @@ pub trait Solve {
         masses: &[PointMass],
         a: f64,
         dt: f64,
+        velocity_ceiling: f64,
     );
 
     /// Returns the largest wavespeed among the zones in the solver's current

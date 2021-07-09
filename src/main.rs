@@ -121,7 +121,7 @@ fn run() -> Result<(), error::Error> {
     let mut mzps_log = vec![];
 
     let setup = make_setup(&state.setup_name, &state.parameters)?;
-    let (mesh, nu, eos, buffer, cfl, fold, chkpt_interval, rk_order, outdir) = (
+    let (mesh, nu, eos, buffer, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
         state.mesh,
         setup.viscosity().unwrap_or(0.0),
         setup.equation_of_state(),
@@ -130,6 +130,7 @@ fn run() -> Result<(), error::Error> {
         cmdline.fold,
         cmdline.checkpoint_interval,
         cmdline.rk_order,
+        cmdline.velocity_ceiling,
         cmdline
             .outdir
             .or_else(|| {
@@ -175,6 +176,7 @@ fn run() -> Result<(), error::Error> {
                     rk_order,
                     state.time,
                     dt,
+                    velocity_ceiling,
                 );
                 state.time += dt;
                 state.iteration += 1;

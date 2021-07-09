@@ -15,6 +15,7 @@ pub struct CommandLine {
     pub end_time: Option<f64>,
     pub rk_order: u32,
     pub cfl_number: f64,
+    pub velocity_ceiling: f64,
 }
 
 #[rustfmt::skip]
@@ -33,6 +34,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         end_time: None,
         rk_order: 1,
         cfl_number: 0.2,
+        velocity_ceiling: 1e16,
     };
 
     enum State {
@@ -44,6 +46,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         RkOrder,
         Cfl,
         Outdir,
+        VelocityCeiling
     }
     let mut state = State::Ready;
 
@@ -86,6 +89,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
                     writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
                     writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
+                    writeln!(message, "       -v|--velocity-ceiling component-wise velocity ceiling [1e16]").unwrap();
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
                     return Err(PrintUserInformation(message));
                 }
@@ -100,6 +104,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-o" | "--outdir" => state = State::Outdir,
                 "-e" | "--end-time" => state = State::EndTime,
                 "-r" | "--rk-order" => state = State::RkOrder,
+                "-v" | "--velocity-ceiling" => state = State::VelocityCeiling,
                 "--cfl" => state = State::Cfl,
                 _ => {
                     if arg.starts_with('-') {
@@ -129,6 +134,10 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
             }
             State::RkOrder => {
                 c.rk_order = arg.parse().map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
+            State::VelocityCeiling => {
+                c.velocity_ceiling = arg.parse().map_err(|e| Cmdline(format!("velocity-ceiling {}: {}", arg, e)))?;
                 state = State::Ready;
             }
             State::EndTime => {

@@ -238,13 +238,13 @@ static __host__ __device__ void shear_strain(const real *gx, const real *gy, rea
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
+static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim, real velocity_ceiling)
 {
     real rho = cons[0];
     real px = cons[1];
     real py = cons[2];
-    real vx = px / rho;
-    real vy = py / rho;
+    real vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
+    real vy = sign(py) * min2(fabs(py / rho), velocity_ceiling);
 
     prim[0] = rho;
     prim[1] = vx;
@@ -404,6 +404,7 @@ static __host__ __device__ void advance_rk_zone(
     real nu,
     real a,
     real dt,
+    real velocity_ceiling,
     int i,
     int j)
 {
@@ -541,7 +542,7 @@ static __host__ __device__ void advance_rk_zone(
         ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i, j);
-    conserved_to_primitive(ucc, pout);
+    conserved_to_primitive(ucc, pout, velocity_ceiling);
 }
 
 static __host__ __device__ void advance_rk_zone_inviscid(
@@ -555,6 +556,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     int num_masses,
     real a,
     real dt,
+    real velocity_ceiling,
     int i,
     int j)
 {
@@ -640,7 +642,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
         ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i, j);
-    conserved_to_primitive(ucc, pout);
+    conserved_to_primitive(ucc, pout, velocity_ceiling);
 }
 
 static __host__ __device__ void wavespeed_zone(
@@ -691,14 +693,15 @@ static void __global__ advance_rk_kernel(
     int num_masses,
     real nu,
     real a,
-    real dt)
+    real dt,
+    real velocity_ceiling)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, i, j);
     }
 }
 
@@ -712,14 +715,15 @@ static void __global__ advance_rk_kernel_inviscid(
     struct PointMass *masses,
     int num_masses,
     real a,
-    real dt)
+    real dt,
+    real velocity_ceiling)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, i, j);
     }
 }
 
@@ -821,6 +825,7 @@ EXTERN_C void iso2d_advance_rk(
     real nu,
     real a,
     real dt,
+    real velocity_ceiling,
     enum ExecutionMode mode)
 {
     struct Patch conserved_rk = patch(mesh, 3, 0, conserved_rk_ptr);
@@ -831,11 +836,11 @@ EXTERN_C void iso2d_advance_rk(
         case CPU: {
             if (nu == 0.0) {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, i, j);
                 }
             } else {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, i, j);
                 }
             }
             break;
@@ -845,11 +850,11 @@ EXTERN_C void iso2d_advance_rk(
             #ifdef _OPENMP
             if (nu == 0.0) {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, i, j);
+                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, i, j);
                 }
             } else {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, i, j);
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, i, j);
                 }
             }
             break;
@@ -862,9 +867,9 @@ EXTERN_C void iso2d_advance_rk(
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
             if (nu == 0.0) {
-                advance_rk_kernel_inviscid<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt);
+                advance_rk_kernel_inviscid<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling);
             } else {
-                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt);
+                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling);
             }
             #endif
             break;
