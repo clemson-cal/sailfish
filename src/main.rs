@@ -21,6 +21,11 @@ where
 {
     let start = std::time::Instant::now();
     f();
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            gpu_mem::device_synchronize();
+        }
+    }
     start.elapsed()
 }
 

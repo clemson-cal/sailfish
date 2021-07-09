@@ -47,6 +47,15 @@ extern "C" void gpu_memcpy_dtod(void *dst, const void *src, ulong size)
     gpuMemcpy(dst, src, size, gpuMemcpyDeviceToDevice);
 }
 
+extern "C" void gpu_device_synchronize()
+{
+#ifdef __NVCC__
+    cudaDeviceSynchronize();
+#else
+    hipDeviceSynchronize();
+#endif
+}
+
 // Adapted from:
 // https://sodocumentation.net/cuda/topic/6566/parallel-reduction--e-g--how-to-sum-an-array
 

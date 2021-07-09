@@ -10,6 +10,7 @@ extern "C" {
     pub fn gpu_memcpy_dtod(dst: *mut c_void, src: *const c_void, size: c_ulong);
 
     pub fn gpu_vec_max_f64(vec: *const f64, size: c_ulong, result: *mut f64);
+    pub fn gpu_device_synchronize();
 }
 
 pub struct DeviceVec<T: Copy> {
@@ -112,6 +113,12 @@ impl Reduce for DeviceVec<f64> {
             unsafe { gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr()) };
             Some(Vec::from(&result)[0])
         }
+    }
+}
+
+pub fn device_synchronize() {
+    unsafe {
+        gpu_device_synchronize()
     }
 }
 

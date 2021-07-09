@@ -41,6 +41,7 @@ fn build(src: &str) -> cc::Build {
         } else if #[cfg(all(feature = "omp", not(feature = "gpu")))] {
             cc::Build::new()
                 .file(src)
+                .flag("-std=c99")
                 .flag("-Xpreprocessor")
                 .flag("-fopenmp")
                 .clone()
@@ -48,6 +49,7 @@ fn build(src: &str) -> cc::Build {
             gpu_build(src)
         } else {
             cc::Build::new()
+                .flag("-std=c99")
                 .file(src)
                 .clone()
         }
