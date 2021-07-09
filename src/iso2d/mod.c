@@ -4,7 +4,11 @@
 
 // ============================ COMPAT ========================================
 // ============================================================================
-#ifndef __NVCC__
+#ifdef __HCC__
+#include <hip/hip_runtime.h>
+#endif
+
+#if !defined(__NVCC__) && !defined(__HCC__)
 #define __device__
 #define __host__
 #define EXTERN_C
