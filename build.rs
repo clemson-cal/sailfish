@@ -2,6 +2,7 @@ use std::env;
 use std::fs;
 use cfg_if::cfg_if;
 
+#[allow(dead_code)]
 fn is_program_in_path(program: &str) -> bool {
     if let Ok(path) = env::var("PATH") {
         for p in path.split(":") {
@@ -14,14 +15,29 @@ fn is_program_in_path(program: &str) -> bool {
     false
 }
 
+#[allow(dead_code)]
+fn gpu_build(src: &str) -> cc::Build {
+    let src = src.to_owned() + "u";
+    if is_program_in_path("nvcc") {
+        cc::Build::new()
+            .file(src)
+            .cuda(true)
+            .clone()
+    } else if is_program_in_path("hipcc") {
+        cc::Build::new()
+            .file(src)
+            .compiler("hipcc")
+            .clone()
+    } else {
+        panic!("neither nvcc nor hipcc is installed");        
+    }
+}
+
 fn build(src: &str) -> cc::Build {
     cfg_if! {
         if #[cfg(all(feature = "omp", feature = "cuda"))] {
-            cc::Build::new()
-                .file(src)
-                .cuda(true)
-                .flag("-x=cu")
-                .flag("-Xcompiler")
+            gpu_build(src)
+                //.flag("-Xcompiler")
                 .flag("-fopenmp")
                 .clone()
         } else if #[cfg(all(feature = "omp", not(feature = "cuda")))] {
@@ -31,11 +47,7 @@ fn build(src: &str) -> cc::Build {
                 .flag("-fopenmp")
                 .clone()
         } else if #[cfg(all(not(feature = "omp"), feature = "cuda"))] {
-            cc::Build::new()
-                .file(src)
-                .cuda(true)
-                .flag("-x=cu")
-                .clone()
+            gpu_build(src)
         } else {
             cc::Build::new()
                 .file(src)
