@@ -1,7 +1,6 @@
 #include <math.h>
 
 #ifdef __NVCC__
-#define EXTERN_C extern "C"
 #define gpuFree cudaFree
 #define gpuMalloc cudaMalloc
 #define gpuMemcpy cudaMemcpy
@@ -11,7 +10,6 @@
 
 #else
 #include <hip/hip_runtime.h>
-#define EXTERN_C
 #define gpuFree hipFree
 #define gpuMalloc hipMalloc
 #define gpuMemcpy hipMemcpy
@@ -22,29 +20,29 @@
 
 typedef unsigned long ulong;
 
-EXTERN_C void *gpu_malloc(ulong size)
+extern "C" void *gpu_malloc(ulong size)
 {
     void *ptr;
     gpuMalloc(&ptr, size);
     return ptr;
 }
 
-EXTERN_C void gpu_free(void *ptr)
+extern "C" void gpu_free(void *ptr)
 {
     gpuFree(&ptr);
 }
 
-EXTERN_C void gpu_memcpy_htod(void *dst, const void *src, ulong size)
+extern "C" void gpu_memcpy_htod(void *dst, const void *src, ulong size)
 {
     gpuMemcpy(dst, src, size, gpuMemcpyHostToDevice);
 }
 
-EXTERN_C void gpu_memcpy_dtoh(void *dst, const void *src, ulong size)
+extern "C" void gpu_memcpy_dtoh(void *dst, const void *src, ulong size)
 {
     gpuMemcpy(dst, src, size, gpuMemcpyDeviceToHost);
 }
 
-EXTERN_C void gpu_memcpy_dtod(void *dst, const void *src, ulong size)
+extern "C" void gpu_memcpy_dtod(void *dst, const void *src, ulong size)
 {
     gpuMemcpy(dst, src, size, gpuMemcpyDeviceToDevice);
 }
@@ -85,7 +83,7 @@ static __global__ void vec_max_f64_kernel(const double *in, ulong N, double *out
     }
 }
 
-EXTERN_C void gpu_vec_max_f64(const double *vec, ulong size, double *result)
+extern "C" void gpu_vec_max_f64(const double *vec, ulong size, double *result)
 {
     if (size == 0) {
         return;
