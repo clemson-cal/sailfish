@@ -4,17 +4,17 @@
 
 // ============================ COMPAT ========================================
 // ============================================================================
-//#ifdef __HCC__
+#ifdef __ROCM__
 #include <hip/hip_runtime.h>
-//#endif
+#endif
 
-//#if !defined(__NVCC__) && !defined(__HCC__)
-//#define __device__
-//#define __host__
-//#define EXTERN_C
-//#else
+#if !defined(__NVCC__) && !defined(__ROCM__)
+#define __device__
+#define __host__
+#define EXTERN_C
+#else
 #define EXTERN_C extern "C"
-//#endif
+#endif
 
 
 // ============================ PHYSICS =======================================

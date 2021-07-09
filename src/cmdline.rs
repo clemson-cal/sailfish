@@ -80,7 +80,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -h|--help             display this help message").unwrap();
                     #[cfg(feature = "omp")]
                     writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
-                    #[cfg(feature = "cuda")]
+                    #[cfg(feature = "gpu")]
                     writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
                     writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
@@ -95,7 +95,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 }
                 #[cfg(feature = "omp")]
                 "-p" | "--use-omp" => c.use_omp = true,
-                #[cfg(feature = "cuda")]
+                #[cfg(feature = "gpu")]
                 "-g" | "--use-gpu" => c.use_gpu = true,
                 "-u" | "--upsample" => c.upsample = true,
                 "-n" | "--resolution" => state = State::GridResolution,

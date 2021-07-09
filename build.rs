@@ -1,6 +1,6 @@
+use cfg_if::cfg_if;
 use std::env;
 use std::fs;
-use cfg_if::cfg_if;
 
 #[allow(dead_code)]
 fn is_program_in_path(program: &str) -> bool {
@@ -19,34 +19,32 @@ fn is_program_in_path(program: &str) -> bool {
 fn gpu_build(src: &str) -> cc::Build {
     let src = src.to_owned() + "u";
     if is_program_in_path("nvcc") {
-        cc::Build::new()
-            .file(src)
-            .cuda(true)
-            .clone()
+        cc::Build::new().file(src).cuda(true).clone()
     } else if is_program_in_path("hipcc") {
         cc::Build::new()
             .file(src)
+            .define("__ROCM__", None)
             .compiler("hipcc")
             .clone()
     } else {
-        panic!("neither nvcc nor hipcc is installed");        
+        panic!("neither nvcc nor hipcc is installed");
     }
 }
 
 fn build(src: &str) -> cc::Build {
     cfg_if! {
-        if #[cfg(all(feature = "omp", feature = "cuda"))] {
+        if #[cfg(all(feature = "omp", feature = "gpu"))] {
             gpu_build(src)
-                //.flag("-Xcompiler")
+                .flag("-Xcompiler")
                 .flag("-fopenmp")
                 .clone()
-        } else if #[cfg(all(feature = "omp", not(feature = "cuda")))] {
+        } else if #[cfg(all(feature = "omp", not(feature = "gpu")))] {
             cc::Build::new()
                 .file(src)
                 .flag("-Xpreprocessor")
                 .flag("-fopenmp")
                 .clone()
-        } else if #[cfg(all(not(feature = "omp"), feature = "cuda"))] {
+        } else if #[cfg(all(not(feature = "omp"), feature = "gpu"))] {
             gpu_build(src)
         } else {
             cc::Build::new()
@@ -58,20 +56,27 @@ fn build(src: &str) -> cc::Build {
 
 fn gpu_link_flags() {
     cfg_if! {
-        if #[cfg(feature = "cuda")] {
+        if #[cfg(feature = "gpu")] {
             if is_program_in_path("nvcc") {
                 println!("cargo:rustc-link-lib=dylib=cudart");
             } else if is_program_in_path("hipcc") {
                 println!("cargo:rustc-link-search=native=/opt/rocm/lib");
                 println!("cargo:rustc-link-lib=dylib=amdhip64");
             } else {
-                panic!("neither nvcc nor hipcc is installed");        
+                panic!("neither nvcc nor hipcc is installed");
             }
         }
     }
 }
 
 fn main() {
+    cfg_if! {
+        if #[cfg(all(feature = "omp", feature = "gpu"))] {
+            if !is_program_in_path("nvcc") && is_program_in_path("hipcc") {
+                panic!("features omp and gpu cannot be enabled simultaneously on AMD, try --no-default-features --features=gpu")
+            }
+        }
+    }
     build("src/iso2d/mod.c").compile("iso2d_mod");
     gpu_link_flags();
 }

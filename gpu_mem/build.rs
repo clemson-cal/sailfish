@@ -22,7 +22,7 @@ fn gpu_build(src: &str) -> cc::Build {
     } else if is_program_in_path("hipcc") {
         cc::Build::new()
             .file(src)
-	    .compiler("hipcc")
+            .compiler("hipcc")
             .clone()
     } else {
         panic!("neither nvcc nor hipcc is installed");        

@@ -196,7 +196,7 @@ pub mod omp {
     }
 }
 
-#[cfg(feature = "cuda")]
+#[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
     use gpu_mem::DeviceVec;
