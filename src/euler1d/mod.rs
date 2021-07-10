@@ -1,4 +1,4 @@
-use crate::sailfish::{PointMass, EquationOfState, BufferZone, ExecutionMode, Solve};
+use crate::sailfish::{ExecutionMode, Solve};
 
 extern "C" {
     fn euler1d_primitive_to_conserved(
@@ -73,10 +73,8 @@ pub mod cpu {
         }
         fn advance_rk(
             &mut self,
-            _nu: f64,
-            _eos: EquationOfState,
-            _buffer: BufferZone,
-            _masses: &[PointMass],
+            _time: f64,
+            _setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
         ) {

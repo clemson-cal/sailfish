@@ -47,25 +47,20 @@ pub fn advance(
     dt: f64,
 ) {
     solver.primitive_to_conserved();
-    let buffer = setup.buffer_zone();
-    let eos = setup.equation_of_state();
-    let nu = setup.viscosity().unwrap_or(0.0);
-    let masses = |t| setup.masses(t);
-
     match rk_order {
         1 => {
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt);
+            solver.advance_rk(time, setup, 0.0, dt);
         }
         2 => {
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0.0, dt);
-            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 0.5, dt);
+            solver.advance_rk(time + 0.0 * dt, setup, 0.0, dt);
+            solver.advance_rk(time + 1.0 * dt, setup, 0.5, dt);
         }
         3 => {
             // t1 = a1 * tn + (1 - a1) * (tn + dt) =     tn +     (      dt) = tn +     dt [a1 = 0]
             // t2 = a2 * tn + (1 - a2) * (t1 + dt) = 3/4 tn + 1/4 (tn + 2dt) = tn + 1/2 dt [a2 = 3/4]
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.0 * dt), 0. / 1., dt);
-            solver.advance_rk(nu, eos, buffer, &masses(time + 1.0 * dt), 3. / 4., dt);
-            solver.advance_rk(nu, eos, buffer, &masses(time + 0.5 * dt), 1. / 3., dt);
+            solver.advance_rk(time + 0.0 * dt, setup, 0. / 1., dt);
+            solver.advance_rk(time + 1.0 * dt, setup, 3. / 4., dt);
+            solver.advance_rk(time + 0.5 * dt, setup, 1. / 3., dt);
         }
         _ => {
             panic!("invalid RK order")
@@ -139,13 +134,15 @@ pub mod cpu {
         }
         fn advance_rk(
             &mut self,
-            nu: f64,
-            eos: EquationOfState,
-            buffer: BufferZone,
-            masses: &[PointMass],
+            time: f64,
+            setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
         ) {
+            let buffer = setup.buffer_zone();
+            let eos = setup.equation_of_state();
+            let nu = setup.viscosity().unwrap_or(0.0);
+            let masses = setup.masses(time);
             unsafe {
                 iso2d_advance_rk(
                     self.mesh,
@@ -205,14 +202,12 @@ pub mod omp {
         }
         fn advance_rk(
             &mut self,
-            nu: f64,
-            eos: EquationOfState,
-            buffer: BufferZone,
-            masses: &[PointMass],
+            time: f64,
+            setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
         ) {
-            self.0.advance_rk(nu, eos, buffer, masses, a, dt)
+            self.0.advance_rk(time, setup, a, dt)
         }
         fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
             self.0.max_wavespeed(time, setup)
@@ -265,14 +260,15 @@ pub mod gpu {
         }
         fn advance_rk(
             &mut self,
-            nu: f64,
-            eos: EquationOfState,
-            buffer: BufferZone,
-            masses: &[PointMass],
+            time: f64,
+            setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
         ) {
-            let masses = DeviceVec::from(masses);
+            let buffer = setup.buffer_zone();
+            let eos = setup.equation_of_state();
+            let nu = setup.viscosity().unwrap_or(0.0);
+            let masses = DeviceVec::from(&setup.masses(time));
 
             unsafe {
                 iso2d_advance_rk(

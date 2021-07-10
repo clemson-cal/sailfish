@@ -122,10 +122,8 @@ pub trait Solve {
     /// sub-stup.
     fn advance_rk(
         &mut self,
-        nu: f64,
-        eos: EquationOfState,
-        buffer: BufferZone,
-        masses: &[PointMass],
+        time: f64,
+        setup: &Box<dyn Setup>,
         a: f64,
         dt: f64,
     );
