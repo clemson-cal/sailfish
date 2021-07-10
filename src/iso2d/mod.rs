@@ -296,10 +296,9 @@ pub mod gpu {
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
         fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
-            let eos = setup.equation_of_state();
-            let masses = setup.masses(t);
             use gpu_mem::Reduce;
-            let masses = DeviceVec::from(masses);
+            let eos = setup.equation_of_state();
+            let masses = DeviceVec::from(&setup.masses(time));
 
             unsafe {
                 iso2d_wavespeed(
