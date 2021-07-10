@@ -196,6 +196,9 @@ static __host__ __device__ void advance_rk_zone(
     real dt,
     int i)
 {
+    if (2 > i || i >= face_positions.count - 3) {
+        return;
+    }
     real dx = GET(face_positions, 1)[0] - GET(face_positions, 0)[0]; // TODO!
     // real xl = faces.x0 + (i + 0.0) * dx;
     // real xc = faces.x0 + (i + 0.5) * dx;
