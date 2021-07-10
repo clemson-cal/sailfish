@@ -37,7 +37,7 @@ extern "C" {
     );
 }
 
-pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: Vec<f64>) -> Box<dyn Solve> {
+pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: &[f64]) -> Box<dyn Solve> {
     match mode {
         ExecutionMode::CPU => Box::new(cpu::Solver::new(mesh, primitive)),
         ExecutionMode::OMP => {
@@ -72,15 +72,15 @@ pub mod cpu {
     }
 
     impl Solver {
-        pub fn new(mesh: StructuredMesh, primitive: Vec<f64>) -> Self {
+        pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
             assert_eq!(
                 primitive.len(),
                 (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
             );
             Self {
                 mesh,
-                primitive1: primitive.clone(),
-                primitive2: primitive,
+                primitive1: primitive.to_vec(),
+                primitive2: primitive.to_vec(),
                 conserved0: vec![0.0; mesh.num_total_zones() * 3],
                 mode: ExecutionMode::CPU,
             }
@@ -157,7 +157,7 @@ pub mod omp {
     pub struct Solver(cpu::Solver);
 
     impl Solver {
-        pub fn new(mesh: StructuredMesh, primitive: Vec<f64>) -> Self {
+        pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
             let mut solver = cpu::Solver::new(mesh, primitive);
             solver.mode = ExecutionMode::OMP;
             Self(solver)
@@ -201,15 +201,15 @@ pub mod gpu {
     }
 
     impl Solver {
-        pub fn new(mesh: StructuredMesh, primitive: Vec<f64>) -> Self {
+        pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
             assert_eq!(
                 primitive.len(),
                 (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
             );
             Self {
                 mesh,
-                primitive1: DeviceVec::from(&primitive),
-                primitive2: DeviceVec::from(&primitive),
+                primitive1: DeviceVec::from(primitive),
+                primitive2: DeviceVec::from(primitive),
                 conserved0: DeviceVec::from(&vec![0.0; mesh.num_total_zones() * 3]),
                 wavespeeds: DeviceVec::from(&vec![0.0; mesh.num_total_zones()]),
             }

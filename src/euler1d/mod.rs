@@ -37,16 +37,16 @@ pub mod cpu {
     }
 
     impl Solver {
-        pub fn new(face_positions: Vec<f64>, primitive: Vec<f64>) -> Self {
+        pub fn new(face_positions: &[f64], primitive: &[f64]) -> Self {
             let num_zones = face_positions.len() - 1;
             assert_eq!(
                 primitive.len(),
                 num_zones * 3
             );
             Self {
-                face_positions,
-                primitive1: primitive.clone(),
-                primitive2: primitive,
+                face_positions: face_positions.to_vec(),
+                primitive1: primitive.to_vec(),
+                primitive2: primitive.to_vec(),
                 conserved0: vec![0.0; num_zones * 3],
                 mode: ExecutionMode::CPU,
             }

@@ -17,8 +17,8 @@ impl Mesh {
     pub fn min_spacing(&self) -> f64 {
         match self {
             Self::Structured(mesh) => f64::min(mesh.dx, mesh.dy),
-            Self::FacePositions1D(_faces) => {
-                todo!()
+            Self::FacePositions1D(faces) => {
+                faces.windows(2).map(|w| w[1] - w[0]).fold(f64::MAX, f64::min)
             }
         }        
     }

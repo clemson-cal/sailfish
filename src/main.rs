@@ -43,6 +43,7 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "specify setup:").unwrap();
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
+    writeln!(message, "    shocktube").unwrap();
     PrintUserInformation(message)
 }
 
@@ -50,6 +51,7 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
     match setup_name {
         "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -102,14 +104,18 @@ fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
 
     let mut state = make_state(&cmdline)?;
-    let mut solver = iso2d::solver(
-        cmdline.execution_mode(),
-        match state.mesh {
-            mesh::Mesh::Structured(mesh) => mesh,
-            _ => panic!("wrong mesh type"),
-        },
-        state.primitive.clone(),
-    );
+
+    let mut solver: Box<dyn sailfish::Solve> = match (state.setup_name.as_str(), &state.mesh) {
+        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => iso2d::solver(
+            cmdline.execution_mode(),
+            mesh.clone(),
+            &state.primitive,
+        ),
+        ("shocktube", mesh::Mesh::FacePositions1D(faces)) => {
+            Box::new(euler1d::cpu::Solver::new(&faces, &state.primitive))
+        }
+        _ => panic!(),
+    };
     let mut mzps_log = vec![];
 
     let setup = make_setup(&state.setup_name, &state.parameters)?;
