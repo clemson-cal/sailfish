@@ -1,15 +1,13 @@
 use cfg_if::cfg_if;
 
 fn use_omp() -> bool {
-    let use_omp;
     cfg_if! {
         if #[cfg(feature = "omp")] {
-            use_omp = true;
+            true
         } else {
-            use_omp = false;
+            false
         }
     }
-    use_omp
 }
 
 fn main() {

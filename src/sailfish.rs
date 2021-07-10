@@ -116,6 +116,7 @@ pub trait Solve {
 
     /// Advances the primitive variable array by one low-storage Runge-Kutta
     /// sub-stup.
+    #[allow(clippy::too_many_arguments)]
     fn advance_rk(
         &mut self,
         nu: f64,
