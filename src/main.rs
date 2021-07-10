@@ -106,7 +106,7 @@ fn run() -> Result<(), error::Error> {
         cmdline.execution_mode(),
         match state.mesh {
             mesh::Mesh::Structured(mesh) => mesh,
-            _ => panic!("wrong mesh type")
+            _ => panic!("wrong mesh type"),
         },
         state.primitive.clone(),
     );
@@ -155,15 +155,7 @@ fn run() -> Result<(), error::Error> {
             for _ in 0..fold {
                 let a_max = solver.max_wavespeed(state.time, setup.as_ref());
                 let dt = mesh.min_spacing() / a_max * cfl;
-
-                iso2d::advance(
-                    solver.as_mut(),
-                    setup.as_ref(),
-                    rk_order,
-                    state.time,
-                    dt,
-                    velocity_ceiling,
-                );
+                solver.advance(setup.as_ref(), rk_order, state.time, dt, velocity_ceiling);
                 state.time += dt;
                 state.iteration += 1;
             }

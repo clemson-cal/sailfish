@@ -73,8 +73,8 @@ pub mod cpu {
         }
         fn advance_rk(
             &mut self,
-            _time: f64,
             _setup: &dyn Setup,
+            _time: f64,
             a: f64,
             dt: f64,
             _velocity_ceiling: f64,

@@ -37,38 +37,6 @@ extern "C" {
     );
 }
 
-/// Primitive variable array in a solver using first, second, or third-order
-/// Runge-Kutta time stepping.
-pub fn advance(
-    solver: &mut dyn Solve,
-    setup: &dyn Setup,
-    rk_order: u32,
-    time: f64,
-    dt: f64,
-    velocity_ceiling: f64,
-) {
-    solver.primitive_to_conserved();
-    match rk_order {
-        1 => {
-            solver.advance_rk(time, setup, 0.0, dt, velocity_ceiling);
-        }
-        2 => {
-            solver.advance_rk(time + 0.0 * dt, setup, 0.0, dt, velocity_ceiling);
-            solver.advance_rk(time + 1.0 * dt, setup, 0.5, dt, velocity_ceiling);
-        }
-        3 => {
-            // t1 = a1 * tn + (1 - a1) * (tn + dt) =     tn +     (      dt) = tn +     dt [a1 = 0]
-            // t2 = a2 * tn + (1 - a2) * (t1 + dt) = 3/4 tn + 1/4 (tn + 2dt) = tn + 1/2 dt [a2 = 3/4]
-            solver.advance_rk(time + 0.0 * dt, setup, 0. / 1., dt, velocity_ceiling);
-            solver.advance_rk(time + 1.0 * dt, setup, 3. / 4., dt, velocity_ceiling);
-            solver.advance_rk(time + 0.5 * dt, setup, 1. / 3., dt, velocity_ceiling);
-        }
-        _ => {
-            panic!("invalid RK order")
-        }
-    }
-}
-
 pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: Vec<f64>) -> Box<dyn Solve> {
     match mode {
         ExecutionMode::CPU => Box::new(cpu::Solver::new(mesh, primitive)),
@@ -135,8 +103,8 @@ pub mod cpu {
         }
         fn advance_rk(
             &mut self,
-            time: f64,
             setup: &dyn Setup,
+            time: f64,
             a: f64,
             dt: f64,
             velocity_ceiling: f64,
@@ -205,13 +173,13 @@ pub mod omp {
         }
         fn advance_rk(
             &mut self,
-            time: f64,
             setup: &dyn Setup,
+            time: f64,
             a: f64,
             dt: f64,
             velocity_ceiling: f64,
         ) {
-            self.0.advance_rk(time, setup, a, dt, velocity_ceiling)
+            self.0.advance_rk(setup, time, a, dt, velocity_ceiling)
         }
         fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
             self.0.max_wavespeed(time, setup)
@@ -264,8 +232,8 @@ pub mod gpu {
         }
         fn advance_rk(
             &mut self,
-            time: f64,
             setup: &Box<dyn Setup>,
+            time: f64,
             a: f64,
             dt: f64,
             velocity_ceiling: f64,
