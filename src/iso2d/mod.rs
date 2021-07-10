@@ -84,7 +84,7 @@ pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: Vec<f64>) ->
         }
         ExecutionMode::GPU => {
             cfg_if! {
-                if #[cfg(feature = "cuda")] {
+                if #[cfg(feature = "gpu")] {
                     Box::new(gpu::Solver::new(mesh, primitive))
                 } else {
                     panic!()
