@@ -3,7 +3,8 @@ fn main() {
     let plat = Platform::discover();
 
     if !std::matches!(plat, Platform::Cuda | Platform::Rocm) {
-        panic!("neither nvcc nor hipcc is installed");
+        println!("cargo:warning=neither nvcc nor hipcc is installed; linker would fail");
+    } else {
+        plat.build().file("src/lib.cu").compile("lib");
     }
-    plat.build().file("src/lib.cu").compile("lib");
 }

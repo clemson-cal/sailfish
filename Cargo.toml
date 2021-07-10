@@ -19,6 +19,6 @@ cc = "1.0"
 sf_build = { path = "sf_build" }
 
 [features]
-default = ["omp"]
+default = ["omp", "gpu"]
 omp = []
 gpu = ["gpu_mem"]

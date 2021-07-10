@@ -66,7 +66,7 @@ impl Setup for Explosion {
         EquationOfState::Isothermal { sound_speed_squared: 1.0 }
     }
     fn buffer_zone(&self) -> BufferZone {
-        BufferZone::None
+        BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
         None
@@ -170,7 +170,7 @@ impl Setup for Binary {
         EquationOfState::LocallyIsothermal { mach_number_squared: self.mach_number.powi(2) }
     }
     fn buffer_zone(&self) -> BufferZone {
-        BufferZone::None
+        BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
         Some(self.nu)

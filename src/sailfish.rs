@@ -41,7 +41,7 @@ pub struct PointMass {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum BufferZone {
-    None,
+    NoBuffer,
     Keplerian {
         surface_density: f64,
         central_mass: f64,
