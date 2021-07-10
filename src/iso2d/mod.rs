@@ -232,7 +232,7 @@ pub mod gpu {
         }
         fn advance_rk(
             &mut self,
-            setup: &Box<dyn Setup>,
+            setup: &dyn Setup,
             time: f64,
             a: f64,
             dt: f64,
@@ -262,7 +262,7 @@ pub mod gpu {
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
+        fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
             use gpu_mem::Reduce;
             let eos = setup.equation_of_state();
             let masses = DeviceVec::from(&setup.masses(time));
