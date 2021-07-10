@@ -1,44 +1,20 @@
 use cfg_if::cfg_if;
 
-fn compile_c_mod(mod_name: &str) {
-    let src = format!("src/{}/mod.c", mod_name);
-    let lib = format!("{}_mod", mod_name);
-
+fn use_omp() -> bool {
     cfg_if! {
-        if #[cfg(all(feature = "omp", feature = "cuda"))] {
-            cc::Build::new()
-                .file(&src)
-                .cuda(true)
-                .flag("-x=cu")
-                .flag("-Xcompiler")
-                .flag("-fopenmp")
-                .compile(&lib);
-        } else if #[cfg(all(feature = "omp", not(feature = "cuda")))] {
-            cc::Build::new()
-                .file(&src)
-                .flag("-Xpreprocessor")
-                .flag("-fopenmp")
-                .compile(&lib);
-        } else if #[cfg(all(not(feature = "omp"), feature = "cuda"))] {
-            cc::Build::new()
-                .file(&src)
-                .cuda(true)
-                .flag("-x=cu")
-                .compile(&lib);
+        if #[cfg(feature = "omp")] {
+            true
         } else {
-            cc::Build::new()
-                .file(&src)
-                .compile(&lib);
+            false
         }
-    }    
+    }
 }
 
 fn main() {
-    compile_c_mod("iso2d");
-    compile_c_mod("euler1d");
-    cfg_if! {
-        if #[cfg(feature = "cuda")] {
-            println!("cargo:rustc-link-lib=dylib=cudart");            
-        }
-    }
+    let plat = sf_build::Platform::discover();
+    plat.build_src("src/iso2d/mod", use_omp())
+        .compile("iso2d_mod");
+    plat.build_src("src/euler1d/mod", use_omp())
+        .compile("euler1d_mod");
+    plat.emit_link_flags();
 }

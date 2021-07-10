@@ -77,6 +77,7 @@ pub mod cpu {
             _setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
+            _velocity_ceiling: f64,
         ) {
             unsafe {
                 euler1d_advance_rk(

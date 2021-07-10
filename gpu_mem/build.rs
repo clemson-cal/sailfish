@@ -1,7 +1,9 @@
 fn main() {
-    cc::Build::new()
-        .file("src/lib.cu")
-        .cuda(true)
-        .compile("lib");
-    println!("cargo:rustc-link-lib=dylib=cudart");
+    use sf_build::Platform;
+    let plat = Platform::discover();
+
+    if !std::matches!(plat, Platform::Cuda | Platform::Rocm) {
+        panic!("neither nvcc nor hipcc is installed");
+    }
+    plat.build().file("src/lib.cu").compile("lib");
 }

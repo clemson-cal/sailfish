@@ -31,6 +31,7 @@ name = "gpu_mem"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "sf_build",
 ]
 
 [[package]]
@@ -103,6 +104,7 @@ dependencies = [
  "kind-config",
  "rmp-serde",
  "serde",
+ "sf_build",
 ]
 
 [[package]]
@@ -123,6 +125,13 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "sf_build"
+version = "0.1.0"
+dependencies = [
+ "cc",
 ]
 
 [[package]]

@@ -22,6 +22,7 @@ extern "C" {
         nu: f64,
         a: f64,
         dt: f64,
+        velocity_ceiling: f64,
         mode: ExecutionMode,
     );
 
@@ -45,22 +46,23 @@ pub fn advance(
     rk_order: u32,
     time: f64,
     dt: f64,
+    velocity_ceiling: f64,
 ) {
     solver.primitive_to_conserved();
     match rk_order {
         1 => {
-            solver.advance_rk(time, setup, 0.0, dt);
+            solver.advance_rk(time, setup, 0.0, dt, velocity_ceiling);
         }
         2 => {
-            solver.advance_rk(time + 0.0 * dt, setup, 0.0, dt);
-            solver.advance_rk(time + 1.0 * dt, setup, 0.5, dt);
+            solver.advance_rk(time + 0.0 * dt, setup, 0.0, dt, velocity_ceiling);
+            solver.advance_rk(time + 1.0 * dt, setup, 0.5, dt, velocity_ceiling);
         }
         3 => {
             // t1 = a1 * tn + (1 - a1) * (tn + dt) =     tn +     (      dt) = tn +     dt [a1 = 0]
             // t2 = a2 * tn + (1 - a2) * (t1 + dt) = 3/4 tn + 1/4 (tn + 2dt) = tn + 1/2 dt [a2 = 3/4]
-            solver.advance_rk(time + 0.0 * dt, setup, 0. / 1., dt);
-            solver.advance_rk(time + 1.0 * dt, setup, 3. / 4., dt);
-            solver.advance_rk(time + 0.5 * dt, setup, 1. / 3., dt);
+            solver.advance_rk(time + 0.0 * dt, setup, 0. / 1., dt, velocity_ceiling);
+            solver.advance_rk(time + 1.0 * dt, setup, 3. / 4., dt, velocity_ceiling);
+            solver.advance_rk(time + 0.5 * dt, setup, 1. / 3., dt, velocity_ceiling);
         }
         _ => {
             panic!("invalid RK order")
@@ -138,6 +140,7 @@ pub mod cpu {
             setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
+            velocity_ceiling: f64,
         ) {
             let buffer = setup.buffer_zone();
             let eos = setup.equation_of_state();
@@ -156,6 +159,7 @@ pub mod cpu {
                     nu,
                     a,
                     dt,
+                    velocity_ceiling,
                     self.mode,
                 )
             };
@@ -206,8 +210,9 @@ pub mod omp {
             setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
+            velocity_ceiling: f64,
         ) {
-            self.0.advance_rk(time, setup, a, dt)
+            self.0.advance_rk(time, setup, a, dt, velocity_ceiling)
         }
         fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
             self.0.max_wavespeed(time, setup)
@@ -215,7 +220,7 @@ pub mod omp {
     }
 }
 
-#[cfg(feature = "cuda")]
+#[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
     use gpu_mem::DeviceVec;
@@ -264,6 +269,7 @@ pub mod gpu {
             setup: &Box<dyn Setup>,
             a: f64,
             dt: f64,
+            velocity_ceiling: f64,
         ) {
             let buffer = setup.buffer_zone();
             let eos = setup.equation_of_state();
@@ -283,6 +289,7 @@ pub mod gpu {
                     nu,
                     a,
                     dt,
+                    velocity_ceiling,
                     ExecutionMode::GPU,
                 )
             };

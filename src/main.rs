@@ -3,6 +3,7 @@ use crate::error::Error::*;
 use crate::setup::Setup;
 use crate::state::State;
 
+use cfg_if::cfg_if;
 use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
@@ -22,6 +23,11 @@ where
 {
     let start = std::time::Instant::now();
     f();
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            gpu_mem::device_synchronize();
+        }
+    }
     start.elapsed()
 }
 
@@ -107,12 +113,13 @@ fn run() -> Result<(), error::Error> {
     let mut mzps_log = vec![];
 
     let setup = make_setup(&state.setup_name, &state.parameters)?;
-    let (mesh, cfl, fold, chkpt_interval, rk_order, outdir) = (
+    let (mesh, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
         state.mesh.clone(),
         cmdline.cfl_number,
         cmdline.fold,
         cmdline.checkpoint_interval,
         cmdline.rk_order,
+        cmdline.velocity_ceiling,
         cmdline
             .outdir
             .or_else(|| {
@@ -155,6 +162,7 @@ fn run() -> Result<(), error::Error> {
                     rk_order,
                     state.time,
                     dt,
+                    velocity_ceiling,
                 );
                 state.time += dt;
                 state.iteration += 1;

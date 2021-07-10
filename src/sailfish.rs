@@ -120,12 +120,14 @@ pub trait Solve {
 
     /// Advances the primitive variable array by one low-storage Runge-Kutta
     /// sub-stup.
+    #[allow(clippy::too_many_arguments)]
     fn advance_rk(
         &mut self,
         time: f64,
         setup: &Box<dyn Setup>,
         a: f64,
         dt: f64,
+        velocity_ceiling: f64,
     );
 
     /// Returns the largest wavespeed among the zones in the solver's current
