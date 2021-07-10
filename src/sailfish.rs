@@ -124,7 +124,7 @@ pub trait Solve {
     fn advance_rk(
         &mut self,
         time: f64,
-        setup: &Box<dyn Setup>,
+        setup: &dyn Setup,
         a: f64,
         dt: f64,
         velocity_ceiling: f64,
@@ -132,5 +132,5 @@ pub trait Solve {
 
     /// Returns the largest wavespeed among the zones in the solver's current
     /// primitive array.
-    fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64;
+    fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64;
 }

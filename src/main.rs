@@ -153,12 +153,12 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                let a_max = solver.max_wavespeed(state.time, &setup);
+                let a_max = solver.max_wavespeed(state.time, setup.as_ref());
                 let dt = mesh.min_spacing() / a_max * cfl;
 
                 iso2d::advance(
-                    &mut solver,
-                    &setup,
+                    solver.as_mut(),
+                    setup.as_ref(),
                     rk_order,
                     state.time,
                     dt,

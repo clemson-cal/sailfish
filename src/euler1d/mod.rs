@@ -74,7 +74,7 @@ pub mod cpu {
         fn advance_rk(
             &mut self,
             _time: f64,
-            _setup: &Box<dyn Setup>,
+            _setup: &dyn Setup,
             a: f64,
             dt: f64,
             _velocity_ceiling: f64,
@@ -93,7 +93,7 @@ pub mod cpu {
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, _time: f64, _setup: &Box<dyn Setup>) -> f64 {
+        fn max_wavespeed(&self, _time: f64, _setup: &dyn Setup) -> f64 {
             let mut wavespeeds = vec![0.0; self.num_zones()];
             unsafe {
                 euler1d_wavespeed(

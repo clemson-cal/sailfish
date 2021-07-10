@@ -39,10 +39,9 @@ extern "C" {
 
 /// Primitive variable array in a solver using first, second, or third-order
 /// Runge-Kutta time stepping.
-#[allow(clippy::too_many_arguments)]
 pub fn advance(
-    solver: &mut Box<dyn Solve>,
-    setup: &Box<dyn Setup>,
+    solver: &mut dyn Solve,
+    setup: &dyn Setup,
     rk_order: u32,
     time: f64,
     dt: f64,
@@ -137,7 +136,7 @@ pub mod cpu {
         fn advance_rk(
             &mut self,
             time: f64,
-            setup: &Box<dyn Setup>,
+            setup: &dyn Setup,
             a: f64,
             dt: f64,
             velocity_ceiling: f64,
@@ -165,7 +164,7 @@ pub mod cpu {
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
+        fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
             let eos = setup.equation_of_state();
             let masses = setup.masses(time);
             let mut wavespeeds = vec![0.0; self.mesh.num_total_zones()];
@@ -207,14 +206,14 @@ pub mod omp {
         fn advance_rk(
             &mut self,
             time: f64,
-            setup: &Box<dyn Setup>,
+            setup: &dyn Setup,
             a: f64,
             dt: f64,
             velocity_ceiling: f64,
         ) {
             self.0.advance_rk(time, setup, a, dt, velocity_ceiling)
         }
-        fn max_wavespeed(&self, time: f64, setup: &Box<dyn Setup>) -> f64 {
+        fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
             self.0.max_wavespeed(time, setup)
         }
     }
