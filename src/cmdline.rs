@@ -1,4 +1,5 @@
 use crate::error::Error;
+use crate::sailfish::ExecutionMode;
 use std::fmt::Write;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -16,6 +17,18 @@ pub struct CommandLine {
     pub rk_order: u32,
     pub cfl_number: f64,
     pub velocity_ceiling: f64,
+}
+
+impl CommandLine {
+    pub fn execution_mode(&self) -> ExecutionMode {
+        if self.use_gpu {
+            ExecutionMode::GPU
+        } else if self.use_omp {
+            ExecutionMode::OMP
+        } else {
+            ExecutionMode::CPU
+        }
+    }
 }
 
 #[rustfmt::skip]

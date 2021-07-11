@@ -1,3 +1,5 @@
+use crate::Setup;
+
 #[repr(C)]
 #[derive(Clone, Copy)]
 pub enum ExecutionMode {
@@ -39,7 +41,7 @@ pub struct PointMass {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum BufferZone {
-    None,
+    NoBuffer,
     Keplerian {
         surface_density: f64,
         central_mass: f64,
@@ -49,9 +51,11 @@ pub enum BufferZone {
     },
 }
 
+/// A logically cartesian 2d mesh with uniform grid spacing. C equivalent is
+/// defined in sailfish.h.
 #[repr(C)]
-#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
-pub struct Mesh {
+#[derive(Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct StructuredMesh {
     /// Number of zones on the i-axis
     pub ni: i32,
     /// Number of zones on the j-axis
@@ -66,7 +70,7 @@ pub struct Mesh {
     pub dy: f64,
 }
 
-impl Mesh {
+impl StructuredMesh {
     /// Creates a square mesh that is centered on the origin, with the given
     /// number of zones on each side.
     pub fn centered_square(domain_radius: f64, resolution: u32) -> Self {
@@ -114,21 +118,50 @@ pub trait Solve {
     /// array, and stores that array in the solver's conserved variable buffer.
     fn primitive_to_conserved(&mut self);
 
+    /// Returns the largest wavespeed among the zones in the solver's current
+    /// primitive array.
+    fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64;
+
     /// Advances the primitive variable array by one low-storage Runge-Kutta
     /// sub-stup.
-    #[allow(clippy::too_many_arguments)]
     fn advance_rk(
         &mut self,
-        nu: f64,
-        eos: EquationOfState,
-        buffer: BufferZone,
-        masses: &[PointMass],
+        setup: &dyn Setup,
+        time: f64,
         a: f64,
         dt: f64,
         velocity_ceiling: f64,
     );
 
-    /// Returns the largest wavespeed among the zones in the solver's current
-    /// primitive array.
-    fn max_wavespeed(&self, eos: EquationOfState, masses: &[PointMass]) -> f64;
+    /// Primitive variable array in a solver using first, second, or third-order
+    /// Runge-Kutta time stepping.
+    fn advance(
+        &mut self,
+        setup: &dyn Setup,
+        rk_order: u32,
+        time: f64,
+        dt: f64,
+        velocity_ceiling: f64,
+    ) {
+        self.primitive_to_conserved();
+        match rk_order {
+            1 => {
+                self.advance_rk(setup, time, 0.0, dt, velocity_ceiling);
+            }
+            2 => {
+                self.advance_rk(setup, time + 0.0 * dt, 0.0, dt, velocity_ceiling);
+                self.advance_rk(setup, time + 1.0 * dt, 0.5, dt, velocity_ceiling);
+            }
+            3 => {
+                // t1 = a1 * tn + (1 - a1) * (tn + dt) =     tn +     (      dt) = tn +     dt [a1 = 0]
+                // t2 = a2 * tn + (1 - a2) * (t1 + dt) = 3/4 tn + 1/4 (tn + 2dt) = tn + 1/2 dt [a2 = 3/4]
+                self.advance_rk(setup, time + 0.0 * dt, 0. / 1., dt, velocity_ceiling);
+                self.advance_rk(setup, time + 1.0 * dt, 3. / 4., dt, velocity_ceiling);
+                self.advance_rk(setup, time + 0.5 * dt, 1. / 3., dt, velocity_ceiling);
+            }
+            _ => {
+                panic!("invalid RK order")
+            }
+        }
+    }
 }
