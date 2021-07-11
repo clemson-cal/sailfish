@@ -21,6 +21,7 @@ extern "C" {
         mode: ExecutionMode,
     );
 
+    #[cfg(feature = "gpu")]
     fn euler1d_wavespeed(
         num_zones: i32,
         primitive_ptr: *const f64,

@@ -1,12 +1,11 @@
 use crate::cmdline::CommandLine;
 use crate::error;
 use crate::mesh;
-use serde::{Deserialize, Serialize};
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
 use std::io::Write;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct RecurringTask {
     pub number: u64,
     pub last_time: Option<f64>,

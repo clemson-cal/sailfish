@@ -103,7 +103,7 @@ fn parent_dir(path: &str) -> Option<&str> {
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
     let mut state = make_state(&cmdline)?;
-    let mut solver: Box<dyn sailfish::Solve> = match (state.setup_name.as_str(), &state.mesh) {
+    let mut solver = match (state.setup_name.as_str(), &state.mesh) {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
