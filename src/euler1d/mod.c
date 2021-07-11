@@ -489,8 +489,8 @@ EXTERN_C real euler1d_max_wavespeed(
             break;
         }
 
-        case GPU: break; // Not implemented, use euler1d_wavespeed,
-                         // and then an independent reduction.
+        case GPU: break; // Not implemented, use euler1d_wavespeed
+                         // followed by a GPU reduction.
     }
     return a_max;
 }

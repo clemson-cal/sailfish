@@ -20,10 +20,10 @@ pub enum Platform {
 }
 
 impl Platform {
-    pub fn discover() -> Self {
-        if is_program_in_path("nvcc") {
+    pub fn discover(gpu: bool) -> Self {
+        if gpu && is_program_in_path("nvcc") {
             Platform::Cuda
-        } else if is_program_in_path("hipcc") {
+        } else if gpu && is_program_in_path("hipcc") {
             Platform::Rocm
         } else {
             Platform::NoGpu
