@@ -1,7 +1,7 @@
-use crate::error;
 use crate::mesh::Mesh;
 use crate::sailfish::{BufferZone, EquationOfState, PointMass, SinkModel, StructuredMesh};
-use error::Error::*;
+use crate::error::{self, Error::*};
+use crate::lookup_table::LookupTable;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup {
@@ -256,5 +256,68 @@ impl Setup for Shocktube {
         let dx = 1.0 / resolution as f64;
         let faces = (0..resolution + 1).map(|i| i as f64 * dx).collect();
         Mesh::FacePositions1D(faces)
+    }
+}
+
+pub struct Tabulated {
+    faces: Vec<f64>,
+    table: LookupTable<4>,
+}
+
+impl std::str::FromStr for Tabulated {
+    type Err = error::Error;
+
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        let filename = parameters;
+        let table = LookupTable::<4>::from_ascii_file(filename)
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        if table.len() < 2 {
+            return Err(InvalidSetup("table must have at least 2 rows".to_owned()));
+        }
+
+        let cell_centers: Vec<f64> = table.rows().iter().map(|row| row[0]).collect();
+        let n = cell_centers.len();
+        let dxl = cell_centers[1] - cell_centers[0];
+        let dxr = cell_centers[n - 1] - cell_centers[n - 2];
+        let mut faces = vec![];
+        faces.push(cell_centers[0] - 0.5 * dxl);
+
+        for w in cell_centers.windows(2) {
+            faces.push(0.5 * (w[0] + w[1]))
+        }
+        faces.push(cell_centers[n - 1] + 0.5 * dxr);
+
+        Ok(Self { faces, table })
+    }
+}
+
+impl Setup for Tabulated {
+    fn print_parameters(&self) {}
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        let row = self.table.sample(x);
+        primitive[0] = row[1];
+        primitive[1] = row[2];
+        primitive[2] = row[3];
+    }
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, _resolution: u32) -> Mesh {
+        // Note: resolution is ignored. Consider making it an Option, and
+        // returning Result in case it's given for problems that specify the
+        // resolution internally.
+        Mesh::FacePositions1D(self.faces.clone())
     }
 }

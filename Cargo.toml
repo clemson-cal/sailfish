@@ -7,10 +7,11 @@ description = "fast code to simulate binary accretion"
 
 [dependencies]
 cfg-if = "1.0"
-kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
+thiserror = "1.0"
 kind-config = "0.2"
 serde = { version = "1.0", features = ["derive"] }
 rmp-serde = "0.15"
+kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
 gpu_mem = { path = "gpu_mem", optional = true }
 
 [build-dependencies]

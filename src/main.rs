@@ -12,6 +12,7 @@ pub mod cmdline;
 pub mod error;
 pub mod euler1d;
 pub mod iso2d;
+pub mod lookup_table;
 pub mod mesh;
 pub mod sailfish;
 pub mod setup;
@@ -44,6 +45,7 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    tabulated").unwrap();
     PrintUserInformation(message)
 }
 
@@ -52,6 +54,7 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
         "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
         "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
+        "tabulated" => Ok(Box::new(setup::Tabulated::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -107,7 +110,7 @@ fn run() -> Result<(), error::Error> {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
-        ("shocktube", mesh::Mesh::FacePositions1D(faces)) => {
+        ("shocktube" | "tabulated", mesh::Mesh::FacePositions1D(faces)) => {
             euler1d::solver(cmdline.execution_mode(), faces, &state.primitive)
         }
         _ => panic!(),
