@@ -166,14 +166,16 @@ static __host__ __device__ real cell_volume(enum Coordinates coords, real x0, re
 static __host__ __device__ void geometric_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source)
 {
     switch (coords) {
-        case Cartesian:
-            break;
         case SphericalPolar: {
             double p = prim[2];
             source[0] = 0.0;
             source[1] = p * (x1 * x1 - x0 * x0);
             source[2] = 0.0;
             break;
+        default:
+            source[0] = 0.0;
+            source[1] = 0.0;
+            source[2] = 0.0;
         }
     }
 }
