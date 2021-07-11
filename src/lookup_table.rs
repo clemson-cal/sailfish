@@ -79,8 +79,10 @@ impl<const NUM_COLS: usize> LookupTable<NUM_COLS> {
 
     /// Returns a fixed-length array of data at the given independent variable
     /// value `x`. The result is interpolated linearly between the two nearest
-    /// tabulated points. This function panics if `x` is out of range (not
-    /// between the lowest and highest value of the left-most table column.
+    /// tabulated points. This function panics if `x` is not between the
+    /// lowest and highest value of the tabulated points. However, a
+    /// reasonable attempt is made to be forgiving if the sample is just
+    /// marginally out-of-bounds due to round-off error.
     pub fn sample(&self, x: f64) -> [f64; NUM_COLS] {
         let mut result = [0.0; NUM_COLS];
         let (i0, i1) = self.indexes_straddling(x);

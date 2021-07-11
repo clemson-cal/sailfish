@@ -145,6 +145,42 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 
 // ============================ PATCH =========================================
 // ============================================================================
+static __host__ __device__ real face_area(enum Coordinates coords, real x)
+{
+    switch (coords) {
+        case Cartesian: return 1.0;
+        case SphericalPolar: return x * x;
+    }
+    return 0.0;
+}
+
+static __host__ __device__ real cell_volume(enum Coordinates coords, real x0, real x1) 
+{
+    switch (coords) {
+        case Cartesian: return x1 - x0;
+        case SphericalPolar: return (pow(x1, 3) - pow(x0, 3)) / 3.0;
+    }
+    return 0.0;
+}
+
+static __host__ __device__ void geometric_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source)
+{
+    switch (coords) {
+        case Cartesian:
+            break;
+        case SphericalPolar: {
+            double p = prim[2];
+            source[0] = 0.0;
+            source[1] = p * (x1 * x1 - x0 * x0);
+            source[2] = 0.0;
+            break;
+        }
+    }
+}
+
+
+// ============================ PATCH =========================================
+// ============================================================================
 #define FOR_EACH(p) \
     for (int i = p.start; i < p.start + p.count; ++i)
 #define FOR_EACH_OMP(p) \
@@ -178,9 +214,9 @@ static struct Patch patch(int num_elements, int num_fields, real *data)
 // ============================ SCHEME ========================================
 // ============================================================================
 static __host__ __device__ void primitive_to_conserved_zone(
-        struct Patch primitive,
-        struct Patch conserved,
-        int i)
+    struct Patch primitive,
+    struct Patch conserved,
+    int i)
 {
     real *p = GET(primitive, i);
     real *u = GET(conserved, i);
@@ -192,6 +228,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    enum Coordinates coords,
     real a,
     real dt,
     int i)
@@ -199,10 +236,8 @@ static __host__ __device__ void advance_rk_zone(
     if (2 > i || i >= face_positions.count - 3) {
         return;
     }
-    real dx = GET(face_positions, 1)[0] - GET(face_positions, 0)[0]; // TODO!
-    // real xl = faces.x0 + (i + 0.0) * dx;
-    // real xc = faces.x0 + (i + 0.5) * dx;
-    // real xr = faces.x0 + (i + 1.0) * dx;
+    real xl = *GET(face_positions, i);
+    real xr = *GET(face_positions, i + 1);
 
     real *un = GET(conserved_rk, i);
     real *pcc = GET(primitive_rd, i);
@@ -215,13 +250,13 @@ static __host__ __device__ void advance_rk_zone(
     real plim[NCONS];
     real prip[NCONS];
     real prim[NCONS];
-    real gxli[NCONS];
-    real gxri[NCONS];
-    real gxcc[NCONS];
+    real gxli[NCONS] = {0.0, 0.0, 0.0};
+    real gxri[NCONS] = {0.0, 0.0, 0.0};
+    real gxcc[NCONS] = {0.0, 0.0, 0.0};
 
-    plm_gradient(pki, pli, pcc, gxli);
-    plm_gradient(pli, pcc, pri, gxcc);
-    plm_gradient(pcc, pri, pti, gxri);
+    // plm_gradient(pki, pli, pcc, gxli);
+    // plm_gradient(pli, pcc, pri, gxcc);
+    // plm_gradient(pcc, pri, pti, gxri);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -234,14 +269,19 @@ static __host__ __device__ void advance_rk_zone(
     real fli[NCONS];
     real fri[NCONS];
     real ucc[NCONS];
+    real sources[NCONS];
+    real dal = face_area(coords, xl);
+    real dar = face_area(coords, xr);
+    real dv = cell_volume(coords, xl, xr);
 
     riemann_hlle(plim, plip, fli);
     riemann_hlle(prim, prip, fri);
     primitive_to_conserved(pcc, ucc);
+    geometric_source_terms(coords, xl, xr, pcc, sources);
 
     for (int q = 0; q < NCONS; ++q)
     {
-        ucc[q] -= (fri[q] - fli[q]) / dx * dt;
+        ucc[q] += (fli[q] * dal - fri[q] * dar + sources[q]) / dv * dt;
         ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i);
@@ -280,6 +320,7 @@ static void __global__ advance_rk_kernel(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    enum Coordinates coords,
     real a,
     real dt)
 {
@@ -287,7 +328,7 @@ static void __global__ advance_rk_kernel(
 
     if (i < faces.ni)
     {
-        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
+        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, coords, a, dt, i);
     }
 }
 
@@ -375,6 +416,7 @@ EXTERN_C void euler1d_advance_rk(
     real *primitive_wr_ptr,
     real a,
     real dt,
+    enum Coordinates coords,
     enum ExecutionMode mode)
 {
     struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
@@ -385,7 +427,7 @@ EXTERN_C void euler1d_advance_rk(
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, coords, a, dt, i);
             }
             break;
         }
@@ -393,7 +435,7 @@ EXTERN_C void euler1d_advance_rk(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, coords, a, dt, i);
             }
             #endif
             break;
@@ -403,7 +445,7 @@ EXTERN_C void euler1d_advance_rk(
             #ifdef __NVCC__
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, a, dt);
+            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, coords, a, dt);
             #endif
             break;
         }

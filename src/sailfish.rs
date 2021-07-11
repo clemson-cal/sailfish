@@ -108,6 +108,13 @@ impl StructuredMesh {
     }
 }
 
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub enum Coordinates {
+    Cartesian,
+    SphericalPolar,
+}
+
 pub trait Solve {
     /// Returns the primitive variable array for this solver. The data is
     /// row-major with contiguous primitive variable components. The array

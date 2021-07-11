@@ -1,5 +1,5 @@
 use crate::Setup;
-use crate::sailfish::{ExecutionMode, Solve};
+use crate::sailfish::{Coordinates, ExecutionMode, Solve};
 use cfg_if::cfg_if;
 
 extern "C" {
@@ -18,6 +18,7 @@ extern "C" {
         primitive_wr_ptr: *mut f64,
         a: f64,
         dt: f64,
+        coords: Coordinates,
         mode: ExecutionMode,
     );
 
@@ -33,13 +34,13 @@ extern "C" {
         -> f64;
 }
 
-pub fn solver(mode: ExecutionMode, faces: &[f64], primitive: &[f64]) -> Box<dyn Solve> {
+pub fn solver(mode: ExecutionMode, faces: &[f64], primitive: &[f64], coords: Coordinates) -> Box<dyn Solve> {
     match mode {
-        ExecutionMode::CPU => Box::new(cpu::Solver::new(faces, primitive)),
+        ExecutionMode::CPU => Box::new(cpu::Solver::new(faces, primitive, coords)),
         ExecutionMode::OMP => {
             cfg_if! {
                 if #[cfg(feature = "omp")] {
-                    Box::new(omp::Solver::new(faces, primitive))
+                    Box::new(omp::Solver::new(faces, primitive, coords))
                 } else {
                     panic!()
                 }
@@ -48,7 +49,7 @@ pub fn solver(mode: ExecutionMode, faces: &[f64], primitive: &[f64]) -> Box<dyn 
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Box::new(gpu::Solver::new(faces, primitive))
+                    Box::new(gpu::Solver::new(faces, primitive, coords))
                 } else {
                     panic!()
                 }
@@ -65,11 +66,12 @@ pub mod cpu {
         primitive1: Vec<f64>,
         primitive2: Vec<f64>,
         conserved0: Vec<f64>,
+        coords: Coordinates,
         pub(super) mode: ExecutionMode,
     }
 
     impl Solver {
-        pub fn new(faces: &[f64], primitive: &[f64]) -> Self {
+        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
             let num_zones = faces.len() - 1;
             assert_eq!(primitive.len(), num_zones * 3);
             Self {
@@ -77,6 +79,7 @@ pub mod cpu {
                 primitive1: primitive.to_vec(),
                 primitive2: primitive.to_vec(),
                 conserved0: vec![0.0; num_zones * 3],
+                coords,
                 mode: ExecutionMode::CPU,
             }
         }
@@ -117,6 +120,7 @@ pub mod cpu {
                     self.primitive2.as_mut_ptr(),
                     a,
                     dt,
+                    self.coords,
                     self.mode,
                 )
             };
@@ -135,8 +139,8 @@ pub mod omp {
     pub struct Solver(cpu::Solver);
 
     impl Solver {
-        pub fn new(faces: &[f64], primitive: &[f64]) -> Self {
-            let mut solver = cpu::Solver::new(faces, primitive);
+        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
+            let mut solver = cpu::Solver::new(faces, primitive, coords);
             solver.mode = ExecutionMode::OMP;
             Self(solver)
         }
@@ -176,10 +180,11 @@ pub mod gpu {
         primitive2: DeviceVec<f64>,
         conserved0: DeviceVec<f64>,
         wavespeeds: DeviceVec<f64>,
+        coords: Coordinates,
     }
 
     impl Solver {
-        pub fn new(faces: &[f64], primitive: &[f64]) -> Self {
+        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
             let num_zones = faces.len() - 1;
             assert_eq!(primitive.len(), num_zones * 3);
             Self {
@@ -188,6 +193,7 @@ pub mod gpu {
                 primitive2: DeviceVec::from(primitive),
                 conserved0: DeviceVec::from(&vec![0.0; num_zones * 3]),
                 wavespeeds: DeviceVec::from(&vec![0.0; num_zones]),
+                coords,
             }
         }
 
@@ -227,6 +233,7 @@ pub mod gpu {
                     self.primitive2.as_mut_device_ptr(),
                     a,
                     dt,
+                    self.coords,
                     ExecutionMode::GPU,
                 )
             };

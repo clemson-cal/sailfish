@@ -1,5 +1,6 @@
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
+use crate::sailfish::Coordinates;
 use crate::setup::Setup;
 use crate::state::State;
 
@@ -111,7 +112,7 @@ fn run() -> Result<(), error::Error> {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
         ("shocktube" | "tabulated", mesh::Mesh::FacePositions1D(faces)) => {
-            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive)
+            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, Coordinates::Cartesian)
         }
         _ => panic!(),
     };
