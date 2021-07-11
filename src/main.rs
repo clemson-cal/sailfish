@@ -80,7 +80,7 @@ fn new_state(
 
 fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     let state = if let Some(ref setup_string) = cmdline.setup {
-        let (name, parameters) = split_at_first_colon(&setup_string);
+        let (name, parameters) = split_at_first_colon(setup_string);
         if name.ends_with(".sf") {
             state::State::from_checkpoint(name, parameters)?
         } else {
@@ -105,10 +105,10 @@ fn run() -> Result<(), error::Error> {
     let mut state = make_state(&cmdline)?;
     let mut solver: Box<dyn sailfish::Solve> = match (state.setup_name.as_str(), &state.mesh) {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
-            iso2d::solver(cmdline.execution_mode(), mesh.clone(), &state.primitive)
+            iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
         ("shocktube", mesh::Mesh::FacePositions1D(faces)) => {
-            euler1d::solver(cmdline.execution_mode(), &faces, &state.primitive)
+            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive)
         }
         _ => panic!(),
     };
