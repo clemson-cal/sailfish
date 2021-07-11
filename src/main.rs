@@ -102,17 +102,13 @@ fn parent_dir(path: &str) -> Option<&str> {
 
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
-
     let mut state = make_state(&cmdline)?;
-
     let mut solver: Box<dyn sailfish::Solve> = match (state.setup_name.as_str(), &state.mesh) {
-        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => iso2d::solver(
-            cmdline.execution_mode(),
-            mesh.clone(),
-            &state.primitive,
-        ),
+        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
+            iso2d::solver(cmdline.execution_mode(), mesh.clone(), &state.primitive)
+        }
         ("shocktube", mesh::Mesh::FacePositions1D(faces)) => {
-            Box::new(euler1d::cpu::Solver::new(&faces, &state.primitive))
+            euler1d::solver(cmdline.execution_mode(), &faces, &state.primitive)
         }
         _ => panic!(),
     };

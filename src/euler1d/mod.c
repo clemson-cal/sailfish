@@ -453,3 +453,44 @@ EXTERN_C void euler1d_wavespeed(
         }
     }
 }
+
+
+/**
+ * Return the maximum wavespeed over all zones. Not implemented for GPU
+ * execution.
+ * @param primitive_ptr[in]   [num_zones] [3]
+ * @param mode                The execution mode
+ */
+EXTERN_C real euler1d_max_wavespeed(
+    int num_zones,
+    real *primitive_ptr,
+    enum ExecutionMode mode)
+{
+    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
+    real a_max = 0.0;
+
+    switch (mode) {
+        case CPU: {
+            for (int i = 0; i < num_zones; ++i)
+            {
+                a_max = max2(a_max, primitive_to_max_wavespeed(GET(primitive, i)));
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            #pragma omp parallel for reduction(max:a_max)
+            for (int i = 0; i < num_zones; ++i)
+            {
+                a_max = max2(a_max, primitive_to_max_wavespeed(GET(primitive, i)));
+            }
+            #endif
+            break;
+        }
+
+        case GPU: break; // Not implemented, use euler1d_wavespeed,
+                         // and then an independent reduction.
+    }
+    return a_max;
+}
