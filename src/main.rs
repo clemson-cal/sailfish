@@ -1,8 +1,8 @@
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
-use crate::sailfish::{Mesh, Solve};
 use crate::setup::Setup;
 use crate::state::State;
+
 use cfg_if::cfg_if;
 use std::fmt::Write;
 use std::path::Path;
@@ -10,7 +10,10 @@ use std::str::FromStr;
 
 pub mod cmdline;
 pub mod error;
+pub mod euler1d;
 pub mod iso2d;
+pub mod lookup_table;
+pub mod mesh;
 pub mod sailfish;
 pub mod setup;
 pub mod state;
@@ -21,6 +24,11 @@ where
 {
     let start = std::time::Instant::now();
     f();
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            gpu_mem::device_synchronize();
+        }
+    }
     start.elapsed()
 }
 
@@ -36,6 +44,8 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "specify setup:").unwrap();
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
+    writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    tabulated").unwrap();
     PrintUserInformation(message)
 }
 
@@ -43,29 +53,9 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
     match setup_name {
         "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
+        "tabulated" => Ok(Box::new(setup::Tabulated::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
-    }
-}
-
-fn make_solver(cmdline: &CommandLine, mesh: Mesh, primitive: Vec<f64>) -> Box<dyn Solve> {
-    if cmdline.use_gpu {
-        cfg_if! {
-            if #[cfg(feature = "cuda")] {
-                Box::new(iso2d::gpu::Solver::new(mesh, primitive))
-            } else {
-                panic!()
-            }
-        }
-    } else if cmdline.use_omp {
-        cfg_if! {
-            if #[cfg(feature = "omp")] {
-                Box::new(iso2d::omp::Solver::new(mesh, primitive))
-            } else {
-                panic!()
-            }
-        }
-    } else {
-        Box::new(iso2d::cpu::Solver::new(mesh, primitive))
     }
 }
 
@@ -79,7 +69,7 @@ fn new_state(
 
     let state = State {
         command_line,
-        mesh,
+        mesh: mesh.clone(),
         restart_file: None,
         iteration: 0,
         time: 0.0,
@@ -93,7 +83,7 @@ fn new_state(
 
 fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     let state = if let Some(ref setup_string) = cmdline.setup {
-        let (name, parameters) = split_at_first_colon(&setup_string);
+        let (name, parameters) = split_at_first_colon(setup_string);
         if name.ends_with(".sf") {
             state::State::from_checkpoint(name, parameters)?
         } else {
@@ -115,21 +105,26 @@ fn parent_dir(path: &str) -> Option<&str> {
 
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
-
     let mut state = make_state(&cmdline)?;
-    let mut solver = make_solver(&cmdline, state.mesh, state.primitive.clone());
+    let setup = make_setup(&state.setup_name, &state.parameters)?;
+    let mut solver = match (state.setup_name.as_str(), &state.mesh) {
+        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
+            iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
+        }
+        ("shocktube" | "tabulated", mesh::Mesh::FacePositions1D(faces)) => {
+            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, setup.coordinate_system())
+        }
+        _ => panic!(),
+    };
     let mut mzps_log = vec![];
 
-    let setup = make_setup(&state.setup_name, &state.parameters)?;
-    let (mesh, nu, eos, buffer, cfl, fold, chkpt_interval, rk_order, outdir) = (
-        state.mesh,
-        setup.viscosity().unwrap_or(0.0),
-        setup.equation_of_state(),
-        setup.buffer_zone(),
+    let (mesh, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
+        state.mesh.clone(),
         cmdline.cfl_number,
         cmdline.fold,
         cmdline.checkpoint_interval,
         cmdline.rk_order,
+        cmdline.velocity_ceiling,
         cmdline
             .outdir
             .or_else(|| {
@@ -163,19 +158,9 @@ fn run() -> Result<(), error::Error> {
 
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                let a_max = solver.max_wavespeed(eos, &setup.masses(state.time));
-                let dt = f64::min(mesh.dx, mesh.dy) / a_max * cfl;
-
-                iso2d::advance(
-                    &mut solver,
-                    eos,
-                    buffer,
-                    |t| setup.masses(t),
-                    nu,
-                    rk_order,
-                    state.time,
-                    dt,
-                );
+                let a_max = solver.max_wavespeed(state.time, setup.as_ref());
+                let dt = mesh.min_spacing() / a_max * cfl;
+                solver.advance(setup.as_ref(), rk_order, state.time, dt, velocity_ceiling);
                 state.time += dt;
                 state.iteration += 1;
             }

@@ -1,7 +1,8 @@
-use crate::sailfish::{BufferZone, EquationOfState, Mesh, PointMass, SinkModel};
-use crate::error;
+use crate::error::{self, Error::*};
+use crate::lookup_table::LookupTable;
+use crate::mesh::Mesh;
+use crate::sailfish::{BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh};
 use kepler_two_body::{OrbitalElements, OrbitalState};
-use error::Error::*;
 
 pub trait Setup {
     fn print_parameters(&self);
@@ -11,18 +12,31 @@ pub trait Setup {
     fn buffer_zone(&self) -> BufferZone;
     fn viscosity(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
+    fn coordinate_system(&self) -> Coordinates;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
-        let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
-        let si = 3 * (mesh.nj + 4);
-        let sj = 3;
-        for i in -2..mesh.ni + 2 {
-            for j in -2..mesh.nj + 2 {
-                let n = ((i + 2) * si + (j + 2) * sj) as usize;
-                let [x, y] = mesh.cell_coordinates(i, j);
-                self.initial_primitive(x, y, &mut primitive[n..n + 3])
+        match mesh {
+            Mesh::Structured(mesh) => {
+                let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
+                let si = 3 * (mesh.nj + 4);
+                let sj = 3;
+                for i in -2i32..mesh.ni + 2 {
+                    for j in -2i32..mesh.nj + 2 {
+                        let n = ((i + 2) * si + (j + 2) * sj) as usize;
+                        let [x, y] = mesh.cell_coordinates(i, j);
+                        self.initial_primitive(x, y, &mut primitive[n..n + 3])
+                    }
+                }
+                primitive
+            }
+            Mesh::FacePositions1D(faces) => {
+                let mut primitive = vec![0.0; (faces.len() - 1) * 3];
+                for i in 0..faces.len() - 1 {
+                    let x = 0.5 * (faces[i] + faces[i + 1]);
+                    self.initial_primitive(x, 0.0, &mut primitive[3 * i..3 * i + 3]);
+                }
+                primitive
             }
         }
-        primitive
     }
 }
 
@@ -34,14 +48,16 @@ impl std::str::FromStr for Explosion {
         if parameters.is_empty() {
             Ok(Self {})
         } else {
-            Err(InvalidSetup(format!("explosion problem does not take any parameters, got {}", parameters)))
+            Err(InvalidSetup(format!(
+                "explosion problem does not take any parameters, got {}",
+                parameters
+            )))
         }
     }
 }
 
 impl Setup for Explosion {
-    fn print_parameters(&self) {
-    }
+    fn print_parameters(&self) {}
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
@@ -55,16 +71,21 @@ impl Setup for Explosion {
         vec![]
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::Isothermal { sound_speed_squared: 1.0 }
+        EquationOfState::Isothermal {
+            sound_speed_squared: 1.0,
+        }
     }
     fn buffer_zone(&self) -> BufferZone {
-        BufferZone::None
+        BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::centered_square(1.0, resolution)
+        Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
     }
 }
 
@@ -80,14 +101,16 @@ pub struct Binary {
 
 impl std::str::FromStr for Binary {
     type Err = error::Error;
+
+    #[rustfmt::skip]
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         let form = kind_config::Form::new()
             .item("domain_radius", 12.0, "half-size of the simulation domain [a]")
-            .item("nu", 1e-3, "kinematic viscosity coefficient [Omega a^2]")
-            .item("mach_number", 10.0, "mach number for locally isothermal EOS")
-            .item("sink_radius", 0.05, "sink kernel radius [a]")
-            .item("sink_rate", 10.0, "rate of mass subtraction in the sink [Omega]")
-            .item("sink_model", "af", "sink prescription: [none|af|tf|ff]")
+            .item("nu",            1e-3, "kinematic viscosity coefficient [Omega a^2]")
+            .item("mach_number",   10.0, "mach number for locally isothermal EOS")
+            .item("sink_radius",   0.05, "sink kernel radius [a]")
+            .item("sink_rate",     10.0, "rate of mass subtraction in the sink [Omega]")
+            .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -112,7 +135,12 @@ impl std::str::FromStr for Binary {
 impl Setup for Binary {
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
-            println!("{:.<20} {:<10} {}", key, self.form.get(&key), self.form.about(&key));
+            println!(
+                "{:.<20} {:<10} {}",
+                key,
+                self.form.get(&key),
+                self.form.about(&key)
+            );
         }
     }
 
@@ -159,15 +187,137 @@ impl Setup for Binary {
         vec![mass0, mass1]
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::LocallyIsothermal { mach_number_squared: self.mach_number.powi(2) }
+        EquationOfState::LocallyIsothermal {
+            mach_number_squared: self.mach_number.powi(2),
+        }
     }
     fn buffer_zone(&self) -> BufferZone {
-        BufferZone::None
+        BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
         Some(self.nu)
     }
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::centered_square(self.domain_radius, resolution)
+        Mesh::Structured(StructuredMesh::centered_square(
+            self.domain_radius,
+            resolution,
+        ))
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+}
+
+pub struct Shocktube {}
+
+impl std::str::FromStr for Shocktube {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self {})
+        } else {
+            Err(InvalidSetup(format!(
+                "shocktube problem does not take any parameters, got {}",
+                parameters
+            )))
+        }
+    }
+}
+
+impl Setup for Shocktube {
+    fn print_parameters(&self) {}
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        if x < 0.5 {
+            primitive[0] = 1.0;
+            primitive[2] = 1.0;
+        } else {
+            primitive[0] = 0.1;
+            primitive[2] = 0.125;
+        }
+    }
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let dx = 1.0 / resolution as f64;
+        let faces = (0..resolution + 1).map(|i| i as f64 * dx).collect();
+        Mesh::FacePositions1D(faces)
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+}
+
+pub struct Tabulated {
+    faces: Vec<f64>,
+    table: LookupTable<4>,
+}
+
+impl std::str::FromStr for Tabulated {
+    type Err = error::Error;
+
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        use std::iter::once;
+
+        let filename = parameters;
+        let table = LookupTable::<4>::from_ascii_file(filename)
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        if table.len() < 2 {
+            return Err(InvalidSetup("table must have at least 2 rows".to_owned()));
+        }
+        let cell_centers: Vec<f64> = table.rows().iter().map(|row| row[0]).collect();
+        let n = cell_centers.len();
+        let dxl = cell_centers[1] - cell_centers[0];
+        let dxr = cell_centers[n - 1] - cell_centers[n - 2];
+        let faces = once(cell_centers[0] - 0.5 * dxl)
+            .chain(cell_centers.windows(2).map(|w| 0.5 * (w[0] + w[1])))
+            .chain(once(cell_centers[n - 1] + 0.5 * dxr))
+            .collect();
+        Ok(Self { faces, table })
+    }
+}
+
+impl Setup for Tabulated {
+    fn print_parameters(&self) {}
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        let row = self.table.sample(x);
+        primitive[0] = row[1];
+        primitive[1] = row[2];
+        primitive[2] = row[3];
+    }
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, _resolution: u32) -> Mesh {
+        // Note: resolution is ignored. Consider making it an Option, and
+        // returning Result in case it's given for problems that specify the
+        // resolution internally.
+        Mesh::FacePositions1D(self.faces.clone())
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::SphericalPolar
     }
 }

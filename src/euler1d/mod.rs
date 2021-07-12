@@ -1,49 +1,46 @@
 use crate::Setup;
-use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, StructuredMesh, PointMass, Solve};
+use crate::sailfish::{Coordinates, ExecutionMode, Solve};
 use cfg_if::cfg_if;
 
 extern "C" {
-    fn iso2d_primitive_to_conserved(
-        mesh: StructuredMesh,
+    fn euler1d_primitive_to_conserved(
+        num_zones: i32,
         primitive_ptr: *const f64,
         conserved_ptr: *mut f64,
         mode: ExecutionMode,
     );
 
-    fn iso2d_advance_rk(
-        mesh: StructuredMesh,
+    fn euler1d_advance_rk(
+        num_zones: i32,
+        face_positions_ptr: *const f64,
         conserved_rk_ptr: *const f64,
         primitive_rd_ptr: *const f64,
         primitive_wr_ptr: *mut f64,
-        eos: EquationOfState,
-        buffer: BufferZone,
-        masses: *const PointMass,
-        num_masses: i32,
-        nu: f64,
         a: f64,
         dt: f64,
-        velocity_ceiling: f64,
+        coords: Coordinates,
         mode: ExecutionMode,
     );
 
-    fn iso2d_wavespeed(
-        mesh: StructuredMesh,
+    #[cfg(feature = "gpu")]
+    fn euler1d_wavespeed(
+        num_zones: i32,
         primitive_ptr: *const f64,
         wavespeed_ptr: *mut f64,
-        eos: EquationOfState,
-        masses: *const PointMass,
-        num_masses: i32,
         mode: ExecutionMode,
     );
+
+    fn euler1d_max_wavespeed(num_zones: i32, primitive_ptr: *const f64, mode: ExecutionMode)
+        -> f64;
 }
 
-pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: &[f64]) -> Box<dyn Solve> {
+pub fn solver(mode: ExecutionMode, faces: &[f64], primitive: &[f64], coords: Coordinates) -> Box<dyn Solve> {
     match mode {
-        ExecutionMode::CPU => Box::new(cpu::Solver::new(mesh, primitive)),
+        ExecutionMode::CPU => Box::new(cpu::Solver::new(faces, primitive, coords)),
         ExecutionMode::OMP => {
             cfg_if! {
                 if #[cfg(feature = "omp")] {
-                    Box::new(omp::Solver::new(mesh, primitive))
+                    Box::new(omp::Solver::new(faces, primitive, coords))
                 } else {
                     panic!()
                 }
@@ -52,7 +49,7 @@ pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: &[f64]) -> B
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Box::new(gpu::Solver::new(mesh, primitive))
+                    Box::new(gpu::Solver::new(faces, primitive, coords))
                 } else {
                     panic!()
                 }
@@ -63,27 +60,32 @@ pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: &[f64]) -> B
 
 pub mod cpu {
     use super::*;
+
     pub struct Solver {
-        mesh: StructuredMesh,
+        faces: Vec<f64>,
         primitive1: Vec<f64>,
         primitive2: Vec<f64>,
         conserved0: Vec<f64>,
+        coords: Coordinates,
         pub(super) mode: ExecutionMode,
     }
 
     impl Solver {
-        pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
-            assert_eq!(
-                primitive.len(),
-                (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
-            );
+        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
+            let num_zones = faces.len() - 1;
+            assert_eq!(primitive.len(), num_zones * 3);
             Self {
-                mesh,
+                faces: faces.to_vec(),
                 primitive1: primitive.to_vec(),
                 primitive2: primitive.to_vec(),
-                conserved0: vec![0.0; mesh.num_total_zones() * 3],
+                conserved0: vec![0.0; num_zones * 3],
+                coords,
                 mode: ExecutionMode::CPU,
             }
+        }
+
+        fn num_zones(&self) -> usize {
+            self.faces.len() - 1
         }
     }
 
@@ -93,8 +95,8 @@ pub mod cpu {
         }
         fn primitive_to_conserved(&mut self) {
             unsafe {
-                iso2d_primitive_to_conserved(
-                    self.mesh,
+                euler1d_primitive_to_conserved(
+                    self.num_zones() as i32,
                     self.primitive1.as_ptr(),
                     self.conserved0.as_mut_ptr(),
                     self.mode,
@@ -103,51 +105,31 @@ pub mod cpu {
         }
         fn advance_rk(
             &mut self,
-            setup: &dyn Setup,
-            time: f64,
+            _setup: &dyn Setup,
+            _time: f64,
             a: f64,
             dt: f64,
-            velocity_ceiling: f64,
+            _velocity_ceiling: f64,
         ) {
-            let buffer = setup.buffer_zone();
-            let eos = setup.equation_of_state();
-            let nu = setup.viscosity().unwrap_or(0.0);
-            let masses = setup.masses(time);
             unsafe {
-                iso2d_advance_rk(
-                    self.mesh,
+                euler1d_advance_rk(
+                    self.num_zones() as i32,
+                    self.faces.as_ptr(),
                     self.conserved0.as_ptr(),
                     self.primitive1.as_ptr(),
                     self.primitive2.as_mut_ptr(),
-                    eos,
-                    buffer,
-                    masses.as_ptr(),
-                    masses.len() as i32,
-                    nu,
                     a,
                     dt,
-                    velocity_ceiling,
+                    self.coords,
                     self.mode,
                 )
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
-            let eos = setup.equation_of_state();
-            let masses = setup.masses(time);
-            let mut wavespeeds = vec![0.0; self.mesh.num_total_zones()];
+        fn max_wavespeed(&self, _time: f64, _setup: &dyn Setup) -> f64 {
             unsafe {
-                iso2d_wavespeed(
-                    self.mesh,
-                    self.primitive1.as_ptr(),
-                    wavespeeds.as_mut_ptr(),
-                    eos,
-                    masses.as_ptr(),
-                    masses.len() as i32,
-                    self.mode,
-                )
-            };
-            wavespeeds.iter().cloned().fold(0.0, f64::max)
+                euler1d_max_wavespeed(self.num_zones() as i32, self.primitive1.as_ptr(), self.mode)
+            }
         }
     }
 }
@@ -157,8 +139,8 @@ pub mod omp {
     pub struct Solver(cpu::Solver);
 
     impl Solver {
-        pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
-            let mut solver = cpu::Solver::new(mesh, primitive);
+        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
+            let mut solver = cpu::Solver::new(faces, primitive, coords);
             solver.mode = ExecutionMode::OMP;
             Self(solver)
         }
@@ -193,26 +175,30 @@ pub mod gpu {
     use gpu_mem::DeviceVec;
 
     pub struct Solver {
-        mesh: StructuredMesh,
+        faces: DeviceVec<f64>,
         primitive1: DeviceVec<f64>,
         primitive2: DeviceVec<f64>,
         conserved0: DeviceVec<f64>,
         wavespeeds: DeviceVec<f64>,
+        coords: Coordinates,
     }
 
     impl Solver {
-        pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
-            assert_eq!(
-                primitive.len(),
-                (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
-            );
+        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
+            let num_zones = faces.len() - 1;
+            assert_eq!(primitive.len(), num_zones * 3);
             Self {
-                mesh,
+                faces: DeviceVec::from(faces),
                 primitive1: DeviceVec::from(primitive),
                 primitive2: DeviceVec::from(primitive),
-                conserved0: DeviceVec::from(&vec![0.0; mesh.num_total_zones() * 3]),
-                wavespeeds: DeviceVec::from(&vec![0.0; mesh.num_total_zones()]),
+                conserved0: DeviceVec::from(&vec![0.0; num_zones * 3]),
+                wavespeeds: DeviceVec::from(&vec![0.0; num_zones]),
+                coords,
             }
+        }
+
+        fn num_zones(&self) -> usize {
+            self.faces.len() - 1
         }
     }
 
@@ -222,8 +208,8 @@ pub mod gpu {
         }
         fn primitive_to_conserved(&mut self) {
             unsafe {
-                iso2d_primitive_to_conserved(
-                    self.mesh,
+                euler1d_primitive_to_conserved(
+                    self.num_zones() as i32,
                     self.primitive1.as_device_ptr(),
                     self.conserved0.as_mut_device_ptr(),
                     ExecutionMode::GPU,
@@ -232,49 +218,34 @@ pub mod gpu {
         }
         fn advance_rk(
             &mut self,
-            setup: &dyn Setup,
-            time: f64,
+            _setup: &dyn Setup,
+            _time: f64,
             a: f64,
             dt: f64,
-            velocity_ceiling: f64,
+            _velocity_ceiling: f64,
         ) {
-            let buffer = setup.buffer_zone();
-            let eos = setup.equation_of_state();
-            let nu = setup.viscosity().unwrap_or(0.0);
-            let masses = DeviceVec::from(&setup.masses(time));
-
             unsafe {
-                iso2d_advance_rk(
-                    self.mesh,
+                euler1d_advance_rk(
+                    self.num_zones() as i32,
+                    self.faces.as_device_ptr(),
                     self.conserved0.as_device_ptr(),
                     self.primitive1.as_device_ptr(),
                     self.primitive2.as_mut_device_ptr(),
-                    eos,
-                    buffer,
-                    masses.as_device_ptr(),
-                    masses.len() as i32,
-                    nu,
                     a,
                     dt,
-                    velocity_ceiling,
+                    self.coords,
                     ExecutionMode::GPU,
                 )
             };
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
-        fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
+        fn max_wavespeed(&self, _time: f64, _setup: &dyn Setup) -> f64 {
             use gpu_mem::Reduce;
-            let eos = setup.equation_of_state();
-            let masses = DeviceVec::from(&setup.masses(time));
-
             unsafe {
-                iso2d_wavespeed(
-                    self.mesh,
+                euler1d_wavespeed(
+                    self.num_zones() as i32,
                     self.primitive1.as_device_ptr(),
                     self.wavespeeds.as_device_ptr() as *mut f64,
-                    eos,
-                    masses.as_device_ptr(),
-                    masses.len() as i32,
                     ExecutionMode::GPU,
                 )
             };

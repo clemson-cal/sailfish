@@ -1,12 +1,11 @@
 use crate::cmdline::CommandLine;
 use crate::error;
-use crate::sailfish::Mesh;
-use serde::{Deserialize, Serialize};
+use crate::mesh;
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
 use std::io::Write;
 
-#[derive(Clone, Serialize, Deserialize)]
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct RecurringTask {
     pub number: u64,
     pub last_time: Option<f64>,
@@ -20,7 +19,10 @@ impl Default for RecurringTask {
 
 impl RecurringTask {
     pub fn new() -> Self {
-        Self { number: 0, last_time: None }
+        Self {
+            number: 0,
+            last_time: None,
+        }
     }
     pub fn next(&mut self, interval: f64) {
         if self.last_time.is_none() {
@@ -31,7 +33,8 @@ impl RecurringTask {
         self.number += 1;
     }
     pub fn is_due(&self, time: f64, interval: f64) -> bool {
-        self.last_time.map_or(true, |last_time| time >= last_time + interval)
+        self.last_time
+            .map_or(true, |last_time| time >= last_time + interval)
     }
 }
 
@@ -39,7 +42,7 @@ impl RecurringTask {
 pub struct State {
     pub command_line: CommandLine,
     pub restart_file: Option<String>,
-    pub mesh: Mesh,
+    pub mesh: mesh::Mesh,
     pub setup_name: String,
     pub parameters: String,
     pub primitive: Vec<f64>,
@@ -69,8 +72,10 @@ impl State {
     }
 
     pub fn set_primitive(&mut self, primitive: Vec<f64>) {
-        assert!(primitive.len() == self.primitive.len(),
-            "new and old primitive array sizes must match");
+        assert!(
+            primitive.len() == self.primitive.len(),
+            "new and old primitive array sizes must match"
+        );
         self.primitive = primitive;
     }
 
@@ -90,8 +95,12 @@ impl State {
     }
 
     pub fn upsample(mut self) -> Self {
-        let ni = self.mesh.ni;
-        let nj = self.mesh.nj;
+        let mut mesh = match self.mesh {
+            mesh::Mesh::Structured(ref mut mesh) => mesh,
+            _ => panic!("can only upsample structured mesh"),
+        };
+        let ni = mesh.ni;
+        let nj = mesh.nj;
         let mi = 2 * ni;
         let mj = 2 * nj;
         let mut new_primitive = vec![0.0; (mi as usize + 4) * (mj as usize + 4) * 3];
@@ -104,28 +113,37 @@ impl State {
                 let j1 = 2 * j + 1;
 
                 for q in 0..3 {
-                    let p = self.primitive[(i + 2) as usize * (nj as usize + 4) * 3 + (j + 2) as usize * 3 + q];
+                    let p = self.primitive
+                        [(i + 2) as usize * (nj as usize + 4) * 3 + (j + 2) as usize * 3 + q];
 
                     if (-2..mi + 2).contains(&i0) && (-2..mj + 2).contains(&j0) {
-                        new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3 + (j0 + 2) as usize * 3 + q] = p;
+                        new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3
+                            + (j0 + 2) as usize * 3
+                            + q] = p;
                     }
                     if (-2..mi + 2).contains(&i0) && (-2..mj + 2).contains(&j1) {
-                        new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3 + (j1 + 2) as usize * 3 + q] = p;
+                        new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3
+                            + (j1 + 2) as usize * 3
+                            + q] = p;
                     }
                     if (-2..mi + 2).contains(&i1) && (-2..mj + 2).contains(&j0) {
-                        new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3 + (j0 + 2) as usize * 3 + q] = p;
+                        new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3
+                            + (j0 + 2) as usize * 3
+                            + q] = p;
                     }
                     if (-2..mi + 2).contains(&i1) && (-2..mj + 2).contains(&j1) {
-                        new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3 + (j1 + 2) as usize * 3 + q] = p;
+                        new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3
+                            + (j1 + 2) as usize * 3
+                            + q] = p;
                     }
                 }
             }
         }
         self.primitive = new_primitive;
-        self.mesh.ni *= 2;
-        self.mesh.nj *= 2;
-        self.mesh.dx *= 0.5;
-        self.mesh.dy *= 0.5;
+        mesh.ni *= 2;
+        mesh.nj *= 2;
+        mesh.dx *= 0.5;
+        mesh.dy *= 0.5;
         self
     }
 }
