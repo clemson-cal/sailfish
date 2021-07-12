@@ -1,7 +1,7 @@
-use crate::mesh::Mesh;
-use crate::sailfish::{BufferZone, EquationOfState, PointMass, SinkModel, StructuredMesh};
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
+use crate::mesh::Mesh;
+use crate::sailfish::{BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh};
 use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup {
@@ -12,6 +12,7 @@ pub trait Setup {
     fn buffer_zone(&self) -> BufferZone;
     fn viscosity(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
+    fn coordinate_system(&self) -> Coordinates;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
         match mesh {
             Mesh::Structured(mesh) => {
@@ -83,6 +84,9 @@ impl Setup for Explosion {
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
     }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
 }
 
 pub struct Binary {
@@ -97,26 +101,16 @@ pub struct Binary {
 
 impl std::str::FromStr for Binary {
     type Err = error::Error;
+
+    #[rustfmt::skip]
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         let form = kind_config::Form::new()
-            .item(
-                "domain_radius",
-                12.0,
-                "half-size of the simulation domain [a]",
-            )
-            .item("nu", 1e-3, "kinematic viscosity coefficient [Omega a^2]")
-            .item(
-                "mach_number",
-                10.0,
-                "mach number for locally isothermal EOS",
-            )
-            .item("sink_radius", 0.05, "sink kernel radius [a]")
-            .item(
-                "sink_rate",
-                10.0,
-                "rate of mass subtraction in the sink [Omega]",
-            )
-            .item("sink_model", "af", "sink prescription: [none|af|tf|ff]")
+            .item("domain_radius", 12.0, "half-size of the simulation domain [a]")
+            .item("nu",            1e-3, "kinematic viscosity coefficient [Omega a^2]")
+            .item("mach_number",   10.0, "mach number for locally isothermal EOS")
+            .item("sink_radius",   0.05, "sink kernel radius [a]")
+            .item("sink_rate",     10.0, "rate of mass subtraction in the sink [Omega]")
+            .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -209,6 +203,9 @@ impl Setup for Binary {
             resolution,
         ))
     }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
 }
 
 pub struct Shocktube {}
@@ -257,6 +254,9 @@ impl Setup for Shocktube {
         let faces = (0..resolution + 1).map(|i| i as f64 * dx).collect();
         Mesh::FacePositions1D(faces)
     }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
 }
 
 pub struct Tabulated {
@@ -268,6 +268,8 @@ impl std::str::FromStr for Tabulated {
     type Err = error::Error;
 
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        use std::iter::once;
+
         let filename = parameters;
         let table = LookupTable::<4>::from_ascii_file(filename)
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
@@ -275,19 +277,14 @@ impl std::str::FromStr for Tabulated {
         if table.len() < 2 {
             return Err(InvalidSetup("table must have at least 2 rows".to_owned()));
         }
-
         let cell_centers: Vec<f64> = table.rows().iter().map(|row| row[0]).collect();
         let n = cell_centers.len();
         let dxl = cell_centers[1] - cell_centers[0];
         let dxr = cell_centers[n - 1] - cell_centers[n - 2];
-        let mut faces = vec![];
-        faces.push(cell_centers[0] - 0.5 * dxl);
-
-        for w in cell_centers.windows(2) {
-            faces.push(0.5 * (w[0] + w[1]))
-        }
-        faces.push(cell_centers[n - 1] + 0.5 * dxr);
-
+        let faces = once(cell_centers[0] - 0.5 * dxl)
+            .chain(cell_centers.windows(2).map(|w| 0.5 * (w[0] + w[1])))
+            .chain(once(cell_centers[n - 1] + 0.5 * dxr))
+            .collect();
         Ok(Self { faces, table })
     }
 }
@@ -319,5 +316,8 @@ impl Setup for Tabulated {
         // returning Result in case it's given for problems that specify the
         // resolution internally.
         Mesh::FacePositions1D(self.faces.clone())
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::SphericalPolar
     }
 }

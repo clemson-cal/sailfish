@@ -252,13 +252,15 @@ static __host__ __device__ void advance_rk_zone(
     real plim[NCONS];
     real prip[NCONS];
     real prim[NCONS];
-    real gxli[NCONS] = {0.0, 0.0, 0.0};
-    real gxri[NCONS] = {0.0, 0.0, 0.0};
-    real gxcc[NCONS] = {0.0, 0.0, 0.0};
+    real gxli[NCONS];
+    real gxri[NCONS];
+    real gxcc[NCONS];
 
-    // plm_gradient(pki, pli, pcc, gxli);
-    // plm_gradient(pli, pcc, pri, gxcc);
-    // plm_gradient(pcc, pri, pti, gxri);
+    // NOTE: the gradient calculation here is assuming smoothly varying face
+    // locations.
+    plm_gradient(pki, pli, pcc, gxli);
+    plm_gradient(pli, pcc, pri, gxcc);
+    plm_gradient(pcc, pri, pti, gxri);
 
     for (int q = 0; q < NCONS; ++q)
     {

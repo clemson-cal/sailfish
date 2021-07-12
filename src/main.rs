@@ -1,6 +1,5 @@
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
-use crate::sailfish::Coordinates;
 use crate::setup::Setup;
 use crate::state::State;
 
@@ -107,18 +106,18 @@ fn parent_dir(path: &str) -> Option<&str> {
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
     let mut state = make_state(&cmdline)?;
+    let setup = make_setup(&state.setup_name, &state.parameters)?;
     let mut solver = match (state.setup_name.as_str(), &state.mesh) {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
         ("shocktube" | "tabulated", mesh::Mesh::FacePositions1D(faces)) => {
-            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, Coordinates::Cartesian)
+            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, setup.coordinate_system())
         }
         _ => panic!(),
     };
     let mut mzps_log = vec![];
 
-    let setup = make_setup(&state.setup_name, &state.parameters)?;
     let (mesh, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
         state.mesh.clone(),
         cmdline.cfl_number,
