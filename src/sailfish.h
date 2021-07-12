@@ -89,5 +89,9 @@ struct Mesh
     real x0, y0;
     real dx, dy;
 };
-#define MESH_X(m, i) (m.x0 + (i) * m.dx)
-#define MESH_Y(m, i) (m.y0 + (j) * m.dy)
+
+enum Coordinates
+{
+    Cartesian,
+    SphericalPolar,
+};
