@@ -45,7 +45,7 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
-    writeln!(message, "    tabulated").unwrap();
+    writeln!(message, "    sedov").unwrap();
     PrintUserInformation(message)
 }
 
@@ -54,7 +54,7 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
         "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
         "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
-        "tabulated" => Ok(Box::new(setup::Tabulated::from_str(parameters)?)),
+        "sedov" => Ok(Box::new(setup::Sedov::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -111,7 +111,7 @@ fn run() -> Result<(), error::Error> {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
-        ("shocktube" | "tabulated", mesh::Mesh::FacePositions1D(faces)) => {
+        ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => {
             euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, setup.coordinate_system())
         }
         _ => panic!(),
@@ -168,7 +168,7 @@ fn run() -> Result<(), error::Error> {
 
         mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
         println!(
-            "[{}] t={:.3} Mzps={:.3}",
+            "[{}] t={:.5} Mzps={:.3}",
             state.iteration,
             state.time,
             mzps_log.last().unwrap()
