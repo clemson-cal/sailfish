@@ -156,6 +156,7 @@ fn run() -> Result<(), error::Error> {
             state.write_checkpoint(chkpt_interval, &outdir)?;
         }
 
+        let mut dt_mut = 0.0;
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 let a_max = solver.max_wavespeed(state.time, setup.as_ref());
@@ -163,14 +164,16 @@ fn run() -> Result<(), error::Error> {
                 solver.advance(setup.as_ref(), rk_order, state.time, dt, velocity_ceiling);
                 state.time += dt;
                 state.iteration += 1;
+                dt_mut = dt;
             }
         });
 
         mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
         println!(
-            "[{}] t={:.5} Mzps={:.3}",
+            "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
             state.iteration,
             state.time,
+            dt_mut,
             mzps_log.last().unwrap()
         );
     }

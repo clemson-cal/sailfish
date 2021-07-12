@@ -20,6 +20,6 @@ impl Mesh {
             Self::FacePositions1D(faces) => {
                 faces.windows(2).map(|w| w[1] - w[0]).fold(f64::MAX, f64::min)
             }
-        }        
+        }
     }
 }
