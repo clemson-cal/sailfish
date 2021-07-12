@@ -1,4 +1,5 @@
 #include <math.h>
+#include <stddef.h>
 #include "../sailfish.h"
 
 
@@ -44,9 +45,19 @@ static __host__ __device__ real plm_gradient_scalar(real yl, real y0, real yr)
 
 static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real *g)
 {
-    for (int q = 0; q < NCONS; ++q)
+    if (yl && y0 && yr)
     {
-        g[q] = plm_gradient_scalar(yl[q], y0[q], yr[q]);
+        for (int q = 0; q < NCONS; ++q)
+        {
+            g[q] = plm_gradient_scalar(yl[q], y0[q], yr[q]);
+        }
+    }
+    else
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            g[q] = 0.0;
+        }
     }
 }
 
@@ -235,18 +246,17 @@ static __host__ __device__ void advance_rk_zone(
     real dt,
     int i)
 {
-    if (2 > i || i >= face_positions.count - 3) {
-        return;
-    }
+    int ni = face_positions.count - 1;
+
     real xl = *GET(face_positions, i);
     real xr = *GET(face_positions, i + 1);
 
     real *un = GET(conserved_rk, i);
     real *pcc = GET(primitive_rd, i);
-    real *pli = GET(primitive_rd, i - 1);
-    real *pri = GET(primitive_rd, i + 1);
-    real *pki = GET(primitive_rd, i - 2);
-    real *pti = GET(primitive_rd, i + 2);
+    real *pli = i >= 0 + 1 ? GET(primitive_rd, i - 1) : NULL;
+    real *pri = i < ni - 1 ? GET(primitive_rd, i + 1) : NULL;
+    real *pki = i >= 0 + 2 ? GET(primitive_rd, i - 2) : NULL;
+    real *pti = i < ni - 2 ? GET(primitive_rd, i + 2) : NULL;
 
     real plip[NCONS];
     real plim[NCONS];
@@ -256,18 +266,19 @@ static __host__ __device__ void advance_rk_zone(
     real gxri[NCONS];
     real gxcc[NCONS];
 
-    // NOTE: the gradient calculation here is assuming smoothly varying face
-    // locations.
+    // NOTE: the gradient calculation here assumes smoothly varying face
+    // separations. Also note plm_gradient initializes the gradients to zero
+    // if any of the inputs are NULL.
     plm_gradient(pki, pli, pcc, gxli);
     plm_gradient(pli, pcc, pri, gxcc);
     plm_gradient(pcc, pri, pti, gxri);
 
     for (int q = 0; q < NCONS; ++q)
     {
-        plim[q] = pli[q] + 0.5 * gxli[q];
+        plim[q] = pli ? pli[q] + 0.5 * gxli[q] : pcc[q];
         plip[q] = pcc[q] - 0.5 * gxcc[q];
         prim[q] = pcc[q] + 0.5 * gxcc[q];
-        prip[q] = pri[q] - 0.5 * gxri[q];
+        prip[q] = pri ? pri[q] - 0.5 * gxri[q] : pcc[q];
     }
 
     real fli[NCONS];
