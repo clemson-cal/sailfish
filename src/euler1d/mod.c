@@ -183,11 +183,12 @@ static __host__ __device__ void geometric_source_terms(enum Coordinates coords, 
             source[1] = p * (x1 * x1 - x0 * x0);
             source[2] = 0.0;
             break;
-        default:
+	}
+        default: {
             source[0] = 0.0;
             source[1] = 0.0;
             source[2] = 0.0;
-        }
+	}
     }
 }
 
@@ -324,14 +325,14 @@ static void __global__ primitive_to_conserved_kernel(
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < faces.ni)
+    if (i < conserved.count)
     {
         primitive_to_conserved_zone(primitive, conserved, i);
     }
 }
 
 static void __global__ advance_rk_kernel(
-    struct FacePositions faces,
+    struct Patch faces,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
@@ -341,7 +342,7 @@ static void __global__ advance_rk_kernel(
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < faces.ni)
+    if (i < primitive_wr.count)
     {
         advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, coords, a, dt, i);
     }
@@ -353,7 +354,7 @@ static void __global__ wavespeed_kernel(
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < faces.ni)
+    if (i < wavespeed.count)
     {
         wavespeed_zone(primitive, wavespeed, i);
     }
@@ -403,8 +404,8 @@ EXTERN_C void euler1d_primitive_to_conserved(
         case GPU: {
             #ifdef __NVCC__
             dim3 bs = dim3(256);
-            dim3 bd = dim3((faces.ni + bs.x - 1) / bs.x);
-            primitive_to_conserved_kernel<<<bd, bs>>>(faces, primitive, conserved);
+            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
+            primitive_to_conserved_kernel<<<bd, bs>>>(primitive, conserved);
             #endif
             break;
         }
