@@ -136,6 +136,7 @@ fn run() -> Result<(), error::Error> {
             })
             .unwrap_or_else(|| String::from(".")),
     );
+    let dx_min = mesh.min_spacing();
 
     if let Some(mut resolution) = cmdline.resolution {
         if cmdline.upsample {
@@ -160,7 +161,7 @@ fn run() -> Result<(), error::Error> {
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 let a_max = solver.max_wavespeed(state.time, setup.as_ref());
-                let dt = mesh.min_spacing() / a_max * cfl;
+                let dt = dx_min / a_max * cfl;
                 solver.advance(setup.as_ref(), rk_order, state.time, dt, velocity_ceiling);
                 state.time += dt;
                 state.iteration += 1;
