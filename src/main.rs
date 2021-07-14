@@ -45,7 +45,7 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
-    writeln!(message, "    tabulated").unwrap();
+    writeln!(message, "    sedov").unwrap();
     PrintUserInformation(message)
 }
 
@@ -54,7 +54,7 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
         "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
         "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
-        "tabulated" => Ok(Box::new(setup::Tabulated::from_str(parameters)?)),
+        "sedov" => Ok(Box::new(setup::Sedov::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -111,7 +111,7 @@ fn run() -> Result<(), error::Error> {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
-        ("shocktube" | "tabulated", mesh::Mesh::FacePositions1D(faces)) => {
+        ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => {
             euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, setup.coordinate_system())
         }
         _ => panic!(),
@@ -156,6 +156,7 @@ fn run() -> Result<(), error::Error> {
             state.write_checkpoint(chkpt_interval, &outdir)?;
         }
 
+        let mut dt_mut = 0.0;
         let elapsed = time_exec(|| {
             for _ in 0..fold {
                 let a_max = solver.max_wavespeed(state.time, setup.as_ref());
@@ -163,14 +164,16 @@ fn run() -> Result<(), error::Error> {
                 solver.advance(setup.as_ref(), rk_order, state.time, dt, velocity_ceiling);
                 state.time += dt;
                 state.iteration += 1;
+                dt_mut = dt;
             }
         });
 
         mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
         println!(
-            "[{}] t={:.3} Mzps={:.3}",
+            "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
             state.iteration,
             state.time,
+            dt_mut,
             mzps_log.last().unwrap()
         );
     }
