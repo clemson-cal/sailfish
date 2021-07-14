@@ -116,7 +116,6 @@ fn run() -> Result<(), error::Error> {
         }
         _ => panic!(),
     };
-    let mut mzps_log = vec![];
 
     let (mesh, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
         state.mesh.clone(),
@@ -169,13 +168,13 @@ fn run() -> Result<(), error::Error> {
             }
         });
 
-        mzps_log.push((mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64());
+        let mzps = (mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64();
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
             state.iteration,
             state.time,
             dt_mut,
-            mzps_log.last().unwrap()
+            mzps,
         );
     }
     state.set_primitive(solver.primitive());
