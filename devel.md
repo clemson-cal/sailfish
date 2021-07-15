@@ -3,7 +3,7 @@
 - [ ] Orbital evolution
 - [ ] Time series
 - [x] Upsampling
-- [ ] HIP / ROCm port
+- [x] HIP / ROCm port
 - [ ] Multi-GPU
 - [ ] Physics
       - [ ] PLM runtime parameter
