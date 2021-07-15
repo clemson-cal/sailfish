@@ -106,7 +106,9 @@ fn parent_dir(path: &str) -> Option<&str> {
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
     let mut state = make_state(&cmdline)?;
+    let mut dt = 0.0;
     let setup = make_setup(&state.setup_name, &state.parameters)?;
+    let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
     let mut solver = match (state.setup_name.as_str(), &state.mesh) {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
@@ -156,15 +158,18 @@ fn run() -> Result<(), error::Error> {
             state.write_checkpoint(chkpt_interval, &outdir)?;
         }
 
-        let mut dt_mut = 0.0;
+        if !recompute_dt_each_iteration {
+            dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
+        }
+
         let elapsed = time_exec(|| {
             for _ in 0..fold {
-                let a_max = solver.max_wavespeed(state.time, setup.as_ref());
-                let dt = dx_min / a_max * cfl;
+                if recompute_dt_each_iteration {
+                    dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
+                }
                 solver.advance(setup.as_ref(), rk_order, state.time, dt, velocity_ceiling);
                 state.time += dt;
                 state.iteration += 1;
-                dt_mut = dt;
             }
         });
 
@@ -173,7 +178,7 @@ fn run() -> Result<(), error::Error> {
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
             state.iteration,
             state.time,
-            dt_mut,
+            dt,
             mzps,
         );
     }

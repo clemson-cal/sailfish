@@ -16,6 +16,8 @@ pub struct CommandLine {
     pub end_time: Option<f64>,
     pub rk_order: u32,
     pub cfl_number: f64,
+    #[serde(default)]
+    pub recompute_timestep: String,
     pub velocity_ceiling: f64,
 }
 
@@ -27,6 +29,18 @@ impl CommandLine {
             ExecutionMode::OMP
         } else {
             ExecutionMode::CPU
+        }
+    }
+
+    pub fn recompute_dt_each_iteration(&self) -> Result<bool, Error> {
+        if self.recompute_timestep.is_empty() {
+            Ok(true)
+        } else if self.recompute_timestep == "iter" {
+            Ok(true)
+        } else if self.recompute_timestep == "fold" {
+            Ok(false)
+        } else {
+            return Err(Error::Cmdline("invalid mode for --timestep, expected (iter|fold)".to_owned()))
         }
     }
 }
@@ -47,6 +61,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         end_time: None,
         rk_order: 1,
         cfl_number: 0.2,
+        recompute_timestep: String::from(""),
         velocity_ceiling: 1e16,
     };
 
@@ -59,6 +74,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         RkOrder,
         Cfl,
         Outdir,
+        RecomputeTimestep,
         VelocityCeiling
     }
     let mut state = State::Ready;
@@ -98,6 +114,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
                     writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
+                    writeln!(message, "       --timestep            when to recompute time step ([iter]|fold)").unwrap();
                     writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints [1.0]").unwrap();
                     writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
                     writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
@@ -113,6 +130,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-u" | "--upsample" => c.upsample = true,
                 "-n" | "--resolution" => state = State::GridResolution,
                 "-f" | "--fold" => state = State::Fold,
+                "--timestep" => state = State::RecomputeTimestep,
                 "-c" | "--checkpoint" => state = State::Checkpoint,
                 "-o" | "--outdir" => state = State::Outdir,
                 "-e" | "--end-time" => state = State::EndTime,
@@ -135,6 +153,10 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
             }
             State::Fold => {
                 c.fold = arg.parse().map_err(|e| Cmdline(format!("fold {}: {}", arg, e)))?;
+                state = State::Ready;
+            }
+            State::RecomputeTimestep => {
+                c.recompute_timestep = arg;
                 state = State::Ready;
             }
             State::Checkpoint => {
