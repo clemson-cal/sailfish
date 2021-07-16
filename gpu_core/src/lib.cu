@@ -56,6 +56,37 @@ extern "C" void gpu_device_synchronize()
 #endif
 }
 
+extern "C" int gpu_get_device_count()
+{
+    int count;
+#ifdef __NVCC__
+    cudaGetDeviceCount(&count);
+#else
+    hipGetDeviceCount(&count);
+#endif
+    return count;
+}
+
+extern "C" int gpu_get_device()
+{
+    int device;
+#ifdef __NVCC__
+    cudaGetDevice(&device);
+#else
+    hipGetDevice(&device);
+#endif
+    return device;
+}
+
+extern "C" void gpu_set_device(int device)
+{
+#ifdef __NVCC__
+    cudaSetDevice(device);
+#else
+    hipSetDevice(device);
+#endif
+}
+
 // Adapted from:
 // https://sodocumentation.net/cuda/topic/6566/parallel-reduction--e-g--how-to-sum-an-array
 

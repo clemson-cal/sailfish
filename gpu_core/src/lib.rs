@@ -1,18 +1,23 @@
 use std::iter::FromIterator;
 use std::mem;
-use std::os::raw::{c_ulong, c_void};
-
-pub mod device;
+use std::os::raw::{c_ulong, c_void, c_int};
 
 extern "C" {
+    // Memory allocation and transfer
     pub fn gpu_malloc(size: c_ulong) -> *mut c_void;
     pub fn gpu_free(ptr: *mut c_void);
     pub fn gpu_memcpy_htod(dst: *mut c_void, src: *const c_void, size: c_ulong);
     pub fn gpu_memcpy_dtoh(dst: *mut c_void, src: *const c_void, size: c_ulong);
     pub fn gpu_memcpy_dtod(dst: *mut c_void, src: *const c_void, size: c_ulong);
 
-    pub fn gpu_vec_max_f64(vec: *const f64, size: c_ulong, result: *mut f64);
+    // Device control
     pub fn gpu_device_synchronize();
+    pub fn gpu_device_count() -> c_int;
+    pub fn gpu_get_device() -> c_int;
+    pub fn gpu_set_device(device_id: c_int);
+
+    // Higher level utility functions
+    pub fn gpu_vec_max_f64(vec: *const f64, size: c_ulong, result: *mut f64);
 }
 
 pub struct DeviceVec<T: Copy> {
@@ -143,6 +148,18 @@ mod tests {
                 dvec.maximum(),
                 if n == 0 { None } else { Some((n - 1) as f64) }
             )
+        }
+    }
+
+    #[test]
+    fn device_get_set() {
+        unsafe {
+            let count = gpu_device_count();
+
+            for id in 0..count {
+                gpu_set_device(id);
+                assert_eq!(gpu_get_device(), id);
+            }
         }
     }
 }
