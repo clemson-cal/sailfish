@@ -29,7 +29,7 @@ extern "C" void *gpu_malloc(ulong size)
 
 extern "C" void gpu_free(void *ptr)
 {
-    gpuFree(&ptr);
+    gpuFree(ptr);
 }
 
 extern "C" void gpu_memcpy_htod(void *dst, const void *src, ulong size)
