@@ -122,6 +122,15 @@ fn run() -> Result<(), error::Error> {
         _ => panic!(),
     };
 
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            if let Some(device) = cmdline.device {
+                gpu_core::set_device(device)
+            }
+            println!("running on GPU {}/{}", gpu_core::get_device(), gpu_core::device_count());
+        }
+    }
+
     let (mesh, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
         state.mesh.clone(),
         cmdline.cfl_number,

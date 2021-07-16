@@ -6,6 +6,7 @@ use std::fmt::Write;
 pub struct CommandLine {
     pub use_omp: bool,
     pub use_gpu: bool,
+    pub device: Option<i32>,
     pub upsample: Option<bool>,
     pub setup: Option<String>,
     pub resolution: Option<u32>,
@@ -50,6 +51,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
     let mut c = CommandLine {
         use_omp: false,
         use_gpu: false,
+        device: None,
         upsample: None,
         resolution: None,
         fold: 10,
@@ -66,6 +68,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
 
     enum State {
         Ready,
+        Device,
         GridResolution,
         Fold,
         Checkpoint,
@@ -110,6 +113,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
                     #[cfg(feature = "gpu")]
                     writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
+                    #[cfg(feature = "gpu")]
+                    writeln!(message, "       -d|--device           a device ID to run on [0]").unwrap();
                     writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
                     writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
@@ -126,6 +131,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-p" | "--use-omp" => c.use_omp = true,
                 #[cfg(feature = "gpu")]
                 "-g" | "--use-gpu" => c.use_gpu = true,
+                #[cfg(feature = "gpu")]
+                "-d" | "--device" => state = State::Device,
                 "-u" | "--upsample" => c.upsample = Some(true),
                 "-n" | "--resolution" => state = State::GridResolution,
                 "-f" | "--fold" => state = State::Fold,
@@ -146,6 +153,10 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     }
                 }
             },
+            State::Device => {
+                c.device = Some(arg.parse().map_err(|e| Cmdline(format!("device {}: {}", arg, e)))?);
+                state = State::Ready;                
+            }
             State::GridResolution => {
                 c.resolution = Some(arg.parse().map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?);
                 state = State::Ready;

@@ -12,7 +12,7 @@ extern "C" {
 
     // Device control
     pub fn gpu_device_synchronize();
-    pub fn gpu_device_count() -> c_int;
+    pub fn gpu_get_device_count() -> c_int;
     pub fn gpu_get_device() -> c_int;
     pub fn gpu_set_device(device_id: c_int);
 
@@ -128,6 +128,21 @@ pub fn device_synchronize() {
         gpu_device_synchronize()
     }
 }
+pub fn device_count() -> i32 {
+    unsafe {
+        gpu_get_device_count()
+    }
+}
+pub fn get_device() -> i32 {
+    unsafe {
+        gpu_get_device()
+    }
+}
+pub fn set_device(device_id: i32) {
+    unsafe {
+        gpu_set_device(device_id)
+    }
+}
 
 #[cfg(test)]
 mod tests {
@@ -154,7 +169,7 @@ mod tests {
     #[test]
     fn device_get_set() {
         unsafe {
-            let count = gpu_device_count();
+            let count = device_count();
 
             for id in 0..count {
                 gpu_set_device(id);
