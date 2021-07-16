@@ -295,7 +295,7 @@ impl Setup for Sedov {
         let row = self.table.sample(x);
         primitive[0] = row[1].max(1e-4);
         primitive[1] = row[2];
-        primitive[2] = row[3].max(1e-8);
+        primitive[2] = row[3].max(1e-10);
     }
     fn masses(&self, _time: f64) -> Vec<PointMass> {
         vec![]

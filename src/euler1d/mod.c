@@ -21,7 +21,7 @@
 // ============================ PHYSICS =======================================
 // ============================================================================
 #define NCONS 3
-#define PLM_THETA 1.5
+#define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (5.0 / 3.0)
 
 
@@ -317,7 +317,7 @@ static __host__ __device__ void wavespeed_zone(
 
 // ============================ KERNELS =======================================
 // ============================================================================
-#ifdef __NVCC__
+#if defined(__NVCC__) || defined(__ROCM__)
 
 static void __global__ primitive_to_conserved_kernel(
     struct Patch primitive,
@@ -402,7 +402,7 @@ EXTERN_C void euler1d_primitive_to_conserved(
         }
 
         case GPU: {
-            #ifdef __NVCC__
+            #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
             primitive_to_conserved_kernel<<<bd, bs>>>(primitive, conserved);
@@ -458,7 +458,7 @@ EXTERN_C void euler1d_advance_rk(
         }
 
         case GPU: {
-            #ifdef __NVCC__
+            #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
             advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, coords, a, dt);
@@ -502,7 +502,7 @@ EXTERN_C void euler1d_wavespeed(
         }
 
         case GPU: {
-            #ifdef __NVCC__
+            #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
             wavespeed_kernel<<<bd, bs>>>(primitive, wavespeed);

@@ -2,6 +2,8 @@ use std::iter::FromIterator;
 use std::mem;
 use std::os::raw::{c_ulong, c_void};
 
+pub mod device;
+
 extern "C" {
     pub fn gpu_malloc(size: c_ulong) -> *mut c_void;
     pub fn gpu_free(ptr: *mut c_void);
