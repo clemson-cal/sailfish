@@ -7,6 +7,12 @@ use kepler_two_body::{OrbitalElements, OrbitalState};
 pub trait Setup {
     fn print_parameters(&self);
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
+    fn initial_time(&self) -> f64 {
+        0.0
+    }
+    fn end_time(&self) -> Option<f64> {
+        None
+    }
     fn masses(&self, time: f64) -> Vec<PointMass>;
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
@@ -86,6 +92,9 @@ impl Setup for Explosion {
     }
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(0.2)
     }
 }
 
@@ -257,6 +266,9 @@ impl Setup for Shocktube {
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
+    fn end_time(&self) -> Option<f64> {
+        Some(0.15)
+    }
 }
 
 pub struct Sedov {
@@ -319,5 +331,8 @@ impl Setup for Sedov {
     }
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::SphericalPolar
+    }
+    fn initial_time(&self) -> f64 {
+        1.0
     }
 }

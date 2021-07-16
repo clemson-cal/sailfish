@@ -72,7 +72,7 @@ fn new_state(
         mesh: mesh.clone(),
         restart_file: None,
         iteration: 0,
-        time: 0.0,
+        time: setup.initial_time(),
         primitive: setup.initial_primitive_vec(&mesh),
         checkpoint: state::RecurringTask::new(),
         setup_name: setup_name.to_string(),
@@ -92,7 +92,7 @@ fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     } else {
         return Err(possible_setups_info());
     };
-    if cmdline.upsample {
+    if cmdline.upsample.unwrap_or(false) {
         Ok(state.upsample())
     } else {
         Ok(state)
@@ -113,9 +113,12 @@ fn run() -> Result<(), error::Error> {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
-        ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => {
-            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, setup.coordinate_system())
-        }
+        ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => euler1d::solver(
+            cmdline.execution_mode(),
+            faces,
+            &state.primitive,
+            setup.coordinate_system(),
+        ),
         _ => panic!(),
     };
 
@@ -140,7 +143,7 @@ fn run() -> Result<(), error::Error> {
     let dx_min = mesh.min_spacing();
 
     if let Some(mut resolution) = cmdline.resolution {
-        if cmdline.upsample {
+        if cmdline.upsample.unwrap_or(false) {
             resolution *= 2
         }
         if setup.mesh(resolution) != mesh {
@@ -149,13 +152,20 @@ fn run() -> Result<(), error::Error> {
             ));
         }
     }
+
+    if cmdline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
+        return Err(InvalidSetup(
+            "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
+        ));
+    }
+
     println!("outdir: {}", outdir);
     setup.print_parameters();
 
-    while state.time < cmdline.end_time.unwrap_or(f64::MAX) {
+    while state.time < cmdline.end_time.or(setup.end_time()).unwrap_or(f64::MAX) {
         if state.checkpoint.is_due(state.time, chkpt_interval) {
             state.set_primitive(solver.primitive());
-            state.write_checkpoint(chkpt_interval, &outdir)?;
+            state.write_checkpoint(&outdir)?;
         }
 
         if !recompute_dt_each_iteration {
@@ -176,14 +186,11 @@ fn run() -> Result<(), error::Error> {
         let mzps = (mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64();
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
-            state.iteration,
-            state.time,
-            dt,
-            mzps,
+            state.iteration, state.time, dt, mzps,
         );
     }
     state.set_primitive(solver.primitive());
-    state.write_checkpoint(chkpt_interval, &outdir)
+    state.write_checkpoint(&outdir)
 }
 
 fn main() {
