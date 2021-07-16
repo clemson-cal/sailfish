@@ -190,7 +190,7 @@ pub mod omp {
 #[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
-    use gpu_mem::DeviceVec;
+    use gpu_core::DeviceVec;
 
     pub struct Solver {
         mesh: StructuredMesh,
@@ -263,7 +263,7 @@ pub mod gpu {
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
         fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
-            use gpu_mem::Reduce;
+            use gpu_core::Reduce;
             let eos = setup.equation_of_state();
             let masses = DeviceVec::from(&setup.masses(time));
 

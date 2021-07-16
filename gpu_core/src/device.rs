@@ -11,7 +11,7 @@ impl System {
     fn create() -> Self {
         Self {}
     }
-    pub fn get() -> Option<Self> {
+    pub fn take() -> Option<Self> {
         SYSTEM.lock().unwrap().take()
     }
     pub fn take_device(&self) -> Option<Device> {
@@ -34,19 +34,13 @@ pub struct Device<'a> {
     _system: PhantomData<&'a System>,
 }
 
-impl<'a> Drop for Device<'a> {
-    fn drop(&mut self) {
-        FREE_DEVICE_IDS.lock().unwrap().push(self.id)
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
     #[test]
     fn name() {
-        let system = System::get().unwrap();
+        let system = System::take().unwrap();
         let gpu1 = system.take_device();
         let gpu2 = system.take_device();
 

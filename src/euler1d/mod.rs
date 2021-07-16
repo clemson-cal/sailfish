@@ -172,7 +172,7 @@ pub mod omp {
 #[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
-    use gpu_mem::DeviceVec;
+    use gpu_core::DeviceVec;
 
     pub struct Solver {
         faces: DeviceVec<f64>,
@@ -240,7 +240,7 @@ pub mod gpu {
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
         fn max_wavespeed(&self, _time: f64, _setup: &dyn Setup) -> f64 {
-            use gpu_mem::Reduce;
+            use gpu_core::Reduce;
             unsafe {
                 euler1d_wavespeed(
                     self.num_zones() as i32,
