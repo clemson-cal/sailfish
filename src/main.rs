@@ -50,11 +50,12 @@ fn possible_setups_info() -> error::Error {
 }
 
 fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, error::Error> {
+    use setup::*;
     match setup_name {
-        "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
-        "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
-        "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
-        "sedov" => Ok(Box::new(setup::Sedov::from_str(parameters)?)),
+        "binary" => Ok(Box::new(Binary::from_str(parameters)?)),
+        "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
+        "sedov" => Ok(Box::new(Sedov::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }

@@ -172,14 +172,14 @@ pub mod omp {
 #[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
-    use gpu_core::DeviceVec;
+    use gpu_core::DeviceBuffer;
 
     pub struct Solver {
-        faces: DeviceVec<f64>,
-        primitive1: DeviceVec<f64>,
-        primitive2: DeviceVec<f64>,
-        conserved0: DeviceVec<f64>,
-        wavespeeds: DeviceVec<f64>,
+        faces: DeviceBuffer<f64>,
+        primitive1: DeviceBuffer<f64>,
+        primitive2: DeviceBuffer<f64>,
+        conserved0: DeviceBuffer<f64>,
+        wavespeeds: DeviceBuffer<f64>,
         coords: Coordinates,
     }
 
@@ -187,12 +187,13 @@ pub mod gpu {
         pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
             let num_zones = faces.len() - 1;
             assert_eq!(primitive.len(), num_zones * 3);
+            let device = gpu_core::Device::default();
             Self {
-                faces: DeviceVec::from(faces),
-                primitive1: DeviceVec::from(primitive),
-                primitive2: DeviceVec::from(primitive),
-                conserved0: DeviceVec::from(&vec![0.0; num_zones * 3]),
-                wavespeeds: DeviceVec::from(&vec![0.0; num_zones]),
+                faces: device.buffer_from(faces),
+                primitive1: device.buffer_from(primitive),
+                primitive2: device.buffer_from(primitive),
+                conserved0: device.buffer_from(&vec![0.0; num_zones * 3]),
+                wavespeeds: device.buffer_from(&vec![0.0; num_zones]),
                 coords,
             }
         }

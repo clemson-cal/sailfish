@@ -190,14 +190,14 @@ pub mod omp {
 #[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
-    use gpu_core::DeviceVec;
+    use gpu_core::{Device, DeviceBuffer};
 
     pub struct Solver {
         mesh: StructuredMesh,
-        primitive1: DeviceVec<f64>,
-        primitive2: DeviceVec<f64>,
-        conserved0: DeviceVec<f64>,
-        wavespeeds: DeviceVec<f64>,
+        primitive1: DeviceBuffer<f64>,
+        primitive2: DeviceBuffer<f64>,
+        conserved0: DeviceBuffer<f64>,
+        wavespeeds: DeviceBuffer<f64>,
     }
 
     impl Solver {
@@ -206,12 +206,13 @@ pub mod gpu {
                 primitive.len(),
                 (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
             );
+            let device = Device::default();
             Self {
                 mesh,
-                primitive1: DeviceVec::from(primitive),
-                primitive2: DeviceVec::from(primitive),
-                conserved0: DeviceVec::from(&vec![0.0; mesh.num_total_zones() * 3]),
-                wavespeeds: DeviceVec::from(&vec![0.0; mesh.num_total_zones()]),
+                primitive1: device.buffer_from(primitive),
+                primitive2: device.buffer_from(primitive),
+                conserved0: device.buffer_from(&vec![0.0; mesh.num_total_zones() * 3]),
+                wavespeeds: device.buffer_from(&vec![0.0; mesh.num_total_zones()]),
             }
         }
     }
@@ -238,10 +239,11 @@ pub mod gpu {
             dt: f64,
             velocity_ceiling: f64,
         ) {
+            let device = Device::default();
             let buffer = setup.buffer_zone();
             let eos = setup.equation_of_state();
             let nu = setup.viscosity().unwrap_or(0.0);
-            let masses = DeviceVec::from(&setup.masses(time));
+            let masses = device.buffer_from(&setup.masses(time));
 
             unsafe {
                 iso2d_advance_rk(
@@ -264,8 +266,9 @@ pub mod gpu {
         }
         fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
             use gpu_core::Reduce;
+            let device = Device::default();
             let eos = setup.equation_of_state();
-            let masses = DeviceVec::from(&setup.masses(time));
+            let masses = device.buffer_from(&setup.masses(time));
 
             unsafe {
                 iso2d_wavespeed(
