@@ -105,6 +105,16 @@ fn parent_dir(path: &str) -> Option<&str> {
 
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
+
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            if let Some(device) = cmdline.device {
+                gpu_core::set_device(device)
+            }
+            println!("running on GPU {}/{}", gpu_core::get_device(), gpu_core::device_count());
+        }
+    }
+
     let mut state = make_state(&cmdline)?;
     let mut dt = 0.0;
     let setup = make_setup(&state.setup_name, &state.parameters)?;
@@ -121,15 +131,6 @@ fn run() -> Result<(), error::Error> {
         ),
         _ => panic!(),
     };
-
-    cfg_if! {
-        if #[cfg(feature = "gpu")] {
-            if let Some(device) = cmdline.device {
-                gpu_core::set_device(device)
-            }
-            println!("running on GPU {}/{}", gpu_core::get_device(), gpu_core::device_count());
-        }
-    }
 
     let (mesh, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
         state.mesh.clone(),
