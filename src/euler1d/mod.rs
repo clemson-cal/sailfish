@@ -1,5 +1,5 @@
-use crate::Setup;
 use crate::sailfish::{Coordinates, ExecutionMode, Solve};
+use crate::Setup;
 use cfg_if::cfg_if;
 
 extern "C" {
@@ -34,7 +34,13 @@ extern "C" {
         -> f64;
 }
 
-pub fn solver(mode: ExecutionMode, faces: &[f64], primitive: &[f64], coords: Coordinates) -> Box<dyn Solve> {
+pub fn solver(
+    mode: ExecutionMode,
+    device: Option<i32>,
+    faces: &[f64],
+    primitive: &[f64],
+    coords: Coordinates,
+) -> Box<dyn Solve> {
     match mode {
         ExecutionMode::CPU => Box::new(cpu::Solver::new(faces, primitive, coords)),
         ExecutionMode::OMP => {
@@ -49,7 +55,7 @@ pub fn solver(mode: ExecutionMode, faces: &[f64], primitive: &[f64], coords: Coo
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Box::new(gpu::Solver::new(faces, primitive, coords))
+                    Box::new(gpu::Solver::new(device, faces, primitive, coords))
                 } else {
                     panic!()
                 }
@@ -172,7 +178,7 @@ pub mod omp {
 #[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
-    use gpu_core::DeviceBuffer;
+    use gpu_core::{Device, DeviceBuffer};
 
     pub struct Solver {
         faces: DeviceBuffer<f64>,
@@ -184,10 +190,15 @@ pub mod gpu {
     }
 
     impl Solver {
-        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
+        pub fn new(
+            device: Option<i32>,
+            faces: &[f64],
+            primitive: &[f64],
+            coords: Coordinates,
+        ) -> Self {
             let num_zones = faces.len() - 1;
             assert_eq!(primitive.len(), num_zones * 3);
-            let device = gpu_core::Device::default();
+            let device = Device::with_id(device.unwrap_or(0)).expect("invalid device id");
             Self {
                 faces: device.buffer_from(faces),
                 primitive1: device.buffer_from(primitive),

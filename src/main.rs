@@ -121,11 +121,15 @@ fn run() -> Result<(), error::Error> {
     let setup = make_setup(&state.setup_name, &state.parameters)?;
     let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
     let mut solver = match (state.setup_name.as_str(), &state.mesh) {
-        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
-            iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
-        }
+        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => iso2d::solver(
+            cmdline.execution_mode(),
+            cmdline.device,
+            *mesh,
+            &state.primitive,
+        ),
         ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => euler1d::solver(
             cmdline.execution_mode(),
+            cmdline.device,
             faces,
             &state.primitive,
             setup.coordinate_system(),

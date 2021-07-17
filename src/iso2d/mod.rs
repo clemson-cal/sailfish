@@ -1,5 +1,7 @@
+use crate::sailfish::{
+    BufferZone, EquationOfState, ExecutionMode, PointMass, Solve, StructuredMesh,
+};
 use crate::Setup;
-use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, StructuredMesh, PointMass, Solve};
 use cfg_if::cfg_if;
 
 extern "C" {
@@ -37,7 +39,12 @@ extern "C" {
     );
 }
 
-pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: &[f64]) -> Box<dyn Solve> {
+pub fn solver(
+    mode: ExecutionMode,
+    device: Option<i32>,
+    mesh: StructuredMesh,
+    primitive: &[f64],
+) -> Box<dyn Solve> {
     match mode {
         ExecutionMode::CPU => Box::new(cpu::Solver::new(mesh, primitive)),
         ExecutionMode::OMP => {
@@ -52,7 +59,7 @@ pub fn solver(mode: ExecutionMode, mesh: StructuredMesh, primitive: &[f64]) -> B
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Box::new(gpu::Solver::new(mesh, primitive))
+                    Box::new(gpu::Solver::new(device, mesh, primitive))
                 } else {
                     panic!()
                 }
@@ -201,12 +208,12 @@ pub mod gpu {
     }
 
     impl Solver {
-        pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
+        pub fn new(device: Option<i32>, mesh: StructuredMesh, primitive: &[f64]) -> Self {
             assert_eq!(
                 primitive.len(),
                 (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
             );
-            let device = Device::default();
+            let device = Device::with_id(device.unwrap_or(0)).expect("invalid device id");
             Self {
                 mesh,
                 primitive1: device.buffer_from(primitive),

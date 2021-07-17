@@ -22,8 +22,8 @@ extern "C" {
 pub struct Device(i32);
 
 impl Device {
-    pub fn with_id(id: usize) -> Option<Self> {
-        if id < unsafe { gpu_get_device_count() } as usize {
+    pub fn with_id(id: i32) -> Option<Self> {
+        if id < unsafe { gpu_get_device_count() } as i32 {
             Some(Self(id as i32))
         } else {
             None
