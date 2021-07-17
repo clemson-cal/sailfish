@@ -26,7 +26,7 @@ where
     f();
     cfg_if! {
         if #[cfg(feature = "gpu")] {
-            gpu_core::device_synchronize();
+            gpu_core::Device::default().synchronize()
         }
     }
     start.elapsed()
@@ -107,14 +107,14 @@ fn parent_dir(path: &str) -> Option<&str> {
 fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
 
-    cfg_if! {
-        if #[cfg(feature = "gpu")] {
-            if let Some(device) = cmdline.device {
-                gpu_core::set_device(device)
-            }
-            println!("running on GPU {}/{}", gpu_core::get_device(), gpu_core::device_count());
-        }
-    }
+    // cfg_if! {
+    //     if #[cfg(feature = "gpu")] {
+    //         if let Some(device) = cmdline.device {
+    //             gpu_core::set_device(device)
+    //         }
+    //         println!("running on GPU {}/{}", gpu_core::get_device(), gpu_core::device_count());
+    //     }
+    // }
 
     let mut state = make_state(&cmdline)?;
     let mut dt = 0.0;

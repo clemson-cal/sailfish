@@ -23,7 +23,7 @@ pub struct Device(i32);
 
 impl Device {
     pub fn with_id(id: usize) -> Option<Self> {
-        if id < device_count() as usize {
+        if id < unsafe { gpu_get_device_count() } as usize {
             Some(Self(id as i32))
         } else {
             None
@@ -43,6 +43,13 @@ impl Device {
             }
         })
     }
+    pub fn synchronize(&self) {
+        on_device(self.0, || {
+            unsafe {
+                gpu_device_synchronize()
+            }
+        })
+    }
 }
 
 impl Default for Device {
@@ -52,7 +59,7 @@ impl Default for Device {
 }
 
 pub fn all_devices() -> impl Iterator<Item = Device> {
-    (0..device_count()).map(Device)
+    (0..unsafe { gpu_get_device_count() }).map(Device)
 }
 
 pub struct DeviceBuffer<T: Copy> {
@@ -143,24 +150,11 @@ impl Reduce for DeviceBuffer<f64> {
     }
 }
 
-pub fn device_synchronize() {
-    unsafe { gpu_device_synchronize() }
-}
-pub fn device_count() -> i32 {
-    unsafe { gpu_get_device_count() }
-}
-pub fn get_device() -> i32 {
-    unsafe { gpu_get_device() }
-}
-pub fn set_device(device_id: i32) {
-    unsafe { gpu_set_device(device_id) }
-}
-
 pub fn on_device<T, F: Fn() -> T>(device: i32, f: F) -> T {
-    let orig = get_device();
-    set_device(device);
+    let orig = unsafe { gpu_get_device() };
+    unsafe { gpu_set_device(device) };
     let result = f();
-    set_device(orig);
+    unsafe { gpu_set_device(orig) };
     result
 }
 
