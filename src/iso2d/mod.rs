@@ -205,6 +205,7 @@ pub mod gpu {
         primitive2: DeviceBuffer<f64>,
         conserved0: DeviceBuffer<f64>,
         wavespeeds: DeviceBuffer<f64>,
+        device: Device,
     }
 
     impl Solver {
@@ -220,6 +221,7 @@ pub mod gpu {
                 primitive2: device.buffer_from(primitive),
                 conserved0: device.buffer_from(&vec![0.0; mesh.num_total_zones() * 3]),
                 wavespeeds: device.buffer_from(&vec![0.0; mesh.num_total_zones()]),
+                device,
             }
         }
     }
@@ -229,14 +231,16 @@ pub mod gpu {
             Vec::from(&self.primitive1)
         }
         fn primitive_to_conserved(&mut self) {
-            unsafe {
-                iso2d_primitive_to_conserved(
-                    self.mesh,
-                    self.primitive1.as_device_ptr(),
-                    self.conserved0.as_mut_device_ptr(),
-                    ExecutionMode::GPU,
-                );
-            }
+            self.device.scope(|_| {
+                unsafe {
+                    iso2d_primitive_to_conserved(
+                        self.mesh,
+                        self.primitive1.as_device_ptr(),
+                        self.conserved0.as_device_ptr() as *mut f64,
+                        ExecutionMode::GPU,
+                    );
+                }
+            })
         }
         fn advance_rk(
             &mut self,
@@ -246,49 +250,50 @@ pub mod gpu {
             dt: f64,
             velocity_ceiling: f64,
         ) {
-            let device = Device::default();
-            let buffer = setup.buffer_zone();
-            let eos = setup.equation_of_state();
-            let nu = setup.viscosity().unwrap_or(0.0);
-            let masses = device.buffer_from(&setup.masses(time));
-
-            unsafe {
-                iso2d_advance_rk(
-                    self.mesh,
-                    self.conserved0.as_device_ptr(),
-                    self.primitive1.as_device_ptr(),
-                    self.primitive2.as_mut_device_ptr(),
-                    eos,
-                    buffer,
-                    masses.as_device_ptr(),
-                    masses.len() as i32,
-                    nu,
-                    a,
-                    dt,
-                    velocity_ceiling,
-                    ExecutionMode::GPU,
-                )
-            };
+            self.device.scope(|device| {
+                let buffer = setup.buffer_zone();
+                let eos = setup.equation_of_state();
+                let nu = setup.viscosity().unwrap_or(0.0);
+                let masses = device.buffer_from(&setup.masses(time));
+                unsafe {
+                    iso2d_advance_rk(
+                        self.mesh,
+                        self.conserved0.as_device_ptr(),
+                        self.primitive1.as_device_ptr(),
+                        self.primitive2.as_device_ptr() as *mut f64,
+                        eos,
+                        buffer,
+                        masses.as_device_ptr(),
+                        masses.len() as i32,
+                        nu,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        ExecutionMode::GPU,
+                    )
+                };
+            });
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
         fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
             use gpu_core::Reduce;
-            let device = Device::default();
-            let eos = setup.equation_of_state();
-            let masses = device.buffer_from(&setup.masses(time));
+            self.device.scope(|device| {
+                let eos = setup.equation_of_state();
+                let masses = device.buffer_from(&setup.masses(time));
 
-            unsafe {
-                iso2d_wavespeed(
-                    self.mesh,
-                    self.primitive1.as_device_ptr(),
-                    self.wavespeeds.as_device_ptr() as *mut f64,
-                    eos,
-                    masses.as_device_ptr(),
-                    masses.len() as i32,
-                    ExecutionMode::GPU,
-                )
-            };
-            self.wavespeeds.maximum().unwrap()
+                unsafe {
+                    iso2d_wavespeed(
+                        self.mesh,
+                        self.primitive1.as_device_ptr(),
+                        self.wavespeeds.as_device_ptr() as *mut f64,
+                        eos,
+                        masses.as_device_ptr(),
+                        masses.len() as i32,
+                        ExecutionMode::GPU,
+                    )
+                };
+                self.wavespeeds.maximum().unwrap()
+            })
         }
     }
 }

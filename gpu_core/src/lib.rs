@@ -38,10 +38,13 @@ impl Device {
                 DeviceBuffer {
                     ptr: ptr as *mut T,
                     len: slice.len(),
-                    device_id: 0,
+                    device_id: self.0,
                 }
             }
         })
+    }
+    pub fn scope<T, F: Fn(&Self) -> T>(&self, f: F) -> T {
+        on_device(self.0, || f(self))
     }
     pub fn synchronize(&self) {
         on_device(self.0, || {
@@ -143,14 +146,16 @@ impl Reduce for DeviceBuffer<f64> {
             None
         } else {
             let device = self.device();
-            let mut result = device.buffer_from(&[0.0]);
-            unsafe { gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr()) };
-            Some(Vec::from(&result)[0])
+            device.scope(|_| {
+                let mut result = device.buffer_from(&[0.0]);
+                unsafe { gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr()) };
+                Some(Vec::from(&result)[0])
+            })
         }
     }
 }
 
-pub fn on_device<T, F: Fn() -> T>(device: i32, f: F) -> T {
+fn on_device<T, F: Fn() -> T>(device: i32, f: F) -> T {
     let orig = unsafe { gpu_get_device() };
     unsafe { gpu_set_device(device) };
     let result = f();

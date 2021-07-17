@@ -187,6 +187,7 @@ pub mod gpu {
         conserved0: DeviceBuffer<f64>,
         wavespeeds: DeviceBuffer<f64>,
         coords: Coordinates,
+        device: Device,
     }
 
     impl Solver {
@@ -206,6 +207,7 @@ pub mod gpu {
                 conserved0: device.buffer_from(&vec![0.0; num_zones * 3]),
                 wavespeeds: device.buffer_from(&vec![0.0; num_zones]),
                 coords,
+                device,
             }
         }
 
@@ -219,14 +221,16 @@ pub mod gpu {
             Vec::from(&self.primitive1)
         }
         fn primitive_to_conserved(&mut self) {
-            unsafe {
-                euler1d_primitive_to_conserved(
-                    self.num_zones() as i32,
-                    self.primitive1.as_device_ptr(),
-                    self.conserved0.as_mut_device_ptr(),
-                    ExecutionMode::GPU,
-                );
-            }
+            self.device.scope(|_| {
+                unsafe {
+                    euler1d_primitive_to_conserved(
+                        self.num_zones() as i32,
+                        self.primitive1.as_device_ptr(),
+                        self.conserved0.as_device_ptr() as *mut f64,
+                        ExecutionMode::GPU,
+                    );
+                }
+            })
         }
         fn advance_rk(
             &mut self,
@@ -236,31 +240,35 @@ pub mod gpu {
             dt: f64,
             _velocity_ceiling: f64,
         ) {
-            unsafe {
-                euler1d_advance_rk(
-                    self.num_zones() as i32,
-                    self.faces.as_device_ptr(),
-                    self.conserved0.as_device_ptr(),
-                    self.primitive1.as_device_ptr(),
-                    self.primitive2.as_mut_device_ptr(),
-                    a,
-                    dt,
-                    self.coords,
-                    ExecutionMode::GPU,
-                )
-            };
+            self.device.scope(|_| {
+                unsafe {
+                    euler1d_advance_rk(
+                        self.num_zones() as i32,
+                        self.faces.as_device_ptr(),
+                        self.conserved0.as_device_ptr(),
+                        self.primitive1.as_device_ptr(),
+                        self.primitive2.as_device_ptr() as *mut f64,
+                        a,
+                        dt,
+                        self.coords,
+                        ExecutionMode::GPU,
+                    )
+                };
+            });
             std::mem::swap(&mut self.primitive1, &mut self.primitive2);
         }
         fn max_wavespeed(&self, _time: f64, _setup: &dyn Setup) -> f64 {
             use gpu_core::Reduce;
-            unsafe {
-                euler1d_wavespeed(
-                    self.num_zones() as i32,
-                    self.primitive1.as_device_ptr(),
-                    self.wavespeeds.as_device_ptr() as *mut f64,
-                    ExecutionMode::GPU,
-                )
-            };
+            self.device.scope(|_| {
+                unsafe {
+                    euler1d_wavespeed(
+                        self.num_zones() as i32,
+                        self.primitive1.as_device_ptr(),
+                        self.wavespeeds.as_device_ptr() as *mut f64,
+                        ExecutionMode::GPU,
+                    )
+                };
+            });
             self.wavespeeds.maximum().unwrap()
         }
     }
