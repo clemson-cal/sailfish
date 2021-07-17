@@ -18,15 +18,16 @@ pub mod sailfish;
 pub mod setup;
 pub mod state;
 
-fn time_exec<F>(mut f: F) -> std::time::Duration
+fn time_exec<F>(device: Option<i32>, mut f: F) -> std::time::Duration
 where
     F: FnMut(),
 {
     let start = std::time::Instant::now();
     f();
+
     cfg_if! {
         if #[cfg(feature = "gpu")] {
-            gpu_core::Device::default().synchronize()
+            gpu_core::Device::with_id(device.unwrap_or(0)).unwrap().synchronize();
         }
     }
     start.elapsed()
@@ -187,7 +188,7 @@ fn run() -> Result<(), error::Error> {
             dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
         }
 
-        let elapsed = time_exec(|| {
+        let elapsed = time_exec(cmdline.device, || {
             for _ in 0..fold {
                 if recompute_dt_each_iteration {
                     dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
