@@ -48,7 +48,6 @@ pub fn solver(
                 if #[cfg(feature = "omp")] {
                     Box::new(omp::Solver::new(faces, primitive, coords))
                 } else {
-                    std::convert::identity(device); // black-box
                     panic!()
                 }
             }
@@ -58,7 +57,7 @@ pub fn solver(
                 if #[cfg(feature = "gpu")] {
                     Box::new(gpu::Solver::new(device, faces, primitive, coords))
                 } else {
-
+                    std::convert::identity(device); // black-box
                     panic!()
                 }
             }

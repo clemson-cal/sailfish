@@ -47,6 +47,15 @@ extern "C" void gpu_memcpy_dtod(void *dst, const void *src, ulong size)
     gpuMemcpy(dst, src, size, gpuMemcpyDeviceToDevice);
 }
 
+extern "C" void gpu_memcpy_peer(void *dst, int dst_device, const void *src, int src_device, ulong size)
+{
+#ifdef __NVCC__
+    cudaMemcpyPeer(dst, dst_device, src, src_device, size);
+#else
+    hipMemcpyPeer(dst, dst_device, src, src_device, size);
+#endif    
+}
+
 extern "C" void gpu_device_synchronize()
 {
 #ifdef __NVCC__

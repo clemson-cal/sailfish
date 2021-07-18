@@ -7,4 +7,5 @@ fn main() {
     } else {
         plat.build().file("src/lib.cu").compile("lib");
     }
+    plat.emit_link_flags();
 }

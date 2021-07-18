@@ -1,4 +1,4 @@
-use std::mem;
+use std::mem::size_of;
 use std::os::raw::{c_int, c_ulong, c_void};
 
 extern "C" {
@@ -8,6 +8,13 @@ extern "C" {
     pub fn gpu_memcpy_htod(dst: *mut c_void, src: *const c_void, size: c_ulong);
     pub fn gpu_memcpy_dtoh(dst: *mut c_void, src: *const c_void, size: c_ulong);
     pub fn gpu_memcpy_dtod(dst: *mut c_void, src: *const c_void, size: c_ulong);
+    pub fn gpu_memcpy_peer(
+        dst: *mut c_void,
+        dst_device: c_int,
+        src: *const c_void,
+        src_device: c_int,
+        size: c_ulong,
+    );
 
     // Device control
     pub fn gpu_device_synchronize();
@@ -31,7 +38,7 @@ impl Device {
     }
     pub fn buffer_from<T: Copy>(&self, slice: &[T]) -> DeviceBuffer<T> {
         on_device(self.0, || {
-            let bytes = (slice.len() * mem::size_of::<T>()) as c_ulong;
+            let bytes = (slice.len() * size_of::<T>()) as c_ulong;
             unsafe {
                 let ptr = gpu_malloc(bytes);
                 gpu_memcpy_htod(ptr, slice.as_ptr() as *const c_void, bytes);
@@ -43,15 +50,24 @@ impl Device {
             }
         })
     }
+    unsafe fn alloc<T: Copy>(&self, len: usize) -> DeviceBuffer<T> {
+        on_device(self.0, || {
+            let bytes = (len * size_of::<T>()) as c_ulong;
+            unsafe {
+                let ptr = gpu_malloc(bytes);
+                DeviceBuffer {
+                    ptr: ptr as *mut T,
+                    len,
+                    device_id: self.0,
+                }
+            }
+        })
+    }
     pub fn scope<T, F: Fn(&Self) -> T>(&self, f: F) -> T {
         on_device(self.0, || f(self))
     }
     pub fn synchronize(&self) {
-        on_device(self.0, || {
-            unsafe {
-                gpu_device_synchronize()
-            }
-        })
+        on_device(self.0, || unsafe { gpu_device_synchronize() })
     }
 }
 
@@ -87,6 +103,19 @@ impl<T: Copy> DeviceBuffer<T> {
     pub fn device(&self) -> Device {
         Device(self.device_id)
     }
+    pub fn copy_to(&self, device: &Device) -> Self {
+        unsafe {
+            let buffer = device.alloc(self.len());
+            gpu_memcpy_peer(
+                buffer.ptr as *mut c_void,
+                device.0,
+                self.ptr as *const c_void,
+                self.device_id,
+                (self.len() * size_of::<T>()) as c_ulong,
+            );
+            buffer
+        }
+    }
 }
 
 impl<T: Copy> From<&DeviceBuffer<T>> for Vec<T>
@@ -96,7 +125,7 @@ where
     fn from(dvec: &DeviceBuffer<T>) -> Self {
         on_device(dvec.device_id, || {
             let mut hvec = vec![T::default(); dvec.len()];
-            let bytes = (dvec.len() * mem::size_of::<T>()) as c_ulong;
+            let bytes = (dvec.len() * size_of::<T>()) as c_ulong;
             unsafe {
                 gpu_memcpy_dtoh(
                     hvec.as_mut_ptr() as *mut c_void,
@@ -111,8 +140,8 @@ where
 
 impl<T: Copy> Drop for DeviceBuffer<T> {
     fn drop(&mut self) {
-        on_device(self.device_id, || {
-            unsafe { gpu_free(self.ptr as *mut c_void) }
+        on_device(self.device_id, || unsafe {
+            gpu_free(self.ptr as *mut c_void)
         })
     }
 }
@@ -120,7 +149,7 @@ impl<T: Copy> Drop for DeviceBuffer<T> {
 impl<T: Copy> Clone for DeviceBuffer<T> {
     fn clone(&self) -> Self {
         on_device(self.device_id, || {
-            let bytes = (self.len * mem::size_of::<T>()) as c_ulong;
+            let bytes = (self.len * size_of::<T>()) as c_ulong;
             unsafe {
                 let ptr = gpu_malloc(bytes);
                 gpu_memcpy_dtod(ptr, self.ptr as *const c_void, bytes);
@@ -145,10 +174,11 @@ impl Reduce for DeviceBuffer<f64> {
         if self.is_empty() {
             None
         } else {
-            let device = self.device();
-            device.scope(|_| {
+            self.device().scope(|device| {
                 let mut result = device.buffer_from(&[0.0]);
-                unsafe { gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr()) };
+                unsafe {
+                    gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr())
+                };
                 Some(Vec::from(&result)[0])
             })
         }
@@ -173,6 +203,18 @@ mod tests {
         let hvec: Vec<_> = (0..100).collect();
         let dvec = gpu.buffer_from(&hvec);
         assert_eq!(hvec, Vec::from(&dvec));
+    }
+
+    #[test]
+    fn peer_to_peer() {
+        for src in all_devices() {
+            for dst in all_devices() {
+                let hvec: Vec<_> = (0..100).collect();
+                let dvec1 = src.buffer_from(&hvec);
+                let dvec2 = dvec1.copy_to(&dst);
+                assert_eq!(Vec::from(&dvec1), Vec::from(&dvec2));
+            }
+        }
     }
 
     #[test]
