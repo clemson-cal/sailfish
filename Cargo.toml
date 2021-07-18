@@ -13,6 +13,7 @@ serde = { version = "1.0", features = ["derive"] }
 rmp-serde = "0.15"
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
 gpu_core = { path = "gpu_core", optional = true }
+openmp-sys = { version = "1.2", optional = true, features = ["static"] }
 
 [build-dependencies]
 cfg-if = "1.0"
@@ -21,5 +22,5 @@ sf_build = { path = "sf_build" }
 
 [features]
 default = ["omp", "gpu"]
-omp = []
+omp = ["openmp-sys"]
 gpu = ["gpu_core"]

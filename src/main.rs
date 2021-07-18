@@ -1,3 +1,6 @@
+#[cfg(feature = "omp")]
+extern crate openmp_sys;
+
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
 use crate::setup::Setup;

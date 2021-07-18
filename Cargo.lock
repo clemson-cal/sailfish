@@ -55,6 +55,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "openmp-sys"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d6309d417983bf3e5155416f38ed21822bb9b25210c148b4f14155bd1d42397a"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "proc-macro2"
 version = "1.0.27"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -102,6 +111,7 @@ dependencies = [
  "gpu_core",
  "kepler-two-body",
  "kind-config",
+ "openmp-sys",
  "rmp-serde",
  "serde",
  "sf_build",
