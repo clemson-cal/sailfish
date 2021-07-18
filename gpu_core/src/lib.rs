@@ -26,6 +26,7 @@ extern "C" {
     pub fn gpu_vec_max_f64(vec: *const f64, size: c_ulong, result: *mut f64);
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Device(i32);
 
 impl Device {
@@ -103,7 +104,7 @@ impl<T: Copy> DeviceBuffer<T> {
     pub fn device(&self) -> Device {
         Device(self.device_id)
     }
-    pub fn copy_to(&self, device: &Device) -> Self {
+    pub fn copy_to(&self, device: Device) -> Self {
         unsafe {
             let buffer = device.alloc(self.len());
             gpu_memcpy_peer(
@@ -211,7 +212,7 @@ mod tests {
             for dst in all_devices() {
                 let hvec: Vec<_> = (0..100).collect();
                 let dvec1 = src.buffer_from(&hvec);
-                let dvec2 = dvec1.copy_to(&dst);
+                let dvec2 = dvec1.copy_to(dst);
                 assert_eq!(Vec::from(&dvec1), Vec::from(&dvec2));
             }
         }
