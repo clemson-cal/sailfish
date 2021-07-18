@@ -28,6 +28,8 @@ where
     cfg_if! {
         if #[cfg(feature = "gpu")] {
             gpu_core::Device::with_id(device.unwrap_or(0)).unwrap().synchronize();
+        } else {
+            std::convert::identity(device); // black-box
         }
     }
     start.elapsed()

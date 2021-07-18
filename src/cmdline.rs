@@ -79,6 +79,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         RecomputeTimestep,
         VelocityCeiling
     }
+    std::convert::identity(State::Device); // black-box
     let mut state = State::Ready;
 
     for arg in std::env::args()
@@ -114,7 +115,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     #[cfg(feature = "gpu")]
                     writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
                     #[cfg(feature = "gpu")]
-                    writeln!(message, "       -d|--device           a device ID to run on [0]").unwrap();
+                    writeln!(message, "       -d|--device           a device ID to run on ([0]-#gpus)").unwrap();
                     writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
                     writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();

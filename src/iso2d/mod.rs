@@ -61,6 +61,7 @@ pub fn solver(
                 if #[cfg(feature = "gpu")] {
                     Box::new(gpu::Solver::new(device, mesh, primitive))
                 } else {
+                    std::convert::identity(device); // black-box
                     panic!()
                 }
             }
