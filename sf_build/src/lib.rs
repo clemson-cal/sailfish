@@ -48,7 +48,7 @@ impl Platform {
             Platform::NoGpu => cc::Build::new().flag("-std=c99").clone(),
             Platform::Cuda => cc::Build::new().cuda(true).clone(),
             Platform::Rocm => cc::Build::new()
-		.cpp(true)
+                .cpp(true)
                 .compiler("hipcc")
                 .define("__ROCM__", None)
                 .clone(),

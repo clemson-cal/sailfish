@@ -59,12 +59,11 @@ impl<const NUM_COLS: usize> LookupTable<NUM_COLS> {
         let rows = values?
             .chunks(NUM_COLS)
             .map(|chunk| {
-                let mut rows = [0.0; NUM_COLS];
-
-                for i in 0..NUM_COLS {
-                    rows[i] = chunk[i]
+                let mut row = [0.0; NUM_COLS];
+                for (r, c) in row.iter_mut().zip(chunk) {
+                    *r = *c;
                 }
-                rows
+                row
             })
             .collect();
         Self::from_rows(rows)
@@ -88,12 +87,12 @@ impl<const NUM_COLS: usize> LookupTable<NUM_COLS> {
         let (i0, i1) = self.indexes_straddling(x);
         let v = &self.rows;
 
-        for i in 0..NUM_COLS {
+        for (i, r) in result.iter_mut().enumerate() {
             let x0 = v[i0][0];
             let y0 = v[i0][i];
             let x1 = v[i1][0];
             let y1 = v[i1][i];
-            result[i] = y0 + (x - x0) * (y1 - y0) / (x1 - x0)
+            *r = y0 + (x - x0) * (y1 - y0) / (x1 - x0)
         }
         result
     }

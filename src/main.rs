@@ -175,7 +175,7 @@ fn run() -> Result<(), error::Error> {
     println!("outdir: {}", outdir);
     setup.print_parameters();
 
-    while state.time < cmdline.end_time.or(setup.end_time()).unwrap_or(f64::MAX) {
+    while state.time < cmdline.end_time.or_else(|| setup.end_time()).unwrap_or(f64::MAX) {
         if state.checkpoint.is_due(state.time, chkpt_interval) {
             state.set_primitive(solver.primitive());
             state.write_checkpoint(&outdir)?;
@@ -203,7 +203,8 @@ fn run() -> Result<(), error::Error> {
         );
     }
     state.set_primitive(solver.primitive());
-    state.write_checkpoint(&outdir)
+    state.write_checkpoint(&outdir)?;
+    Ok(())
 }
 
 fn main() {

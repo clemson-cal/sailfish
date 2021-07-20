@@ -176,7 +176,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 c.checkpoint_logspace = match args.next() {
                     Some("log") => Some(true),
                     Some("linear")|None => Some(false),
-                    _ => return Err(Cmdline(format!("checkpoint mode must be (log|linear) if given")))
+                    _ => return Err(Cmdline("checkpoint mode must be (log|linear) if given".to_string()))
                 };
                 state = State::Ready;
             }
