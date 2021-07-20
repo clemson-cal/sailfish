@@ -45,6 +45,7 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    windself").unwrap();
     writeln!(message, "    sedov").unwrap();
     PrintUserInformation(message)
 }
@@ -54,6 +55,7 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
         "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
         "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
+        "windself" => Ok(Box::new(setup::WindSelf::from_str(parameters)?)),
         "sedov" => Ok(Box::new(setup::Sedov::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
@@ -113,7 +115,7 @@ fn run() -> Result<(), error::Error> {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
             iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
         }
-        ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => euler1d::solver(
+        ("shocktube" | "sedov" | "windself", mesh::Mesh::FacePositions1D(faces)) => euler1d::solver(
             cmdline.execution_mode(),
             faces,
             &state.primitive,

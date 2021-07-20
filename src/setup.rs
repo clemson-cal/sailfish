@@ -271,6 +271,68 @@ impl Setup for Shocktube {
     }
 }
 
+pub struct WindSelf {}
+
+impl std::str::FromStr for WindSelf {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self {})
+        } else {
+            Err(InvalidSetup(format!(
+                "windself problem does not take any parameters, got {}",
+                parameters
+            )))
+        }
+    }
+}
+
+impl Setup for WindSelf {
+    fn print_parameters(&self) {}
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        let t = state.time;
+        let mdot = if t >= 2.0 && t <= 2.9 {
+            1e15 + 1e19 * (t - 2.0).powi(4) / (0.9_f64).powi(4)
+        } else {
+            1e19 + (1e15 - 1e19) * (t - 2.0 - 0.9) / (0.1)
+        };
+        let u = if t >= 2.0 && t < 2.1 {
+            1.1 + (1.5 - 1.1) * (t - 2.0) / (0.1)
+        } else {
+            1.1 + ((t - 2.0 - 0.1) / (t - 2.0 - 1.0)).exp() * 1.5
+        };
+        let rho = mdot / (4.0 * 3.14 * x * x * u * 3e10);
+
+        primitive[0] = rho;
+        primitive[2] = rho * 1e-6;
+    }
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let dx = 1.0 / resolution as f64;
+        let faces = (0..resolution + 1).map(|i| i as f64 * dx).collect();
+        Mesh::FacePositions1D(faces)
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(5.00)
+    }
+}
+
 pub struct Sedov {
     faces: Vec<f64>,
     table: LookupTable<4>,
