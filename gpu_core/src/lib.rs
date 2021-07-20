@@ -15,6 +15,16 @@ extern "C" {
         src_device: c_int,
         size: c_ulong,
     );
+    pub fn gpu_memcpy_3d(
+        dst: *mut c_void,
+        start_dst: *const c_ulong,
+        shape_dst: *const c_ulong,
+        src: *const c_void,
+        start_src: *const c_ulong,
+        shape_src: *const c_ulong,
+        count: *const c_ulong,
+        bytes: c_ulong,
+    );
 
     // Device control
     pub fn gpu_device_synchronize();
@@ -51,7 +61,7 @@ impl Device {
             }
         })
     }
-    unsafe fn alloc<T: Copy>(&self, len: usize) -> DeviceBuffer<T> {
+    unsafe fn uninit_buffer<T: Copy>(&self, len: usize) -> DeviceBuffer<T> {
         on_device(self.0, || {
             let bytes = (len * size_of::<T>()) as c_ulong;
             unsafe {
@@ -89,24 +99,35 @@ pub struct DeviceBuffer<T: Copy> {
 }
 
 impl<T: Copy> DeviceBuffer<T> {
+    /// Returns whether there are any elements in this buffer.
     pub fn is_empty(&self) -> bool {
         self.len == 0
     }
+
+    /// Returns the number of elements in this buffer
     pub fn len(&self) -> usize {
         self.len
     }
+
+    /// Returns a typed, immutable pointer to the device allocation.
     pub fn as_device_ptr(&self) -> *const T {
         self.ptr
     }
+
+    /// Returns a typed, mutable pointer to the device allocation.
     pub fn as_mut_device_ptr(&mut self) -> *mut T {
         self.ptr
     }
+
+    /// Returns a handle for the compute device hosting this buffer.
     pub fn device(&self) -> Device {
         Device(self.device_id)
     }
+
+    /// Copy this buffer to a buffer on another device.
     pub fn copy_to(&self, device: Device) -> Self {
-        unsafe {
-            let buffer = device.alloc(self.len());
+        on_device(self.device_id, || unsafe {
+            let buffer = device.uninit_buffer(self.len());
             gpu_memcpy_peer(
                 buffer.ptr as *mut c_void,
                 device.0,
@@ -115,7 +136,105 @@ impl<T: Copy> DeviceBuffer<T> {
                 (self.len() * size_of::<T>()) as c_ulong,
             );
             buffer
+        })
+    }
+
+    /// Insert the contents of a contiguous buffer into a subset of this one.
+    /// This buffer must have `shape` indexes on each axis, `elems` data
+    /// elements per index, and `start + count` indexes must in-bounds on each
+    /// axis. The other buffer must have `count` indexes on each axis, and
+    /// `elems` data elements per index. If the other buffer resides on
+    /// another device, its contents will first be copied to the destination
+    /// buffer's device.
+    pub fn insert_3d(
+        &mut self,
+        start: [usize; 3],
+        shape: [usize; 3],
+        count: [usize; 3],
+        elems: usize,
+        src_array: &Self,
+    ) {
+        if self.device() != src_array.device() {
+            self.insert_3d(
+                start,
+                shape,
+                count,
+                elems,
+                &src_array.copy_to(self.device()),
+            )
+        } else {
+            self.memcpy_3d(start, shape, src_array, [0, 0, 0], count, count, elems)
         }
+    }
+
+    /// Extract the contents of a buffer into a new buffer. This buffer must
+    /// have `shape` indexes on each axis, `elems` data elements per index,
+    /// and `start + count` indexes must in-bounds on each axis. The other
+    /// buffer must have `count` indexes on each axis, and `elems` data
+    /// elements per index. The new buffer will reside on the same device as
+    /// this one.
+    pub fn extract_3d(
+        &self,
+        start: [usize; 3],
+        shape: [usize; 3],
+        count: [usize; 3],
+        elems: usize,
+    ) -> Self {
+        let mut dst_array = unsafe {
+            self.device()
+                .uninit_buffer(count[0] * count[1] * count[2] * elems)
+        };
+        dst_array.memcpy_3d([0, 0, 0], count, self, start, shape, count, elems);
+        dst_array
+    }
+
+    /// Copy from a subset of a source buffer into a subset of this buffer.
+    /// Both buffers must reside on the same device.
+    pub fn memcpy_3d(
+        &mut self,
+        dst_start: [usize; 3],
+        dst_shape: [usize; 3],
+        src_array: &Self,
+        src_start: [usize; 3],
+        src_shape: [usize; 3],
+        count: [usize; 3],
+        elems: usize,
+    ) {
+        assert_eq!(self.device(), src_array.device());
+        assert_eq!(
+            src_shape[0] * src_shape[1] * src_shape[2] * elems,
+            src_array.len()
+        );
+        assert_eq!(
+            dst_shape[0] * dst_shape[1] * dst_shape[2] * elems,
+            self.len()
+        );
+        assert!(dst_start[0] + count[0] < dst_shape[0]);
+        assert!(dst_start[1] + count[1] < dst_shape[1]);
+        assert!(dst_start[2] + count[2] < dst_shape[2]);
+        assert!(src_start[0] + count[0] < src_shape[0]);
+        assert!(src_start[1] + count[1] < src_shape[1]);
+        assert!(src_start[2] + count[2] < src_shape[2]);
+
+        let c_ulong_array = |a: [usize; 3]| [a[0] as c_ulong, a[1] as c_ulong, a[2] as c_ulong];
+        let dst_start = c_ulong_array(dst_start);
+        let dst_shape = c_ulong_array(dst_shape);
+        let src_start = c_ulong_array(src_start);
+        let src_shape = c_ulong_array(src_shape);
+        let count = c_ulong_array(count);
+
+        on_device(self.device_id, || unsafe {
+            gpu_memcpy_3d(
+                self.ptr as *mut c_void,
+                dst_start.as_ptr(),
+                dst_shape.as_ptr(),
+                src_array.ptr as *const c_void,
+                src_start.as_ptr(),
+                src_shape.as_ptr(),
+                count.as_ptr(),
+                (elems * size_of::<T>()) as c_ulong,
+            )
+        })
     }
 }
 

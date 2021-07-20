@@ -96,6 +96,69 @@ extern "C" void gpu_set_device(int device)
 #endif
 }
 
+static __global__ void gpu_memcpy_3d_kernel(
+    void *dst,
+    ulong *dst_start,
+    ulong *dst_shape,
+    const void *src,
+    ulong *src_start,
+    ulong *src_shape,
+    ulong *count,
+    ulong bytes)
+{
+    int i = threadIdx.z + blockIdx.z * blockDim.z;
+    int j = threadIdx.y + blockIdx.y * blockDim.y;
+    int k = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i >= count[0] || j >= count[1] || j >= count[2])
+    {
+        return;
+    }
+
+    // strides in dst
+    int si_dst = bytes * dst_shape[1] * dst_shape[2];
+    int sj_dst = bytes * dst_shape[1];
+    int sj_dst = bytes;
+
+    // strides in src
+    int si_src = bytes * src_shape[1] * src_shape[2];
+    int sj_src = bytes * src_shape[1];
+    int sj_src = bytes;
+
+    int n_dst = (i - dst_start[0]) * si_dst + (j - dst_start[1]) * sj_dst + (k - dst_start[2]) * sk_dst;
+    int n_src = (i - src_start[0]) * si_src + (j - src_start[1]) * sj_src + (k - src_start[2]) * sk_src;
+
+    for (int q = 0; q < bytes; ++q)
+    {
+        dst[n_dst + q] = src[n_src + q];
+    }
+}
+
+extern "C" void gpu_memcpy_3d(
+    void *dst,
+    ulong *dst_start,
+    ulong *dst_shape,
+    const void *src,
+    ulong *src_start,
+    ulong *src_shape,
+    ulong *count,
+    ulong bytes)
+{
+    dim3 bs = dim3(8, 8, 8);
+
+    if (count[2] == 1) {
+        bs.y *= bs.x;
+        bs.x = 1;
+    }
+    if (count[1] == 1) {
+        bs.z *= bs.y;
+        bs.y = 1;
+    }
+
+    dim3 bd = dim3((count[2] + bs.z - 1) / bs.z, (count[1] + bs.y - 1) / bs.x, (count[0] + bs.x - 1) / bs.x);
+    gpu_memcpy_3d_kernel<<<bd, bs>>>(dst, start, count, shape, bytes);
+}
+
 // Adapted from:
 // https://sodocumentation.net/cuda/topic/6566/parallel-reduction--e-g--how-to-sum-an-array
 
