@@ -124,6 +124,11 @@ impl<T: Copy> DeviceBuffer<T> {
         Device(self.device_id)
     }
 
+    /// Convenience method to copy memory to a `Vec`.
+    pub fn to_vec(&self) -> Vec<T> where T: Default {
+        Vec::from(self)
+    }
+
     /// Copy this buffer to a buffer on another device.
     pub fn copy_to(&self, device: Device) -> Self {
         on_device(self.device_id, || unsafe {
@@ -209,29 +214,29 @@ impl<T: Copy> DeviceBuffer<T> {
             dst_shape[0] * dst_shape[1] * dst_shape[2] * elems,
             self.len()
         );
-        assert!(dst_start[0] + count[0] < dst_shape[0]);
-        assert!(dst_start[1] + count[1] < dst_shape[1]);
-        assert!(dst_start[2] + count[2] < dst_shape[2]);
-        assert!(src_start[0] + count[0] < src_shape[0]);
-        assert!(src_start[1] + count[1] < src_shape[1]);
-        assert!(src_start[2] + count[2] < src_shape[2]);
+        assert!(dst_start[0] + count[0] <= dst_shape[0]);
+        assert!(dst_start[1] + count[1] <= dst_shape[1]);
+        assert!(dst_start[2] + count[2] <= dst_shape[2]);
+        assert!(src_start[0] + count[0] <= src_shape[0]);
+        assert!(src_start[1] + count[1] <= src_shape[1]);
+        assert!(src_start[2] + count[2] <= src_shape[2]);
 
-        let c_ulong_array = |a: [usize; 3]| [a[0] as c_ulong, a[1] as c_ulong, a[2] as c_ulong];
-        let dst_start = c_ulong_array(dst_start);
-        let dst_shape = c_ulong_array(dst_shape);
-        let src_start = c_ulong_array(src_start);
-        let src_shape = c_ulong_array(src_shape);
-        let count = c_ulong_array(count);
+        let ulong_buf = |a: [usize; 3]| self.device().buffer_from(&[a[0] as c_ulong, a[1] as c_ulong, a[2] as c_ulong]);
+        let dst_start = ulong_buf(dst_start);
+        let dst_shape = ulong_buf(dst_shape);
+        let src_start = ulong_buf(src_start);
+        let src_shape = ulong_buf(src_shape);
+        let count = ulong_buf(count);
 
         on_device(self.device_id, || unsafe {
             gpu_memcpy_3d(
                 self.ptr as *mut c_void,
-                dst_start.as_ptr(),
-                dst_shape.as_ptr(),
+                dst_start.as_device_ptr(),
+                dst_shape.as_device_ptr(),
                 src_array.ptr as *const c_void,
-                src_start.as_ptr(),
-                src_shape.as_ptr(),
-                count.as_ptr(),
+                src_start.as_device_ptr(),
+                src_shape.as_device_ptr(),
+                count.as_device_ptr(),
                 (elems * size_of::<T>()) as c_ulong,
             )
         })
@@ -347,6 +352,74 @@ mod tests {
                     dvec.maximum(),
                     if n == 0 { None } else { Some((n - 1) as f64) }
                 )
+            }
+        }
+    }
+
+    #[test]
+    fn multi_dimensional_copy_trivial() {
+        let ni = 5;
+        let nj = 9;
+        let nk = 8;
+        let nq = 3;
+        let si = nq * nk * nj;
+        let sj = nq * nk;
+        let sk = nq;
+        let mut hvec = vec![0.0; ni * nj * nk * nq];
+
+        let f = |i, j, k, q| (i + j + k + q) as f64;
+        for i in 0..ni {
+            for j in 0..nj {
+                for k in 0..nk {
+                    for q in 0..nq {
+                        hvec[i * si + j + sj + k * sk + q] = f(i, j, k, q);
+                    }
+                }
+            }
+        }
+        let dvec = Device::default().buffer_from(&hvec);
+        let gvec = dvec.extract_3d([0, 0, 0], [ni, nj, nk], [ni, nj, nk], nq).to_vec();
+        assert_eq!(hvec, gvec);
+    }
+
+    #[test]
+    fn multi_dimensional_copy_harder() {
+        let ni = 5;
+        let nj = 9;
+        let nk = 8;
+        let nq = 3;
+        let si = nq * nk * nj;
+        let sj = nq * nk;
+        let sk = nq;
+        let mut hvec = vec![0.0; ni * nj * nk * nq];
+
+        let f = |i, j, k, q| (i + j + k + q) as f64;
+        for i in 0..ni {
+            for j in 0..nj {
+                for k in 0..nk {
+                    for q in 0..nq {
+                        hvec[i * si + j + sj + k * sk + q] = f(i, j, k, q);
+                    }
+                }
+            }
+        }
+        let dvec = Device::default().buffer_from(&hvec);
+        let mi = 1;
+        let mj = 2;
+        let mk = 3;
+        let mq = nq;
+        let hsub = dvec.extract_3d([2, 3, 4], [ni, nj, nk], [mi, mj, mk], nq).to_vec();
+        let ti = mq * mk * mj;
+        let tj = mq * mk;
+        let tk = mq;
+
+        for i in 2..mi {
+            for j in 3..mj {
+                for k in 4..mk {
+                    for q in 0..mq {
+                        assert_eq!(hsub[(i - 2) * ti + (j - 3) * tj + (k - 4) * tk + q], f(i, j, k, q));
+                    }
+                }
             }
         }
     }

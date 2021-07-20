@@ -110,19 +110,19 @@ static __global__ void gpu_memcpy_3d_kernel(
     ulong j = threadIdx.y + blockIdx.y * blockDim.y;
     ulong k = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i >= count[0] || j >= count[1] || j >= count[2])
+    if (i >= count[0] || j >= count[1] || k >= count[2])
     {
         return;
     }
 
     // strides in dst
-    ulong si_dst = bytes * dst_shape[1] * dst_shape[2];
-    ulong sj_dst = bytes * dst_shape[1];
+    ulong si_dst = bytes * dst_shape[2] * dst_shape[1];
+    ulong sj_dst = bytes * dst_shape[2];
     ulong sk_dst = bytes;
 
     // strides in src
-    ulong si_src = bytes * src_shape[1] * src_shape[2];
-    ulong sj_src = bytes * src_shape[1];
+    ulong si_src = bytes * src_shape[2] * src_shape[1];
+    ulong sj_src = bytes * src_shape[2];
     ulong sk_src = bytes;
 
     ulong n_dst = (i - dst_start[0]) * si_dst + (j - dst_start[1]) * sj_dst + (k - dst_start[2]) * sk_dst;
