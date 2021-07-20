@@ -51,6 +51,7 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    collision").unwrap();
     writeln!(message, "    sedov").unwrap();
     PrintUserInformation(message)
 }
@@ -62,6 +63,7 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
         "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
         "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
         "sedov" => Ok(Box::new(Sedov::from_str(parameters)?)),
+        "collision" => Ok(Box::new(Collision::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -123,7 +125,7 @@ fn run() -> Result<(), error::Error> {
             *mesh,
             &state.primitive,
         ),
-        ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => euler1d::solver(
+        ("shocktube" | "sedov" | "collision", mesh::Mesh::FacePositions1D(faces)) => euler1d::solver(
             cmdline.execution_mode(),
             cmdline.device,
             faces,
