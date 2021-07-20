@@ -125,7 +125,10 @@ impl<T: Copy> DeviceBuffer<T> {
     }
 
     /// Convenience method to copy memory to a `Vec`.
-    pub fn to_vec(&self) -> Vec<T> where T: Default {
+    pub fn to_vec(&self) -> Vec<T>
+    where
+        T: Default,
+    {
         Vec::from(self)
     }
 
@@ -195,6 +198,7 @@ impl<T: Copy> DeviceBuffer<T> {
 
     /// Copy from a subset of a source buffer into a subset of this buffer.
     /// Both buffers must reside on the same device.
+    #[allow(clippy::too_many_arguments)]
     pub fn memcpy_3d(
         &mut self,
         dst_start: [usize; 3],
@@ -221,7 +225,10 @@ impl<T: Copy> DeviceBuffer<T> {
         assert!(src_start[1] + count[1] <= src_shape[1]);
         assert!(src_start[2] + count[2] <= src_shape[2]);
 
-        let ulong_buf = |a: [usize; 3]| self.device().buffer_from(&[a[0] as c_ulong, a[1] as c_ulong, a[2] as c_ulong]);
+        let ulong_buf = |a: [usize; 3]| {
+            self.device()
+                .buffer_from(&[a[0] as c_ulong, a[1] as c_ulong, a[2] as c_ulong])
+        };
         let dst_start = ulong_buf(dst_start);
         let dst_shape = ulong_buf(dst_shape);
         let src_start = ulong_buf(src_start);
@@ -378,7 +385,9 @@ mod tests {
             }
         }
         let dvec = Device::default().buffer_from(&hvec);
-        let gvec = dvec.extract_3d([0, 0, 0], [ni, nj, nk], [ni, nj, nk], nq).to_vec();
+        let gvec = dvec
+            .extract_3d([0, 0, 0], [ni, nj, nk], [ni, nj, nk], nq)
+            .to_vec();
         assert_eq!(hvec, gvec);
     }
 
@@ -408,7 +417,9 @@ mod tests {
         let mj = 2;
         let mk = 3;
         let mq = nq;
-        let hsub = dvec.extract_3d([2, 3, 4], [ni, nj, nk], [mi, mj, mk], nq).to_vec();
+        let hsub = dvec
+            .extract_3d([2, 3, 4], [ni, nj, nk], [mi, mj, mk], nq)
+            .to_vec();
         let ti = mq * mk * mj;
         let tj = mq * mk;
         let tk = mq;
@@ -417,7 +428,10 @@ mod tests {
             for j in 3..mj {
                 for k in 4..mk {
                     for q in 0..mq {
-                        assert_eq!(hsub[(i - 2) * ti + (j - 3) * tj + (k - 4) * tk + q], f(i, j, k, q));
+                        assert_eq!(
+                            hsub[(i - 2) * ti + (j - 3) * tj + (k - 4) * tk + q],
+                            f(i, j, k, q)
+                        );
                     }
                 }
             }
