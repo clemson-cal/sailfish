@@ -3,12 +3,16 @@ import numpy as np
 import matplotlib.pyplot as plt
 import msgpack
 import os
+from pathlib import Path
 import argparse
 
 
-def file_load(directory_name):
+def file_load(indir, savefigbool):
     file_count = 0
-    for filename in sys.argv[1:]:
+    outdir_path_name = Path().resolve()
+    Path('{}/temp'.format(outdir_path_name)).mkdir(parents=True, exist_ok=True)
+    for filename in Path(indir).iterdir():
+        file_count += 1
         chkpt = msgpack.load(open(filename, 'rb'))
         ni = chkpt['mesh']['ni']
         nj = chkpt['mesh']['nj']
@@ -24,17 +28,23 @@ def file_load(directory_name):
         plt.colorbar()
         plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
         plt.title(r"{} $\Sigma^{{1/4}}$".format(filename))
-        fname = '/{}/temp/{}.png'.format(directory_name, file_count)
+        fname = '{}/temp/{}.png'.format(outdir_path_name, file_count)
+        print(fname)
         plt.savefig(fname)
 
+    if savefigbool is False:
+        os.system("rm -rf {}/{}".format(outdir_path_name, 'output-figures'))
 
-# def make_movie(directory_name):
+
+# def make_movie(outdir):
 #     pass
 
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("filenames", nargs='+')
+    parser.add_argument('--indir', default='', help='Checkpoint file directory.', required=True)
     parser.add_argument('--outdir', default='movie', help='Output movie directory.')
     parser.add_argument('--savefigs', default=False, help='Whether the program saves the figures used to make the movie.')
     args = parser.parse_args()
+
+    file_load(args.indir, args.savefigs)
