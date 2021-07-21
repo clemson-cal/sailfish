@@ -71,6 +71,8 @@ pub fn solver(
 
 pub mod cpu {
     use super::*;
+
+    #[derive(Debug)]
     pub struct Solver {
         mesh: StructuredMesh,
         primitive1: Vec<f64>,

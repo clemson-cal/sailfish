@@ -25,8 +25,8 @@ pub trait Setup {
                 let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
                 let si = 3 * (mesh.nj + 4);
                 let sj = 3;
-                for i in -2i32..mesh.ni + 2 {
-                    for j in -2i32..mesh.nj + 2 {
+                for i in -2..mesh.ni + 2 {
+                    for j in -2..mesh.nj + 2 {
                         let n = ((i + 2) * si + (j + 2) * sj) as usize;
                         let [x, y] = mesh.cell_coordinates(i, j);
                         self.initial_primitive(x, y, &mut primitive[n..n + 3])

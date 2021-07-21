@@ -125,13 +125,15 @@ fn run() -> Result<(), error::Error> {
             *mesh,
             &state.primitive,
         ),
-        ("shocktube" | "sedov" | "collision", mesh::Mesh::FacePositions1D(faces)) => euler1d::solver(
-            cmdline.execution_mode(),
-            cmdline.device,
-            faces,
-            &state.primitive,
-            setup.coordinate_system(),
-        ),
+        ("shocktube" | "sedov" | "collision", mesh::Mesh::FacePositions1D(faces)) => {
+            euler1d::solver(
+                cmdline.execution_mode(),
+                cmdline.device,
+                faces,
+                &state.primitive,
+                setup.coordinate_system(),
+            )
+        }
         _ => panic!(),
     };
 
@@ -175,7 +177,12 @@ fn run() -> Result<(), error::Error> {
     println!("outdir: {}", outdir);
     setup.print_parameters();
 
-    while state.time < cmdline.end_time.or_else(|| setup.end_time()).unwrap_or(f64::MAX) {
+    while state.time
+        < cmdline
+            .end_time
+            .or_else(|| setup.end_time())
+            .unwrap_or(f64::MAX)
+    {
         if state.checkpoint.is_due(state.time, chkpt_interval) {
             state.set_primitive(solver.primitive());
             state.write_checkpoint(&outdir)?;
