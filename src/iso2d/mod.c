@@ -790,7 +790,7 @@ EXTERN_C void iso2d_primitive_to_conserved(
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y); // WARNING: should x & y be transposed for non-square grids?
             primitive_to_conserved_kernel<<<bd, bs>>>(mesh, primitive, conserved);
             #endif
             break;

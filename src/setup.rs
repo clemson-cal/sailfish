@@ -7,6 +7,12 @@ use kepler_two_body::{OrbitalElements, OrbitalState};
 pub trait Setup {
     fn print_parameters(&self);
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
+    fn initial_time(&self) -> f64 {
+        0.0
+    }
+    fn end_time(&self) -> Option<f64> {
+        None
+    }
     fn masses(&self, time: f64) -> Vec<PointMass>;
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
@@ -19,8 +25,8 @@ pub trait Setup {
                 let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
                 let si = 3 * (mesh.nj + 4);
                 let sj = 3;
-                for i in -2i32..mesh.ni + 2 {
-                    for j in -2i32..mesh.nj + 2 {
+                for i in -2..mesh.ni + 2 {
+                    for j in -2..mesh.nj + 2 {
                         let n = ((i + 2) * si + (j + 2) * sj) as usize;
                         let [x, y] = mesh.cell_coordinates(i, j);
                         self.initial_primitive(x, y, &mut primitive[n..n + 3])
@@ -86,6 +92,9 @@ impl Setup for Explosion {
     }
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(0.2)
     }
 }
 
@@ -257,6 +266,80 @@ impl Setup for Shocktube {
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
+    fn end_time(&self) -> Option<f64> {
+        Some(0.15)
+    }
+}
+
+pub struct Collision {}
+
+impl std::str::FromStr for Collision {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self {})
+        } else {
+            Err(InvalidSetup(format!(
+                "collision problem does not take any parameters, got {}",
+                parameters
+            )))
+        }
+    }
+}
+
+impl Setup for Collision {
+    fn print_parameters(&self) {}
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        let xl: f64 = -0.25;
+        let xr: f64 = 0.25;
+        let dx: f64 = 0.025;
+
+        let gaussian = |x: f64, x0: f64| {
+            f64::exp(-(x - x0).powi(2) / dx.powi(2))
+        };
+
+        let step = |x: f64, x0: f64| {
+            if (x - x0).abs() < dx * 10.0 {
+                1.0
+            } else {
+                0.0
+            }
+        };
+
+        let rho = gaussian(x, xl) + gaussian(x, xr) + 1e-2;
+        let vel = step(x, xl) - step(x, xr);
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = rho * 1e-4;
+    }
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let x0 = -1.0;
+        let x1 = 1.0;
+        let dx = (x1 - x0) / resolution as f64;
+        let faces = (0..resolution + 1).map(|i| x0 + i as f64 * dx).collect();
+        Mesh::FacePositions1D(faces)
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(5.00)
+    }
 }
 
 pub struct Sedov {
@@ -293,9 +376,9 @@ impl Setup for Sedov {
     fn print_parameters(&self) {}
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let row = self.table.sample(x);
-        primitive[0] = row[1].max(1e-4);
+        primitive[0] = row[1];
         primitive[1] = row[2];
-        primitive[2] = row[3].max(1e-10);
+        primitive[2] = row[3];
     }
     fn masses(&self, _time: f64) -> Vec<PointMass> {
         vec![]
@@ -319,5 +402,8 @@ impl Setup for Sedov {
     }
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::SphericalPolar
+    }
+    fn initial_time(&self) -> f64 {
+        1.0
     }
 }

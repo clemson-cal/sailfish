@@ -47,6 +47,15 @@ extern "C" void gpu_memcpy_dtod(void *dst, const void *src, ulong size)
     gpuMemcpy(dst, src, size, gpuMemcpyDeviceToDevice);
 }
 
+extern "C" void gpu_memcpy_peer(void *dst, int dst_device, const void *src, int src_device, ulong size)
+{
+#ifdef __NVCC__
+    cudaMemcpyPeer(dst, dst_device, src, src_device, size);
+#else
+    hipMemcpyPeer(dst, dst_device, src, src_device, size);
+#endif    
+}
+
 extern "C" void gpu_device_synchronize()
 {
 #ifdef __NVCC__
@@ -54,6 +63,100 @@ extern "C" void gpu_device_synchronize()
 #else
     hipDeviceSynchronize();
 #endif
+}
+
+extern "C" int gpu_get_device_count()
+{
+    int count;
+#ifdef __NVCC__
+    cudaGetDeviceCount(&count);
+#else
+    hipGetDeviceCount(&count);
+#endif
+    return count;
+}
+
+extern "C" int gpu_get_device()
+{
+    int device;
+#ifdef __NVCC__
+    cudaGetDevice(&device);
+#else
+    hipGetDevice(&device);
+#endif
+    return device;
+}
+
+extern "C" void gpu_set_device(int device)
+{
+#ifdef __NVCC__
+    cudaSetDevice(device);
+#else
+    hipSetDevice(device);
+#endif
+}
+
+static __global__ void gpu_memcpy_3d_kernel(
+    char *dst,
+    ulong *dst_start,
+    ulong *dst_shape,
+    const char *src,
+    ulong *src_start,
+    ulong *src_shape,
+    ulong *count,
+    ulong bytes)
+{
+    ulong i = threadIdx.z + blockIdx.z * blockDim.z;
+    ulong j = threadIdx.y + blockIdx.y * blockDim.y;
+    ulong k = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i >= count[0] || j >= count[1] || k >= count[2])
+    {
+        return;
+    }
+
+    // strides in dst
+    ulong si_dst = bytes * dst_shape[2] * dst_shape[1];
+    ulong sj_dst = bytes * dst_shape[2];
+    ulong sk_dst = bytes;
+
+    // strides in src
+    ulong si_src = bytes * src_shape[2] * src_shape[1];
+    ulong sj_src = bytes * src_shape[2];
+    ulong sk_src = bytes;
+
+    ulong n_dst = (i - dst_start[0]) * si_dst + (j - dst_start[1]) * sj_dst + (k - dst_start[2]) * sk_dst;
+    ulong n_src = (i - src_start[0]) * si_src + (j - src_start[1]) * sj_src + (k - src_start[2]) * sk_src;
+
+    for (ulong q = 0; q < bytes; ++q)
+    {
+        dst[n_dst + q] = src[n_src + q];
+    }
+}
+
+extern "C" void gpu_memcpy_3d(
+    char *dst,
+    ulong *dst_start,
+    ulong *dst_shape,
+    const char *src,
+    ulong *src_start,
+    ulong *src_shape,
+    ulong *count,
+    ulong bytes)
+{
+    dim3 bs = dim3(8, 8, 8);
+
+    if (count[2] == 1) {
+        bs.y *= bs.x;
+        bs.x = 1;
+    }
+    if (count[1] == 1) {
+        bs.z *= bs.y;
+        bs.y = 1;
+    }
+
+    dim3 bd = dim3((count[2] + bs.z - 1) / bs.z, (count[1] + bs.y - 1) / bs.x, (count[0] + bs.x - 1) / bs.x);
+    gpu_memcpy_3d_kernel<<<bd, bs>>>(dst, dst_start, dst_shape, src, src_start, src_shape, count, bytes);
 }
 
 // Adapted from:

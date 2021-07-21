@@ -1,11 +1,10 @@
 [package]
-name = "gpu_mem"
+name = "gpu_core"
 version = "0.1.0"
 authors = ["Jonathan Zrake <jonathan.zrake@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-once_cell = "1.8.0"
 
 [build-dependencies]
 cc = "1.0"

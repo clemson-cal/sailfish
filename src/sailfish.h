@@ -1,3 +1,4 @@
+#include <stdint.h>
 #define real double
 
 enum ExecutionMode {
@@ -85,7 +86,7 @@ struct BufferZone
 
 struct Mesh
 {
-    int ni, nj;
+    int64_t ni, nj;
     real x0, y0;
     real dx, dy;
 };
