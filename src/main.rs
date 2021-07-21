@@ -1,12 +1,11 @@
 #[cfg(feature = "omp")]
 extern crate openmp_sys;
-
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
 use crate::setup::Setup;
 use crate::state::State;
-
 use cfg_if::cfg_if;
+use gridiron::patch::Patch;
 use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
@@ -83,6 +82,7 @@ fn new_state(
         iteration: 0,
         time: setup.initial_time(),
         primitive: setup.initial_primitive_vec(&mesh),
+        primitive_patches: vec![],
         checkpoint: state::RecurringTask::new(),
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
@@ -215,25 +215,39 @@ fn run() -> Result<(), error::Error> {
 }
 
 fn run_decomposed_domain() -> Result<(), error::Error> {
-    use crate::mesh::Mesh;
-    use gridiron::index_space::IndexSpace;
-
-    let n = 16;
+    let n = 256;
     let global_index_space = gridiron::index_space::range2d(0..n, 0..n);
-    let global_mesh = sailfish::StructuredMesh::centered_square(10.0, n as u32);
+    let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
 
     let setup = setup::Explosion {};
+    let mut patches = vec![];
 
-    for (di, dj) in global_index_space
-        .tile(21)
-        .into_iter()
-        .map(IndexSpace::into_rect)
-    {
-        let mesh = global_mesh.subset_mesh(di, dj);
-        let primitive = setup.initial_primitive_vec(&Mesh::Structured(mesh));
-        let solver = iso2d::cpu::Solver::new(mesh, &primitive);
-        println!("{:?}", solver);
+    for space in global_index_space.tile(21).into_iter() {
+        let (i0, j0) = space.start();
+        let (di, dj) = space.clone().into_rect();
+        let mesh = global_mesh.sub_mesh(di.clone(), dj.clone());
+
+        let patch = Patch::from_slice_function(0, space.extend_all(2), 3, |(i, j), prim| {
+            let [x, y] = mesh.cell_coordinates(i - i0, j - j0);
+            setup.initial_primitive(x, y, prim)
+        });
+        patches.push(patch);
     }
+
+    let mut state = State {
+        command_line: CommandLine::default(),
+        mesh: mesh::Mesh::Structured(global_mesh.clone()),
+        restart_file: None,
+        iteration: 0,
+        time: setup.initial_time(),
+        primitive: vec![],
+        primitive_patches: patches,
+        checkpoint: state::RecurringTask::new(),
+        setup_name: String::new(),
+        parameters: String::new(),
+    };
+    state.write_checkpoint(".")?;
+
     Ok(())
 }
 

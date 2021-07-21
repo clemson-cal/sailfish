@@ -124,7 +124,7 @@ impl StructuredMesh {
 
     /// Returns a new structured mesh covering the given index range of this
     /// one.
-    pub fn subset_mesh(&self, di: Range<i64>, dj: Range<i64>) -> Self {
+    pub fn sub_mesh(&self, di: Range<i64>, dj: Range<i64>) -> Self {
         let [x0, y0] = self.vertex_coordinates(di.start, dj.start);
         let [ni, nj] = [di.count() as i64, dj.count() as i64];
         Self {

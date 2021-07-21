@@ -13,7 +13,7 @@ rmp-serde       = { version = "0.15" }
 serde           = { version = "1.0", features = ["derive"] }
 openmp-sys      = { version = "1.2", optional = true }
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
-gridiron        = { git = "https://github.com/clemson-cal/gridiron" }
+gridiron        = { git = "https://github.com/clemson-cal/gridiron", features = ["serde"] }
 gpu_core        = { path = "gpu_core", optional = true }
 
 [build-dependencies]

@@ -40,6 +40,7 @@ version = "0.1.0"
 source = "git+https://github.com/clemson-cal/gridiron#f68ef58c7495ddac1f78fd6f7ec22634754706db"
 dependencies = [
  "cc",
+ "serde",
 ]
 
 [[package]]
