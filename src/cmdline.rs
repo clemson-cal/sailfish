@@ -6,18 +6,18 @@ use std::fmt::Write;
 pub struct CommandLine {
     pub use_omp: bool,
     pub use_gpu: bool,
-    #[serde(default)]
-    pub upsample: bool,
+    pub device: Option<i32>,
+    pub upsample: Option<bool>,
     pub setup: Option<String>,
     pub resolution: Option<u32>,
     pub fold: usize,
     pub checkpoint_interval: f64,
+    pub checkpoint_logspace: Option<bool>,
     pub outdir: Option<String>,
     pub end_time: Option<f64>,
     pub rk_order: u32,
     pub cfl_number: f64,
-    #[serde(default)]
-    pub recompute_timestep: String,
+    pub recompute_timestep: Option<String>,
     pub velocity_ceiling: f64,
 }
 
@@ -33,14 +33,13 @@ impl CommandLine {
     }
 
     pub fn recompute_dt_each_iteration(&self) -> Result<bool, Error> {
-        if self.recompute_timestep.is_empty() {
-            Ok(true)
-        } else if self.recompute_timestep == "iter" {
-            Ok(true)
-        } else if self.recompute_timestep == "fold" {
-            Ok(false)
-        } else {
-            return Err(Error::Cmdline("invalid mode for --timestep, expected (iter|fold)".to_owned()))
+        match self.recompute_timestep.as_deref() {
+            None => Ok(true),
+            Some("iter") => Ok(true),
+            Some("fold") => Ok(false),
+            _ => Err(Error::Cmdline(
+                "invalid mode for --timestep, expected (iter|fold)".to_owned(),
+            )),
         }
     }
 }
@@ -52,21 +51,24 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
     let mut c = CommandLine {
         use_omp: false,
         use_gpu: false,
-        upsample: false,
+        device: None,
+        upsample: None,
         resolution: None,
         fold: 10,
         checkpoint_interval: 1.0,
+        checkpoint_logspace: None,
         setup: None,
         outdir: None,
         end_time: None,
         rk_order: 1,
         cfl_number: 0.2,
-        recompute_timestep: String::from(""),
+        recompute_timestep: None,
         velocity_ceiling: 1e16,
     };
 
     enum State {
         Ready,
+        Device,
         GridResolution,
         Fold,
         Checkpoint,
@@ -77,6 +79,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         RecomputeTimestep,
         VelocityCeiling
     }
+    std::convert::identity(State::Device); // black-box
     let mut state = State::Ready;
 
     for arg in std::env::args()
@@ -111,6 +114,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
                     #[cfg(feature = "gpu")]
                     writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
+                    #[cfg(feature = "gpu")]
+                    writeln!(message, "       -d|--device           a device ID to run on ([0]-#gpus)").unwrap();
                     writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
                     writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
@@ -127,7 +132,9 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-p" | "--use-omp" => c.use_omp = true,
                 #[cfg(feature = "gpu")]
                 "-g" | "--use-gpu" => c.use_gpu = true,
-                "-u" | "--upsample" => c.upsample = true,
+                #[cfg(feature = "gpu")]
+                "-d" | "--device" => state = State::Device,
+                "-u" | "--upsample" => c.upsample = Some(true),
                 "-n" | "--resolution" => state = State::GridResolution,
                 "-f" | "--fold" => state = State::Fold,
                 "--timestep" => state = State::RecomputeTimestep,
@@ -147,6 +154,10 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     }
                 }
             },
+            State::Device => {
+                c.device = Some(arg.parse().map_err(|e| Cmdline(format!("device {}: {}", arg, e)))?);
+                state = State::Ready;                
+            }
             State::GridResolution => {
                 c.resolution = Some(arg.parse().map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?);
                 state = State::Ready;
@@ -156,11 +167,17 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 state = State::Ready;
             }
             State::RecomputeTimestep => {
-                c.recompute_timestep = arg;
+                c.recompute_timestep = Some(arg);
                 state = State::Ready;
             }
             State::Checkpoint => {
-                c.checkpoint_interval = arg.parse().map_err(|e| Cmdline(format!("checkpoint {}: {}", arg, e)))?;
+                let mut args = arg.splitn(2, ':');
+                c.checkpoint_interval = args.next().unwrap_or("").parse().map_err(|e| Cmdline(format!("checkpoint {}: {}", arg, e)))?;
+                c.checkpoint_logspace = match args.next() {
+                    Some("log") => Some(true),
+                    Some("linear")|None => Some(false),
+                    _ => return Err(Cmdline("checkpoint mode must be (log|linear) if given".to_string()))
+                };
                 state = State::Ready;
             }
             State::Outdir => {

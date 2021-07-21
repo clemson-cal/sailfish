@@ -29,7 +29,8 @@
         distribution over time of computed a_max values.
 - [ ] Workflow improvements
       - Store command line flags in the checkpoint so they are restored
-      - Give the problem an optional end time so if none is given the code
+      + Log-space checkpoint mode
+      + Give the problem an optional end time so if none is given the code
         doesn't just run forever
       + Add an option to only recompute timestep only at the fold boundaries
         because the time step

@@ -1,7 +1,8 @@
+use std::ops::Range;
 use crate::Setup;
 
 #[repr(C)]
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum ExecutionMode {
     CPU,
     OMP,
@@ -54,12 +55,12 @@ pub enum BufferZone {
 /// A logically cartesian 2d mesh with uniform grid spacing. C equivalent is
 /// defined in sailfish.h.
 #[repr(C)]
-#[derive(Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StructuredMesh {
     /// Number of zones on the i-axis
-    pub ni: i32,
+    pub ni: i64,
     /// Number of zones on the j-axis
-    pub nj: i32,
+    pub nj: i64,
     /// Left coordinate edge of the domain
     pub x0: f64,
     /// Right coordinate edge of the domain
@@ -77,34 +78,57 @@ impl StructuredMesh {
         Self {
             x0: -domain_radius,
             y0: -domain_radius,
-            ni: resolution as i32,
-            nj: resolution as i32,
+            ni: resolution as i64,
+            nj: resolution as i64,
             dx: 2.0 * domain_radius / resolution as f64,
             dy: 2.0 * domain_radius / resolution as f64,
         }
     }
+
     /// Returns the number of zones on the i-axis as a `u32`.
     pub fn ni(&self) -> u32 {
         self.ni as u32
     }
+
     /// Returns the number of zones on the j-axis as a `u32`.
     pub fn nj(&self) -> u32 {
         self.nj as u32
     }
+
     /// Returns the number of total zones (`ni * nj`) as a `usize`.
     pub fn num_total_zones(&self) -> usize {
         (self.ni * self.nj) as usize
     }
+
     /// Returns the number of zones in each direction
     pub fn shape(&self) -> [u32; 2] {
         [self.ni as u32, self.nj as u32]
     }
-    /// Returns the cell-center [x, y] coordinate at a given index.
+
+    /// Returns the cell-center `[x, y]` coordinate at a given index.
     /// Out-of-bounds indexes are allowed.
-    pub fn cell_coordinates(&self, i: i32, j: i32) -> [f64; 2] {
+    pub fn cell_coordinates(&self, i: i64, j: i64) -> [f64; 2] {
         let x = self.x0 + (i as f64 + 0.5) * self.dx;
         let y = self.y0 + (j as f64 + 0.5) * self.dy;
         [x, y]
+    }
+
+    /// Returns the vertex `[x, y]` coordinate at a given index. Out-of-bounds
+    /// indexes are allowed.
+    pub fn vertex_coordinates(&self, i: i64, j: i64) -> [f64; 2] {
+        let x = self.x0 + i as f64 * self.dx;
+        let y = self.y0 + j as f64 * self.dy;
+        [x, y]
+    }
+
+    /// Returns a new structured mesh covering the given index range of this
+    /// one.
+    pub fn subset_mesh(&self, di: Range<i64>, dj: Range<i64>) -> Self {
+        let [x0, y0] = self.vertex_coordinates(di.start, dj.start);
+        let [ni, nj] = [di.count() as i64, dj.count() as i64];
+        Self {
+            ni, nj, x0, y0, dx: self.dx, dy: self.dy,
+        }
     }
 }
 

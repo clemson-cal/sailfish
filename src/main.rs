@@ -1,3 +1,6 @@
+#[cfg(feature = "omp")]
+extern crate openmp_sys;
+
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
 use crate::setup::Setup;
@@ -18,15 +21,18 @@ pub mod sailfish;
 pub mod setup;
 pub mod state;
 
-fn time_exec<F>(mut f: F) -> std::time::Duration
+fn time_exec<F>(device: Option<i32>, mut f: F) -> std::time::Duration
 where
     F: FnMut(),
 {
     let start = std::time::Instant::now();
     f();
+
     cfg_if! {
         if #[cfg(feature = "gpu")] {
-            gpu_mem::device_synchronize();
+            gpu_core::Device::with_id(device.unwrap_or(0)).unwrap().synchronize();
+        } else {
+            std::convert::identity(device); // black-box
         }
     }
     start.elapsed()
@@ -45,16 +51,19 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    collision").unwrap();
     writeln!(message, "    sedov").unwrap();
     PrintUserInformation(message)
 }
 
 fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, error::Error> {
+    use setup::*;
     match setup_name {
-        "binary" => Ok(Box::new(setup::Binary::from_str(parameters)?)),
-        "explosion" => Ok(Box::new(setup::Explosion::from_str(parameters)?)),
-        "shocktube" => Ok(Box::new(setup::Shocktube::from_str(parameters)?)),
-        "sedov" => Ok(Box::new(setup::Sedov::from_str(parameters)?)),
+        "binary" => Ok(Box::new(Binary::from_str(parameters)?)),
+        "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
+        "sedov" => Ok(Box::new(Sedov::from_str(parameters)?)),
+        "collision" => Ok(Box::new(Collision::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -72,7 +81,7 @@ fn new_state(
         mesh: mesh.clone(),
         restart_file: None,
         iteration: 0,
-        time: 0.0,
+        time: setup.initial_time(),
         primitive: setup.initial_primitive_vec(&mesh),
         checkpoint: state::RecurringTask::new(),
         setup_name: setup_name.to_string(),
@@ -92,7 +101,7 @@ fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     } else {
         return Err(possible_setups_info());
     };
-    if cmdline.upsample {
+    if cmdline.upsample.unwrap_or(false) {
         Ok(state.upsample())
     } else {
         Ok(state)
@@ -110,11 +119,20 @@ fn run() -> Result<(), error::Error> {
     let setup = make_setup(&state.setup_name, &state.parameters)?;
     let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
     let mut solver = match (state.setup_name.as_str(), &state.mesh) {
-        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => {
-            iso2d::solver(cmdline.execution_mode(), *mesh, &state.primitive)
-        }
-        ("shocktube" | "sedov", mesh::Mesh::FacePositions1D(faces)) => {
-            euler1d::solver(cmdline.execution_mode(), faces, &state.primitive, setup.coordinate_system())
+        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => iso2d::solver(
+            cmdline.execution_mode(),
+            cmdline.device,
+            *mesh,
+            &state.primitive,
+        ),
+        ("shocktube" | "sedov" | "collision", mesh::Mesh::FacePositions1D(faces)) => {
+            euler1d::solver(
+                cmdline.execution_mode(),
+                cmdline.device,
+                faces,
+                &state.primitive,
+                setup.coordinate_system(),
+            )
         }
         _ => panic!(),
     };
@@ -140,7 +158,7 @@ fn run() -> Result<(), error::Error> {
     let dx_min = mesh.min_spacing();
 
     if let Some(mut resolution) = cmdline.resolution {
-        if cmdline.upsample {
+        if cmdline.upsample.unwrap_or(false) {
             resolution *= 2
         }
         if setup.mesh(resolution) != mesh {
@@ -149,20 +167,32 @@ fn run() -> Result<(), error::Error> {
             ));
         }
     }
+
+    if cmdline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
+        return Err(InvalidSetup(
+            "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
+        ));
+    }
+
     println!("outdir: {}", outdir);
     setup.print_parameters();
 
-    while state.time < cmdline.end_time.unwrap_or(f64::MAX) {
+    while state.time
+        < cmdline
+            .end_time
+            .or_else(|| setup.end_time())
+            .unwrap_or(f64::MAX)
+    {
         if state.checkpoint.is_due(state.time, chkpt_interval) {
             state.set_primitive(solver.primitive());
-            state.write_checkpoint(chkpt_interval, &outdir)?;
+            state.write_checkpoint(&outdir)?;
         }
 
         if !recompute_dt_each_iteration {
             dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
         }
 
-        let elapsed = time_exec(|| {
+        let elapsed = time_exec(cmdline.device, || {
             for _ in 0..fold {
                 if recompute_dt_each_iteration {
                     dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
@@ -176,14 +206,12 @@ fn run() -> Result<(), error::Error> {
         let mzps = (mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64();
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
-            state.iteration,
-            state.time,
-            dt,
-            mzps,
+            state.iteration, state.time, dt, mzps,
         );
     }
     state.set_primitive(solver.primitive());
-    state.write_checkpoint(chkpt_interval, &outdir)
+    state.write_checkpoint(&outdir)?;
+    Ok(())
 }
 
 fn main() {

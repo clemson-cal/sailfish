@@ -48,6 +48,7 @@ impl Platform {
             Platform::NoGpu => cc::Build::new().flag("-std=c99").clone(),
             Platform::Cuda => cc::Build::new().cuda(true).clone(),
             Platform::Rocm => cc::Build::new()
+                .cpp(true)
                 .compiler("hipcc")
                 .define("__ROCM__", None)
                 .clone(),
@@ -58,7 +59,7 @@ impl Platform {
         match self {
             Platform::NoGpu => self.build().flag("-Xpreprocessor").flag("-fopenmp").clone(),
             Platform::Cuda => self.build().flag("-Xcompiler").flag("-fopenmp").clone(),
-            Platform::Rocm => panic!("ROCm build is not compatible with OpenMP"),
+            Platform::Rocm => self.build().flag("-fopenmp").clone(),
         }
     }
 

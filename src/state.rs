@@ -24,11 +24,13 @@ impl RecurringTask {
             last_time: None,
         }
     }
-    pub fn next(&mut self, interval: f64) {
+    pub fn next(&mut self, current_time: f64, interval: f64, logspace: bool) {
         if self.last_time.is_none() {
-            self.last_time = Some(0.0);
-        } else {
+            self.last_time = Some(current_time);
+        } else if !logspace {
             self.last_time = Some(self.last_time.unwrap() + interval);
+        } else {
+            self.last_time = Some(self.last_time.unwrap() * (1.0 + interval))
         }
         self.number += 1;
     }
@@ -79,12 +81,12 @@ impl State {
         self.primitive = primitive;
     }
 
-    pub fn write_checkpoint(
-        &mut self,
-        checkpoint_interval: f64,
-        outdir: &str,
-    ) -> Result<(), error::Error> {
-        self.checkpoint.next(checkpoint_interval);
+    pub fn write_checkpoint(&mut self, outdir: &str) -> Result<(), error::Error> {
+        self.checkpoint.next(
+            self.time,
+            self.command_line.checkpoint_interval,
+            self.command_line.checkpoint_logspace.unwrap_or(false),
+        );
         create_dir_all(outdir).map_err(error::Error::IOError)?;
         let bytes = rmp_serde::to_vec_named(self).unwrap();
         let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);
