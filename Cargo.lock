@@ -35,6 +35,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "gridiron"
+version = "0.1.0"
+source = "git+https://github.com/clemson-cal/gridiron#f68ef58c7495ddac1f78fd6f7ec22634754706db"
+dependencies = [
+ "cc",
+]
+
+[[package]]
 name = "kepler-two-body"
 version = "0.1.0"
 source = "git+https://github.com/clemson-cal/kepler-two-body#2d8a0f5374052ab7f4f60c5bbbc37c4e5283b4a4"
@@ -109,6 +117,7 @@ dependencies = [
  "cc",
  "cfg-if",
  "gpu_core",
+ "gridiron",
  "kepler-two-body",
  "kind-config",
  "openmp-sys",

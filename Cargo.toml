@@ -6,18 +6,19 @@ authors = ["J. Zrake <jzrake@clemson.edu>", "A. MacFadyen <macfadyen@nyu.edu>"]
 description = "fast code to simulate binary accretion"
 
 [dependencies]
-cfg-if = "1.0"
-thiserror = "1.0"
-kind-config = "0.2"
-serde = { version = "1.0", features = ["derive"] }
-rmp-serde = "0.15"
+cfg-if          = { version = "1.0" }
+thiserror       = { version = "1.0" }
+kind-config     = { version = "0.2" }
+rmp-serde       = { version = "0.15" }
+serde           = { version = "1.0", features = ["derive"] }
+openmp-sys      = { version = "1.2", optional = true }
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
-gpu_core = { path = "gpu_core", optional = true }
-openmp-sys = { version = "1.2", optional = true }
+gridiron        = { git = "https://github.com/clemson-cal/gridiron" }
+gpu_core        = { path = "gpu_core", optional = true }
 
 [build-dependencies]
-cfg-if = "1.0"
-cc = "1.0"
+cfg-if   = { version = "1.0" }
+cc       = { version = "1.0" }
 sf_build = { path = "sf_build" }
 
 [features]

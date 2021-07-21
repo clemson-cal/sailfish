@@ -214,9 +214,39 @@ fn run() -> Result<(), error::Error> {
     Ok(())
 }
 
+fn run_decomposed_domain() -> Result<(), error::Error> {
+    use crate::mesh::Mesh;
+    use gridiron::index_space::IndexSpace;
+
+    let n = 16;
+    let global_index_space = gridiron::index_space::range2d(0..n, 0..n);
+    let global_mesh = sailfish::StructuredMesh::centered_square(10.0, n as u32);
+
+    let setup = setup::Explosion {};
+
+    for (di, dj) in global_index_space
+        .tile(21)
+        .into_iter()
+        .map(IndexSpace::into_rect)
+    {
+        let mesh = global_mesh.subset_mesh(di, dj);
+        let primitive = setup.initial_primitive_vec(&Mesh::Structured(mesh));
+        let solver = iso2d::cpu::Solver::new(mesh, &primitive);
+        println!("{:?}", solver);
+    }
+    Ok(())
+}
+
 fn main() {
-    match run() {
-        Ok(_) => {}
-        Err(e) => print!("{}", e),
+    if false {
+        match run() {
+            Ok(_) => {}
+            Err(e) => print!("{}", e),
+        }
+    } else {
+        match run_decomposed_domain() {
+            Ok(_) => {}
+            Err(e) => print!("{}", e),
+        }
     }
 }
