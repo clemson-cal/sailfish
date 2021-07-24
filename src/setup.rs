@@ -103,7 +103,8 @@ pub struct Binary {
     pub nu: f64,
     pub mach_number: f64,
     pub sink_radius: f64,
-    pub sink_rate: f64,
+    pub sink_rate1: f64,
+    pub sink_rate2: f64,
     pub sink_model: SinkModel,
     form: kind_config::Form,
 }
@@ -114,21 +115,27 @@ impl std::str::FromStr for Binary {
     #[rustfmt::skip]
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         let form = kind_config::Form::new()
-            .item("domain_radius", 12.0, "half-size of the simulation domain [a]")
-            .item("nu",            1e-3, "kinematic viscosity coefficient [Omega a^2]")
+            .item("domain_radius", 12.0, "half-size of the simulation domain (a)")
+            .item("nu",            1e-3, "kinematic viscosity coefficient (Omega a^2)")
             .item("mach_number",   10.0, "mach number for locally isothermal EOS")
-            .item("sink_radius",   0.05, "sink kernel radius [a]")
-            .item("sink_rate",     10.0, "rate of mass subtraction in the sink [Omega]")
+            .item("sink_radius",   0.05, "sink kernel radius (a)")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
+            .item("sink_rate",     10.0, "rate of mass subtraction in the sink (Omega)")
+            .item("q",              1.0, "system mass ratio: [0-1]")
+            .item("e",              0.0, "orbital eccentricity: [0-1]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        // Soon: parse the sink rate possibly as two comma-separated numbers
+        let sink_rate: f64 = form.get("sink_rate").into();
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             mach_number: form.get("mach_number").into(),
             sink_radius: form.get("sink_radius").into(),
-            sink_rate: form.get("sink_rate").into(),
+            sink_rate1: sink_rate,
+            sink_rate2: sink_rate,
             sink_model: match form.get("sink_model").to_string().as_str() {
                 "none" => SinkModel::Inactive,
                 "af" => SinkModel::AccelerationFree,
@@ -169,31 +176,31 @@ impl Setup for Binary {
     fn masses(&self, time: f64) -> Vec<PointMass> {
         let a: f64 = 1.0;
         let m: f64 = 1.0;
-        let q: f64 = 1.0;
-        let e: f64 = 0.0;
+        let q: f64 = self.form.get("q").into();
+        let e: f64 = self.form.get("e").into();
         let binary = OrbitalElements(a, m, q, e);
-        let OrbitalState(mass0, mass1) = binary.orbital_state_from_time(time);
-        let mass0 = PointMass {
-            x: mass0.position_x(),
-            y: mass0.position_y(),
-            vx: mass0.velocity_x(),
-            vy: mass0.velocity_y(),
-            mass: mass0.mass(),
-            rate: self.sink_rate,
-            radius: self.sink_radius,
-            model: self.sink_model,
-        };
+        let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
         let mass1 = PointMass {
             x: mass1.position_x(),
             y: mass1.position_y(),
             vx: mass1.velocity_x(),
             vy: mass1.velocity_y(),
             mass: mass1.mass(),
-            rate: self.sink_rate,
+            rate: self.sink_rate1,
             radius: self.sink_radius,
             model: self.sink_model,
         };
-        vec![mass0, mass1]
+        let mass2 = PointMass {
+            x: mass2.position_x(),
+            y: mass2.position_y(),
+            vx: mass2.velocity_x(),
+            vy: mass2.velocity_y(),
+            mass: mass2.mass(),
+            rate: self.sink_rate2,
+            radius: self.sink_radius,
+            model: self.sink_model,
+        };
+        vec![mass1, mass2]
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::LocallyIsothermal {
