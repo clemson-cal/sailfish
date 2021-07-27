@@ -5,7 +5,7 @@ use crate::error::Error::*;
 use crate::setup::Setup;
 use crate::state::State;
 use cfg_if::cfg_if;
-use gridiron::patch::Patch;
+// use sailfish::ExecutionMode;
 use std::fmt::Write;
 use std::path::Path;
 use std::str::FromStr;
@@ -214,39 +214,111 @@ fn run() -> Result<(), error::Error> {
     Ok(())
 }
 
+use gridiron::adjacency_list::AdjacencyList;
+use gridiron::automaton::Automaton;
+use gridiron::patch::Patch;
+use gridiron::rect_map::Rectangle;
+
+pub struct Solver {
+    primitive: Patch,
+    _mesh: sailfish::StructuredMesh,
+    incoming_count: usize,
+    received_count: usize,
+    outgoing_edges: Vec<Rectangle<i64>>,
+}
+
+impl Solver {
+    pub fn new(
+        primitive: Patch,
+        global_mesh: sailfish::StructuredMesh,
+        edge_list: &AdjacencyList<(Rectangle<i64>, u32)>,
+    ) -> Self {
+        let (di, dj) = primitive.high_resolution_rect();
+        let mesh = global_mesh.sub_mesh(di, dj);
+        let key = (primitive.high_resolution_rect(), primitive.level());
+        Self {
+            incoming_count: edge_list.incoming_edges(&key).count(),
+            received_count: 0,
+            outgoing_edges: edge_list
+                .outgoing_edges(&key)
+                .cloned()
+                .map(|(rect, _)| rect)
+                .collect(),
+            primitive,
+            _mesh: mesh,
+        }
+    }
+}
+
+impl Automaton for Solver {
+    type Key = gridiron::rect_map::Rectangle<i64>;
+    type Value = Self;
+    type Message = gridiron::patch::Patch;
+    fn key(&self) -> Self::Key {
+        self.primitive.high_resolution_rect()
+    }
+    fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
+        self.outgoing_edges
+            .iter()
+            .map(|rect| (rect.clone(), self.primitive.extract(rect.clone())))
+            .collect()
+    }
+    fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
+        neighbor_patch.copy_into(&mut self.primitive); // will fail because primitive is not extended
+        self.received_count += 1;
+        gridiron::automaton::Status::eligible_if(self.received_count == self.incoming_count)
+    }
+    fn value(mut self) -> Self::Value {
+        self.received_count = 0;
+        self
+    }
+}
+
+#[allow(unused)]
 fn run_decomposed_domain() -> Result<(), error::Error> {
-    let n = 256;
-    let global_index_space = gridiron::index_space::range2d(0..n, 0..n);
-    let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
+    use gridiron::index_space::range2d;
+    use gridiron::meshing::GraphTopology;
+    use gridiron::rect_map::RectangleMap;
 
     let setup = setup::Explosion {};
-    let mut patches = vec![];
+    let n = 256;
+    let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
+    let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
+        .tile(21)
+        .into_iter()
+        .map(|space| {
+            let (i0, j0) = space.start();
+            let (di, dj) = space.clone().into_rect();
+            let mesh = global_mesh.sub_mesh(di.clone(), dj.clone());
 
-    for space in global_index_space.tile(21).into_iter() {
-        let (i0, j0) = space.start();
-        let (di, dj) = space.clone().into_rect();
-        let mesh = global_mesh.sub_mesh(di.clone(), dj.clone());
+            let patch = Patch::from_slice_function(0, space, 3, |(i, j), prim| {
+                let [x, y] = mesh.cell_coordinates(i - i0, j - j0);
+                setup.initial_primitive(x, y, prim)
+            });
+            (patch.high_resolution_rect(), patch)
+        })
+        .collect();
 
-        let patch = Patch::from_slice_function(0, space.extend_all(2), 3, |(i, j), prim| {
-            let [x, y] = mesh.cell_coordinates(i - i0, j - j0);
-            setup.initial_primitive(x, y, prim)
-        });
-        patches.push(patch);
-    }
+    let edge_list = patch_map.adjacency_list(2);
 
-    let mut state = State {
-        command_line: CommandLine::default(),
-        mesh: mesh::Mesh::Structured(global_mesh.clone()),
-        restart_file: None,
-        iteration: 0,
-        time: setup.initial_time(),
-        primitive: vec![],
-        primitive_patches: patches,
-        checkpoint: state::RecurringTask::new(),
-        setup_name: String::new(),
-        parameters: String::new(),
-    };
-    state.write_checkpoint(".")?;
+    let solvers: Vec<_> = patch_map
+        .into_iter()
+        .map(|(rect, patch)| Solver::new(patch, global_mesh, &edge_list))
+        .collect();
+
+    // let mut state = State {
+    //     command_line: CommandLine::default(),
+    //     mesh: mesh::Mesh::Structured(global_mesh.clone()),
+    //     restart_file: None,
+    //     iteration: 0,
+    //     time: setup.initial_time(),
+    //     primitive: vec![],
+    //     primitive_patches: patches,
+    //     checkpoint: state::RecurringTask::new(),
+    //     setup_name: String::new(),
+    //     parameters: String::new(),
+    // };
+    // state.write_checkpoint(".")?;
 
     Ok(())
 }
