@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::sailfish::ExecutionMode;
+use crate::sailfish::{self, ExecutionMode};
 use std::fmt::Write;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -110,11 +110,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "usage: sailfish [setup|chkpt] [--version] [--help] <[options]>").unwrap();
                     writeln!(message, "       --version             print the code version number").unwrap();
                     writeln!(message, "       -h|--help             display this help message").unwrap();
-                    #[cfg(feature = "omp")]
                     writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
-                    #[cfg(feature = "gpu")]
-                    writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
-                    #[cfg(feature = "gpu")]
+                    writeln!(message, "       -g|--use-gpu          run with GPU acceleration").unwrap();
                     writeln!(message, "       -d|--device           a device ID to run on ([0]-#gpus)").unwrap();
                     writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
@@ -128,11 +125,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
                     return Err(PrintUserInformation(message));
                 }
-                #[cfg(feature = "omp")]
                 "-p" | "--use-omp" => c.use_omp = true,
-                #[cfg(feature = "gpu")]
                 "-g" | "--use-gpu" => c.use_gpu = true,
-                #[cfg(feature = "gpu")]
                 "-d" | "--device" => state = State::Device,
                 "-u" | "--upsample" => c.upsample = Some(true),
                 "-n" | "--resolution" => state = State::GridResolution,
@@ -203,7 +197,11 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         }
     }
 
-    if c.use_omp && c.use_gpu {
+    if c.use_omp && !sailfish::compiled_with_omp() {
+        Err(CompiledWithoutOpenMP)
+    } else if c.use_gpu && !sailfish::compiled_with_gpu() {
+        Err(CompiledWithoutGpu)
+    } else if c.use_omp && c.use_gpu {
         Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
     } else if !(1..=3).contains(&c.rk_order) {
         Err(Cmdline("rk-order must be 1, 2, or 3".into()))

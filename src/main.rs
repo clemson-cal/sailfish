@@ -124,7 +124,7 @@ fn run() -> Result<(), error::Error> {
             cmdline.device,
             *mesh,
             &state.primitive,
-        ),
+        )?,
         ("shocktube" | "sedov" | "collision", mesh::Mesh::FacePositions1D(faces)) => {
             euler1d::solver(
                 cmdline.execution_mode(),
@@ -132,7 +132,7 @@ fn run() -> Result<(), error::Error> {
                 faces,
                 &state.primitive,
                 setup.coordinate_system(),
-            )
+            )?
         }
         _ => panic!(),
     };

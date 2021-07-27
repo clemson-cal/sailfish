@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::sailfish::{
     BufferZone, EquationOfState, ExecutionMode, PointMass, Solve, StructuredMesh,
 };
@@ -44,22 +45,22 @@ pub fn solver(
     device: Option<i32>,
     mesh: StructuredMesh,
     primitive: &[f64],
-) -> Box<dyn Solve> {
+) -> Result<Box<dyn Solve>, Error> {
     match mode {
-        ExecutionMode::CPU => Box::new(cpu::Solver::new(mesh, primitive)),
+        ExecutionMode::CPU => Ok(Box::new(cpu::Solver::new(mesh, primitive))),
         ExecutionMode::OMP => {
             cfg_if! {
                 if #[cfg(feature = "omp")] {
-                    Box::new(omp::Solver::new(mesh, primitive))
+                    Ok(Box::new(omp::Solver::new(mesh, primitive)))
                 } else {
-                    panic!()
+                    Err(Error::CompiledWithoutOpenMP)
                 }
             }
         }
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Box::new(gpu::Solver::new(device, mesh, primitive))
+                    Ok(Box::new(gpu::Solver::new(device, mesh, primitive)?))
                 } else {
                     std::convert::identity(device); // black-box
                     panic!()
@@ -212,20 +213,25 @@ pub mod gpu {
     }
 
     impl Solver {
-        pub fn new(device: Option<i32>, mesh: StructuredMesh, primitive: &[f64]) -> Self {
+        pub fn new(
+            device: Option<i32>,
+            mesh: StructuredMesh,
+            primitive: &[f64],
+        ) -> Result<Self, Error> {
             assert_eq!(
                 primitive.len(),
                 (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
             );
-            let device = Device::with_id(device.unwrap_or(0)).expect("invalid device id");
-            Self {
+            let id = device.unwrap_or(0);
+            let device = Device::with_id(id).ok_or(Error::InvalidDevice(id))?;
+            Ok(Self {
                 mesh,
                 primitive1: device.buffer_from(primitive),
                 primitive2: device.buffer_from(primitive),
                 conserved0: device.buffer_from(&vec![0.0; mesh.num_total_zones() * 3]),
                 wavespeeds: device.buffer_from(&vec![0.0; mesh.num_total_zones()]),
                 device,
-            }
+            })
         }
     }
 
@@ -234,15 +240,13 @@ pub mod gpu {
             Vec::from(&self.primitive1)
         }
         fn primitive_to_conserved(&mut self) {
-            self.device.scope(|_| {
-                unsafe {
-                    iso2d_primitive_to_conserved(
-                        self.mesh,
-                        self.primitive1.as_device_ptr(),
-                        self.conserved0.as_device_ptr() as *mut f64,
-                        ExecutionMode::GPU,
-                    );
-                }
+            self.device.scope(|_| unsafe {
+                iso2d_primitive_to_conserved(
+                    self.mesh,
+                    self.primitive1.as_device_ptr(),
+                    self.conserved0.as_device_ptr() as *mut f64,
+                    ExecutionMode::GPU,
+                );
             })
         }
         fn advance_rk(
