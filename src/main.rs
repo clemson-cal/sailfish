@@ -5,6 +5,7 @@ use crate::error::Error::*;
 use crate::setup::Setup;
 use crate::state::State;
 use cfg_if::cfg_if;
+use gridiron::index_space::IndexSpace;
 // use sailfish::ExecutionMode;
 use std::fmt::Write;
 use std::path::Path;
@@ -215,36 +216,57 @@ fn run() -> Result<(), error::Error> {
 }
 
 use gridiron::adjacency_list::AdjacencyList;
-use gridiron::automaton::Automaton;
+use gridiron::automaton::{Automaton, Status};
+use gridiron::index_space::range2d;
 use gridiron::patch::Patch;
-use gridiron::rect_map::Rectangle;
+use gridiron::rect_map::{Rectangle, RectangleMap};
 
+fn adjacency_list(
+    patches: &RectangleMap<i64, Patch>,
+    num_guard: usize,
+) -> AdjacencyList<Rectangle<i64>> {
+    let mut edges = AdjacencyList::new();
+    for (b, q) in patches.iter() {
+        for (a, p) in patches.query_rect(q.index_space().extend_all(num_guard as i64)) {
+            if a != b {
+                edges.insert(p.high_resolution_rect(), q.high_resolution_rect())
+            }
+        }
+    }
+    edges
+}
+
+#[allow(unused)]
 pub struct Solver {
-    primitive: Patch,
-    _mesh: sailfish::StructuredMesh,
+    primitive1: Patch,
+    primitive2: Patch,
+    conserved0: Patch,
+    index_space: IndexSpace,
     incoming_count: usize,
     received_count: usize,
     outgoing_edges: Vec<Rectangle<i64>>,
+    _mesh: sailfish::StructuredMesh,
 }
 
 impl Solver {
     pub fn new(
         primitive: Patch,
         global_mesh: sailfish::StructuredMesh,
-        edge_list: &AdjacencyList<(Rectangle<i64>, u32)>,
+        edge_list: &AdjacencyList<Rectangle<i64>>,
     ) -> Self {
-        let (di, dj) = primitive.high_resolution_rect();
-        let mesh = global_mesh.sub_mesh(di, dj);
-        let key = (primitive.high_resolution_rect(), primitive.level());
+        let index_space = primitive.high_resolution_space();
+        let rect = primitive.high_resolution_rect();
+        let key = rect.clone();
+        let mesh = global_mesh.sub_mesh(rect.0, rect.1);
+        let primitive = Patch::extract_from(&primitive, index_space.extend_all(2));
         Self {
+            conserved0: Patch::zeros(0, 3, index_space.clone()),
+            primitive1: primitive.clone(),
+            primitive2: primitive,
+            outgoing_edges: edge_list.outgoing_edges(&key).cloned().collect(),
             incoming_count: edge_list.incoming_edges(&key).count(),
             received_count: 0,
-            outgoing_edges: edge_list
-                .outgoing_edges(&key)
-                .cloned()
-                .map(|(rect, _)| rect)
-                .collect(),
-            primitive,
+            index_space,
             _mesh: mesh,
         }
     }
@@ -255,18 +277,18 @@ impl Automaton for Solver {
     type Value = Self;
     type Message = gridiron::patch::Patch;
     fn key(&self) -> Self::Key {
-        self.primitive.high_resolution_rect()
+        self.primitive1.high_resolution_rect()
     }
     fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
         self.outgoing_edges
             .iter()
-            .map(|rect| (rect.clone(), self.primitive.extract(rect.clone())))
+            .map(|rect| (rect.clone(), self.primitive1.extract(rect.clone())))
             .collect()
     }
     fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
-        neighbor_patch.copy_into(&mut self.primitive); // will fail because primitive is not extended
+        neighbor_patch.copy_into(&mut self.primitive1);
         self.received_count += 1;
-        gridiron::automaton::Status::eligible_if(self.received_count == self.incoming_count)
+        Status::eligible_if(self.received_count == self.incoming_count)
     }
     fn value(mut self) -> Self::Value {
         self.received_count = 0;
@@ -276,10 +298,6 @@ impl Automaton for Solver {
 
 #[allow(unused)]
 fn run_decomposed_domain() -> Result<(), error::Error> {
-    use gridiron::index_space::range2d;
-    use gridiron::meshing::GraphTopology;
-    use gridiron::rect_map::RectangleMap;
-
     let setup = setup::Explosion {};
     let n = 256;
     let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
@@ -299,7 +317,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         })
         .collect();
 
-    let edge_list = patch_map.adjacency_list(2);
+    let edge_list = adjacency_list(&patch_map, 2);
 
     let solvers: Vec<_> = patch_map
         .into_iter()
