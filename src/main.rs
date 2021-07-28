@@ -5,11 +5,18 @@ use crate::error::Error::*;
 use crate::setup::Setup;
 use crate::state::State;
 use cfg_if::cfg_if;
+use gridiron::adjacency_list::AdjacencyList;
+use gridiron::automaton::{self, Automaton, Status};
+use gridiron::index_space::range2d;
 use gridiron::index_space::IndexSpace;
-// use sailfish::ExecutionMode;
+use gridiron::patch::Patch;
+use gridiron::rect_map::{Rectangle, RectangleMap};
+use setup::Explosion;
 use std::fmt::Write;
+use std::mem::swap;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 
 pub mod cmdline;
 pub mod error;
@@ -215,12 +222,6 @@ fn run() -> Result<(), error::Error> {
     Ok(())
 }
 
-use gridiron::adjacency_list::AdjacencyList;
-use gridiron::automaton::{Automaton, Status};
-use gridiron::index_space::range2d;
-use gridiron::patch::Patch;
-use gridiron::rect_map::{Rectangle, RectangleMap};
-
 fn adjacency_list(
     patches: &RectangleMap<i64, Patch>,
     num_guard: usize,
@@ -236,8 +237,9 @@ fn adjacency_list(
     edges
 }
 
-#[allow(unused)]
 pub struct Solver {
+    time: f64,
+    dt: f64,
     primitive1: Patch,
     primitive2: Patch,
     conserved0: Patch,
@@ -245,14 +247,17 @@ pub struct Solver {
     incoming_count: usize,
     received_count: usize,
     outgoing_edges: Vec<Rectangle<i64>>,
-    _mesh: sailfish::StructuredMesh,
+    mesh: sailfish::StructuredMesh,
+    setup: Arc<dyn Setup>,
 }
 
 impl Solver {
     pub fn new(
+        time: f64,
         primitive: Patch,
         global_mesh: sailfish::StructuredMesh,
         edge_list: &AdjacencyList<Rectangle<i64>>,
+        setup: Arc<dyn Setup>,
     ) -> Self {
         let index_space = primitive.high_resolution_space();
         let rect = primitive.high_resolution_rect();
@@ -260,6 +265,8 @@ impl Solver {
         let mesh = global_mesh.sub_mesh(rect.0, rect.1);
         let primitive = Patch::extract_from(&primitive, index_space.extend_all(2));
         Self {
+            time,
+            dt: 0.0,
             conserved0: Patch::zeros(0, 3, index_space.clone()),
             primitive1: primitive.clone(),
             primitive2: primitive,
@@ -267,7 +274,8 @@ impl Solver {
             incoming_count: edge_list.incoming_edges(&key).count(),
             received_count: 0,
             index_space,
-            _mesh: mesh,
+            mesh,
+            setup,
         }
     }
 }
@@ -277,12 +285,17 @@ impl Automaton for Solver {
     type Value = Self;
     type Message = gridiron::patch::Patch;
     fn key(&self) -> Self::Key {
-        self.primitive1.high_resolution_rect()
+        self.index_space.clone().into_rect()
     }
     fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
         self.outgoing_edges
             .iter()
-            .map(|rect| (rect.clone(), self.primitive1.extract(rect.clone())))
+            .map(IndexSpace::from)
+            .map(|neighbor_space| {
+                let overlap = neighbor_space.intersect(self.index_space.extend_all(2));
+                let guard_patch = self.primitive1.extract(overlap);
+                (neighbor_space.clone().into_rect(), guard_patch)
+            })
             .collect()
     }
     fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
@@ -292,11 +305,30 @@ impl Automaton for Solver {
     }
     fn value(mut self) -> Self::Value {
         self.received_count = 0;
+        let masses = self.setup.masses(self.time);
+
+        unsafe {
+            iso2d::iso2d_advance_rk(
+                self.mesh,
+                self.conserved0.data().as_ptr(),
+                self.primitive1.data().as_ptr(),
+                self.primitive2.data_mut().as_mut_ptr(),
+                self.setup.equation_of_state(),
+                self.setup.buffer_zone(),
+                masses.as_ptr(),
+                masses.len() as i32,
+                self.setup.viscosity().unwrap_or(0.0),
+                0.0,
+                self.dt,
+                f64::MAX,
+                sailfish::ExecutionMode::CPU,
+            );
+        }
+        swap(&mut self.primitive1, &mut self.primitive2);
         self
     }
 }
 
-#[allow(unused)]
 fn run_decomposed_domain() -> Result<(), error::Error> {
     let setup = setup::Explosion {};
     let n = 256;
@@ -319,10 +351,13 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
 
     let edge_list = adjacency_list(&patch_map, 2);
 
+    let setup: Arc<dyn Setup> = Arc::new(Explosion {});
     let solvers: Vec<_> = patch_map
         .into_iter()
-        .map(|(rect, patch)| Solver::new(patch, global_mesh, &edge_list))
+        .map(|(_rect, patch)| Solver::new(0.0, patch, global_mesh, &edge_list, setup.clone()))
         .collect();
+
+    let _next_solvers = automaton::execute(solvers);
 
     // let mut state = State {
     //     command_line: CommandLine::default(),

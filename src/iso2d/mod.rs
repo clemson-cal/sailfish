@@ -6,14 +6,14 @@ use crate::Setup;
 use cfg_if::cfg_if;
 
 extern "C" {
-    fn iso2d_primitive_to_conserved(
+    pub fn iso2d_primitive_to_conserved(
         mesh: StructuredMesh,
         primitive_ptr: *const f64,
         conserved_ptr: *mut f64,
         mode: ExecutionMode,
     );
 
-    fn iso2d_advance_rk(
+    pub fn iso2d_advance_rk(
         mesh: StructuredMesh,
         conserved_rk_ptr: *const f64,
         primitive_rd_ptr: *const f64,
@@ -29,7 +29,7 @@ extern "C" {
         mode: ExecutionMode,
     );
 
-    fn iso2d_wavespeed(
+    pub fn iso2d_wavespeed(
         mesh: StructuredMesh,
         primitive_ptr: *const f64,
         wavespeed_ptr: *mut f64,
