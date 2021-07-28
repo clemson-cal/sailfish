@@ -248,7 +248,7 @@ pub struct Solver {
     received_count: usize,
     outgoing_edges: Vec<Rectangle<i64>>,
     mesh: sailfish::StructuredMesh,
-    setup: Arc<dyn Setup>,
+    setup: Explosion,
 }
 
 impl Solver {
@@ -257,7 +257,7 @@ impl Solver {
         primitive: Patch,
         global_mesh: sailfish::StructuredMesh,
         edge_list: &AdjacencyList<Rectangle<i64>>,
-        setup: Arc<dyn Setup>,
+        setup: Explosion,
     ) -> Self {
         let index_space = primitive.high_resolution_space();
         let rect = primitive.high_resolution_rect();
@@ -325,6 +325,9 @@ impl Automaton for Solver {
             })
             .collect()
     }
+    fn independent(&self) -> bool {
+        self.incoming_count == 0
+    }
     fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
         neighbor_patch.copy_into(&mut self.primitive1);
         self.received_count += 1;
@@ -358,10 +361,10 @@ impl Automaton for Solver {
 
 fn run_decomposed_domain() -> Result<(), error::Error> {
     let setup = setup::Explosion {};
-    let n = 256;
+    let n = 1024;
     let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
     let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
-        .tile(2)
+        .tile(128)
         .into_iter()
         .map(|space| {
             let (i0, j0) = space.start();
@@ -378,24 +381,41 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
 
     let edge_list = adjacency_list(&patch_map, 2);
 
-    let setup: Arc<dyn Setup> = Arc::new(Explosion {});
+    let setup = Explosion{};
     let mut solvers: Vec<_> = patch_map
         .into_iter()
         .map(|(_rect, patch)| Solver::new(0.0, patch, global_mesh, &edge_list, setup.clone()))
         .collect();
 
+    let fold = 10;
     let cfl = 0.2;
     let min_spacing = f64::min(global_mesh.dx, global_mesh.dy);
     let max_a = solvers.iter().map(|solver| solver.max_wavespeed()).fold(0.0, f64::max);
     let dt = cfl * min_spacing / max_a;
 
+    let mut time = 0.0;
+    let mut iteration = 0;
+
     for solver in &mut solvers {
         solver.set_timestep(dt)
     }
+    let pool = gridiron::thread_pool::ThreadPool::new(28);
 
-    solvers = automaton::execute(solvers).collect();
-    // solvers = automaton::execute(solvers).collect();
-    // solvers = automaton::execute(solvers).collect();
+    while time < 0.1 {
+        let start = std::time::Instant::now();
+
+        for _ in 0..fold {
+            solvers = automaton::execute_thread_pool(&pool, solvers).collect();
+            time += dt;
+            iteration += 1;
+        }
+        let mzps = (n * n * fold) as f64 / 1e6 / start.elapsed().as_secs_f64();
+
+        println!(
+            "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
+            iteration, time, dt, mzps,
+        );
+    }
 
     let patches = solvers.into_iter().map(|solver| solver.primitive()).collect();
 
@@ -403,8 +423,8 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         command_line: CommandLine::default(),
         mesh: mesh::Mesh::Structured(global_mesh.clone()),
         restart_file: None,
-        iteration: 0,
-        time: setup.initial_time(),
+        iteration,
+        time,
         primitive: vec![],
         primitive_patches: patches,
         checkpoint: state::RecurringTask::new(),

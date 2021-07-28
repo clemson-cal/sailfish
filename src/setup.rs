@@ -46,6 +46,7 @@ pub trait Setup {
     }
 }
 
+#[derive(Clone)]
 pub struct Explosion {}
 
 impl std::str::FromStr for Explosion {
