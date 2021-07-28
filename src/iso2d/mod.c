@@ -525,14 +525,14 @@ static __host__ __device__ void advance_rk_zone(
     shear_strain(gxrj, gyrj, dx, dy, srj);
     shear_strain(gxcc, gycc, dx, dy, scc);
 
-    fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-    fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-    fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-    fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-    flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-    flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-    frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-    frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+    fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+    fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+    fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+    fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+    flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+    flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+    frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+    frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
