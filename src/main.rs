@@ -1,5 +1,6 @@
 #[cfg(feature = "omp")]
 extern crate openmp_sys;
+use std::sync::Arc;
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
 use crate::setup::Setup;
@@ -16,7 +17,6 @@ use std::fmt::Write;
 use std::mem::swap;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::Arc;
 
 pub mod cmdline;
 pub mod error;
@@ -248,7 +248,7 @@ pub struct Solver {
     received_count: usize,
     outgoing_edges: Vec<Rectangle<i64>>,
     mesh: sailfish::StructuredMesh,
-    setup: Explosion,
+    setup: Arc<dyn Setup + Send + Sync>,
 }
 
 impl Solver {
@@ -257,7 +257,7 @@ impl Solver {
         primitive: Patch,
         global_mesh: sailfish::StructuredMesh,
         edge_list: &AdjacencyList<Rectangle<i64>>,
-        setup: Explosion,
+        setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
         let index_space = primitive.high_resolution_space();
         let rect = primitive.high_resolution_rect();
@@ -381,7 +381,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
 
     let edge_list = adjacency_list(&patch_map, 2);
 
-    let setup = Explosion{};
+    let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion{});
     let mut solvers: Vec<_> = patch_map
         .into_iter()
         .map(|(_rect, patch)| Solver::new(0.0, patch, global_mesh, &edge_list, setup.clone()))
