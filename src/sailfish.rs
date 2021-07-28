@@ -45,6 +45,7 @@ pub enum BufferZone {
     NoBuffer,
     Keplerian {
         surface_density: f64,
+        surface_pressure: f64,
         central_mass: f64,
         driving_rate: f64,
         outer_radius: f64,

@@ -76,6 +76,7 @@ struct BufferZone
         struct
         {
             real surface_density;
+            real surface_pressure;
             real central_mass;
             real driving_rate;
             real outer_radius;

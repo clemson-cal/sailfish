@@ -14,6 +14,7 @@ use std::str::FromStr;
 pub mod cmdline;
 pub mod error;
 pub mod euler1d;
+pub mod euler2d;
 pub mod iso2d;
 pub mod lookup_table;
 pub mod mesh;
@@ -48,6 +49,7 @@ fn split_at_first_colon(string: &str) -> (&str, &str) {
 fn possible_setups_info() -> error::Error {
     let mut message = String::new();
     writeln!(message, "specify setup:").unwrap();
+    writeln!(message, "    binary-therm").unwrap();
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
@@ -59,6 +61,7 @@ fn possible_setups_info() -> error::Error {
 fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, error::Error> {
     use setup::*;
     match setup_name {
+        "binary-therm" => Ok(Box::new(BinaryWithThermodynamics::from_str(parameters)?)),
         "binary" => Ok(Box::new(Binary::from_str(parameters)?)),
         "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
         "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
@@ -133,7 +136,13 @@ fn run() -> Result<(), error::Error> {
                 &state.primitive,
                 setup.coordinate_system(),
             )
-        }
+        },
+        ("binary-therm", mesh::Mesh::Structured(mesh)) => euler2d::solver(
+            cmdline.execution_mode(),
+            cmdline.device,
+            *mesh,
+            &state.primitive,
+        ),
         _ => panic!(),
     };
 

@@ -224,6 +224,150 @@ impl Setup for Binary {
     }
 }
 
+pub struct BinaryWithThermodynamics {
+    pub domain_radius: f64,
+    pub alpha: f64,
+    pub sink_radius: f64,
+    pub sink_rate1: f64,
+    pub sink_rate2: f64,
+    pub sink_model: SinkModel,
+    pub gamma_law_index: f64,
+    pub cooling_coefficient: f64,
+    pub pressure_floor: f64,
+    pub density_floor: f64,
+    pub initial_density: f64,
+    pub initial_pressure: f64,
+    form: kind_config::Form,
+}
+
+impl std::str::FromStr for BinaryWithThermodynamics {
+    type Err = error::Error;
+
+    #[rustfmt::skip]
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        let form = kind_config::Form::new()
+            .item("domain_radius",      12.0, "half-size of the simulation domain (a)")
+            .item("alpha",               0.1, "alpha-viscosity coefficient (dimensionless)")
+            .item("sink_radius",        0.05, "sink kernel radius (a)")
+            .item("sink_model",         "af", "sink prescription: [none|af|tf|ff]")
+            .item("sink_rate",          10.0, "rate of mass subtraction in the sink (Omega)")
+            .item("q",                   1.0, "system mass ratio: [0-1]")
+            .item("e",                   0.0, "orbital eccentricity: [0-1]")
+            .item("gamma_law_index",   1.666, "adiabatic index")
+            .item("cooling_coefficient", 0.0, "strength of T^4 cooling")
+            .item("pressure_floor",      0.0, "pressure floor")
+            .item("density_floor",       0.0, "density floor")
+            .item("initial_density",     1.0, "initial surface density at r=a")
+            .item("initial_pressure",   1e-2, "initial surface  pressure at r=a") 
+            .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        // Soon: parse the sink rate possibly as two comma-separated numbers
+        let sink_rate: f64 = form.get("sink_rate").into();
+
+        Ok(Self {
+            domain_radius: form.get("domain_radius").into(),
+            alpha: form.get("alpha").into(),
+            sink_radius: form.get("sink_radius").into(),
+            sink_rate1: sink_rate,
+            sink_rate2: sink_rate,
+            sink_model: match form.get("sink_model").to_string().as_str() {
+                "none" => SinkModel::Inactive,
+                "af" => SinkModel::AccelerationFree,
+                "tf" => SinkModel::TorqueFree,
+                "ff" => SinkModel::ForceFree,
+                _ => return Err(InvalidSetup("invalid sink_model".into())),
+            },
+            gamma_law_index: form.get("gamma_law_index").into(),
+            cooling_coefficient: form.get("cooling_coefficient").into(),
+            pressure_floor: form.get("pressure_floor").into(),
+            density_floor: form.get("density_floor").into(),
+            initial_density: form.get("initial_density").into(),
+            initial_pressure: form.get("initial_pressure").into(),
+            form,
+        })
+    }
+}
+
+impl Setup for BinaryWithThermodynamics {
+    fn print_parameters(&self) {
+        for key in self.form.sorted_keys() {
+            println!(
+                "{:.<20} {:<10} {}",
+                key,
+                self.form.get(&key),
+                self.form.about(&key)
+            );
+        }
+    }
+
+    #[allow(clippy::many_single_char_names)]
+    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
+        let r = (x * x + y * y).sqrt();
+        let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
+        let phi_hat_x = -y / r.max(1e-12);
+        let phi_hat_y = x / r.max(1e-12);
+        let omega = 1.0 / rs.powf(3.0 / 2.0);
+        let d = self.initial_density * omega.powf(2.0 / 5.0);
+        let p = self.initial_pressure * omega;
+        let u = phi_hat_x / rs.sqrt();
+        let v = phi_hat_y / rs.sqrt();
+        primitive[0] = d;
+        primitive[1] = u;
+        primitive[2] = v;
+        primitive[3] = p;
+    }
+    fn masses(&self, time: f64) -> Vec<PointMass> {
+        let a: f64 = 1.0;
+        let m: f64 = 1.0;
+        let q: f64 = self.form.get("q").into();
+        let e: f64 = self.form.get("e").into();
+        let binary = OrbitalElements(a, m, q, e);
+        let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
+        let mass1 = PointMass {
+            x: mass1.position_x(),
+            y: mass1.position_y(),
+            vx: mass1.velocity_x(),
+            vy: mass1.velocity_y(),
+            mass: mass1.mass(),
+            rate: self.sink_rate1,
+            radius: self.sink_radius,
+            model: self.sink_model,
+        };
+        let mass2 = PointMass {
+            x: mass2.position_x(),
+            y: mass2.position_y(),
+            vx: mass2.velocity_x(),
+            vy: mass2.velocity_y(),
+            mass: mass2.mass(),
+            rate: self.sink_rate2,
+            radius: self.sink_radius,
+            model: self.sink_model,
+        };
+        vec![mass1, mass2]
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: self.gamma_law_index,
+        }
+    }
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        Some(self.alpha)
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::Structured(StructuredMesh::centered_square(
+            self.domain_radius,
+            resolution,
+        ))
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+}
+
 pub struct Shocktube {}
 
 impl std::str::FromStr for Shocktube {
