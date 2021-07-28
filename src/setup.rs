@@ -293,6 +293,15 @@ impl std::str::FromStr for BinaryWithThermodynamics {
     }
 }
 
+impl BinaryWithThermodynamics {
+    fn density_scaling(&self, r: f64) -> f64 {
+        r.powf(-3.0 / 5.0) // Eq. (A2) from Goodman (2003)
+    }
+    fn pressure_scaling(&self, r: f64) -> f64 {
+        r.powf(-3.0 / 2.0) // Derived from Goodman (2003)
+    }
+}
+
 impl Setup for BinaryWithThermodynamics {
     fn num_primitives(&self) -> usize { 4 }
     fn print_parameters(&self) {
@@ -312,9 +321,8 @@ impl Setup for BinaryWithThermodynamics {
         let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
-        let omega = 1.0 / rs.powf(3.0 / 2.0);
-        let d = self.initial_density * omega.powf(2.0 / 5.0); // Eq. (A2) from Goodman (2003)
-        let p = self.initial_pressure * omega; // Derived from Goodman (2003)
+        let d = self.initial_density * self.density_scaling(rs);
+        let p = self.initial_pressure * self.pressure_scaling(rs);
         let u = phi_hat_x / rs.sqrt();
         let v = phi_hat_y / rs.sqrt();
         primitive[0] = d;
@@ -357,7 +365,15 @@ impl Setup for BinaryWithThermodynamics {
         }
     }
     fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+        let rbuf = self.domain_radius - 0.2;
+        BufferZone::Keplerian {
+            surface_density: self.initial_density * self.density_scaling(rbuf),
+            surface_pressure: self.initial_pressure * self.pressure_scaling(rbuf),
+            central_mass: 1.0,
+            driving_rate: 1000.0,
+            outer_radius: rbuf,
+            onset_width: 0.1,
+        }
     }
     fn viscosity(&self) -> Option<f64> {
         Some(self.alpha)

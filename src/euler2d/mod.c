@@ -143,7 +143,7 @@ static __host__ __device__ void point_mass_source_term(
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
-            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (prim[1] * prim[1] + prim[2] * prim[2])) + dt * (fx * prim[1] + dy * prim[2]);
+            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (prim[1] * prim[1] + prim[2] * prim[2])) + dt * (fx * prim[1] + fy * prim[2]);
             break;
         case TorqueFree: {
             real vx        = prim[1];
@@ -208,7 +208,7 @@ static __host__ __device__ real sound_speed_squared(
     switch (eos->type)
     {
         case GammaLaw:
-            return prim[3] / prim[0] * eos->gamma_law.gamma_law_index;
+            return prim[3] / prim[0] * GAMMA_LAW_INDEX;
         default:
             return 1.0; // WARNING
     }
@@ -278,12 +278,12 @@ static __host__ __device__ void shear_strain(const real *gx, const real *gy, rea
 static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim, real velocity_ceiling)
 {
     real gamma = GAMMA_LAW_INDEX;
-    real rho = cons[0];
+    real rho = max2(cons[0], 1e-16);
     real px = cons[1];
     real py = cons[2];
     real vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
     real vy = sign(py) * min2(fabs(py / rho), velocity_ceiling);
-    real pres = (cons[3] - 0.5 * rho * (vx * vx + vy * vy)) * (gamma - 1.0);
+    real pres = max2( (cons[3] - 0.5 * rho * (vx * vx + vy * vy)) * (gamma - 1.0), 1e-16 );
 
     prim[0] = rho;
     prim[1] = vx;
@@ -569,14 +569,23 @@ static __host__ __device__ void advance_rk_zone(
     real cs2cc = sound_speed_squared(&eos, pcc);
     real nu = alpha * h * sqrt(cs2cc); // Warning: nu is centered.
 
-    fli[1] -= nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-    fli[2] -= nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-    fri[1] -= nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-    fri[2] -= nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-    flj[1] -= nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-    flj[2] -= nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-    frj[1] -= nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-    frj[2] -= nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+    fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+    fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+    fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+    fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+    flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+    flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+    frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+    frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+
+    fli[3] -= 0.5 * nu * (pli[0] * sli[0] * pli[1] + pcc[0] * scc[0] * pcc[1]); // v^x \tau^x_x
+    fri[3] -= 0.5 * nu * (pcc[0] * scc[0] * pcc[1] + pri[0] * sri[0] * pri[1]);
+    fli[3] -= 0.5 * nu * (pli[0] * sli[1] * pli[2] + pcc[0] * scc[1] * pcc[2]); // v^y \tau^x_y
+    fri[3] -= 0.5 * nu * (pcc[0] * scc[1] * pcc[2] + pri[0] * sri[1] * pri[2]);
+    flj[3] -= 0.5 * nu * (plj[0] * slj[2] * plj[1] + pcc[0] * scc[2] * pcc[1]); // v^x \tau^y_x
+    frj[3] -= 0.5 * nu * (pcc[0] * scc[2] * pcc[1] + prj[0] * srj[2] * prj[1]);
+    flj[3] -= 0.5 * nu * (plj[0] * slj[3] * plj[2] + pcc[0] * scc[3] * pcc[2]); // v^y \tau^y_y
+    frj[3] -= 0.5 * nu * (pcc[0] * scc[3] * pcc[2] + prj[0] * srj[3] * prj[2]);
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
