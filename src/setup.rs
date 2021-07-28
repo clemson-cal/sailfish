@@ -428,16 +428,20 @@ impl std::str::FromStr for FastShell {
 impl Setup for FastShell {
     fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
         let r_shell: f64 = 10.0;
-        let dr: f64 = 1.0;
+        let dr: f64 = 0.1;
 
         let prof = |r: f64| {
-            f64::exp(-(r - r_shell).powi(2) / dr.powi(2))
+            if r > r_shell {
+                0.0
+            } else {
+                f64::exp((r - r_shell) / dr)
+            }
         };
 
-        let rho_ambient = 1e-2 * r.powi(-2);
+        let rho_ambient = 1e-4 * r.powi(-2);
         let rho = 1.0 * prof(r) + rho_ambient;
         let vel = 1.0 * prof(r);
-        let pre = 0.1 * rho_ambient;
+        let pre = 1e-3 * rho;
 
         primitive[0] = rho;
         primitive[1] = vel;
