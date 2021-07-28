@@ -37,7 +37,7 @@ dependencies = [
 [[package]]
 name = "gridiron"
 version = "0.1.0"
-source = "git+https://github.com/clemson-cal/gridiron#e1405ca8b85dbc3aec0dec845c2ccdef7076040e"
+source = "git+https://github.com/clemson-cal/gridiron#ea62d6adf0113c3ac2a0f8d08532ca71b104f573"
 dependencies = [
  "cc",
  "serde",
