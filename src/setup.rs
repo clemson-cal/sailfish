@@ -19,26 +19,28 @@ pub trait Setup {
     fn viscosity(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
     fn coordinate_system(&self) -> Coordinates;
+    fn num_primitives(&self) -> usize;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
+        let nvars = self.num_primitives();
         match mesh {
             Mesh::Structured(mesh) => {
-                let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * 3) as usize];
-                let si = 3 * (mesh.nj + 4);
-                let sj = 3;
+                let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * (nvars as i64)) as usize];
+                let si = (nvars as i64) * (mesh.nj + 4);
+                let sj = nvars as i64;
                 for i in -2..mesh.ni + 2 {
                     for j in -2..mesh.nj + 2 {
                         let n = ((i + 2) * si + (j + 2) * sj) as usize;
                         let [x, y] = mesh.cell_coordinates(i, j);
-                        self.initial_primitive(x, y, &mut primitive[n..n + 3])
+                        self.initial_primitive(x, y, &mut primitive[n..n + nvars])
                     }
                 }
                 primitive
             }
             Mesh::FacePositions1D(faces) => {
-                let mut primitive = vec![0.0; (faces.len() - 1) * 3];
+                let mut primitive = vec![0.0; (faces.len() - 1) * nvars];
                 for i in 0..faces.len() - 1 {
                     let x = 0.5 * (faces[i] + faces[i + 1]);
-                    self.initial_primitive(x, 0.0, &mut primitive[3 * i..3 * i + 3]);
+                    self.initial_primitive(x, 0.0, &mut primitive[nvars * i..nvars * i + nvars]);
                 }
                 primitive
             }
@@ -63,6 +65,7 @@ impl std::str::FromStr for Explosion {
 }
 
 impl Setup for Explosion {
+    fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
@@ -149,6 +152,7 @@ impl std::str::FromStr for Binary {
 }
 
 impl Setup for Binary {
+    fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
             println!(
@@ -290,6 +294,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
 }
 
 impl Setup for BinaryWithThermodynamics {
+    fn num_primitives(&self) -> usize { 4 }
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
             println!(
@@ -308,8 +313,8 @@ impl Setup for BinaryWithThermodynamics {
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
         let omega = 1.0 / rs.powf(3.0 / 2.0);
-        let d = self.initial_density * omega.powf(2.0 / 5.0);
-        let p = self.initial_pressure * omega;
+        let d = self.initial_density * omega.powf(2.0 / 5.0); // Eq. (A2) from Goodman (2003)
+        let p = self.initial_pressure * omega; // Derived from Goodman (2003)
         let u = phi_hat_x / rs.sqrt();
         let v = phi_hat_y / rs.sqrt();
         primitive[0] = d;
@@ -385,6 +390,7 @@ impl std::str::FromStr for Shocktube {
 }
 
 impl Setup for Shocktube {
+    fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         if x < 0.5 {
@@ -439,6 +445,7 @@ impl std::str::FromStr for Collision {
 }
 
 impl Setup for Collision {
+    fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let xl: f64 = -0.25;
@@ -524,6 +531,7 @@ impl std::str::FromStr for Sedov {
 }
 
 impl Setup for Sedov {
+    fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let row = self.table.sample(x);

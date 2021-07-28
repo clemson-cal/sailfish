@@ -76,7 +76,7 @@ pub mod cpu {
     pub struct Solver {
         mesh: StructuredMesh,
         primitive1: Vec<f64>,
-        primitive2: Vec<f64>, //TODO: what is primitive1 and primitive2?
+        primitive2: Vec<f64>,
         conserved0: Vec<f64>,
         pub(super) mode: ExecutionMode,
     }
@@ -85,13 +85,13 @@ pub mod cpu {
         pub fn new(mesh: StructuredMesh, primitive: &[f64]) -> Self {
             assert_eq!(
                 primitive.len(),
-                (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
+                (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 4
             );
             Self {
                 mesh,
                 primitive1: primitive.to_vec(),
                 primitive2: primitive.to_vec(),
-                conserved0: vec![0.0; mesh.num_total_zones() * 3],
+                conserved0: vec![0.0; mesh.num_total_zones() * 4],
                 mode: ExecutionMode::CPU,
             }
         }
@@ -215,14 +215,14 @@ pub mod gpu {
         pub fn new(device: Option<i32>, mesh: StructuredMesh, primitive: &[f64]) -> Self {
             assert_eq!(
                 primitive.len(),
-                (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 3
+                (mesh.ni as usize + 4) * (mesh.nj as usize + 4) * 4
             );
             let device = Device::with_id(device.unwrap_or(0)).expect("invalid device id");
             Self {
                 mesh,
                 primitive1: device.buffer_from(primitive),
                 primitive2: device.buffer_from(primitive),
-                conserved0: device.buffer_from(&vec![0.0; mesh.num_total_zones() * 3]),
+                conserved0: device.buffer_from(&vec![0.0; mesh.num_total_zones() * 4]),
                 wavespeeds: device.buffer_from(&vec![0.0; mesh.num_total_zones()]),
                 device,
             }
