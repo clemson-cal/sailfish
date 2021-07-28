@@ -278,6 +278,33 @@ impl Solver {
             setup,
         }
     }
+
+    pub fn primitive(&self) -> Patch {
+        self.primitive1.extract(self.index_space.clone())
+    }
+
+    pub fn max_wavespeed(&self) -> f64 {
+        let setup = &self.setup;
+        let eos = setup.equation_of_state();
+        let masses = setup.masses(self.time);
+        let mut wavespeeds = vec![0.0; self.mesh.num_total_zones()];
+        unsafe {
+            iso2d::iso2d_wavespeed(
+                self.mesh,
+                self.primitive1.data().as_ptr(),
+                wavespeeds.as_mut_ptr(),
+                eos,
+                masses.as_ptr(),
+                masses.len() as i32,
+                sailfish::ExecutionMode::CPU,
+            )
+        };
+        wavespeeds.iter().cloned().fold(0.0, f64::max)
+    }
+
+    pub fn set_timestep(&mut self, dt: f64) {
+        self.dt = dt
+    }
 }
 
 impl Automaton for Solver {
@@ -292,7 +319,7 @@ impl Automaton for Solver {
             .iter()
             .map(IndexSpace::from)
             .map(|neighbor_space| {
-                let overlap = neighbor_space.intersect(self.index_space.extend_all(2));
+                let overlap = neighbor_space.extend_all(2).intersect(self.index_space.clone());
                 let guard_patch = self.primitive1.extract(overlap);
                 (neighbor_space.clone().into_rect(), guard_patch)
             })
@@ -334,7 +361,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
     let n = 256;
     let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
     let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
-        .tile(21)
+        .tile(2)
         .into_iter()
         .map(|space| {
             let (i0, j0) = space.start();
@@ -352,26 +379,39 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
     let edge_list = adjacency_list(&patch_map, 2);
 
     let setup: Arc<dyn Setup> = Arc::new(Explosion {});
-    let solvers: Vec<_> = patch_map
+    let mut solvers: Vec<_> = patch_map
         .into_iter()
         .map(|(_rect, patch)| Solver::new(0.0, patch, global_mesh, &edge_list, setup.clone()))
         .collect();
 
-    let _next_solvers = automaton::execute(solvers);
+    let cfl = 0.2;
+    let min_spacing = f64::min(global_mesh.dx, global_mesh.dy);
+    let max_a = solvers.iter().map(|solver| solver.max_wavespeed()).fold(0.0, f64::max);
+    let dt = cfl * min_spacing / max_a;
 
-    // let mut state = State {
-    //     command_line: CommandLine::default(),
-    //     mesh: mesh::Mesh::Structured(global_mesh.clone()),
-    //     restart_file: None,
-    //     iteration: 0,
-    //     time: setup.initial_time(),
-    //     primitive: vec![],
-    //     primitive_patches: patches,
-    //     checkpoint: state::RecurringTask::new(),
-    //     setup_name: String::new(),
-    //     parameters: String::new(),
-    // };
-    // state.write_checkpoint(".")?;
+    for solver in &mut solvers {
+        solver.set_timestep(dt)
+    }
+
+    solvers = automaton::execute(solvers).collect();
+    // solvers = automaton::execute(solvers).collect();
+    // solvers = automaton::execute(solvers).collect();
+
+    let patches = solvers.into_iter().map(|solver| solver.primitive()).collect();
+
+    let mut state = State {
+        command_line: CommandLine::default(),
+        mesh: mesh::Mesh::Structured(global_mesh.clone()),
+        restart_file: None,
+        iteration: 0,
+        time: setup.initial_time(),
+        primitive: vec![],
+        primitive_patches: patches,
+        checkpoint: state::RecurringTask::new(),
+        setup_name: String::new(),
+        parameters: String::new(),
+    };
+    state.write_checkpoint(".")?;
 
     Ok(())
 }
