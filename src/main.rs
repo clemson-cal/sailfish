@@ -1,6 +1,5 @@
 #[cfg(feature = "omp")]
 extern crate openmp_sys;
-use std::sync::Arc;
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
 use crate::setup::Setup;
@@ -17,6 +16,7 @@ use std::fmt::Write;
 use std::mem::swap;
 use std::path::Path;
 use std::str::FromStr;
+use std::sync::Arc;
 
 pub mod cmdline;
 pub mod error;
@@ -237,9 +237,17 @@ fn adjacency_list(
     edges
 }
 
+enum SolverState {
+    NotReady,
+    RungeKuttaStage(usize),
+}
+
 pub struct Solver {
     time: f64,
-    dt: f64,
+    time0: f64,
+    state: SolverState,
+    dt: Option<f64>,
+    rk_order: usize,
     primitive1: Patch,
     primitive2: Patch,
     conserved0: Patch,
@@ -257,6 +265,7 @@ impl Solver {
         primitive: Patch,
         global_mesh: sailfish::StructuredMesh,
         edge_list: &AdjacencyList<Rectangle<i64>>,
+        rk_order: usize,
         setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
         let index_space = primitive.high_resolution_space();
@@ -266,7 +275,10 @@ impl Solver {
         let primitive = Patch::extract_from(&primitive, index_space.extend_all(2));
         Self {
             time,
-            dt: 0.0,
+            time0: time,
+            state: SolverState::NotReady,
+            dt: None,
+            rk_order,
             conserved0: Patch::zeros(0, 3, index_space.clone()),
             primitive1: primitive.clone(),
             primitive2: primitive,
@@ -302,40 +314,41 @@ impl Solver {
         wavespeeds.iter().cloned().fold(0.0, f64::max)
     }
 
-    pub fn set_timestep(&mut self, dt: f64) {
-        self.dt = dt
+    pub fn new_timestep(&mut self) {
+        unsafe {
+            iso2d::iso2d_primitive_to_conserved(
+                self.mesh,
+                self.primitive1.data().as_ptr(),
+                self.conserved0.data_mut().as_mut_ptr(),
+                sailfish::ExecutionMode::CPU,
+            );
+        }
+        self.time0 = self.time;
+        self.state = SolverState::RungeKuttaStage(0);
     }
-}
 
-impl Automaton for Solver {
-    type Key = gridiron::rect_map::Rectangle<i64>;
-    type Value = Self;
-    type Message = gridiron::patch::Patch;
-    fn key(&self) -> Self::Key {
-        self.index_space.clone().into_rect()
-    }
-    fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
-        self.outgoing_edges
-            .iter()
-            .map(IndexSpace::from)
-            .map(|neighbor_space| {
-                let overlap = neighbor_space.extend_all(2).intersect(self.index_space.clone());
-                let guard_patch = self.primitive1.extract(overlap);
-                (neighbor_space.clone().into_rect(), guard_patch)
-            })
-            .collect()
-    }
-    fn independent(&self) -> bool {
-        self.incoming_count == 0
-    }
-    fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
-        neighbor_patch.copy_into(&mut self.primitive1);
-        self.received_count += 1;
-        Status::eligible_if(self.received_count == self.incoming_count)
-    }
-    fn value(mut self) -> Self::Value {
-        self.received_count = 0;
+    pub fn advance_rk(&mut self, stage: usize) {
         let masses = self.setup.masses(self.time);
+        let dt = self.dt.unwrap();
+
+        let a = match self.rk_order {
+            1 => match stage {
+                0 => 0.0,
+                _ => panic!(),
+            },
+            2 => match stage {
+                0 => 0.0,
+                1 => 0.5,
+                _ => panic!(),
+            },
+            3 => match stage {
+                0 => 0.0,
+                1 => 3.0 / 4.0,
+                2 => 1.0 / 3.0,
+                _ => panic!(),
+            },
+            _ => panic!(),
+        };
 
         unsafe {
             iso2d::iso2d_advance_rk(
@@ -348,12 +361,69 @@ impl Automaton for Solver {
                 masses.as_ptr(),
                 masses.len() as i32,
                 self.setup.viscosity().unwrap_or(0.0),
-                0.0,
-                self.dt,
+                a,
+                dt,
                 f64::MAX,
                 sailfish::ExecutionMode::CPU,
             );
         }
+        self.time = self.time0 * a + (self.time + dt) * (1.0 - a);
+        self.state = if stage == self.rk_order - 1 {
+            SolverState::NotReady
+        } else {
+            SolverState::RungeKuttaStage(stage + 1)
+        }
+    }
+
+    pub fn set_timestep(&mut self, dt: f64) {
+        self.dt = Some(dt)
+    }
+}
+
+impl Automaton for Solver {
+    type Key = gridiron::rect_map::Rectangle<i64>;
+
+    type Value = Self;
+
+    type Message = gridiron::patch::Patch;
+
+    fn key(&self) -> Self::Key {
+        self.index_space.clone().into_rect()
+    }
+
+    fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
+        self.outgoing_edges
+            .iter()
+            .map(IndexSpace::from)
+            .map(|neighbor_space| {
+                let overlap = neighbor_space
+                    .extend_all(2)
+                    .intersect(self.index_space.clone());
+                let guard_patch = self.primitive1.extract(overlap);
+                (neighbor_space.into_rect(), guard_patch)
+            })
+            .collect()
+    }
+
+    fn independent(&self) -> bool {
+        self.incoming_count == 0
+    }
+
+    fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
+        neighbor_patch.copy_into(&mut self.primitive1);
+        self.received_count += 1;
+        Status::eligible_if(self.received_count == self.incoming_count)
+    }
+
+    fn value(mut self) -> Self::Value {
+        if matches!(self.state, SolverState::NotReady) {
+            self.new_timestep()
+        }
+        match self.state {
+            SolverState::RungeKuttaStage(stage) => self.advance_rk(stage),
+            _ => unreachable!(),
+        }
+        self.received_count = 0;
         swap(&mut self.primitive1, &mut self.primitive2);
         self
     }
@@ -361,7 +431,12 @@ impl Automaton for Solver {
 
 fn run_decomposed_domain() -> Result<(), error::Error> {
     let setup = setup::Explosion {};
+
     let n = 1024;
+    let rk_order = 3;
+    let fold = 10;
+    let cfl = 0.2;
+
     let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
     let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
         .tile(128)
@@ -369,7 +444,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         .map(|space| {
             let (i0, j0) = space.start();
             let (di, dj) = space.clone().into_rect();
-            let mesh = global_mesh.sub_mesh(di.clone(), dj.clone());
+            let mesh = global_mesh.sub_mesh(di, dj);
 
             let patch = Patch::from_slice_function(0, space, 3, |(i, j), prim| {
                 let [x, y] = mesh.cell_coordinates(i - i0, j - j0);
@@ -381,20 +456,24 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
 
     let edge_list = adjacency_list(&patch_map, 2);
 
-    let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion{});
+    let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion {});
     let mut solvers: Vec<_> = patch_map
         .into_iter()
-        .map(|(_rect, patch)| Solver::new(0.0, patch, global_mesh, &edge_list, setup.clone()))
+        .map(|(_rect, patch)| {
+            Solver::new(0.0, patch, global_mesh, &edge_list, rk_order, setup.clone())
+        })
         .collect();
 
-    let fold = 10;
-    let cfl = 0.2;
     let min_spacing = f64::min(global_mesh.dx, global_mesh.dy);
-    let max_a = solvers.iter().map(|solver| solver.max_wavespeed()).fold(0.0, f64::max);
-    let dt = cfl * min_spacing / max_a;
 
     let mut time = 0.0;
     let mut iteration = 0;
+
+    let max_a = solvers
+        .iter()
+        .map(|solver| solver.max_wavespeed())
+        .fold(0.0, f64::max);
+    let dt = cfl * min_spacing / max_a;
 
     for solver in &mut solvers {
         solver.set_timestep(dt)
@@ -405,7 +484,9 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         let start = std::time::Instant::now();
 
         for _ in 0..fold {
-            solvers = automaton::execute_thread_pool(&pool, solvers).collect();
+            for _stage in 0..rk_order {
+                solvers = automaton::execute_thread_pool(&pool, solvers).collect();
+            }
             time += dt;
             iteration += 1;
         }
@@ -417,11 +498,14 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         );
     }
 
-    let patches = solvers.into_iter().map(|solver| solver.primitive()).collect();
+    let patches = solvers
+        .into_iter()
+        .map(|solver| solver.primitive())
+        .collect();
 
     let mut state = State {
         command_line: CommandLine::default(),
-        mesh: mesh::Mesh::Structured(global_mesh.clone()),
+        mesh: mesh::Mesh::Structured(global_mesh),
         restart_file: None,
         iteration,
         time,
