@@ -11,6 +11,7 @@ use gridiron::index_space::range2d;
 use gridiron::index_space::IndexSpace;
 use gridiron::patch::Patch;
 use gridiron::rect_map::{Rectangle, RectangleMap};
+use rayon::prelude::*;
 use sailfish::ExecutionMode;
 use setup::Explosion;
 use std::fmt::Write;
@@ -479,17 +480,8 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         .collect();
 
     let min_spacing = f64::min(global_mesh.dx, global_mesh.dy);
-    let max_a = solvers
-        .iter()
-        .map(|solver| solver.max_wavespeed())
-        .fold(0.0, f64::max);
-    let dt = cfl * min_spacing / max_a;
     let mut time = 0.0;
     let mut iteration = 0;
-
-    for solver in &mut solvers {
-        solver.set_timestep(dt)
-    }
 
     let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
         ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
@@ -497,10 +489,35 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         ExecutionMode::GPU => unimplemented!(),
     };
 
+    for solver in &mut solvers {
+        solver.set_timestep(0.0001)
+    }
+
     while time < 0.1 {
         let start = std::time::Instant::now();
+        let mut dt = 0.0;
 
         for _ in 0..fold {
+            let max_a = if let Some(ref pool) = pool {
+                pool.install(|| {
+                    solvers
+                        .par_iter()
+                        .map(|solver| solver.max_wavespeed())
+                        .reduce(|| 0.0, |x, y| f64::max(x, y))
+                })
+            } else {
+                solvers
+                    .iter()
+                    .map(|solver| solver.max_wavespeed())
+                    .fold(0.0, |x, y| f64::max(x, y))
+            };
+
+            dt = cfl * min_spacing / max_a;
+
+            for solver in &mut solvers {
+                solver.set_timestep(dt)
+            }
+
             for _stage in 0..rk_order {
                 solvers = match pool {
                     Some(ref pool) => pool.scope(|scope| execute_rayon(scope, solvers).collect()),
