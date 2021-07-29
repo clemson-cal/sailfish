@@ -773,7 +773,7 @@ static void __global__ advance_rk_kernel(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
     }
 }
 
@@ -897,7 +897,7 @@ EXTERN_C void euler2d_advance_rk(
     struct BufferZone buffer,
     struct PointMass *masses,
     int num_masses,
-    real nu,
+    real alpha,
     real a,
     real dt,
     real velocity_ceiling,
@@ -918,7 +918,7 @@ EXTERN_C void euler2d_advance_rk(
                 }
             } else {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
                 }
             }
             break;
@@ -932,7 +932,7 @@ EXTERN_C void euler2d_advance_rk(
                 }
             } else {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
                 }
             }
             break;
@@ -947,7 +947,7 @@ EXTERN_C void euler2d_advance_rk(
             if (nu == 0.0) {
                 advance_rk_kernel_inviscid<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor);
             } else {
-                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor);
+                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor);
             }
             #endif
             break;
