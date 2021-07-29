@@ -306,8 +306,8 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
         vy  = 0.0;
     }
     if (pres < pressure_floor) { pres = pressure_floor; }
-    if (vx > velocity_ceiling) { vx = velocity_ceiling; }
-    if (vy > velocity_ceiling) { vy = velocity_ceiling; }
+    if (vx > velocity_ceiling) { vx = sign(px) * velocity_ceiling; }
+    if (vy > velocity_ceiling) { vy = sign(py) * velocity_ceiling; }
 
     prim[0] = rho;
     prim[1] = vx;
