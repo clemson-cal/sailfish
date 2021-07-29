@@ -764,7 +764,9 @@ static void __global__ advance_rk_kernel(
     real a,
     real dt,
     real velocity_ceiling,
-    real cooling_coefficient)
+    real cooling_coefficient,
+    real density_floor,
+    real pressure_floor)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -787,7 +789,9 @@ static void __global__ advance_rk_kernel_inviscid(
     real a,
     real dt,
     real velocity_ceiling,
-    real cooling_coefficient)
+    real cooling_coefficient,
+    real density_floor,
+    real pressure_floor)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
