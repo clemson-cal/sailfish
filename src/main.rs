@@ -11,6 +11,7 @@ use gridiron::index_space::range2d;
 use gridiron::index_space::IndexSpace;
 use gridiron::patch::Patch;
 use gridiron::rect_map::{Rectangle, RectangleMap};
+use sailfish::ExecutionMode;
 use setup::Explosion;
 use std::fmt::Write;
 use std::mem::swap;
@@ -256,6 +257,7 @@ pub struct Solver {
     received_count: usize,
     outgoing_edges: Vec<Rectangle<i64>>,
     mesh: sailfish::StructuredMesh,
+    mode: ExecutionMode,
     setup: Arc<dyn Setup + Send + Sync>,
 }
 
@@ -266,6 +268,7 @@ impl Solver {
         global_mesh: sailfish::StructuredMesh,
         edge_list: &AdjacencyList<Rectangle<i64>>,
         rk_order: usize,
+        mode: ExecutionMode,
         setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
         let index_space = primitive.high_resolution_space();
@@ -286,6 +289,7 @@ impl Solver {
             incoming_count: edge_list.incoming_edges(&key).count(),
             received_count: 0,
             index_space,
+            mode,
             mesh,
             setup,
         }
@@ -308,7 +312,7 @@ impl Solver {
                 eos,
                 masses.as_ptr(),
                 masses.len() as i32,
-                sailfish::ExecutionMode::CPU,
+                self.mode,
             )
         };
         wavespeeds.iter().cloned().fold(0.0, f64::max)
@@ -320,7 +324,7 @@ impl Solver {
                 self.mesh,
                 self.primitive1.data().as_ptr(),
                 self.conserved0.data_mut().as_mut_ptr(),
-                sailfish::ExecutionMode::CPU,
+                self.mode,
             );
         }
         self.time0 = self.time;
@@ -364,7 +368,7 @@ impl Solver {
                 a,
                 dt,
                 f64::MAX,
-                sailfish::ExecutionMode::CPU,
+                self.mode,
             );
         }
         self.time = self.time0 * a + (self.time + dt) * (1.0 - a);
@@ -430,16 +434,22 @@ impl Automaton for Solver {
 }
 
 fn run_decomposed_domain() -> Result<(), error::Error> {
-    let setup = setup::Explosion {};
+    let cmdline = cmdline::parse_command_line()?;
+    let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion {});
 
-    let n = 1024;
-    let rk_order = 3;
-    let fold = 10;
-    let cfl = 0.2;
+    let n = cmdline.resolution.unwrap_or(2048) as i64;
+    let rk_order = cmdline.rk_order as usize;
+    let fold = cmdline.fold;
+    let cfl = cmdline.cfl_number;
+    let num_patches = match cmdline.execution_mode() {
+        ExecutionMode::CPU => 512,
+        ExecutionMode::OMP => 1,
+        ExecutionMode::GPU => unimplemented!(),
+    };
 
     let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
     let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
-        .tile(128)
+        .tile(num_patches)
         .into_iter()
         .map(|space| {
             let (i0, j0) = space.start();
@@ -456,11 +466,18 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
 
     let edge_list = adjacency_list(&patch_map, 2);
 
-    let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion {});
     let mut solvers: Vec<_> = patch_map
         .into_iter()
         .map(|(_rect, patch)| {
-            Solver::new(0.0, patch, global_mesh, &edge_list, rk_order, setup.clone())
+            Solver::new(
+                0.0,
+                patch,
+                global_mesh,
+                &edge_list,
+                rk_order,
+                cmdline.execution_mode(),
+                setup.clone(),
+            )
         })
         .collect();
 
@@ -478,19 +495,26 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
     for solver in &mut solvers {
         solver.set_timestep(dt)
     }
-    let pool = gridiron::thread_pool::ThreadPool::new(28);
+    let pool: Option<gridiron::thread_pool::ThreadPool> = match cmdline.execution_mode() {
+        ExecutionMode::CPU => Some(gridiron::thread_pool::ThreadPool::new(56)),
+        ExecutionMode::OMP => None,
+        ExecutionMode::GPU => unimplemented!(),
+    };
 
     while time < 0.1 {
         let start = std::time::Instant::now();
 
         for _ in 0..fold {
             for _stage in 0..rk_order {
-                solvers = automaton::execute_thread_pool(&pool, solvers).collect();
+                solvers = match pool {
+                    Some(ref pool) => automaton::execute_thread_pool(&pool, solvers).collect(),
+                    None => automaton::execute(solvers).collect(),
+                };
             }
             time += dt;
             iteration += 1;
         }
-        let mzps = (n * n * fold) as f64 / 1e6 / start.elapsed().as_secs_f64();
+        let mzps = (n * n * fold as i64) as f64 / 1e6 / start.elapsed().as_secs_f64();
 
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
