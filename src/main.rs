@@ -6,7 +6,7 @@ use crate::setup::Setup;
 use crate::state::State;
 use cfg_if::cfg_if;
 use gridiron::adjacency_list::AdjacencyList;
-use gridiron::automaton::{self, Automaton, Status};
+use gridiron::automaton::{self, execute_rayon, Automaton, Status};
 use gridiron::index_space::range2d;
 use gridiron::index_space::IndexSpace;
 use gridiron::patch::Patch;
@@ -371,6 +371,8 @@ impl Solver {
                 self.mode,
             );
         }
+        swap(&mut self.primitive1, &mut self.primitive2);
+
         self.time = self.time0 * a + (self.time + dt) * (1.0 - a);
         self.state = if stage == self.rk_order - 1 {
             SolverState::NotReady
@@ -415,20 +417,17 @@ impl Automaton for Solver {
 
     fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
         neighbor_patch.copy_into(&mut self.primitive1);
-        self.received_count += 1;
-        Status::eligible_if(self.received_count == self.incoming_count)
+        self.received_count = (self.received_count + 1) % self.incoming_count;
+        Status::eligible_if(self.received_count == 0)
     }
 
     fn value(mut self) -> Self::Value {
-        if matches!(self.state, SolverState::NotReady) {
+        if let SolverState::NotReady = self.state {
             self.new_timestep()
         }
-        match self.state {
-            SolverState::RungeKuttaStage(stage) => self.advance_rk(stage),
-            _ => unreachable!(),
+        if let SolverState::RungeKuttaStage(stage) = self.state {
+            self.advance_rk(stage)
         }
-        self.received_count = 0;
-        swap(&mut self.primitive1, &mut self.primitive2);
         self
     }
 }
@@ -446,7 +445,6 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         ExecutionMode::OMP => 1,
         ExecutionMode::GPU => unimplemented!(),
     };
-
     let global_mesh = sailfish::StructuredMesh::centered_square(1.0, n as u32);
     let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
         .tile(num_patches)
@@ -465,7 +463,6 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         .collect();
 
     let edge_list = adjacency_list(&patch_map, 2);
-
     let mut solvers: Vec<_> = patch_map
         .into_iter()
         .map(|(_rect, patch)| {
@@ -482,21 +479,20 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         .collect();
 
     let min_spacing = f64::min(global_mesh.dx, global_mesh.dy);
-
-    let mut time = 0.0;
-    let mut iteration = 0;
-
     let max_a = solvers
         .iter()
         .map(|solver| solver.max_wavespeed())
         .fold(0.0, f64::max);
     let dt = cfl * min_spacing / max_a;
+    let mut time = 0.0;
+    let mut iteration = 0;
 
     for solver in &mut solvers {
         solver.set_timestep(dt)
     }
-    let pool: Option<gridiron::thread_pool::ThreadPool> = match cmdline.execution_mode() {
-        ExecutionMode::CPU => Some(gridiron::thread_pool::ThreadPool::new(56)),
+
+    let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
+        ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
         ExecutionMode::OMP => None,
         ExecutionMode::GPU => unimplemented!(),
     };
@@ -507,7 +503,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         for _ in 0..fold {
             for _stage in 0..rk_order {
                 solvers = match pool {
-                    Some(ref pool) => automaton::execute_thread_pool(&pool, solvers).collect(),
+                    Some(ref pool) => pool.scope(|scope| execute_rayon(scope, solvers).collect()),
                     None => automaton::execute(solvers).collect(),
                 };
             }

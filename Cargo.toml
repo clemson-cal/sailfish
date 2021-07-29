@@ -10,10 +10,11 @@ cfg-if          = { version = "1.0" }
 thiserror       = { version = "1.0" }
 kind-config     = { version = "0.2" }
 rmp-serde       = { version = "0.15" }
+rayon           = { version = "1.5" }
 serde           = { version = "1.0", features = ["derive"] }
 openmp-sys      = { version = "1.2", optional = true }
 kepler-two-body = { git = "https://github.com/clemson-cal/kepler-two-body" }
-gridiron        = { git = "https://github.com/clemson-cal/gridiron", default_features = false, features = ["serde"] }
+gridiron        = { git = "https://github.com/clemson-cal/gridiron", default_features = false, features = ["serde", "rayon"] }
 gpu_core        = { path = "gpu_core", optional = true }
 
 [build-dependencies]
