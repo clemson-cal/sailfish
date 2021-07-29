@@ -1,7 +1,7 @@
 use crate::cmdline::CommandLine;
 use crate::error;
 use crate::mesh;
-use gridiron::patch::Patch;
+use crate::patch::Patch;
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
 use std::io::Write;

@@ -2,6 +2,7 @@
 extern crate openmp_sys;
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
+use crate::patch::Patch;
 use crate::setup::Setup;
 use crate::state::State;
 use cfg_if::cfg_if;
@@ -9,7 +10,6 @@ use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{self, execute_rayon, Automaton, Status};
 use gridiron::index_space::range2d;
 use gridiron::index_space::IndexSpace;
-use gridiron::patch::Patch;
 use gridiron::rect_map::{Rectangle, RectangleMap};
 use rayon::prelude::*;
 use sailfish::ExecutionMode;
@@ -234,7 +234,7 @@ fn adjacency_list(
     for (b, q) in patches.iter() {
         for (a, p) in patches.query_rect(q.index_space().extend_all(num_guard as i64)) {
             if a != b {
-                edges.insert(p.high_resolution_rect(), q.high_resolution_rect())
+                edges.insert(p.rect(), q.rect())
             }
         }
     }
@@ -275,21 +275,23 @@ impl Solver {
         mode: ExecutionMode,
         setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
-        let index_space = primitive.high_resolution_space();
-        let rect = primitive.high_resolution_rect();
+        let index_space = primitive.index_space();
+        let rect = primitive.rect();
         let key = rect.clone();
         let mesh = global_mesh.sub_mesh(rect.0, rect.1);
-        let primitive = Patch::extract_from(&primitive, index_space.extend_all(2));
+        let mut primitive_ext = Patch::zeros(3, &index_space.extend_all(2));
+        primitive.copy_into(&mut primitive_ext);
+
         Self {
             time,
             time0: time,
             state: SolverState::NotReady,
             dt: None,
             rk_order,
-            primitive1: primitive.clone(),
-            primitive2: primitive,
-            conserved0: Patch::zeros(0, 3, index_space.clone()),
-            wavespeeds: Arc::new(Mutex::new(Patch::zeros(0, 1, index_space.clone()))),
+            primitive1: primitive_ext.clone(),
+            primitive2: primitive_ext,
+            conserved0: Patch::zeros(3, &index_space),
+            wavespeeds: Arc::new(Mutex::new(Patch::zeros(1, &index_space))),
             outgoing_edges: edge_list.outgoing_edges(&key).cloned().collect(),
             incoming_count: edge_list.incoming_edges(&key).count(),
             received_count: 0,
@@ -301,7 +303,7 @@ impl Solver {
     }
 
     pub fn primitive(&self) -> Patch {
-        self.primitive1.extract(self.index_space.clone())
+        self.primitive1.extract(&self.index_space)
     }
 
     pub fn max_wavespeed(&self) -> f64 {
@@ -314,23 +316,23 @@ impl Solver {
         unsafe {
             iso2d::iso2d_wavespeed(
                 self.mesh,
-                self.primitive1.data().as_ptr(),
-                wavespeeds.data_mut().as_mut_ptr(),
+                self.primitive1.as_ptr(),
+                wavespeeds.as_mut_ptr(),
                 eos,
                 masses.as_ptr(),
                 masses.len() as i32,
                 self.mode,
             )
         };
-        wavespeeds.data().iter().cloned().fold(0.0, f64::max)
+        wavespeeds.as_slice().unwrap().iter().cloned().fold(0.0, f64::max)
     }
 
     pub fn new_timestep(&mut self) {
         unsafe {
             iso2d::iso2d_primitive_to_conserved(
                 self.mesh,
-                self.primitive1.data().as_ptr(),
-                self.conserved0.data_mut().as_mut_ptr(),
+                self.primitive1.as_ptr(),
+                self.conserved0.as_mut_ptr(),
                 self.mode,
             );
         }
@@ -364,9 +366,9 @@ impl Solver {
         unsafe {
             iso2d::iso2d_advance_rk(
                 self.mesh,
-                self.conserved0.data().as_ptr(),
-                self.primitive1.data().as_ptr(),
-                self.primitive2.data_mut().as_mut_ptr(),
+                self.conserved0.as_ptr(),
+                self.primitive1.as_ptr(),
+                self.primitive2.as_mut_ptr(),
                 self.setup.equation_of_state(),
                 self.setup.buffer_zone(),
                 masses.as_ptr(),
@@ -398,7 +400,7 @@ impl Automaton for Solver {
 
     type Value = Self;
 
-    type Message = gridiron::patch::Patch;
+    type Message = Patch;
 
     fn key(&self) -> Self::Key {
         self.index_space.clone().into_rect()
@@ -412,7 +414,7 @@ impl Automaton for Solver {
                 let overlap = neighbor_space
                     .extend_all(2)
                     .intersect(self.index_space.clone());
-                let guard_patch = self.primitive1.extract(overlap);
+                let guard_patch = self.primitive1.extract(&overlap);
                 (neighbor_space.into_rect(), guard_patch)
             })
             .collect()
@@ -461,11 +463,11 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
             let (di, dj) = space.clone().into_rect();
             let mesh = global_mesh.sub_mesh(di, dj);
 
-            let patch = Patch::from_slice_function(0, space, 3, |(i, j), prim| {
+            let patch = Patch::from_slice_function(&space, 3, |(i, j), prim| {
                 let [x, y] = mesh.cell_coordinates(i - i0, j - j0);
-                setup.initial_primitive(x, y, prim)
+                setup.initial_primitive(x, y, prim);
             });
-            (patch.high_resolution_rect(), patch)
+            (patch.rect(), patch)
         })
         .collect();
 
@@ -495,7 +497,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         ExecutionMode::GPU => unimplemented!(),
     };
 
-    while time < 0.1 {
+    while time < cmdline.end_time.unwrap_or(0.1) {
         let start = std::time::Instant::now();
         let mut dt = 0.0;
 
@@ -541,6 +543,12 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         .into_iter()
         .map(|solver| solver.primitive())
         .collect();
+
+    // let patches = patch_map
+    //     .into_iter()
+    //     .map(|(_rect, patch)| {
+    //         patch
+    //     }).collect();
 
     let mut state = State {
         command_line: CommandLine::default(),

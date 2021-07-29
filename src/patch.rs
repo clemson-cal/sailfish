@@ -2,6 +2,7 @@
 use gpu_core::Device;
 use gridiron::index_space::IndexSpace;
 use gridiron::rect_map::Rectangle;
+use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 use std::mem::size_of;
 use Buffer::*;
@@ -36,7 +37,16 @@ impl Serialize for Buffer<f64> {
     }
 }
 
-#[derive(Clone, serde::Serialize)]
+impl<'de> Deserialize<'de> for Buffer<f64> {
+    fn deserialize<D>(_deserializer: D) -> Result<Buffer<f64>, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        todo!()
+    }
+}
+
+#[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct Patch {
     /// The region of index space covered by this patch.
     rect: Rectangle<i64>,
@@ -50,22 +60,18 @@ pub struct Patch {
 
 impl Patch {
     /// Generates a patch in host memory of zeros over the given index space.
-    pub fn zeros<I: Clone + Into<IndexSpace>>(num_fields: usize, space: &I) -> Self {
-        let space: IndexSpace = space.clone().into();
-        let data = Host(vec![0.0; space.len() * num_fields]);
-
+    pub fn zeros(num_fields: usize, space: &IndexSpace) -> Self {
         Self {
             rect: space.into(),
             num_fields,
-            data,
+            data: Host(vec![0.0; space.len() * num_fields]),
         }
     }
 
     /// Generates a patch in host memory covering the given space, with values
     /// defined from a closure.
-    pub fn from_scalar_function<I, F>(space: &I, f: F) -> Self
+    pub fn from_scalar_function<F>(space: &IndexSpace, f: F) -> Self
     where
-        I: Clone + Into<IndexSpace>,
         F: Fn((i64, i64)) -> f64,
     {
         Self::from_vector_function(space, |i| [f(i)])
@@ -75,9 +81,8 @@ impl Patch {
     /// defined from a closure which returns a fixed-length array. The number
     /// of fields in the patch is inferred from the size of the fixed length
     /// array returned by the closure.
-    pub fn from_vector_function<I, F, const NUM_FIELDS: usize>(space: &I, f: F) -> Self
+    pub fn from_vector_function<F, const NUM_FIELDS: usize>(space: &IndexSpace, f: F) -> Self
     where
-        I: Clone + Into<IndexSpace>,
         F: Fn((i64, i64)) -> [f64; NUM_FIELDS],
     {
         Self::from_slice_function(space, NUM_FIELDS, |i, s| s.clone_from_slice(&f(i)))
@@ -85,12 +90,10 @@ impl Patch {
 
     /// Generates a patch in host memory covering the given space, with values
     /// defined from a closure which operates on mutable slices.
-    pub fn from_slice_function<I, F>(space: &I, num_fields: usize, f: F) -> Self
+    pub fn from_slice_function<F>(space: &IndexSpace, num_fields: usize, f: F) -> Self
     where
-        I: Clone + Into<IndexSpace>,
         F: Fn((i64, i64), &mut [f64]),
     {
-        let space: IndexSpace = space.clone().into();
         let mut data = vec![0.0; space.len() * num_fields];
 
         for (index, slice) in space.iter().zip(data.chunks_exact_mut(num_fields)) {
@@ -119,6 +122,16 @@ impl Patch {
         match self.data {
             Device(ref data) => Some(data.device()),
             Host(_) => None,
+        }
+    }
+
+    /// Returns the underlying data as a slice, if it lives on the host,
+    /// otherwise returns `None`.
+    pub fn as_slice(&self) -> Option<&[f64]> {
+        match self.data {
+            Host(ref data) => Some(data.as_slice()),
+            #[cfg(feature = "gpu")]
+            Device(_) => None,
         }
     }
 
@@ -206,46 +219,35 @@ impl Patch {
         }
     }
 
-    /// Extracts a subset of this patch and returns it. This method panics if
-    /// the given space is not fully contained within this patch.
-    pub fn extract<I: Clone + Into<IndexSpace>>(&self, dst_space: &I) -> Self {
-        let dst_space: IndexSpace = dst_space.clone().into();
-        let src_space: IndexSpace = self.rect.clone().into();
-
+    /// Extracts a subset of this patch and returns it, with memory residing
+    /// in the same location as this buffer. This method panics if the given
+    /// space is not fully contained within this patch.
+    pub fn extract(&self, dst_space: &IndexSpace) -> Self {
         assert! {
-            src_space.contains_space(&dst_space),
+            self.index_space().contains_space(&dst_space),
             "the index space is out of bounds"
         }
 
         match &self.data {
-            Host(ref src_data) => {
-                let mut dst_data = vec![0.0; dst_space.len() * self.num_fields];
-                for index in dst_space.iter() {
-                    let n_src = src_space.row_major_offset(index);
-                    let n_dst = dst_space.row_major_offset(index);
-                    dst_data[n_dst] = src_data[n_src];
-                }
-                Self {
-                    rect: dst_space.into(),
-                    num_fields: self.num_fields,
-                    data: Host(dst_data),
-                }
+            Host(_) => {
+                let mut result = Patch::zeros(self.num_fields, dst_space);
+                self.copy_into(&mut result);
+                result
             }
+
             #[cfg(feature = "gpu")]
             Device(ref src_data) => {
-                let start = [
-                    src_space.start().0 as usize,
-                    src_space.start().1 as usize,
-                    0,
-                ];
-                let shape = [src_space.dim().0, src_space.dim().1, 1];
-                let count = [dst_space.dim().0, dst_space.dim().1, 1];
-                let dst_data = src_data.extract_3d(start, shape, count, self.num_fields);
-                Self {
-                    rect: dst_space.into(),
+                let mut result = Self {
+                    rect: dst_space.clone().into_rect(),
                     num_fields: self.num_fields,
-                    data: Device(dst_data),
-                }
+                    data: Device(unsafe {
+                        src_data
+                            .device()
+                            .uninit_buffer(dst_space.len() * self.num_fields)
+                    }),
+                };
+                self.copy_into(&mut result);
+                result
             }
         }
     }
@@ -280,18 +282,22 @@ impl Patch {
 
                 assert_eq!(src_count, dst_count);
 
-                dst_data.memcpy_3d(dst_start, dst_shape, src_data, src_start, src_shape, src_count, self.num_fields);
-            },
-
-            #[cfg(feature = "gpu")]
-            (Device(_), Host(_)) => {
-                self.to_host().copy_into(target)
+                dst_data.memcpy_3d(
+                    dst_start,
+                    dst_shape,
+                    src_data,
+                    src_start,
+                    src_shape,
+                    src_count,
+                    self.num_fields,
+                );
             }
 
             #[cfg(feature = "gpu")]
-            (Host(_), Device(ref dst_data)) => {
-                self.to_device(dst_data.device()).copy_into(target)
-            }
+            (Device(_), Host(_)) => self.to_host().copy_into(target),
+
+            #[cfg(feature = "gpu")]
+            (Host(_), Device(ref dst_data)) => self.to_device(dst_data.device()).copy_into(target),
         }
     }
 }

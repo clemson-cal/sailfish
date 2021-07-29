@@ -61,7 +61,7 @@ impl Device {
             }
         })
     }
-    unsafe fn uninit_buffer<T: Copy>(&self, len: usize) -> DeviceBuffer<T> {
+    pub unsafe fn uninit_buffer<T: Copy>(&self, len: usize) -> DeviceBuffer<T> {
         on_device(self.0, || {
             let bytes = (len * size_of::<T>()) as c_ulong;
             unsafe {
