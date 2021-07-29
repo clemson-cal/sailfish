@@ -295,6 +295,13 @@ impl<T: Copy> Clone for DeviceBuffer<T> {
     }
 }
 
+/// This impl is required because of the *mut T data member. The symantics of
+/// the struct member functions, and the thread safety of the CUDA and HIP
+/// API's, guarantee it's safe to transfer ownership of a device buffer across
+/// thread boundaries.
+unsafe impl<T: Copy> Send for DeviceBuffer<T> {}
+unsafe impl<T: Copy> Sync for DeviceBuffer<T> {}
+
 pub trait Reduce {
     type Item: Copy;
     fn maximum(&self) -> Option<Self::Item>;

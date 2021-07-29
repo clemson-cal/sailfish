@@ -108,6 +108,10 @@ impl Patch {
         IndexSpace::from(&self.rect)
     }
 
+    pub fn rect(&self) -> Rectangle<i64> {
+        self.rect.clone()
+    }
+
     /// Returns the device where the data buffer lives, if it's a device
     /// buffer, and `None` otherwise.
     #[cfg(feature = "gpu")]
@@ -132,7 +136,7 @@ impl Patch {
     /// Returns a mutable pointer to the underlying storage. The pointer will
     /// reference data on the host or one of the GPU devices, depending on
     /// where the buffer resides.
-    pub fn as_mut_ptr(&mut self) -> *const f64 {
+    pub fn as_mut_ptr(&mut self) -> *mut f64 {
         match self.data {
             Host(ref mut data) => data.as_mut_ptr(),
             #[cfg(feature = "gpu")]
@@ -242,6 +246,51 @@ impl Patch {
                     num_fields: self.num_fields,
                     data: Device(dst_data),
                 }
+            }
+        }
+    }
+
+    /// Copies values from this patch into another one. The two patches must
+    /// have the same number of fields, but they do not need to have the same
+    /// index space. Only the elements at the overlapping part of the index
+    /// spaces are copied; the non-overlapping part of the target patch is
+    /// unchanged. Memory will be migrated across the host and device, or
+    /// between devices as needed.
+    pub fn copy_into(&self, target: &mut Self) {
+        assert!(self.num_fields == target.num_fields);
+
+        let overlap = self.index_space().intersect(target.index_space());
+        let src_region = overlap.memory_region_in(self.index_space());
+        let dst_region = overlap.memory_region_in(target.index_space());
+
+        match (&self.data, &mut target.data) {
+            (Host(ref src_data), Host(ref mut dst_data)) => src_region
+                .iter_slice(src_data, self.num_fields)
+                .zip(dst_region.iter_slice_mut(dst_data, self.num_fields))
+                .for_each(|(s, d)| d.copy_from_slice(s)),
+
+            #[cfg(feature = "gpu")]
+            (Device(ref src_data), Device(ref mut dst_data)) => {
+                let dst_start = [dst_region.start.0, dst_region.start.1, 0];
+                let dst_shape = [dst_region.shape.0, dst_region.shape.1, 1];
+                let dst_count = [dst_region.count.0, dst_region.count.1, 1];
+                let src_start = [src_region.start.0, src_region.start.1, 0];
+                let src_shape = [src_region.shape.0, src_region.shape.1, 1];
+                let src_count = [src_region.count.0, src_region.count.1, 1];
+
+                assert_eq!(src_count, dst_count);
+
+                dst_data.memcpy_3d(dst_start, dst_shape, src_data, src_start, src_shape, src_count, self.num_fields);
+            },
+
+            #[cfg(feature = "gpu")]
+            (Device(_), Host(_)) => {
+                self.to_host().copy_into(target)
+            }
+
+            #[cfg(feature = "gpu")]
+            (Host(_), Device(ref dst_data)) => {
+                self.to_device(dst_data.device()).copy_into(target)
             }
         }
     }
