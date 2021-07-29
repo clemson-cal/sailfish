@@ -1,12 +1,15 @@
+#[cfg(feature = "gpu")]
 use gpu_core::Device;
 use gridiron::index_space::IndexSpace;
 use gridiron::rect_map::Rectangle;
 use serde::ser::{Serialize, Serializer};
 use std::mem::size_of;
+use Buffer::*;
 
 #[derive(Clone)]
 enum Buffer<T: Copy> {
     Host(Vec<T>),
+    #[cfg(feature = "gpu")]
     Device(gpu_core::DeviceBuffer<T>),
 }
 
@@ -16,7 +19,7 @@ impl Serialize for Buffer<f64> {
         S: Serializer,
     {
         let bytes = match self {
-            Buffer::Host(data) => {
+            Host(data) => {
                 let mut bytes = Vec::with_capacity(data.len() * size_of::<f64>());
                 for x in data {
                     for b in x.to_le_bytes() {
@@ -25,7 +28,9 @@ impl Serialize for Buffer<f64> {
                 }
                 bytes
             }
-            Buffer::Device(_) => panic!(),
+
+            #[cfg(feature = "gpu")]
+            Device(_) => panic!(),
         };
         serializer.serialize_bytes(&bytes)
     }
@@ -44,19 +49,10 @@ pub struct Patch {
 }
 
 impl Patch {
-    /// Creates a new empty patch.
-    // pub fn new() -> Self {
-    //     Self {
-    //         rect: (0..0, 0..0),
-    //         num_fields: 0,
-    //         data: Buffer::Host(Vec::new()),
-    //     }
-    // }
-
-    /// Generates a patch of zeros over the given index space.
+    /// Generates a patch in host memory of zeros over the given index space.
     pub fn zeros<I: Clone + Into<IndexSpace>>(num_fields: usize, space: &I) -> Self {
         let space: IndexSpace = space.clone().into();
-        let data = Buffer::Host(vec![0.0; space.len() * num_fields]);
+        let data = Host(vec![0.0; space.len() * num_fields]);
 
         Self {
             rect: space.into(),
@@ -65,8 +61,8 @@ impl Patch {
         }
     }
 
-    /// Generates a patch covering the given space, with values defined from a
-    /// closure.
+    /// Generates a patch in host memory covering the given space, with values
+    /// defined from a closure.
     pub fn from_scalar_function<I, F>(space: &I, f: F) -> Self
     where
         I: Clone + Into<IndexSpace>,
@@ -75,10 +71,10 @@ impl Patch {
         Self::from_vector_function(space, |i| [f(i)])
     }
 
-    /// Generates a patch covering the given space, with values defined from a
-    /// closure which returns a fixed-length array. The number of fields in
-    /// the patch is inferred from the size of the fixed length array returned
-    /// by the closure.
+    /// Generates a patch in host memory covering the given space, with values
+    /// defined from a closure which returns a fixed-length array. The number
+    /// of fields in the patch is inferred from the size of the fixed length
+    /// array returned by the closure.
     pub fn from_vector_function<I, F, const NUM_FIELDS: usize>(space: &I, f: F) -> Self
     where
         I: Clone + Into<IndexSpace>,
@@ -87,8 +83,8 @@ impl Patch {
         Self::from_slice_function(space, NUM_FIELDS, |i, s| s.clone_from_slice(&f(i)))
     }
 
-    /// Generates a patch covering the given space, with values defined from a
-    /// closure which operates on mutable slices.
+    /// Generates a patch in host memory covering the given space, with values
+    /// defined from a closure which operates on mutable slices.
     pub fn from_slice_function<I, F>(space: &I, num_fields: usize, f: F) -> Self
     where
         I: Clone + Into<IndexSpace>,
@@ -103,7 +99,7 @@ impl Patch {
         Self {
             rect: space.into(),
             num_fields,
-            data: Buffer::Host(data),
+            data: Host(data),
         }
     }
 
@@ -112,15 +108,48 @@ impl Patch {
         IndexSpace::from(&self.rect)
     }
 
+    /// Returns the device where the data buffer lives, if it's a device
+    /// buffer, and `None` otherwise.
+    #[cfg(feature = "gpu")]
+    pub fn device(&self) -> Option<Device> {
+        match self.data {
+            Device(ref data) => Some(data.device()),
+            Host(_) => None,
+        }
+    }
+
+    /// Returns an immutable pointer to the underlying storage. The pointer
+    /// will reference data on the host or one of the GPU devices, depending
+    /// on where the buffer resides.
+    pub fn as_ptr(&self) -> *const f64 {
+        match self.data {
+            Host(ref data) => data.as_ptr(),
+            #[cfg(feature = "gpu")]
+            Device(ref data) => data.as_device_ptr(),
+        }
+    }
+
+    /// Returns a mutable pointer to the underlying storage. The pointer will
+    /// reference data on the host or one of the GPU devices, depending on
+    /// where the buffer resides.
+    pub fn as_mut_ptr(&mut self) -> *const f64 {
+        match self.data {
+            Host(ref mut data) => data.as_mut_ptr(),
+            #[cfg(feature = "gpu")]
+            Device(ref mut data) => data.as_mut_device_ptr(),
+        }
+    }
+
     /// Makes a deep copy of this buffer on the given device. This buffer may
     /// reside on the host, or on any device.
+    #[cfg(feature = "gpu")]
     pub fn to_device(&self, device: Device) -> Self {
         Self {
             rect: self.rect.clone(),
             num_fields: self.num_fields,
             data: match self.data {
-                Buffer::Host(ref data) => Buffer::Device(device.buffer_from(data)),
-                Buffer::Device(ref data) => Buffer::Device(data.copy_to(device)),
+                Host(ref data) => Device(device.buffer_from(data)),
+                Device(ref data) => Device(data.copy_to(device)),
             },
         }
     }
@@ -128,13 +157,14 @@ impl Patch {
     /// Makes a deep copy of this buffer on the given device, if necessary. If
     /// the buffer already resides on the given device, no memory transfers or
     /// copies will take place.
+    #[cfg(feature = "gpu")]
     pub fn into_device(self, device: Device) -> Self {
         Self {
             rect: self.rect.clone(),
             num_fields: self.num_fields,
             data: match self.data {
-                Buffer::Host(data) => Buffer::Device(device.buffer_from(&data)),
-                Buffer::Device(data) => Buffer::Device(if data.device() == device {
+                Host(data) => Device(device.buffer_from(&data)),
+                Device(data) => Device(if data.device() == device {
                     data
                 } else {
                     data.copy_to(device)
@@ -145,13 +175,14 @@ impl Patch {
 
     /// Makes a deep copy of this buffer to host memory. This buffer may
     /// reside on the host, or on any device.
+    #[cfg(feature = "gpu")]
     pub fn to_host(&self) -> Self {
         Self {
             rect: self.rect.clone(),
             num_fields: self.num_fields,
             data: match self.data {
-                Buffer::Host(ref data) => Buffer::Host(data.clone()),
-                Buffer::Device(ref data) => Buffer::Host(data.to_vec()),
+                Host(ref data) => Host(data.clone()),
+                Device(ref data) => Host(data.to_vec()),
             },
         }
     }
@@ -159,13 +190,14 @@ impl Patch {
     /// Makes a deep copy of this buffer to host memory, if necessary. If the
     /// buffer already resides on the host, no memory transfers or copies will
     /// take place.
+    #[cfg(feature = "gpu")]
     pub fn into_host(self) -> Self {
         Self {
             rect: self.rect.clone(),
             num_fields: self.num_fields,
             data: match self.data {
-                Buffer::Host(data) => Buffer::Host(data),
-                Buffer::Device(data) => Buffer::Host(data.to_vec()),
+                Host(data) => Host(data),
+                Device(data) => Host(data.to_vec()),
             },
         }
     }
@@ -182,7 +214,7 @@ impl Patch {
         }
 
         match &self.data {
-            Buffer::Host(ref src_data) => {
+            Host(ref src_data) => {
                 let mut dst_data = vec![0.0; dst_space.len() * self.num_fields];
                 for index in dst_space.iter() {
                     let n_src = src_space.row_major_offset(index);
@@ -192,10 +224,11 @@ impl Patch {
                 Self {
                     rect: dst_space.into(),
                     num_fields: self.num_fields,
-                    data: Buffer::Host(dst_data),
+                    data: Host(dst_data),
                 }
             }
-            Buffer::Device(ref src_data) => {
+            #[cfg(feature = "gpu")]
+            Device(ref src_data) => {
                 let start = [
                     src_space.start().0 as usize,
                     src_space.start().1 as usize,
@@ -207,7 +240,7 @@ impl Patch {
                 Self {
                     rect: dst_space.into(),
                     num_fields: self.num_fields,
-                    data: Buffer::Device(dst_data),
+                    data: Device(dst_data),
                 }
             }
         }
