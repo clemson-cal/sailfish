@@ -17,6 +17,9 @@ pub trait Setup {
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone;
     fn viscosity(&self) -> Option<f64>;
+    fn cooling_coefficient(&self) -> Option<f64>;
+    fn density_floor(&self) -> Option<f64>;
+    fn pressure_floor(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
     fn coordinate_system(&self) -> Coordinates;
     fn num_primitives(&self) -> usize;
@@ -88,6 +91,15 @@ impl Setup for Explosion {
         BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn density_floor(&self) -> Option<f64> {
+        None
+    }
+    fn pressure_floor(&self) -> Option<f64> {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -217,6 +229,15 @@ impl Setup for Binary {
     fn viscosity(&self) -> Option<f64> {
         Some(self.nu)
     }
+    fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn density_floor(&self) -> Option<f64> {
+        None
+    }
+    fn pressure_floor(&self) -> Option<f64> {
+        None
+    }
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
@@ -294,12 +315,15 @@ impl std::str::FromStr for BinaryWithThermodynamics {
 }
 
 impl BinaryWithThermodynamics {
+
     fn density_scaling(&self, r: f64) -> f64 {
         r.powf(-3.0 / 5.0) // Eq. (A2) from Goodman (2003)
     }
+
     fn pressure_scaling(&self, r: f64) -> f64 {
         r.powf(-3.0 / 2.0) // Derived from Goodman (2003)
     }
+
 }
 
 impl Setup for BinaryWithThermodynamics {
@@ -378,6 +402,15 @@ impl Setup for BinaryWithThermodynamics {
     fn viscosity(&self) -> Option<f64> {
         Some(self.alpha)
     }
+    fn cooling_coefficient(&self) -> Option<f64> {
+        Some(self.cooling_coefficient)
+    }
+    fn density_floor(&self) -> Option<f64> {
+        Some(self.density_floor)
+    }
+    fn pressure_floor(&self) -> Option<f64> {
+        Some(self.pressure_floor)
+    }
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
@@ -429,6 +462,15 @@ impl Setup for Shocktube {
         BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn density_floor(&self) -> Option<f64> {
+        None
+    }
+    fn pressure_floor(&self) -> Option<f64> {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -501,6 +543,15 @@ impl Setup for Collision {
     fn viscosity(&self) -> Option<f64> {
         None
     }
+    fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn density_floor(&self) -> Option<f64> {
+        None
+    }
+    fn pressure_floor(&self) -> Option<f64> {
+        None
+    }
     fn mesh(&self, resolution: u32) -> Mesh {
         let x0 = -1.0;
         let x1 = 1.0;
@@ -567,6 +618,15 @@ impl Setup for Sedov {
         BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn density_floor(&self) -> Option<f64> {
+        None
+    }
+    fn pressure_floor(&self) -> Option<f64> {
         None
     }
     fn mesh(&self, _resolution: u32) -> Mesh {

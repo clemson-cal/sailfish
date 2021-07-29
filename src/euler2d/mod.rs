@@ -25,6 +25,9 @@ extern "C" {
         a: f64,
         dt: f64,
         velocity_ceiling: f64,
+        cooling_coefficient: f64,
+        density_floor: f64,
+        pressure_floor: f64,
         mode: ExecutionMode,
     );
 
@@ -123,6 +126,9 @@ pub mod cpu {
             let eos = setup.equation_of_state();
             let alpha = setup.viscosity().unwrap_or(0.0);
             let masses = setup.masses(time);
+            let cooling_coefficient = setup.cooling_coefficient().unwrap_or(0.0);
+            let density_floor = setup.density_floor().unwrap_or(0.0);
+            let pressure_floor = setup.pressure_floor().unwrap_or(0.0);
             unsafe {
                 euler2d_advance_rk(
                     self.mesh,
@@ -137,6 +143,9 @@ pub mod cpu {
                     a,
                     dt,
                     velocity_ceiling,
+                    cooling_coefficient,
+                    density_floor,
+                    pressure_floor,
                     self.mode,
                 )
             };
@@ -258,6 +267,9 @@ pub mod gpu {
                 let eos = setup.equation_of_state();
                 let alpha = setup.viscosity().unwrap_or(0.0);
                 let masses = device.buffer_from(&setup.masses(time));
+                let cooling_coefficient = setup.cooling_coefficient().unwrap_or(0.0);
+                let density_floor = setup.density_floor().unwrap_or(0.0);
+                let pressure_floor = setup.pressure_floor().unwrap_or(0.0);
                 unsafe {
                     euler2d_advance_rk(
                         self.mesh,
@@ -272,6 +284,9 @@ pub mod gpu {
                         a,
                         dt,
                         velocity_ceiling,
+                        cooling_coefficient,
+                        density_floor,
+                        pressure_floor,
                         ExecutionMode::GPU,
                     )
                 };
