@@ -16,9 +16,10 @@ use sailfish::ExecutionMode;
 use setup::Explosion;
 use std::fmt::Write;
 use std::mem::swap;
+use std::ops::DerefMut;
 use std::path::Path;
 use std::str::FromStr;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 pub mod cmdline;
 pub mod error;
@@ -26,6 +27,7 @@ pub mod euler1d;
 pub mod iso2d;
 pub mod lookup_table;
 pub mod mesh;
+pub mod patch;
 pub mod sailfish;
 pub mod setup;
 pub mod state;
@@ -253,6 +255,7 @@ pub struct Solver {
     primitive1: Patch,
     primitive2: Patch,
     conserved0: Patch,
+    wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
     incoming_count: usize,
     received_count: usize,
@@ -283,9 +286,10 @@ impl Solver {
             state: SolverState::NotReady,
             dt: None,
             rk_order,
-            conserved0: Patch::zeros(0, 3, index_space.clone()),
             primitive1: primitive.clone(),
             primitive2: primitive,
+            conserved0: Patch::zeros(0, 3, index_space.clone()),
+            wavespeeds: Arc::new(Mutex::new(Patch::zeros(0, 1, index_space.clone()))),
             outgoing_edges: edge_list.outgoing_edges(&key).cloned().collect(),
             incoming_count: edge_list.incoming_edges(&key).count(),
             received_count: 0,
@@ -304,19 +308,21 @@ impl Solver {
         let setup = &self.setup;
         let eos = setup.equation_of_state();
         let masses = setup.masses(self.time);
-        let mut wavespeeds = vec![0.0; self.mesh.num_total_zones()];
+        let mut lock = self.wavespeeds.lock().unwrap();
+        let wavespeeds = lock.deref_mut();
+
         unsafe {
             iso2d::iso2d_wavespeed(
                 self.mesh,
                 self.primitive1.data().as_ptr(),
-                wavespeeds.as_mut_ptr(),
+                wavespeeds.data_mut().as_mut_ptr(),
                 eos,
                 masses.as_ptr(),
                 masses.len() as i32,
                 self.mode,
             )
         };
-        wavespeeds.iter().cloned().fold(0.0, f64::max)
+        wavespeeds.data().iter().cloned().fold(0.0, f64::max)
     }
 
     pub fn new_timestep(&mut self) {
@@ -489,10 +495,6 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         ExecutionMode::GPU => unimplemented!(),
     };
 
-    for solver in &mut solvers {
-        solver.set_timestep(0.0001)
-    }
-
     while time < 0.1 {
         let start = std::time::Instant::now();
         let mut dt = 0.0;
@@ -503,13 +505,13 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
                     solvers
                         .par_iter()
                         .map(|solver| solver.max_wavespeed())
-                        .reduce(|| 0.0, |x, y| f64::max(x, y))
+                        .reduce(|| 0.0, f64::max)
                 })
             } else {
                 solvers
                     .iter()
                     .map(|solver| solver.max_wavespeed())
-                    .fold(0.0, |x, y| f64::max(x, y))
+                    .fold(0.0, f64::max)
             };
 
             dt = cfl * min_spacing / max_a;
