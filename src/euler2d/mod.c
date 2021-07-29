@@ -771,7 +771,7 @@ static void __global__ advance_rk_kernel(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, cooling_coefficient, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
     }
 }
 
@@ -794,7 +794,7 @@ static void __global__ advance_rk_kernel_inviscid(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, i, j);
+        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
     }
 }
 
