@@ -294,8 +294,8 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
     real vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
     real vy = sign(py) * min2(fabs(py / rho), velocity_ceiling);
     real pres = max2( (cons[3] - 0.5 * rho * (vx * vx + vy * vy)) * (gamma - 1.0), pressure_floor );
-    real cssq = gamma * pres / rho
-    real pmax = pow(10.0, 2.0) * rho / gamma
+    real cssq = gamma * pres / rho;
+    real pmax = pow(10.0, 2.0) * rho / gamma;
 
     prim[0] = rho;
     prim[1] = vx;
