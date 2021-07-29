@@ -288,26 +288,17 @@ static __host__ __device__ void cooling_term(real cooling_coefficient, real dt, 
 static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim, real velocity_ceiling, real density_floor, real pressure_floor)
 {
     real gamma = GAMMA_LAW_INDEX;
-    //real rho = max2(cons[0], density_floor);
-    real rho = cons[0];
-    real px = cons[1];
-    real py = cons[2];
-    //real vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
-    //real vy = sign(py) * min2(fabs(py / rho), velocity_ceiling);
-    real vx = px / rho;
-    real vy = py / rho;
-    //real pres = max2( (cons[3] - 0.5 * rho * (vx * vx + vy * vy)) * (gamma - 1.0), pressure_floor );
-    real pres = (cons[3] - 0.5 * rho * (vx * vx + vy * vy)) * (gamma - 1.0);
+    real pres  = max2(pressure_floor, (cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0]) * (gamma - 1.0));
+    real vx    = sign(cons[1]) * min2(fabs(cons[1] / cons[0]), velocity_ceiling);
+    real vy    = sign(cons[2]) * min2(fabs(cons[2] / cons[0]), velocity_ceiling);
+    real rho   = cons[0];
 
-    if (rho < density_floor)
+    if (cons[0] < density_floor)
     {
         rho = density_floor;
         vx  = 0.0;
         vy  = 0.0;
     }
-    if (pres < pressure_floor) { pres = pressure_floor; }
-    if (vx > velocity_ceiling) { vx = sign(px) * velocity_ceiling; }
-    if (vy > velocity_ceiling) { vy = sign(py) * velocity_ceiling; }
 
     prim[0] = rho;
     prim[1] = vx;
