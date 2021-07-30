@@ -1,5 +1,6 @@
 use std::ops::Range;
 use crate::Setup;
+use cfg_if::cfg_if;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -193,6 +194,26 @@ pub trait Solve {
             _ => {
                 panic!("invalid RK order")
             }
+        }
+    }
+}
+
+pub fn compiled_with_omp() -> bool {
+    cfg_if! {
+        if #[cfg(feature = "omp")] {
+            true
+        } else {
+            false
+        }
+    }
+}
+
+pub fn compiled_with_gpu() -> bool {
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            true
+        } else {
+            false
         }
     }
 }

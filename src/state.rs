@@ -90,9 +90,9 @@ impl State {
         create_dir_all(outdir).map_err(error::Error::IOError)?;
         let bytes = rmp_serde::to_vec_named(self).unwrap();
         let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);
-        let mut file = File::create(&filename).unwrap();
+        let mut file = File::create(&filename).map_err(error::Error::IOError)?;
         println!("write {}", filename);
-        file.write_all(&bytes).unwrap();
+        file.write_all(&bytes).map_err(error::Error::IOError)?;
         Ok(())
     }
 

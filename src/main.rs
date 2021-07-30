@@ -51,8 +51,9 @@ fn possible_setups_info() -> error::Error {
     writeln!(message, "    binary").unwrap();
     writeln!(message, "    explosion").unwrap();
     writeln!(message, "    shocktube").unwrap();
-    writeln!(message, "    collision").unwrap();
     writeln!(message, "    sedov").unwrap();
+    writeln!(message, "    pulse-collision").unwrap();
+    writeln!(message, "    fast-shell").unwrap();
     PrintUserInformation(message)
 }
 
@@ -63,7 +64,8 @@ fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, erro
         "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
         "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
         "sedov" => Ok(Box::new(Sedov::from_str(parameters)?)),
-        "collision" => Ok(Box::new(Collision::from_str(parameters)?)),
+        "pulse-collision" => Ok(Box::new(PulseCollision::from_str(parameters)?)),
+        "fast-shell" => Ok(Box::new(FastShell::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -124,15 +126,15 @@ fn run() -> Result<(), error::Error> {
             cmdline.device,
             *mesh,
             &state.primitive,
-        ),
-        ("shocktube" | "sedov" | "collision", mesh::Mesh::FacePositions1D(faces)) => {
+        )?,
+        ("shocktube" | "sedov" | "pulse-collision" | "fast-shell", mesh::Mesh::FacePositions1D(faces)) => {
             euler1d::solver(
                 cmdline.execution_mode(),
                 cmdline.device,
                 faces,
                 &state.primitive,
                 setup.coordinate_system(),
-            )
+            )?
         }
         _ => panic!(),
     };

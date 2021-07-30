@@ -5,7 +5,7 @@ use crate::sailfish::{BufferZone, Coordinates, EquationOfState, PointMass, SinkM
 use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup {
-    fn print_parameters(&self);
+    fn print_parameters(&self) {}
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
     fn initial_time(&self) -> f64 {
         0.0
@@ -13,10 +13,16 @@ pub trait Setup {
     fn end_time(&self) -> Option<f64> {
         None
     }
-    fn masses(&self, time: f64) -> Vec<PointMass>;
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
     fn equation_of_state(&self) -> EquationOfState;
-    fn buffer_zone(&self) -> BufferZone;
-    fn viscosity(&self) -> Option<f64>;
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
     fn mesh(&self, resolution: u32) -> Mesh;
     fn coordinate_system(&self) -> Coordinates;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
@@ -103,7 +109,8 @@ pub struct Binary {
     pub nu: f64,
     pub mach_number: f64,
     pub sink_radius: f64,
-    pub sink_rate: f64,
+    pub sink_rate1: f64,
+    pub sink_rate2: f64,
     pub sink_model: SinkModel,
     form: kind_config::Form,
 }
@@ -114,21 +121,27 @@ impl std::str::FromStr for Binary {
     #[rustfmt::skip]
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         let form = kind_config::Form::new()
-            .item("domain_radius", 12.0, "half-size of the simulation domain [a]")
-            .item("nu",            1e-3, "kinematic viscosity coefficient [Omega a^2]")
+            .item("domain_radius", 12.0, "half-size of the simulation domain (a)")
+            .item("nu",            1e-3, "kinematic viscosity coefficient (Omega a^2)")
             .item("mach_number",   10.0, "mach number for locally isothermal EOS")
-            .item("sink_radius",   0.05, "sink kernel radius [a]")
-            .item("sink_rate",     10.0, "rate of mass subtraction in the sink [Omega]")
+            .item("sink_radius",   0.05, "sink kernel radius (a)")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
+            .item("sink_rate",     10.0, "rate of mass subtraction in the sink (Omega)")
+            .item("q",              1.0, "system mass ratio: [0-1]")
+            .item("e",              0.0, "orbital eccentricity: [0-1]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        // Soon: parse the sink rate possibly as two comma-separated numbers
+        let sink_rate: f64 = form.get("sink_rate").into();
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             mach_number: form.get("mach_number").into(),
             sink_radius: form.get("sink_radius").into(),
-            sink_rate: form.get("sink_rate").into(),
+            sink_rate1: sink_rate,
+            sink_rate2: sink_rate,
             sink_model: match form.get("sink_model").to_string().as_str() {
                 "none" => SinkModel::Inactive,
                 "af" => SinkModel::AccelerationFree,
@@ -169,31 +182,31 @@ impl Setup for Binary {
     fn masses(&self, time: f64) -> Vec<PointMass> {
         let a: f64 = 1.0;
         let m: f64 = 1.0;
-        let q: f64 = 1.0;
-        let e: f64 = 0.0;
+        let q: f64 = self.form.get("q").into();
+        let e: f64 = self.form.get("e").into();
         let binary = OrbitalElements(a, m, q, e);
-        let OrbitalState(mass0, mass1) = binary.orbital_state_from_time(time);
-        let mass0 = PointMass {
-            x: mass0.position_x(),
-            y: mass0.position_y(),
-            vx: mass0.velocity_x(),
-            vy: mass0.velocity_y(),
-            mass: mass0.mass(),
-            rate: self.sink_rate,
-            radius: self.sink_radius,
-            model: self.sink_model,
-        };
+        let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
         let mass1 = PointMass {
             x: mass1.position_x(),
             y: mass1.position_y(),
             vx: mass1.velocity_x(),
             vy: mass1.velocity_y(),
             mass: mass1.mass(),
-            rate: self.sink_rate,
+            rate: self.sink_rate1,
             radius: self.sink_radius,
             model: self.sink_model,
         };
-        vec![mass0, mass1]
+        let mass2 = PointMass {
+            x: mass2.position_x(),
+            y: mass2.position_y(),
+            vx: mass2.velocity_x(),
+            vy: mass2.velocity_y(),
+            mass: mass2.mass(),
+            rate: self.sink_rate2,
+            radius: self.sink_radius,
+            model: self.sink_model,
+        };
+        vec![mass1, mass2]
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::LocallyIsothermal {
@@ -271,77 +284,6 @@ impl Setup for Shocktube {
     }
 }
 
-pub struct Collision {}
-
-impl std::str::FromStr for Collision {
-    type Err = error::Error;
-    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
-        if parameters.is_empty() {
-            Ok(Self {})
-        } else {
-            Err(InvalidSetup(format!(
-                "collision problem does not take any parameters, got {}",
-                parameters
-            )))
-        }
-    }
-}
-
-impl Setup for Collision {
-    fn print_parameters(&self) {}
-    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
-        let xl: f64 = -0.25;
-        let xr: f64 = 0.25;
-        let dx: f64 = 0.025;
-
-        let gaussian = |x: f64, x0: f64| {
-            f64::exp(-(x - x0).powi(2) / dx.powi(2))
-        };
-
-        let step = |x: f64, x0: f64| {
-            if (x - x0).abs() < dx * 10.0 {
-                1.0
-            } else {
-                0.0
-            }
-        };
-
-        let rho = gaussian(x, xl) + gaussian(x, xr) + 1e-2;
-        let vel = step(x, xl) - step(x, xr);
-
-        primitive[0] = rho;
-        primitive[1] = vel;
-        primitive[2] = rho * 1e-4;
-    }
-    fn masses(&self, _time: f64) -> Vec<PointMass> {
-        vec![]
-    }
-    fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::GammaLaw {
-            gamma_law_index: 5.0 / 3.0,
-        }
-    }
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
-    }
-    fn viscosity(&self) -> Option<f64> {
-        None
-    }
-    fn mesh(&self, resolution: u32) -> Mesh {
-        let x0 = -1.0;
-        let x1 = 1.0;
-        let dx = (x1 - x0) / resolution as f64;
-        let faces = (0..resolution + 1).map(|i| x0 + i as f64 * dx).collect();
-        Mesh::FacePositions1D(faces)
-    }
-    fn coordinate_system(&self) -> Coordinates {
-        Coordinates::Cartesian
-    }
-    fn end_time(&self) -> Option<f64> {
-        Some(5.00)
-    }
-}
-
 pub struct Sedov {
     faces: Vec<f64>,
     table: LookupTable<4>,
@@ -405,5 +347,126 @@ impl Setup for Sedov {
     }
     fn initial_time(&self) -> f64 {
         1.0
+    }
+}
+
+/// Models the collision of two fast pulses, in planar cartesian geometry. The
+/// fluid is non-relativistic. The setup does not have runtime model
+/// parameters (yet), it is hard-coded for a Mach number of 50, a domain
+/// extending from x=-100, to x=100, and the pulses have a mass ratio of
+/// 100:1. They move in the opposite direction but with equal momentum so the
+/// simulation is in the center-of-momentum frame.
+pub struct PulseCollision {}
+
+impl std::str::FromStr for PulseCollision {
+    type Err = error::Error;
+    fn from_str(_parameters: &str) -> Result<Self, Self::Err> {
+        Ok(Self {})
+    }
+}
+
+impl Setup for PulseCollision {
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        let xl: f64 = -2.0;
+        let xr: f64 = 2.0;
+        let dx: f64 = 0.05;
+
+        let gaussian = |x: f64, x0: f64| {
+            f64::exp(-(x - x0).powi(2) / dx.powi(2))
+        };
+
+        let step = |x: f64, x0: f64| {
+            if (x - x0).abs() < dx * 10.0 {
+                1.0
+            } else {
+                0.0
+            }
+        };
+
+        let rho = 100.0 * gaussian(x, xl) + gaussian(x, xr) + 1e-7;
+        let vel = 0.01 * step(x, xl) - step(x, xr);
+        let mach = 50.0;
+        let vel_sound = vel / mach;
+        let p = 3.0 / 5.0 * vel_sound * vel_sound * rho + 1e-11;
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = p;
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let x0 = -100.0;
+        let x1 = 100.0;
+        let dx = (x1 - x0) / resolution as f64;
+        let faces = (0..resolution + 1).map(|i| x0 + i as f64 * dx).collect();
+        Mesh::FacePositions1D(faces)
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(1.00)
+    }
+}
+
+/// Models the collision of a fast shell of material with a wind-like target
+/// medium in spherical polar geometry. The fluid is non-relativistic. The
+/// setup does not have runtime model parameters (yet).
+pub struct FastShell {}
+
+impl std::str::FromStr for FastShell {
+    type Err = error::Error;
+    fn from_str(_parameters: &str) -> Result<Self, Self::Err> {
+        Ok(Self {})
+    }
+}
+
+impl Setup for FastShell {
+    fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
+        let r_shell: f64 = 10.0;
+        let dr: f64 = 0.1;
+
+        let prof = |r: f64| {
+            if r > r_shell {
+                0.0
+            } else {
+                f64::exp((r - r_shell) / dr)
+            }
+        };
+
+        let rho_ambient = 1e-4 * r.powi(-2);
+        let rho = 1.0 * prof(r) + rho_ambient;
+        let vel = 1.0 * prof(r);
+        let pre = 1e-3 * rho;
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = pre;
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let num_decades = 2;
+        let zones_per_decade = resolution;
+        let r_inner = 1.0;
+
+        let faces = (0..(zones_per_decade * num_decades + 1) as u32).map(|i| {
+            r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64)
+        }).collect();
+
+        Mesh::FacePositions1D(faces)
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::SphericalPolar
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(1.0)
     }
 }
