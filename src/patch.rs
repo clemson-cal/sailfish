@@ -1,4 +1,5 @@
 #[cfg(feature = "gpu")]
+use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::index_space::IndexSpace;
 use gridiron::rect_map::Rectangle;
@@ -108,20 +109,21 @@ impl Patch {
 
     /// Returns the index space for this patch.
     pub fn index_space(&self) -> IndexSpace {
-        IndexSpace::from(&self.rect)
+        self.rect.clone().into()
     }
 
+    /// Returns the rectangle for this patch.
     pub fn rect(&self) -> Rectangle<i64> {
         self.rect.clone()
     }
 
     /// Returns the device where the data buffer lives, if it's a device
     /// buffer, and `None` otherwise.
-    #[cfg(feature = "gpu")]
     pub fn device(&self) -> Option<Device> {
         match self.data {
-            Device(ref data) => Some(data.device()),
             Host(_) => None,
+            #[cfg(feature = "gpu")]
+            Device(ref data) => Some(data.device()),
         }
     }
 
@@ -158,64 +160,87 @@ impl Patch {
     }
 
     /// Makes a deep copy of this buffer on the given device. This buffer may
-    /// reside on the host, or on any device.
+    /// reside on the host, or on any device. This function will panic if GPU
+    /// support is not available.
     #[cfg(feature = "gpu")]
     pub fn to_device(&self, device: Device) -> Self {
-        Self {
-            rect: self.rect.clone(),
-            num_fields: self.num_fields,
-            data: match self.data {
-                Host(ref data) => Device(device.buffer_from(data)),
-                Device(ref data) => Device(data.copy_to(device)),
-            },
+        cfg_if! {
+            if #[cfg(feature = "gpu")] {
+                Self {
+                    rect: self.rect.clone(),
+                    num_fields: self.num_fields,
+                    data: match self.data {
+                        Host(ref data) => Device(device.buffer_from(data)),
+                        Device(ref data) => Device(data.copy_to(device)),
+                    },
+                }
+            } else {
+                unimplemented!("Patch::to_device requires gpu feature")
+            }
         }
     }
 
     /// Makes a deep copy of this buffer on the given device, if necessary. If
     /// the buffer already resides on the given device, no memory transfers or
-    /// copies will take place.
-    #[cfg(feature = "gpu")]
+    /// copies will take place. This function will panic if GPU support is not
+    /// available.
     pub fn into_device(self, device: Device) -> Self {
-        Self {
-            rect: self.rect.clone(),
-            num_fields: self.num_fields,
-            data: match self.data {
-                Host(data) => Device(device.buffer_from(&data)),
-                Device(data) => Device(if data.device() == device {
-                    data
-                } else {
-                    data.copy_to(device)
-                }),
-            },
+        cfg_if! {
+            if #[cfg(feature = "gpu")] {
+                Self {
+                    rect: self.rect.clone(),
+                    num_fields: self.num_fields,
+                    data: match self.data {
+                        Host(data) => Device(device.buffer_from(&data)),
+                        Device(data) => Device(if data.device() == device {
+                            data
+                        } else {
+                            data.copy_to(device)
+                        }),
+                    },
+                }
+            } else {
+                unimplemented!("Patch::into_device requires gpu feature")
+            }
         }
     }
 
     /// Makes a deep copy of this buffer to host memory. This buffer may
     /// reside on the host, or on any device.
-    #[cfg(feature = "gpu")]
     pub fn to_host(&self) -> Self {
-        Self {
-            rect: self.rect.clone(),
-            num_fields: self.num_fields,
-            data: match self.data {
-                Host(ref data) => Host(data.clone()),
-                Device(ref data) => Host(data.to_vec()),
-            },
+        cfg_if! {
+            if #[cfg(feature = "gpu")] {
+                Self {
+                    rect: self.rect.clone(),
+                    num_fields: self.num_fields,
+                    data: match self.data {
+                        Host(ref data) => Host(data.clone()),
+                        Device(ref data) => Host(data.to_vec()),
+                    },
+                }
+            } else {
+                self.clone()
+            }
         }
     }
 
     /// Makes a deep copy of this buffer to host memory, if necessary. If the
     /// buffer already resides on the host, no memory transfers or copies will
     /// take place.
-    #[cfg(feature = "gpu")]
     pub fn into_host(self) -> Self {
-        Self {
-            rect: self.rect.clone(),
-            num_fields: self.num_fields,
-            data: match self.data {
-                Host(data) => Host(data),
-                Device(data) => Host(data.to_vec()),
-            },
+        cfg_if! {
+            if #[cfg(feature = "gpu")] {
+                Self {
+                    rect: self.rect.clone(),
+                    num_fields: self.num_fields,
+                    data: match self.data {
+                        Host(data) => Host(data),
+                        Device(data) => Host(data.to_vec()),
+                    },
+                }
+            } else {
+                self
+            }
         }
     }
 
@@ -256,40 +281,35 @@ impl Patch {
     /// have the same number of fields, but they do not need to have the same
     /// index space. Only the elements at the overlapping part of the index
     /// spaces are copied; the non-overlapping part of the target patch is
-    /// unchanged. Memory will be migrated across the host and device, or
-    /// between devices as needed.
+    /// unchanged. Memory will be migrated from host to device, device to
+    /// host, or between devices as needed.
     pub fn copy_into(&self, target: &mut Self) {
         assert!(self.num_fields == target.num_fields);
 
         let overlap = self.index_space().intersect(target.index_space());
-        let src_region = overlap.memory_region_in(self.index_space());
-        let dst_region = overlap.memory_region_in(target.index_space());
+        let src_reg = overlap.memory_region_in(self.index_space());
+        let dst_reg = overlap.memory_region_in(target.index_space());
+        let nq = self.num_fields;
 
         match (&self.data, &mut target.data) {
-            (Host(ref src_data), Host(ref mut dst_data)) => src_region
-                .iter_slice(src_data, self.num_fields)
-                .zip(dst_region.iter_slice_mut(dst_data, self.num_fields))
+            (Host(ref src), Host(ref mut dst)) => src_reg
+                .iter_slice(src, nq)
+                .zip(dst_reg.iter_slice_mut(dst, nq))
                 .for_each(|(s, d)| d.copy_from_slice(s)),
 
             #[cfg(feature = "gpu")]
-            (Device(ref src_data), Device(ref mut dst_data)) => {
-                let dst_start = [dst_region.start.0, dst_region.start.1, 0];
-                let dst_shape = [dst_region.shape.0, dst_region.shape.1, 1];
-                let dst_count = [dst_region.count.0, dst_region.count.1, 1];
-                let src_start = [src_region.start.0, src_region.start.1, 0];
-                let src_shape = [src_region.shape.0, src_region.shape.1, 1];
-                let src_count = [src_region.count.0, src_region.count.1, 1];
+            (Device(ref src), Device(ref mut dst)) => {
+                let dst_start = [dst_reg.start.0, dst_reg.start.1, 0];
+                let dst_shape = [dst_reg.shape.0, dst_reg.shape.1, 1];
+                let dst_count = [dst_reg.count.0, dst_reg.count.1, 1];
+                let src_start = [src_reg.start.0, src_reg.start.1, 0];
+                let src_shape = [src_reg.shape.0, src_reg.shape.1, 1];
+                let src_count = [src_reg.count.0, src_reg.count.1, 1];
 
                 assert_eq!(src_count, dst_count);
 
-                dst_data.memcpy_3d(
-                    dst_start,
-                    dst_shape,
-                    src_data,
-                    src_start,
-                    src_shape,
-                    src_count,
-                    self.num_fields,
+                dst.memcpy_3d(
+                    dst_start, dst_shape, src, src_start, src_shape, src_count, nq,
                 );
             }
 
@@ -297,7 +317,7 @@ impl Patch {
             (Device(_), Host(_)) => self.to_host().copy_into(target),
 
             #[cfg(feature = "gpu")]
-            (Host(_), Device(ref dst_data)) => self.to_device(dst_data.device()).copy_into(target),
+            (Host(_), Device(ref dst)) => self.to_device(dst.device()).copy_into(target),
         }
     }
 }
