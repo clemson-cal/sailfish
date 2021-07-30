@@ -1,12 +1,18 @@
-#[cfg(feature = "gpu")]
 use cfg_if::cfg_if;
-use gpu_core::Device;
 use gridiron::index_space::IndexSpace;
 use gridiron::rect_map::Rectangle;
 use serde::de::{Deserialize, Deserializer};
 use serde::ser::{Serialize, Serializer};
 use std::mem::size_of;
 use Buffer::*;
+
+cfg_if! {
+    if #[cfg(feature = "gpu")] {
+        pub use gpu_core::Device;
+    } else {
+        pub struct Device{}
+    }
+}
 
 #[derive(Clone)]
 enum Buffer<T: Copy> {
@@ -200,6 +206,7 @@ impl Patch {
                     },
                 }
             } else {
+                std::convert::identity(device); // black-box
                 unimplemented!("Patch::into_device requires gpu feature")
             }
         }
@@ -282,11 +289,15 @@ impl Patch {
     /// index space. Only the elements at the overlapping part of the index
     /// spaces are copied; the non-overlapping part of the target patch is
     /// unchanged. Memory will be migrated from host to device, device to
-    /// host, or between devices as needed.
+    /// host, or between devices as needed. This method panics if the source
+    /// and destination index spaces do not overlap.
     pub fn copy_into(&self, target: &mut Self) {
         assert!(self.num_fields == target.num_fields);
 
-        let overlap = self.index_space().intersect(target.index_space());
+        let overlap = self
+            .index_space()
+            .intersect(target.index_space())
+            .expect("source and destination index spaces do not overlap");
         let src_reg = overlap.memory_region_in(self.index_space());
         let dst_reg = overlap.memory_region_in(target.index_space());
         let nq = self.num_fields;

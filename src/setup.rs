@@ -1,7 +1,11 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::sailfish::{BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh};
+use crate::patch::Patch;
+use crate::sailfish::{
+    BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh,
+};
+use gridiron::index_space::IndexSpace;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup {
@@ -42,6 +46,17 @@ pub trait Setup {
                 }
                 primitive
             }
+        }
+    }
+    fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
+        match mesh {
+            Mesh::Structured(mesh) => {
+                crate::patch::Patch::from_slice_function(space, 3, |(i, j), prim| {
+                    let [x, y] = mesh.cell_coordinates(i, j);
+                    self.initial_primitive(x, y, prim)
+                })
+            }
+            _ => unimplemented!(),
         }
     }
 }
@@ -302,9 +317,7 @@ impl Setup for Collision {
         let xr: f64 = 0.25;
         let dx: f64 = 0.025;
 
-        let gaussian = |x: f64, x0: f64| {
-            f64::exp(-(x - x0).powi(2) / dx.powi(2))
-        };
+        let gaussian = |x: f64, x0: f64| f64::exp(-(x - x0).powi(2) / dx.powi(2));
 
         let step = |x: f64, x0: f64| {
             if (x - x0).abs() < dx * 10.0 {

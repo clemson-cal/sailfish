@@ -8,8 +8,7 @@ use crate::state::State;
 use cfg_if::cfg_if;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{self, execute_rayon, Automaton, Status};
-use gridiron::index_space::range2d;
-use gridiron::index_space::IndexSpace;
+use gridiron::index_space::{range2d, Axis, IndexSpace};
 use gridiron::rect_map::{Rectangle, RectangleMap};
 use rayon::prelude::*;
 use sailfish::ExecutionMode;
@@ -269,18 +268,33 @@ impl Solver {
     pub fn new(
         time: f64,
         primitive: Patch,
-        global_mesh: sailfish::StructuredMesh,
+        global_structured_mesh: sailfish::StructuredMesh,
         edge_list: &AdjacencyList<Rectangle<i64>>,
         rk_order: usize,
         mode: ExecutionMode,
         setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
-        let index_space = primitive.index_space();
+        let local_space = primitive.index_space();
         let rect = primitive.rect();
-        let key = rect.clone();
-        let mesh = global_mesh.sub_mesh(rect.0, rect.1);
-        let mut primitive_ext = Patch::zeros(3, &index_space.extend_all(2));
+        let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
+        let global_space_ext = global_mesh.index_space().extend_all(2);
+        let guard_spaces = [
+            global_space_ext.keep_lower(2, Axis::I),
+            global_space_ext.keep_upper(2, Axis::I),
+            global_space_ext.keep_lower(2, Axis::J),
+            global_space_ext.keep_upper(2, Axis::J),
+        ];
+
+        let mut primitive_ext = Patch::zeros(3, &local_space.extend_all(2));
         primitive.copy_into(&mut primitive_ext);
+
+        for guard_space in guard_spaces {
+            if let Some(overlap) = guard_space.intersect(local_space.extend_all(2)) {
+                setup
+                    .initial_primitive_patch(&overlap, &global_mesh)
+                    .copy_into(&mut primitive_ext);
+            }
+        }
 
         Self {
             time,
@@ -290,14 +304,14 @@ impl Solver {
             rk_order,
             primitive1: primitive_ext.clone(),
             primitive2: primitive_ext,
-            conserved0: Patch::zeros(3, &index_space),
-            wavespeeds: Arc::new(Mutex::new(Patch::zeros(1, &index_space))),
-            outgoing_edges: edge_list.outgoing_edges(&key).cloned().collect(),
-            incoming_count: edge_list.incoming_edges(&key).count(),
+            conserved0: Patch::zeros(3, &local_space),
+            wavespeeds: Arc::new(Mutex::new(Patch::zeros(1, &local_space))),
+            outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
+            incoming_count: edge_list.incoming_edges(&rect).count(),
             received_count: 0,
-            index_space,
+            index_space: local_space,
             mode,
-            mesh,
+            mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
             setup,
         }
     }
@@ -420,7 +434,8 @@ impl Automaton for Solver {
             .map(|neighbor_space| {
                 let overlap = neighbor_space
                     .extend_all(2)
-                    .intersect(self.index_space.clone());
+                    .intersect(self.index_space.clone())
+                    .unwrap();
                 let guard_patch = self.primitive1.extract(&overlap);
                 (neighbor_space.into_rect(), guard_patch)
             })
@@ -516,12 +531,11 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
     };
 
     while state.time < cmdline.end_time.unwrap_or(0.1) {
-
-        if state.checkpoint.is_due(state.time, cmdline.checkpoint_interval) {
-            state.primitive_patches = solvers
-                .iter()
-                .map(|solver| solver.primitive())
-                .collect();
+        if state
+            .checkpoint
+            .is_due(state.time, cmdline.checkpoint_interval)
+        {
+            state.primitive_patches = solvers.iter().map(|solver| solver.primitive()).collect();
             state.write_checkpoint(&outdir)?;
         }
 
@@ -566,10 +580,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         );
     }
 
-    state.primitive_patches = solvers
-        .iter()
-        .map(|solver| solver.primitive())
-        .collect();
+    state.primitive_patches = solvers.iter().map(|solver| solver.primitive()).collect();
     state.write_checkpoint(outdir)?;
 
     Ok(())
