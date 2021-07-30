@@ -7,7 +7,7 @@ from pathlib import Path
 import argparse
 
 
-def file_load(indir, outdir, savefigbool):
+def file_load(indir, outdir, savefigbool, filename):
     file_count = 0
     current_path_name = Path().resolve()
     Path('{}/output-figures'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
@@ -32,15 +32,15 @@ def file_load(indir, outdir, savefigbool):
         print(fname)
         plt.savefig(fname)
 
-    make_movie(current_path_name, outdir)
+    make_movie(current_path_name, outdir, filename)
 
     if savefigbool is False:
         os.system("rm -rf {}/{}".format(current_path_name, 'output-figures'))
 
 
-def make_movie(current_path, outdir):
+def make_movie(current_path, outdir, filename):
     Path('{}/{}'.format(current_path, outdir)).mkdir(parents=True, exist_ok=True)
-    command = "ffmpeg -f image2 -r 24 -i {}/output-figures/%d.png -vcodec mpeg4 -y {}/movie.mp4".format(current_path, outdir)
+    command = "ffmpeg -f image2 -r 24 -i {}/output-figures/%d.png -vcodec mpeg4 -y {}/{}.mp4".format(current_path, outdir, filename)
 
     os.system(command)
 
@@ -49,7 +49,8 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser()
     parser.add_argument('--indir', default='', help='Checkpoint file directory.', required=True)
     parser.add_argument('--outdir', default='movie', help='Output movie directory.')
+    parser.add_argument('--filename', default='movie', help='Output movie name.')
     parser.add_argument('--savefigs', default=False, help='Whether the program saves the figures used to make the movie.')
     args = parser.parse_args()
 
-    file_load(args.indir, args.outdir, args.savefigs)
+    file_load(args.indir, args.outdir, args.savefigs, args.filename)
