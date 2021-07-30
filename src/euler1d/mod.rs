@@ -1,3 +1,4 @@
+use crate::error::Error;
 use crate::sailfish::{Coordinates, ExecutionMode, Solve};
 use crate::Setup;
 use cfg_if::cfg_if;
@@ -40,13 +41,13 @@ pub fn solver(
     faces: &[f64],
     primitive: &[f64],
     coords: Coordinates,
-) -> Box<dyn Solve> {
+) -> Result<Box<dyn Solve>, Error> {
     match mode {
-        ExecutionMode::CPU => Box::new(cpu::Solver::new(faces, primitive, coords)),
+        ExecutionMode::CPU => Ok(Box::new(cpu::Solver::new(faces, primitive, coords))),
         ExecutionMode::OMP => {
             cfg_if! {
                 if #[cfg(feature = "omp")] {
-                    Box::new(omp::Solver::new(faces, primitive, coords))
+                    Ok(Box::new(omp::Solver::new(faces, primitive, coords)))
                 } else {
                     panic!()
                 }
@@ -55,7 +56,7 @@ pub fn solver(
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Box::new(gpu::Solver::new(device, faces, primitive, coords))
+                    Ok(Box::new(gpu::Solver::new(device, faces, primitive, coords)?))
                 } else {
                     std::convert::identity(device); // black-box
                     panic!()
@@ -197,11 +198,12 @@ pub mod gpu {
             faces: &[f64],
             primitive: &[f64],
             coords: Coordinates,
-        ) -> Self {
+        ) -> Result<Self, Error> {
             let num_zones = faces.len() - 1;
             assert_eq!(primitive.len(), num_zones * 3);
-            let device = Device::with_id(device.unwrap_or(0)).expect("invalid device id");
-            Self {
+            let id = device.unwrap_or(0);
+            let device = Device::with_id(id).ok_or(Error::InvalidDevice(id))?;
+            Ok(Self {
                 faces: device.buffer_from(faces),
                 primitive1: device.buffer_from(primitive),
                 primitive2: device.buffer_from(primitive),
@@ -209,7 +211,7 @@ pub mod gpu {
                 wavespeeds: device.buffer_from(&vec![0.0; num_zones]),
                 coords,
                 device,
-            }
+            })
         }
 
         fn num_zones(&self) -> usize {
