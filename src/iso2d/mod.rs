@@ -158,6 +158,8 @@ pub mod cpu {
                     self.mode,
                 )
             };
+
+            // NOTE: no parallelization happens here, even in OMP mode
             wavespeeds.iter().cloned().fold(0.0, f64::max)
         }
     }

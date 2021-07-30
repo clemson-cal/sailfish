@@ -324,7 +324,14 @@ impl Solver {
                 self.mode,
             )
         };
-        wavespeeds.as_slice().unwrap().iter().cloned().fold(0.0, f64::max)
+
+        // NOTE: no parallelization happens here, even in OMP mode
+        wavespeeds
+            .as_slice()
+            .unwrap()
+            .iter()
+            .cloned()
+            .fold(0.0, f64::max)
     }
 
     pub fn new_timestep(&mut self) {
@@ -449,6 +456,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
     let rk_order = cmdline.rk_order as usize;
     let fold = cmdline.fold;
     let cfl = cmdline.cfl_number;
+    let outdir = cmdline.outdir.as_deref().unwrap_or(".");
     let num_patches = match cmdline.execution_mode() {
         ExecutionMode::CPU => 512,
         ExecutionMode::OMP => 1,
@@ -487,9 +495,19 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         })
         .collect();
 
+    let mut state = State {
+        command_line: cmdline.clone(),
+        mesh: mesh::Mesh::Structured(global_mesh),
+        restart_file: None,
+        iteration: 0,
+        time: 0.0,
+        primitive: vec![],
+        primitive_patches: solvers.iter().map(|solver| solver.primitive()).collect(),
+        checkpoint: state::RecurringTask::new(),
+        setup_name: String::new(),
+        parameters: String::new(),
+    };
     let min_spacing = f64::min(global_mesh.dx, global_mesh.dy);
-    let mut time = 0.0;
-    let mut iteration = 0;
 
     let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
         ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
@@ -497,7 +515,16 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         ExecutionMode::GPU => unimplemented!(),
     };
 
-    while time < cmdline.end_time.unwrap_or(0.1) {
+    while state.time < cmdline.end_time.unwrap_or(0.1) {
+
+        if state.checkpoint.is_due(state.time, cmdline.checkpoint_interval) {
+            state.primitive_patches = solvers
+                .iter()
+                .map(|solver| solver.primitive())
+                .collect();
+            state.write_checkpoint(&outdir)?;
+        }
+
         let start = std::time::Instant::now();
         let mut dt = 0.0;
 
@@ -522,47 +549,28 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
                 solver.set_timestep(dt)
             }
 
-            for _stage in 0..rk_order {
+            for _ in 0..rk_order {
                 solvers = match pool {
                     Some(ref pool) => pool.scope(|scope| execute_rayon(scope, solvers).collect()),
                     None => automaton::execute(solvers).collect(),
                 };
             }
-            time += dt;
-            iteration += 1;
+            state.time += dt;
+            state.iteration += 1;
         }
         let mzps = (n * n * fold as i64) as f64 / 1e6 / start.elapsed().as_secs_f64();
 
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
-            iteration, time, dt, mzps,
+            state.iteration, state.time, dt, mzps,
         );
     }
 
-    let patches = solvers
-        .into_iter()
+    state.primitive_patches = solvers
+        .iter()
         .map(|solver| solver.primitive())
         .collect();
-
-    // let patches = patch_map
-    //     .into_iter()
-    //     .map(|(_rect, patch)| {
-    //         patch
-    //     }).collect();
-
-    let mut state = State {
-        command_line: CommandLine::default(),
-        mesh: mesh::Mesh::Structured(global_mesh),
-        restart_file: None,
-        iteration,
-        time,
-        primitive: vec![],
-        primitive_patches: patches,
-        checkpoint: state::RecurringTask::new(),
-        setup_name: String::new(),
-        parameters: String::new(),
-    };
-    state.write_checkpoint(".")?;
+    state.write_checkpoint(outdir)?;
 
     Ok(())
 }

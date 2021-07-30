@@ -238,7 +238,7 @@ impl Patch {
             #[cfg(feature = "gpu")]
             Device(ref src_data) => {
                 let mut result = Self {
-                    rect: dst_space.clone().into_rect(),
+                    rect: dst_space.into(),
                     num_fields: self.num_fields,
                     data: Device(unsafe {
                         src_data
