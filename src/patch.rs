@@ -320,4 +320,11 @@ impl Patch {
             (Host(_), Device(ref dst)) => self.to_device(dst.device()).copy_into(target),
         }
     }
+
+    pub fn map_mut<F>(&mut self, subset: &IndexSpace, f: F)
+    where
+        F: Fn((i64, i64), &mut [f64]),
+    {
+        Self::from_slice_function(subset, self.num_fields, f).copy_into(self);
+    }
 }
