@@ -289,7 +289,7 @@ impl Solver {
         primitive.copy_into(&mut primitive_ext);
 
         for guard_space in guard_spaces {
-            if let Some(overlap) = guard_space.intersect(local_space.extend_all(2)) {
+            if let Some(overlap) = guard_space.intersect(&local_space.extend_all(2)) {
                 setup
                     .initial_primitive_patch(&overlap, &global_mesh)
                     .copy_into(&mut primitive_ext);
@@ -424,7 +424,7 @@ impl Automaton for Solver {
     type Message = Patch;
 
     fn key(&self) -> Self::Key {
-        self.index_space.clone().into_rect()
+        self.index_space.to_rect()
     }
 
     fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
@@ -434,10 +434,10 @@ impl Automaton for Solver {
             .map(|neighbor_space| {
                 let overlap = neighbor_space
                     .extend_all(2)
-                    .intersect(self.index_space.clone())
+                    .intersect(&self.index_space)
                     .unwrap();
                 let guard_patch = self.primitive1.extract(&overlap);
-                (neighbor_space.into_rect(), guard_patch)
+                (neighbor_space.to_rect(), guard_patch)
             })
             .collect()
     }
@@ -483,7 +483,7 @@ fn run_decomposed_domain() -> Result<(), error::Error> {
         .into_iter()
         .map(|space| {
             let (i0, j0) = space.start();
-            let (di, dj) = space.clone().into_rect();
+            let (di, dj) = space.to_rect();
             let mesh = global_mesh.sub_mesh(di, dj);
 
             let patch = Patch::from_slice_function(&space, 3, |(i, j), prim| {

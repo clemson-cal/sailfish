@@ -296,10 +296,10 @@ impl Patch {
 
         let overlap = self
             .index_space()
-            .intersect(target.index_space())
+            .intersect(&target.index_space())
             .expect("source and destination index spaces do not overlap");
-        let src_reg = overlap.memory_region_in(self.index_space());
-        let dst_reg = overlap.memory_region_in(target.index_space());
+        let src_reg = overlap.memory_region_in(&self.index_space());
+        let dst_reg = overlap.memory_region_in(&target.index_space());
         let nq = self.num_fields;
 
         match (&self.data, &mut target.data) {
