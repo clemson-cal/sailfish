@@ -211,6 +211,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
     } else if !(1..=3).contains(&c.rk_order) {
         Err(Cmdline("rk-order must be 1, 2, or 3".into()))
+    } else if c.checkpoint_interval <= 0.0 {
+        Err(Cmdline("checkpoint interval --checkpoint (-c) must be >0".to_string()))
     } else if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
     } else {
