@@ -54,6 +54,7 @@ pub struct Solver {
     outgoing_edges: Vec<Rectangle<i64>>,
     mesh: StructuredMesh,
     mode: ExecutionMode,
+    device: Option<Device>,
     setup: Arc<dyn Setup + Send + Sync>,
 }
 
@@ -80,15 +81,19 @@ impl Solver {
             global_space_ext.keep_upper(2, Axis::J),
         ];
 
-        let wavespeeds = Patch::zeros(1, &local_space);
-        let mut primitive_ext = Patch::zeros(3, &local_space.extend_all(2));
-        primitive.copy_into(&mut primitive_ext);
+        let primitive1 = Patch::zeros(3, &local_space.extend_all(2)).on(device);
+        let primitive2 = Patch::zeros(3, &local_space.extend_all(2)).on(device);
+        let conserved0 = Patch::zeros(3, &local_space).on(device);
+        let wavespeeds = Patch::zeros(1, &local_space).on(device);
 
-        for guard_space in guard_spaces {
-            if let Some(overlap) = guard_space.intersect(&local_space_ext) {
+        let mut primitive1 = primitive1;
+        primitive.copy_into(&mut primitive1);
+
+        for space in guard_spaces {
+            if let Some(overlap) = space.intersect(&local_space_ext) {
                 setup
                     .initial_primitive_patch(&overlap, &global_mesh)
-                    .copy_into(&mut primitive_ext);
+                    .copy_into(&mut primitive1);
             }
         }
 
@@ -98,15 +103,16 @@ impl Solver {
             state: SolverState::NotReady,
             dt: None,
             rk_order,
-            primitive1: primitive_ext.clone(),
-            primitive2: primitive_ext,
-            conserved0: Patch::zeros(3, &local_space),
+            primitive1,
+            primitive2,
+            conserved0,
             wavespeeds: Arc::new(Mutex::new(wavespeeds)),
             outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
             incoming_count: edge_list.incoming_edges(&rect).count(),
             received_count: 0,
             index_space: local_space,
             mode,
+            device,
             mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
             setup,
         }
@@ -138,17 +144,19 @@ impl Solver {
         let mut lock = self.wavespeeds.lock().unwrap();
         let wavespeeds = lock.deref_mut();
 
-        unsafe {
-            iso2d::iso2d_wavespeed(
-                self.mesh,
-                self.primitive1.as_ptr(),
-                wavespeeds.as_mut_ptr(),
-                eos,
-                masses.as_ptr(),
-                masses.len() as i32,
-                self.mode,
-            )
-        };
+        gpu_core::scope(self.device, || {
+            unsafe {
+                iso2d::iso2d_wavespeed(
+                    self.mesh,
+                    self.primitive1.as_ptr(),
+                    wavespeeds.as_mut_ptr(),
+                    eos,
+                    masses.as_ptr(),
+                    masses.len() as i32,
+                    self.mode,
+                )
+            }
+        });
 
         match self.mode {
             ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
@@ -173,14 +181,16 @@ impl Solver {
     }
 
     pub fn new_timestep(&mut self) {
-        unsafe {
-            iso2d::iso2d_primitive_to_conserved(
-                self.mesh,
-                self.primitive1.as_ptr(),
-                self.conserved0.as_mut_ptr(),
-                self.mode,
-            );
-        }
+        gpu_core::scope(self.device, || {
+            unsafe {
+                iso2d::iso2d_primitive_to_conserved(
+                    self.mesh,
+                    self.primitive1.as_ptr(),
+                    self.conserved0.as_mut_ptr(),
+                    self.mode,
+                );
+            }
+        });
         self.time0 = self.time;
         self.state = SolverState::RungeKuttaStage(0);
     }
@@ -208,23 +218,25 @@ impl Solver {
             _ => panic!(),
         };
 
-        unsafe {
-            iso2d::iso2d_advance_rk(
-                self.mesh,
-                self.conserved0.as_ptr(),
-                self.primitive1.as_ptr(),
-                self.primitive2.as_mut_ptr(),
-                self.setup.equation_of_state(),
-                self.setup.buffer_zone(),
-                masses.as_ptr(),
-                masses.len() as i32,
-                self.setup.viscosity().unwrap_or(0.0),
-                a,
-                dt,
-                f64::MAX,
-                self.mode,
-            );
-        }
+        gpu_core::scope(self.device, || {
+            unsafe {
+                iso2d::iso2d_advance_rk(
+                    self.mesh,
+                    self.conserved0.as_ptr(),
+                    self.primitive1.as_ptr(),
+                    self.primitive2.as_mut_ptr(),
+                    self.setup.equation_of_state(),
+                    self.setup.buffer_zone(),
+                    masses.as_ptr(),
+                    masses.len() as i32,
+                    self.setup.viscosity().unwrap_or(0.0),
+                    a,
+                    dt,
+                    f64::MAX,
+                    self.mode,
+                );
+            }
+        });
         swap(&mut self.primitive1, &mut self.primitive2);
 
         self.time = self.time0 * a + (self.time + dt) * (1.0 - a);
@@ -334,7 +346,7 @@ pub fn run() -> Result<(), error::Error> {
         iteration: 0,
         time: 0.0,
         primitive: vec![],
-        primitive_patches: solvers.iter().map(|solver| solver.primitive()).collect(),
+        primitive_patches: solvers.iter().map(|s| s.primitive()).collect(),
         checkpoint: state::RecurringTask::new(),
         setup_name: String::new(),
         parameters: String::new(),
@@ -351,7 +363,7 @@ pub fn run() -> Result<(), error::Error> {
             .checkpoint
             .is_due(state.time, cmdline.checkpoint_interval)
         {
-            state.primitive_patches = solvers.iter().map(|solver| solver.primitive()).collect();
+            state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
             state.write_checkpoint(&outdir)?;
         }
 
@@ -363,13 +375,13 @@ pub fn run() -> Result<(), error::Error> {
                 pool.install(|| {
                     solvers
                         .par_iter()
-                        .map(|solver| solver.max_wavespeed())
+                        .map(|s| s.max_wavespeed())
                         .reduce(|| 0.0, f64::max)
                 })
             } else {
                 solvers
                     .iter()
-                    .map(|solver| solver.max_wavespeed())
+                    .map(|s| s.max_wavespeed())
                     .fold(0.0, f64::max)
             };
 
@@ -381,7 +393,7 @@ pub fn run() -> Result<(), error::Error> {
 
             for _ in 0..rk_order {
                 solvers = match pool {
-                    Some(ref pool) => pool.scope(|scope| execute_rayon(scope, solvers).collect()),
+                    Some(ref pool) => pool.scope(|s| execute_rayon(s, solvers).collect()),
                     None => automaton::execute(solvers).collect(),
                 };
             }
@@ -396,7 +408,7 @@ pub fn run() -> Result<(), error::Error> {
         );
     }
 
-    state.primitive_patches = solvers.iter().map(|solver| solver.primitive()).collect();
+    state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
     state.write_checkpoint(outdir)?;
 
     Ok(())

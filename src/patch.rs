@@ -254,6 +254,17 @@ impl Patch {
         }
     }
 
+    /// Consumes this buffer and ensures it resides the given device, if it's
+    /// `Some`. Otherwise if `device` is `None` then ensure this buffer
+    /// resides in host memory.
+    pub fn on(self, device: Option<Device>) -> Self {
+        if let Some(device) = device {
+            self.into_device(device)
+        } else {
+            self.into_host()
+        }
+    }
+
     /// Extracts a subset of this patch and returns it, with memory residing
     /// in the same location as this buffer. This method panics if the given
     /// space is not fully contained within this patch.

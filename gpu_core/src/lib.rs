@@ -1,15 +1,18 @@
-use std::os::raw::{c_int, c_ulong, c_void};
+use cfg_if::cfg_if;
 
-#[cfg(feature = "gpu")]
-pub mod buffer;
 pub mod device;
-
-#[cfg(feature = "gpu")]
-pub use buffer::DeviceBuffer;
-#[cfg(feature = "gpu")]
-pub use buffer::Reduce;
 pub use device::Device;
 
+cfg_if! {
+    if #[cfg(feature = "gpu")] {
+        use std::os::raw::{c_int, c_ulong, c_void};
+        pub mod buffer;        
+        pub use buffer::DeviceBuffer;
+        pub use buffer::Reduce;
+    }
+}
+
+#[cfg(feature = "gpu")]
 extern "C" {
     // Memory allocation and transfer
     pub fn gpu_malloc(size: c_ulong) -> *mut c_void;
@@ -45,16 +48,32 @@ extern "C" {
     pub fn gpu_vec_max_f64(vec: *const f64, size: c_ulong, result: *mut f64);
 }
 
-#[cfg(feature = "gpu")]
-fn on_device<T, F: Fn() -> T>(device: i32, f: F) -> T {
-    let orig = unsafe { gpu_get_device() };
-    unsafe { gpu_set_device(device) };
-    let result = f();
-    unsafe { gpu_set_device(orig) };
-    result
+/// Executes the given closure on a GPU device if `device` is `Some`.
+/// Otherwise, the closure is just executed.
+pub fn scope<T, F: FnMut() -> T>(device: Option<Device>, mut f: F) -> T {
+    if let Some(device) = device {
+        cfg_if! {
+            if #[cfg(feature = "gpu")] {
+                on_device(device.0, f)
+            } else {
+                panic!("gpu feature not enabled, requested device {:?}", device)
+            }
+        }
+    } else {
+        f()
+    }
 }
 
 #[cfg(feature = "gpu")]
 pub fn all_devices() -> impl Iterator<Item = Device> {
     (0..unsafe { gpu_get_device_count() }).map(Device)
+}
+
+#[cfg(feature = "gpu")]
+fn on_device<T, F: FnMut() -> T>(device: i32, mut f: F) -> T {
+    let orig = unsafe { gpu_get_device() };
+    unsafe { gpu_set_device(device) };
+    let result = f();
+    unsafe { gpu_set_device(orig) };
+    result
 }

@@ -81,6 +81,7 @@ name = "gpu_core"
 version = "0.1.0"
 dependencies = [
  "cc",
+ "cfg-if",
  "sf_build",
 ]
 
