@@ -151,14 +151,14 @@ impl Solver {
         };
 
         match self.mode {
-            ExecutionMode::CPU => wavespeeds
-                .as_slice()
-                .unwrap()
-                .iter()
-                .cloned()
-                .fold(0.0, f64::max),
-            ExecutionMode::OMP => todo!(),
-
+            ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
+                use std::os::raw::c_ulong;
+                iso2d::iso2d_maximum(
+                    wavespeeds.as_ptr(),
+                    wavespeeds.as_slice().unwrap().len() as c_ulong,
+                    self.mode,
+                )
+            },
             ExecutionMode::GPU => {
                 cfg_if! {
                     if #[cfg(feature = "gpu")] {

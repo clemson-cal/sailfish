@@ -38,6 +38,12 @@ extern "C" {
         num_masses: i32,
         mode: ExecutionMode,
     );
+
+    pub fn iso2d_maximum(
+        data: *const f64,
+        size: std::os::raw::c_ulong,
+        mode: ExecutionMode
+    ) -> f64;
 }
 
 pub fn solver(
