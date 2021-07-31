@@ -6,6 +6,7 @@ import os
 from pathlib import Path
 import argparse
 
+plt.switch_backend('agg')
 
 def file_load(indir, outdir, savefigbool, filename):
     file_count = 0
