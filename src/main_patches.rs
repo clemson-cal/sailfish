@@ -7,6 +7,7 @@ use crate::sailfish::{ExecutionMode, StructuredMesh};
 use crate::setup::Explosion;
 use crate::setup::Setup;
 use crate::state::{self, State};
+use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{self, execute_rayon, Automaton, Status};
@@ -108,7 +109,8 @@ impl Solver {
             mode,
             mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
             setup,
-        }.on(device)
+        }
+        .on(device)
     }
 
     fn on(mut self, device: Option<Device>) -> Self {
@@ -148,13 +150,26 @@ impl Solver {
             )
         };
 
-        // NOTE: no parallelization happens here, even in OMP mode
-        wavespeeds
-            .as_slice()
-            .unwrap()
-            .iter()
-            .cloned()
-            .fold(0.0, f64::max)
+        match self.mode {
+            ExecutionMode::CPU => wavespeeds
+                .as_slice()
+                .unwrap()
+                .iter()
+                .cloned()
+                .fold(0.0, f64::max),
+            ExecutionMode::OMP => todo!(),
+
+            ExecutionMode::GPU => {
+                cfg_if! {
+                    if #[cfg(feature = "gpu")] {
+                        use gpu_core::Reduce;
+                        wavespeeds.as_device_buffer().unwrap().maximum().unwrap()
+                    } else {
+                        unreachable!()
+                    }
+                }
+            }
+        }
     }
 
     pub fn new_timestep(&mut self) {
@@ -306,7 +321,7 @@ pub fn run() -> Result<(), error::Error> {
                 &edge_list,
                 rk_order,
                 cmdline.execution_mode(),
-                cmdline.device.map(Device::with_id).map(Option::unwrap),
+                cmdline.device.and_then(Device::with_id),
                 setup.clone(),
             )
         })

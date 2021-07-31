@@ -7,13 +7,6 @@ use serde::ser::{Serialize, Serializer};
 use std::mem::size_of;
 use Buffer::*;
 
-// cfg_if! {
-//     if #[cfg(feature = "gpu")] {
-//     } else {
-//         pub struct Device{}
-//     }
-// }
-
 #[derive(Clone)]
 enum Buffer<T: Copy> {
     Host(Vec<T>),
@@ -140,6 +133,16 @@ impl Patch {
             Host(ref data) => Some(data.as_slice()),
             #[cfg(feature = "gpu")]
             Device(_) => None,
+        }
+    }
+
+    /// Returns the underlying data as a device buffer, if it lives on a
+    /// device, otherwise returns `None`.
+    #[cfg(feature = "gpu")]
+    pub fn as_device_buffer(&self) -> Option<&gpu_core::DeviceBuffer<f64>> {
+        match self.data {
+            Host(_) => None,        
+            Device(ref data) => Some(data),
         }
     }
 
