@@ -12,9 +12,9 @@ def file_load(indir, outdir, savefigbool, filename):
     file_count = 0
     current_path_name = Path().resolve()
     Path('{}/output-figures'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
-    for filename in Path(indir).iterdir():
+    for name in Path(indir).iterdir():
         file_count += 1
-        chkpt = msgpack.load(open(filename, 'rb'))
+        chkpt = msgpack.load(open(name, 'rb'))
         ni = chkpt['mesh']['ni']
         nj = chkpt['mesh']['nj']
         x0 = chkpt['mesh']['x0']
@@ -28,12 +28,12 @@ def file_load(indir, outdir, savefigbool, filename):
                    extent=[x0, x1, y0, y1])
         plt.colorbar()
         plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
-        plt.title(r"{} $\Sigma^{{1/4}}$".format(filename))
+        plt.title(r"{} $\Sigma^{{1/4}}$".format(name))
         fname = '{}/output-figures/{}.png'.format(current_path_name, file_count)
         print(fname)
         plt.savefig(fname)
 
-    make_movie(current_path_name, outdir, filename)
+    make_movie(current_path_name, outdir, name)
 
     if savefigbool is False:
         os.system("rm -rf {}/{}".format(current_path_name, 'output-figures'))
