@@ -26,6 +26,7 @@ extern "C" {
         dt: f64,
         velocity_ceiling: f64,
         cooling_coefficient: f64,
+        mach_ceiling: f64,
         density_floor: f64,
         pressure_floor: f64,
         mode: ExecutionMode,
@@ -127,6 +128,7 @@ pub mod cpu {
             let alpha = setup.viscosity().unwrap_or(0.0);
             let masses = setup.masses(time);
             let cooling_coefficient = setup.cooling_coefficient().unwrap_or(0.0);
+            let mach_ceiling = setup.mach_ceiling().unwrap_or(1e5);
             let density_floor = setup.density_floor().unwrap_or(0.0);
             let pressure_floor = setup.pressure_floor().unwrap_or(0.0);
             unsafe {
@@ -144,6 +146,7 @@ pub mod cpu {
                     dt,
                     velocity_ceiling,
                     cooling_coefficient,
+                    mach_ceiling,
                     density_floor,
                     pressure_floor,
                     self.mode,
@@ -268,6 +271,7 @@ pub mod gpu {
                 let alpha = setup.viscosity().unwrap_or(0.0);
                 let masses = device.buffer_from(&setup.masses(time));
                 let cooling_coefficient = setup.cooling_coefficient().unwrap_or(0.0);
+                let mach_ceiling = setup.mach_ceiling().unwrap_or(1e5);
                 let density_floor = setup.density_floor().unwrap_or(0.0);
                 let pressure_floor = setup.pressure_floor().unwrap_or(0.0);
                 unsafe {
@@ -285,6 +289,7 @@ pub mod gpu {
                         dt,
                         velocity_ceiling,
                         cooling_coefficient,
+                        mach_ceiling,
                         density_floor,
                         pressure_floor,
                         ExecutionMode::GPU,

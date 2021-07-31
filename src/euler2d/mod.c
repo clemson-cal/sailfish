@@ -96,7 +96,7 @@ static __host__ __device__ real disk_height(
         real dy = y1 - y0;
         real r2 = dx * dx + dy * dy + 1e-12;
         real r  = sqrt(r2);
-        omegatilde2 += mp / r2 / r;
+        omegatilde2 += mp / pow(r, 3);
     }
     real sigma = prim[0];
     real pres  = prim[3];
@@ -275,12 +275,15 @@ static __host__ __device__ void shear_strain(const real *gx, const real *gy, rea
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __host__ __device__ void cooling_term(real cooling_coefficient, real dt, real *prim, real *cons)
+static __host__ __device__ void cooling_term(real cooling_coefficient, real mach_ceiling, real dt, real *prim, real *cons)
 {
     real gamma = GAMMA_LAW_INDEX;
     real sigma = prim[0];
     real eps   = prim[3] / prim[0] / (gamma - 1.0);
     real eps_cooled = eps * pow(1.0 + 3.0 * cooling_coefficient / pow(sigma, 2.0) * pow(eps,3) * dt, -1.0 / 3.0);
+
+    real ek = 0.5 * (prim[1] * prim[1] + prim[2] * prim[2]);
+    eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) / pow(mach_ceiling,2));
 
     cons[3] += sigma * (eps_cooled - eps);
 }
@@ -298,6 +301,7 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
         rho = density_floor;
         vx  = 0.0;
         vy  = 0.0;
+        pres= pow(density_floor, gamma);
     }
 
     prim[0] = rho;
@@ -463,6 +467,7 @@ static __host__ __device__ void advance_rk_zone(
     real dt,
     real velocity_ceiling,
     real cooling_coefficient,
+    real mach_ceiling,
     real density_floor,
     real pressure_floor,
     int i,
@@ -470,12 +475,12 @@ static __host__ __device__ void advance_rk_zone(
 {
     real dx = mesh.dx;
     real dy = mesh.dy;
-    //real xl = mesh.x0 + (i + 0.0) * dx;
+    real xl = mesh.x0 + (i + 0.0) * dx;
     real xc = mesh.x0 + (i + 0.5) * dx;
-    //real xr = mesh.x0 + (i + 1.0) * dx;
-    //real yl = mesh.y0 + (j + 0.0) * dy;
+    real xr = mesh.x0 + (i + 1.0) * dx;
+    real yl = mesh.y0 + (j + 0.0) * dy;
     real yc = mesh.y0 + (j + 0.5) * dy;
-    //real yr = mesh.y0 + (j + 1.0) * dy;
+    real yr = mesh.y0 + (j + 1.0) * dy;
 
     // ------------------------------------------------------------------------
     //                 tj
@@ -583,32 +588,41 @@ static __host__ __device__ void advance_rk_zone(
     shear_strain(gxrj, gyrj, dx, dy, srj);
     shear_strain(gxcc, gycc, dx, dy, scc);
 
-    real h = disk_height(masses, num_masses, xc, yc, pcc);
     real cs2cc = sound_speed_squared(&eos, pcc);
-    real nu = alpha * h * sqrt(cs2cc); // Warning: nu is centered.
+    real hcc = disk_height(masses, num_masses, xc, yc, pcc);
+    real hli = disk_height(masses, num_masses, xl, yc, pli);
+    real hri = disk_height(masses, num_masses, xr, yc, pri);
+    real hlj = disk_height(masses, num_masses, xc, yl, plj);
+    real hrj = disk_height(masses, num_masses, xc, yr, prj);
 
-    fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-    fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-    fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-    fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-    flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-    flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-    frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-    frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+    real nucc = alpha * hcc * sqrt(cs2cc);
+    real nuli = alpha * hli * sqrt(cs2li);
+    real nuri = alpha * hri * sqrt(cs2ri);
+    real nulj = alpha * hlj * sqrt(cs2lj);
+    real nurj = alpha * hrj * sqrt(cs2rj);
 
-    fli[3] -= 0.5 * nu * (pli[0] * sli[0] * pli[1] + pcc[0] * scc[0] * pcc[1]); // v^x \tau^x_x
-    fri[3] -= 0.5 * nu * (pcc[0] * scc[0] * pcc[1] + pri[0] * sri[0] * pri[1]);
-    fli[3] -= 0.5 * nu * (pli[0] * sli[1] * pli[2] + pcc[0] * scc[1] * pcc[2]); // v^y \tau^x_y
-    fri[3] -= 0.5 * nu * (pcc[0] * scc[1] * pcc[2] + pri[0] * sri[1] * pri[2]);
-    flj[3] -= 0.5 * nu * (plj[0] * slj[2] * plj[1] + pcc[0] * scc[2] * pcc[1]); // v^x \tau^y_x
-    frj[3] -= 0.5 * nu * (pcc[0] * scc[2] * pcc[1] + prj[0] * srj[2] * prj[1]);
-    flj[3] -= 0.5 * nu * (plj[0] * slj[3] * plj[2] + pcc[0] * scc[3] * pcc[2]); // v^y \tau^y_y
-    frj[3] -= 0.5 * nu * (pcc[0] * scc[3] * pcc[2] + prj[0] * srj[3] * prj[2]);
+    fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
+    fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
+    fri[1] -= 0.5 * (nuri * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
+    fri[2] -= 0.5 * (nuri * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
+    flj[1] -= 0.5 * (nulj * plj[0] * slj[2] + nucc * pcc[0] * scc[2]); // y-x
+    flj[2] -= 0.5 * (nulj * plj[0] * slj[3] + nucc * pcc[0] * scc[3]); // y-y
+    frj[1] -= 0.5 * (nurj * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
+    frj[2] -= 0.5 * (nurj * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
+
+    fli[3] -= 0.5 * (nuli * pli[0] * sli[0] * pli[1] + nucc * pcc[0] * scc[0] * pcc[1]); // v^x \tau^x_x
+    fri[3] -= 0.5 * (nucc * pcc[0] * scc[0] * pcc[1] + nuri * pri[0] * sri[0] * pri[1]);
+    fli[3] -= 0.5 * (nuli * pli[0] * sli[1] * pli[2] + nucc * pcc[0] * scc[1] * pcc[2]); // v^y \tau^x_y
+    fri[3] -= 0.5 * (nucc * pcc[0] * scc[1] * pcc[2] + nuri * pri[0] * sri[1] * pri[2]);
+    flj[3] -= 0.5 * (nulj * plj[0] * slj[2] * plj[1] + nucc * pcc[0] * scc[2] * pcc[1]); // v^x \tau^y_x
+    frj[3] -= 0.5 * (nucc * pcc[0] * scc[2] * pcc[1] + nurj * prj[0] * srj[2] * prj[1]);
+    flj[3] -= 0.5 * (nulj * plj[0] * slj[3] * plj[2] + nucc * pcc[0] * scc[3] * pcc[2]);  // v^y \tau^y_y
+    frj[3] -= 0.5 * (nucc * pcc[0] * scc[3] * pcc[2] + nurj * prj[0] * srj[3] * prj[2]);
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc, h, ucc);
-    cooling_term(cooling_coefficient, dt, pcc, ucc);
+    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc, hcc, ucc);
+    cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -632,6 +646,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     real dt,
     real velocity_ceiling,
     real cooling_coefficient,
+    real mach_ceiling,
     real density_floor,
     real pressure_floor,
     int i,
@@ -713,7 +728,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
     point_masses_source_term(masses, num_masses, xc, yc, dt, pcc, h, ucc);
-    cooling_term(cooling_coefficient, dt, pcc, ucc);
+    cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -770,6 +785,7 @@ static void __global__ advance_rk_kernel(
     real dt,
     real velocity_ceiling,
     real cooling_coefficient,
+    real mach_ceiling,
     real density_floor,
     real pressure_floor)
 {
@@ -778,7 +794,7 @@ static void __global__ advance_rk_kernel(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
     }
 }
 
@@ -795,6 +811,7 @@ static void __global__ advance_rk_kernel_inviscid(
     real dt,
     real velocity_ceiling,
     real cooling_coefficient,
+    real mach_ceiling,
     real density_floor,
     real pressure_floor)
 {
@@ -803,7 +820,7 @@ static void __global__ advance_rk_kernel_inviscid(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
     }
 }
 
@@ -907,6 +924,7 @@ EXTERN_C void euler2d_advance_rk(
     real dt,
     real velocity_ceiling,
     real cooling_coefficient,
+    real mach_ceiling,
     real density_floor,
     real pressure_floor,
     enum ExecutionMode mode)
@@ -917,13 +935,13 @@ EXTERN_C void euler2d_advance_rk(
 
     switch (mode) {
         case CPU: {
-            if (nu == 0.0) {
+            if (alpha == 0.0) {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
                 }
             } else {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
                 }
             }
             break;
@@ -931,13 +949,13 @@ EXTERN_C void euler2d_advance_rk(
 
         case OMP: {
             #ifdef _OPENMP
-            if (nu == 0.0) {
+            if (alpha == 0.0) {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
                 }
             } else {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor, i, j);
+                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
                 }
             }
             break;
@@ -949,10 +967,10 @@ EXTERN_C void euler2d_advance_rk(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-            if (nu == 0.0) {
-                advance_rk_kernel_inviscid<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor);
+            if (alpha == 0.0) {
+                advance_rk_kernel_inviscid<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor);
             } else {
-                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, density_floor, pressure_floor);
+                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor);
             }
             #endif
             break;

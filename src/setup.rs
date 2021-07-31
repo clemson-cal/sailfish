@@ -18,6 +18,7 @@ pub trait Setup {
     fn buffer_zone(&self) -> BufferZone;
     fn viscosity(&self) -> Option<f64>;
     fn cooling_coefficient(&self) -> Option<f64>;
+    fn mach_ceiling(&self) -> Option<f64>;
     fn density_floor(&self) -> Option<f64>;
     fn pressure_floor(&self) -> Option<f64>;
     fn mesh(&self, resolution: u32) -> Mesh;
@@ -94,6 +95,9 @@ impl Setup for Explosion {
         None
     }
     fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn mach_ceiling(&self) -> Option<f64> {
         None
     }
     fn density_floor(&self) -> Option<f64> {
@@ -232,6 +236,9 @@ impl Setup for Binary {
     fn cooling_coefficient(&self) -> Option<f64> {
         None
     }
+    fn mach_ceiling(&self) -> Option<f64> {
+        None
+    }
     fn density_floor(&self) -> Option<f64> {
         None
     }
@@ -262,6 +269,7 @@ pub struct BinaryWithThermodynamics {
     pub density_floor: f64,
     pub initial_density: f64,
     pub initial_pressure: f64,
+    pub mach_ceiling: f64,
     form: kind_config::Form,
 }
 
@@ -283,7 +291,8 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .item("pressure_floor",      0.0, "pressure floor")
             .item("density_floor",       0.0, "density floor")
             .item("initial_density",     1.0, "initial surface density at r=a")
-            .item("initial_pressure",   1e-2, "initial surface  pressure at r=a") 
+            .item("initial_pressure",   1e-2, "initial surface  pressure at r=a")
+            .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -309,6 +318,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             density_floor: form.get("density_floor").into(),
             initial_density: form.get("initial_density").into(),
             initial_pressure: form.get("initial_pressure").into(),
+            mach_ceiling: form.get("mach_ceiling").into(),
             form,
         })
     }
@@ -345,8 +355,8 @@ impl Setup for BinaryWithThermodynamics {
         let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
-        let d = self.initial_density * self.density_scaling(rs);
-        let p = self.initial_pressure * self.pressure_scaling(rs);
+        let d = self.initial_density  * self.density_scaling(rs)  * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
+        let p = self.initial_pressure * self.pressure_scaling(rs) * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
         let u = phi_hat_x / rs.sqrt();
         let v = phi_hat_y / rs.sqrt();
         primitive[0] = d;
@@ -404,6 +414,9 @@ impl Setup for BinaryWithThermodynamics {
     }
     fn cooling_coefficient(&self) -> Option<f64> {
         Some(self.cooling_coefficient)
+    }
+    fn mach_ceiling(&self) -> Option<f64> {
+        Some(self.mach_ceiling)
     }
     fn density_floor(&self) -> Option<f64> {
         Some(self.density_floor)
@@ -465,6 +478,9 @@ impl Setup for Shocktube {
         None
     }
     fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn mach_ceiling(&self) -> Option<f64> {
         None
     }
     fn density_floor(&self) -> Option<f64> {
@@ -546,6 +562,9 @@ impl Setup for Collision {
     fn cooling_coefficient(&self) -> Option<f64> {
         None
     }
+    fn mach_ceiling(&self) -> Option<f64> {
+        None
+    }
     fn density_floor(&self) -> Option<f64> {
         None
     }
@@ -621,6 +640,9 @@ impl Setup for Sedov {
         None
     }
     fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn mach_ceiling(&self) -> Option<f64> {
         None
     }
     fn density_floor(&self) -> Option<f64> {
