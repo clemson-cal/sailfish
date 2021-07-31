@@ -1,4 +1,5 @@
 use cfg_if::cfg_if;
+use gpu_core::Device;
 use gridiron::index_space::IndexSpace;
 use gridiron::rect_map::Rectangle;
 use serde::de::{Deserialize, Deserializer};
@@ -6,13 +7,12 @@ use serde::ser::{Serialize, Serializer};
 use std::mem::size_of;
 use Buffer::*;
 
-cfg_if! {
-    if #[cfg(feature = "gpu")] {
-        pub use gpu_core::Device;
-    } else {
-        pub struct Device{}
-    }
-}
+// cfg_if! {
+//     if #[cfg(feature = "gpu")] {
+//     } else {
+//         pub struct Device{}
+//     }
+// }
 
 #[derive(Clone)]
 enum Buffer<T: Copy> {
@@ -168,7 +168,6 @@ impl Patch {
     /// Makes a deep copy of this buffer on the given device. This buffer may
     /// reside on the host, or on any device. This function will panic if GPU
     /// support is not available.
-    #[cfg(feature = "gpu")]
     pub fn to_device(&self, device: Device) -> Self {
         cfg_if! {
             if #[cfg(feature = "gpu")] {
@@ -181,6 +180,7 @@ impl Patch {
                     },
                 }
             } else {
+                std::convert::identity(device); // black-box
                 unimplemented!("Patch::to_device requires gpu feature")
             }
         }

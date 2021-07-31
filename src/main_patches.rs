@@ -7,6 +7,7 @@ use crate::sailfish::{ExecutionMode, StructuredMesh};
 use crate::setup::Explosion;
 use crate::setup::Setup;
 use crate::state::{self, State};
+use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{self, execute_rayon, Automaton, Status};
 use gridiron::index_space::{range2d, Axis, IndexSpace};
@@ -63,9 +64,11 @@ impl Solver {
         edge_list: &AdjacencyList<Rectangle<i64>>,
         rk_order: usize,
         mode: ExecutionMode,
+        device: Option<Device>,
         setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
         let local_space = primitive.index_space();
+        let local_space_ext = local_space.extend_all(2);
         let rect = primitive.rect();
         let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
         let global_space_ext = global_mesh.index_space().extend_all(2);
@@ -76,11 +79,12 @@ impl Solver {
             global_space_ext.keep_upper(2, Axis::J),
         ];
 
+        let wavespeeds = Patch::zeros(1, &local_space);
         let mut primitive_ext = Patch::zeros(3, &local_space.extend_all(2));
         primitive.copy_into(&mut primitive_ext);
 
         for guard_space in guard_spaces {
-            if let Some(overlap) = guard_space.intersect(&local_space.extend_all(2)) {
+            if let Some(overlap) = guard_space.intersect(&local_space_ext) {
                 setup
                     .initial_primitive_patch(&overlap, &global_mesh)
                     .copy_into(&mut primitive_ext);
@@ -96,7 +100,7 @@ impl Solver {
             primitive1: primitive_ext.clone(),
             primitive2: primitive_ext,
             conserved0: Patch::zeros(3, &local_space),
-            wavespeeds: Arc::new(Mutex::new(Patch::zeros(1, &local_space))),
+            wavespeeds: Arc::new(Mutex::new(wavespeeds)),
             outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
             incoming_count: edge_list.incoming_edges(&rect).count(),
             received_count: 0,
@@ -104,7 +108,21 @@ impl Solver {
             mode,
             mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
             setup,
+        }.on(device)
+    }
+
+    fn on(mut self, device: Option<Device>) -> Self {
+        if let Some(device) = device {
+            assert!(matches!(self.mode, ExecutionMode::GPU));
+            let wavespeeds = self.wavespeeds.lock().unwrap().to_device(device);
+            self.primitive1 = self.primitive1.into_device(device);
+            self.primitive2 = self.primitive2.into_device(device);
+            self.conserved0 = self.conserved0.into_device(device);
+            self.wavespeeds = Arc::new(Mutex::new(wavespeeds));
+        } else {
+            assert!(!matches!(self.mode, ExecutionMode::GPU));
         }
+        self
     }
 
     pub fn primitive(&self) -> Patch {
@@ -268,17 +286,13 @@ pub fn run() -> Result<(), error::Error> {
         ExecutionMode::OMP => 1,
         ExecutionMode::GPU => unimplemented!(),
     };
-    let global_mesh = StructuredMesh::centered_square(1.0, n as u32);
+    let structured_mesh = StructuredMesh::centered_square(1.0, n as u32);
+    let mesh = mesh::Mesh::Structured(structured_mesh.clone());
+    let min_spacing = mesh.min_spacing();
     let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
         .tile(num_patches)
         .into_iter()
-        .map(|space| {
-            let patch = Patch::from_slice_function(&space, 3, |(i, j), prim| {
-                let [x, y] = global_mesh.cell_coordinates(i, j);
-                setup.initial_primitive(x, y, prim);
-            });
-            (patch.rect(), patch)
-        })
+        .map(|s| (s.to_rect(), setup.initial_primitive_patch(&s, &mesh)))
         .collect();
 
     let edge_list = adjacency_list(&patch_map, 2);
@@ -288,10 +302,11 @@ pub fn run() -> Result<(), error::Error> {
             Solver::new(
                 0.0,
                 patch,
-                global_mesh,
+                structured_mesh,
                 &edge_list,
                 rk_order,
                 cmdline.execution_mode(),
+                cmdline.device.map(Device::with_id).map(Option::unwrap),
                 setup.clone(),
             )
         })
@@ -299,7 +314,7 @@ pub fn run() -> Result<(), error::Error> {
 
     let mut state = State {
         command_line: cmdline.clone(),
-        mesh: mesh::Mesh::Structured(global_mesh),
+        mesh,
         restart_file: None,
         iteration: 0,
         time: 0.0,
@@ -309,7 +324,6 @@ pub fn run() -> Result<(), error::Error> {
         setup_name: String::new(),
         parameters: String::new(),
     };
-    let min_spacing = f64::min(global_mesh.dx, global_mesh.dy);
 
     let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
         ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
