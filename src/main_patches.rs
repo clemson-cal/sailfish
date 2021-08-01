@@ -70,6 +70,11 @@ impl Solver {
         device: Option<Device>,
         setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
+        assert! {
+            (device.is_none() && std::matches!(mode, ExecutionMode::CPU | ExecutionMode::OMP)) ||
+            (device.is_some() && std::matches!(mode, ExecutionMode::GPU)),
+            "device must be Some if and only if execution mode is GPU"
+        };
         let rect = primitive.rect();
         let local_space = primitive.index_space();
         let local_space_ext = local_space.extend_all(2);
@@ -296,8 +301,6 @@ pub fn max_wavespeed(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f6
 }
 
 pub fn run() -> Result<(), error::Error> {
-    use std::iter::once;
-
     let cmdline = cmdline::parse_command_line()?;
     let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion {});
 
@@ -322,22 +325,21 @@ pub fn run() -> Result<(), error::Error> {
         .collect();
 
     let edge_list = adjacency_list(&patch_map, 2);
-    let mut solvers: Vec<_> = patch_map
-        .into_iter()
-        .zip(gpu_core::all_devices().map(Some).chain(once(None)).cycle())
-        .map(|((_rect, patch), device)| {
-            Solver::new(
-                0.0,
-                patch,
-                structured_mesh,
-                &edge_list,
-                rk_order,
-                cmdline.execution_mode(),
-                device,
-                setup.clone(),
-            )
-        })
-        .collect();
+    let mut solvers = vec![];
+
+    for ((_rect, patch), device) in patch_map.into_iter().zip(gpu_core::all_devices().cycle()) {
+        let solver = Solver::new(
+            0.0,
+            patch,
+            structured_mesh,
+            &edge_list,
+            rk_order,
+            cmdline.execution_mode(),
+            if cmdline.use_gpu { Some(device) } else { None },
+            setup.clone(),
+        );
+        solvers.push(solver)
+    }
 
     let mut state = State {
         command_line: cmdline.clone(),

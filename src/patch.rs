@@ -19,19 +19,20 @@ impl Serialize for Buffer<f64> {
     where
         S: Serializer,
     {
-        let bytes = match self {
-            Host(data) => {
-                let mut bytes = Vec::with_capacity(data.len() * size_of::<f64>());
-                for x in data {
-                    for b in x.to_le_bytes() {
-                        bytes.push(b);
-                    }
+        let byte_vec = |data: &[f64]| {
+            let mut bytes = Vec::with_capacity(data.len() * size_of::<f64>());
+            for x in data {
+                for b in x.to_le_bytes() {
+                    bytes.push(b);
                 }
-                bytes
             }
+            bytes
+        };
 
+        let bytes = match self {
+            Host(data) => byte_vec(data),
             #[cfg(feature = "gpu")]
-            Device(_) => panic!(),
+            Device(data) => byte_vec(&data.to_vec()),
         };
         serializer.serialize_bytes(&bytes)
     }
@@ -141,7 +142,7 @@ impl Patch {
     #[cfg(feature = "gpu")]
     pub fn as_device_buffer(&self) -> Option<&gpu_core::DeviceBuffer<f64>> {
         match self.data {
-            Host(_) => None,        
+            Host(_) => None,
             Device(ref data) => Some(data),
         }
     }
@@ -333,9 +334,15 @@ impl Patch {
 
                 assert_eq!(src_count, dst_count);
 
-                dst.memcpy_3d(
-                    dst_start, dst_shape, src, src_start, src_shape, src_count, nq,
-                );
+                if src.device() == dst.device() {
+                    dst.memcpy_3d(
+                        dst_start, dst_shape, src, src_start, src_shape, src_count, nq,
+                    )
+                } else {
+                    self.extract(&overlap)
+                        .on(target.device())
+                        .copy_into(target)
+                }
             }
 
             #[cfg(feature = "gpu")]
