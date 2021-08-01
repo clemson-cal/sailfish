@@ -10,7 +10,7 @@ use crate::state::{self, State};
 use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
-use gridiron::automaton::{self, execute_rayon, Automaton, Status};
+use gridiron::automaton::{execute, execute_rayon, Automaton, Status};
 use gridiron::index_space::{range2d, Axis, IndexSpace};
 use gridiron::rect_map::{Rectangle, RectangleMap};
 use rayon::prelude::*;
@@ -378,7 +378,7 @@ pub fn run() -> Result<(), error::Error> {
             for _ in 0..rk_order {
                 solvers = match pool {
                     Some(ref pool) => pool.scope(|s| execute_rayon(s, solvers).collect()),
-                    None => automaton::execute(solvers).collect(),
+                    None => execute(solvers).collect(),
                 };
             }
             state.time += dt;

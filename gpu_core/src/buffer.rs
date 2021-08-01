@@ -168,7 +168,14 @@ impl<T: Copy> DeviceBuffer<T> {
                 count[2] as c_ulong,
                 (elems * std::mem::size_of::<T>()) as c_ulong,
             )
-        })
+        });
+
+        if let Some(error) = self.device().last_error() {
+            panic!(
+                "DeviceBuffer::memcpy_3d {} dst={:?}/{:?} src={:?}/{:?} count={:?}",
+                error, dst_start, dst_shape, src_start, src_shape, count,
+            );
+        }
     }
 }
 

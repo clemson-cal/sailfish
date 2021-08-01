@@ -317,6 +317,10 @@ impl Patch {
         let dst_reg = overlap.memory_region_in(&target.index_space());
         let nq = self.num_fields;
 
+        if self.device() != target.device() {
+            return self.extract(&overlap).on(target.device()).copy_into(target);
+        }
+
         match (&self.data, &mut target.data) {
             (Host(ref src), Host(ref mut dst)) => src_reg
                 .iter_slice(src, nq)
@@ -331,25 +335,13 @@ impl Patch {
                 let src_start = [src_reg.start.0, src_reg.start.1, 0];
                 let src_shape = [src_reg.shape.0, src_reg.shape.1, 1];
                 let src_count = [src_reg.count.0, src_reg.count.1, 1];
-
                 assert_eq!(src_count, dst_count);
 
-                if src.device() == dst.device() {
-                    dst.memcpy_3d(
-                        dst_start, dst_shape, src, src_start, src_shape, src_count, nq,
-                    )
-                } else {
-                    self.extract(&overlap)
-                        .on(target.device())
-                        .copy_into(target)
-                }
+                dst.memcpy_3d(
+                    dst_start, dst_shape, src, src_start, src_shape, src_count, nq,
+                )
             }
-
-            #[cfg(feature = "gpu")]
-            (Device(_), Host(_)) => self.to_host().copy_into(target),
-
-            #[cfg(feature = "gpu")]
-            (Host(_), Device(ref dst)) => self.to_device(dst.device()).copy_into(target),
+            _ => unreachable!(),
         }
     }
 
