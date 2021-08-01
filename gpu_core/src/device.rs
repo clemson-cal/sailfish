@@ -1,5 +1,5 @@
 //! Exports a `Device` struct for interacting with the GPU device.
-//! 
+//!
 //! The `Device` struct provides an execution context to run closures on a
 //! particular device, including memory allocation and kernel launches. A stub
 //! `Device` struct is provided to help with feature compatibility: creation
@@ -7,10 +7,10 @@
 //! creation methods are removed from the API (`gpu_core::Buffer` does not
 //! provide a stub implementation).
 
-#[cfg(feature = "gpu")] 
+#[cfg(feature = "gpu")]
 use crate::*;
 
-#[cfg(feature = "gpu")] 
+#[cfg(feature = "gpu")]
 use buffer::DeviceBuffer;
 
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
@@ -70,6 +70,24 @@ impl Device {
     pub fn synchronize(&self) {
         on_device(self.0, || unsafe { gpu_device_synchronize() })
     }
+
+    pub fn last_error(&self) -> Option<String> {
+        use std::ffi::CStr;
+
+        on_device(self.0, || {
+            let error_str = unsafe { gpu_get_last_error() };
+            if error_str == std::ptr::null() {
+                None
+            } else {
+                Some(
+                    unsafe { CStr::from_ptr(error_str) }
+                        .to_str()
+                        .unwrap()
+                        .to_owned(),
+                )
+            }
+        })
+    }
 }
 
 impl Default for Device {
@@ -86,6 +104,8 @@ impl Device {
     pub fn scope<T, F: Fn(&Self) -> T>(&self, f: F) -> T {
         f(self)
     }
-    pub fn synchronize(&self) {
+    pub fn synchronize(&self) {}
+    pub fn last_error(&self) -> Option<String> {
+        None
     }
 }

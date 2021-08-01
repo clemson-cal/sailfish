@@ -5,7 +5,7 @@ pub use device::Device;
 
 cfg_if! {
     if #[cfg(feature = "gpu")] {
-        use std::os::raw::{c_int, c_ulong, c_void};
+        use std::os::raw::{c_int, c_ulong, c_void, c_char};
         pub mod buffer;        
         pub use buffer::DeviceBuffer;
         pub use buffer::Reduce;
@@ -53,6 +53,7 @@ extern "C" {
     pub fn gpu_get_device_count() -> c_int;
     pub fn gpu_get_device() -> c_int;
     pub fn gpu_set_device(device_id: c_int);
+    pub fn gpu_get_last_error() -> *const c_char;
 
     // Higher level utility functions
     pub fn gpu_vec_max_f64(vec: *const f64, size: c_ulong, result: *mut f64);

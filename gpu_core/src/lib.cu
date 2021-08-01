@@ -96,6 +96,21 @@ extern "C" void gpu_set_device(int device)
 #endif
 }
 
+extern "C" const char *gpu_get_last_error()
+{
+#ifdef __NVCC__
+    cudaError_t error = cudaGetLastError();
+    if (error)
+        return cudaGetErrorString(error);
+    return NULL;
+#else
+    hipError_t error = hipGetLastError();
+    if (error) 
+        return hipGetErrorString(error);
+    return NULL;
+#endif
+}
+
 static __global__ void gpu_memcpy_3d_kernel(
     char *dst,
     const char *src,
