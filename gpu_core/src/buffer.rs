@@ -1,6 +1,6 @@
 //! Exports a `DeviceBuffer` struct for interacting with memory allocations on
 //! a GPU device.
-//! 
+//!
 //! Abstractions are provided to obtain memory from a GPU device, free it, or
 //! transfer it to or from the host or other GPU devices, with Rust-like
 //! safety guarantees. You can obtain a pointer to a `DeviceBuffer` underlying
@@ -147,25 +147,25 @@ impl<T: Copy> DeviceBuffer<T> {
         assert!(src_start[1] + count[1] <= src_shape[1]);
         assert!(src_start[2] + count[2] <= src_shape[2]);
 
-        let ulong_buf = |a: [usize; 3]| {
-            self.device()
-                .buffer_from(&[a[0] as c_ulong, a[1] as c_ulong, a[2] as c_ulong])
-        };
-        let dst_start = ulong_buf(dst_start);
-        let dst_shape = ulong_buf(dst_shape);
-        let src_start = ulong_buf(src_start);
-        let src_shape = ulong_buf(src_shape);
-        let count = ulong_buf(count);
-
         on_device(self.device_id, || unsafe {
             gpu_memcpy_3d(
                 self.ptr as *mut c_void,
-                dst_start.as_device_ptr(),
-                dst_shape.as_device_ptr(),
                 src_array.ptr as *const c_void,
-                src_start.as_device_ptr(),
-                src_shape.as_device_ptr(),
-                count.as_device_ptr(),
+                dst_start[0] as c_ulong,
+                dst_start[1] as c_ulong,
+                dst_start[2] as c_ulong,
+                dst_shape[0] as c_ulong,
+                dst_shape[1] as c_ulong,
+                dst_shape[2] as c_ulong,
+                src_start[0] as c_ulong,
+                src_start[1] as c_ulong,
+                src_start[2] as c_ulong,
+                src_shape[0] as c_ulong,
+                src_shape[1] as c_ulong,
+                src_shape[2] as c_ulong,
+                count[0] as c_ulong,
+                count[1] as c_ulong,
+                count[2] as c_ulong,
                 (elems * std::mem::size_of::<T>()) as c_ulong,
             )
         })

@@ -27,16 +27,26 @@ extern "C" {
         src_device: c_int,
         size: c_ulong,
     );
+
     pub fn gpu_memcpy_3d(
         dst: *mut c_void,
-        start_dst: *const c_ulong,
-        shape_dst: *const c_ulong,
         src: *const c_void,
-        start_src: *const c_ulong,
-        shape_src: *const c_ulong,
-        count: *const c_ulong,
-        bytes: c_ulong,
-    );
+        dst_start_i: c_ulong,
+        dst_start_j: c_ulong,
+        dst_start_k: c_ulong,
+        dst_shape_i: c_ulong,
+        dst_shape_j: c_ulong,
+        dst_shape_k: c_ulong,
+        src_start_i: c_ulong,
+        src_start_j: c_ulong,
+        src_start_k: c_ulong,
+        src_shape_i: c_ulong,
+        src_shape_j: c_ulong,
+        src_shape_k: c_ulong,
+        count_i: c_ulong,
+        count_j: c_ulong,
+        count_k: c_ulong,
+        bytes_per_elem: c_ulong);
 
     // Device control
     pub fn gpu_device_synchronize();
