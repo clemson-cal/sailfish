@@ -603,12 +603,12 @@ static __host__ __device__ void advance_rk_zone(
 
     fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
     fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
-    fri[1] -= 0.5 * (nuri * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
-    fri[2] -= 0.5 * (nuri * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
+    fri[1] -= 0.5 * (nucc * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
+    fri[2] -= 0.5 * (nucc * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
     flj[1] -= 0.5 * (nulj * plj[0] * slj[2] + nucc * pcc[0] * scc[2]); // y-x
     flj[2] -= 0.5 * (nulj * plj[0] * slj[3] + nucc * pcc[0] * scc[3]); // y-y
-    frj[1] -= 0.5 * (nurj * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
-    frj[2] -= 0.5 * (nurj * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
+    frj[1] -= 0.5 * (nucc * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
+    frj[2] -= 0.5 * (nucc * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
 
     fli[3] -= 0.5 * (nuli * pli[0] * sli[0] * pli[1] + nucc * pcc[0] * scc[0] * pcc[1]); // v^x \tau^x_x
     fri[3] -= 0.5 * (nucc * pcc[0] * scc[0] * pcc[1] + nuri * pri[0] * sri[0] * pri[1]);
