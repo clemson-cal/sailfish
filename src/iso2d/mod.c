@@ -1,3 +1,4 @@
+#include <stdio.h>
 #include <math.h>
 #include "../sailfish.h"
 
@@ -142,7 +143,7 @@ static __host__ __device__ void point_mass_source_term(
 }
 
 static __host__ __device__ void point_masses_source_term(
-    struct PointMass* masses,
+    struct PointMass *masses,
     int num_masses,
     real x1,
     real y1,
