@@ -64,9 +64,14 @@ pub fn scope<T, F: FnMut() -> T>(device: Option<Device>, mut f: F) -> T {
     }
 }
 
-#[cfg(feature = "gpu")]
-pub fn all_devices() -> impl Iterator<Item = Device> {
-    (0..unsafe { gpu_get_device_count() }).map(Device)
+pub fn all_devices() -> impl Iterator<Item = Device> + Clone {
+    cfg_if! {
+        if #[cfg(feature = "gpu")] {
+            (0..unsafe { gpu_get_device_count() }).map(Device)
+        } else {
+            (0..0).map(Device)
+        }
+    }
 }
 
 #[cfg(feature = "gpu")]

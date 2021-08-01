@@ -16,6 +16,7 @@ use gridiron::rect_map::{Rectangle, RectangleMap};
 use rayon::prelude::*;
 use std::mem::swap;
 use std::ops::DerefMut;
+use std::os::raw::c_ulong;
 use std::sync::{Arc, Mutex};
 
 fn adjacency_list(
@@ -69,11 +70,12 @@ impl Solver {
         device: Option<Device>,
         setup: Arc<dyn Setup + Send + Sync>,
     ) -> Self {
+        let rect = primitive.rect();
         let local_space = primitive.index_space();
         let local_space_ext = local_space.extend_all(2);
-        let rect = primitive.rect();
         let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
         let global_space_ext = global_mesh.index_space().extend_all(2);
+
         let guard_spaces = [
             global_space_ext.keep_lower(2, Axis::I),
             global_space_ext.keep_upper(2, Axis::I),
@@ -116,21 +118,6 @@ impl Solver {
             mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
             setup,
         }
-        .on(device)
-    }
-
-    fn on(mut self, device: Option<Device>) -> Self {
-        if let Some(device) = device {
-            assert!(matches!(self.mode, ExecutionMode::GPU));
-            let wavespeeds = self.wavespeeds.lock().unwrap().to_device(device);
-            self.primitive1 = self.primitive1.into_device(device);
-            self.primitive2 = self.primitive2.into_device(device);
-            self.conserved0 = self.conserved0.into_device(device);
-            self.wavespeeds = Arc::new(Mutex::new(wavespeeds));
-        } else {
-            assert!(!matches!(self.mode, ExecutionMode::GPU));
-        }
-        self
     }
 
     pub fn primitive(&self) -> Patch {
@@ -144,23 +131,20 @@ impl Solver {
         let mut lock = self.wavespeeds.lock().unwrap();
         let wavespeeds = lock.deref_mut();
 
-        gpu_core::scope(self.device, || {
-            unsafe {
-                iso2d::iso2d_wavespeed(
-                    self.mesh,
-                    self.primitive1.as_ptr(),
-                    wavespeeds.as_mut_ptr(),
-                    eos,
-                    masses.as_ptr(),
-                    masses.len() as i32,
-                    self.mode,
-                )
-            }
+        gpu_core::scope(self.device, || unsafe {
+            iso2d::iso2d_wavespeed(
+                self.mesh,
+                self.primitive1.as_ptr(),
+                wavespeeds.as_mut_ptr(),
+                eos,
+                masses.as_ptr(),
+                masses.len() as i32,
+                self.mode,
+            )
         });
 
         match self.mode {
             ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
-                use std::os::raw::c_ulong;
                 iso2d::iso2d_maximum(
                     wavespeeds.as_ptr(),
                     wavespeeds.as_slice().unwrap().len() as c_ulong,
@@ -181,15 +165,13 @@ impl Solver {
     }
 
     pub fn new_timestep(&mut self) {
-        gpu_core::scope(self.device, || {
-            unsafe {
-                iso2d::iso2d_primitive_to_conserved(
-                    self.mesh,
-                    self.primitive1.as_ptr(),
-                    self.conserved0.as_mut_ptr(),
-                    self.mode,
-                );
-            }
+        gpu_core::scope(self.device, || unsafe {
+            iso2d::iso2d_primitive_to_conserved(
+                self.mesh,
+                self.primitive1.as_ptr(),
+                self.conserved0.as_mut_ptr(),
+                self.mode,
+            );
         });
         self.time0 = self.time;
         self.state = SolverState::RungeKuttaStage(0);
@@ -218,24 +200,22 @@ impl Solver {
             _ => panic!(),
         };
 
-        gpu_core::scope(self.device, || {
-            unsafe {
-                iso2d::iso2d_advance_rk(
-                    self.mesh,
-                    self.conserved0.as_ptr(),
-                    self.primitive1.as_ptr(),
-                    self.primitive2.as_mut_ptr(),
-                    self.setup.equation_of_state(),
-                    self.setup.buffer_zone(),
-                    masses.as_ptr(),
-                    masses.len() as i32,
-                    self.setup.viscosity().unwrap_or(0.0),
-                    a,
-                    dt,
-                    f64::MAX,
-                    self.mode,
-                );
-            }
+        gpu_core::scope(self.device, || unsafe {
+            iso2d::iso2d_advance_rk(
+                self.mesh,
+                self.conserved0.as_ptr(),
+                self.primitive1.as_ptr(),
+                self.primitive2.as_mut_ptr(),
+                self.setup.equation_of_state(),
+                self.setup.buffer_zone(),
+                masses.as_ptr(),
+                masses.len() as i32,
+                self.setup.viscosity().unwrap_or(0.0),
+                a,
+                dt,
+                f64::MAX,
+                self.mode,
+            );
         });
         swap(&mut self.primitive1, &mut self.primitive2);
 
@@ -299,19 +279,38 @@ impl Automaton for Solver {
     }
 }
 
+pub fn max_wavespeed(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f64 {
+    if let Some(pool) = pool {
+        pool.install(|| {
+            solvers
+                .par_iter()
+                .map(|s| s.max_wavespeed())
+                .reduce(|| 0.0, f64::max)
+        })
+    } else {
+        solvers
+            .iter()
+            .map(|s| s.max_wavespeed())
+            .fold(0.0, f64::max)
+    }
+}
+
 pub fn run() -> Result<(), error::Error> {
+    use std::iter::once;
+
     let cmdline = cmdline::parse_command_line()?;
     let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion {});
 
     let n = cmdline.resolution.unwrap_or(2048) as i64;
     let rk_order = cmdline.rk_order as usize;
     let fold = cmdline.fold;
+    let cpi = cmdline.checkpoint_interval;
     let cfl = cmdline.cfl_number;
     let outdir = cmdline.outdir.as_deref().unwrap_or(".");
     let num_patches = match cmdline.execution_mode() {
         ExecutionMode::CPU => 512,
         ExecutionMode::OMP => 1,
-        ExecutionMode::GPU => unimplemented!(),
+        ExecutionMode::GPU => gpu_core::all_devices().count(),
     };
     let structured_mesh = StructuredMesh::centered_square(1.0, n as u32);
     let mesh = mesh::Mesh::Structured(structured_mesh.clone());
@@ -325,7 +324,8 @@ pub fn run() -> Result<(), error::Error> {
     let edge_list = adjacency_list(&patch_map, 2);
     let mut solvers: Vec<_> = patch_map
         .into_iter()
-        .map(|(_rect, patch)| {
+        .zip(gpu_core::all_devices().map(Some).chain(once(None)).cycle())
+        .map(|((_rect, patch), device)| {
             Solver::new(
                 0.0,
                 patch,
@@ -333,7 +333,7 @@ pub fn run() -> Result<(), error::Error> {
                 &edge_list,
                 rk_order,
                 cmdline.execution_mode(),
-                cmdline.device.and_then(Device::with_id),
+                device,
                 setup.clone(),
             )
         })
@@ -344,7 +344,7 @@ pub fn run() -> Result<(), error::Error> {
         mesh,
         restart_file: None,
         iteration: 0,
-        time: 0.0,
+        time: setup.initial_time(),
         primitive: vec![],
         primitive_patches: solvers.iter().map(|s| s.primitive()).collect(),
         checkpoint: state::RecurringTask::new(),
@@ -355,14 +355,11 @@ pub fn run() -> Result<(), error::Error> {
     let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
         ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
         ExecutionMode::OMP => None,
-        ExecutionMode::GPU => unimplemented!(),
+        ExecutionMode::GPU => None,
     };
 
     while state.time < cmdline.end_time.unwrap_or(0.1) {
-        if state
-            .checkpoint
-            .is_due(state.time, cmdline.checkpoint_interval)
-        {
+        if state.checkpoint.is_due(state.time, cpi) {
             state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
             state.write_checkpoint(&outdir)?;
         }
@@ -371,26 +368,11 @@ pub fn run() -> Result<(), error::Error> {
         let mut dt = 0.0;
 
         for _ in 0..fold {
-            let max_a = if let Some(ref pool) = pool {
-                pool.install(|| {
-                    solvers
-                        .par_iter()
-                        .map(|s| s.max_wavespeed())
-                        .reduce(|| 0.0, f64::max)
-                })
-            } else {
-                solvers
-                    .iter()
-                    .map(|s| s.max_wavespeed())
-                    .fold(0.0, f64::max)
-            };
-
-            dt = cfl * min_spacing / max_a;
+            dt = cfl * min_spacing / max_wavespeed(&solvers, &pool);
 
             for solver in &mut solvers {
                 solver.set_timestep(dt)
             }
-
             for _ in 0..rk_order {
                 solvers = match pool {
                     Some(ref pool) => pool.scope(|s| execute_rayon(s, solvers).collect()),
