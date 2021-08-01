@@ -140,8 +140,8 @@ static __global__ void gpu_memcpy_3d_kernel(
         return;
     }
 
-    ulong n_dst = (i - dst_start_i) * dst_si + (j - dst_start_j) * dst_sj + (k - dst_start_k) * dst_sk;
-    ulong n_src = (i - src_start_i) * src_si + (j - src_start_j) * src_sj + (k - src_start_k) * src_sk;
+    ulong n_dst = (i + dst_start_i) * dst_si + (j + dst_start_j) * dst_sj + (k + dst_start_k) * dst_sk;
+    ulong n_src = (i + src_start_i) * src_si + (j + src_start_j) * src_sj + (k + src_start_k) * src_sk;
 
     for (ulong q = 0; q < bytes_per_elem; ++q)
     {
@@ -193,7 +193,8 @@ extern "C" void gpu_memcpy_3d(
     ulong src_sj = bytes_per_elem * src_shape_k;
     ulong src_sk = bytes_per_elem;
 
-    dim3 bd = dim3((count_k + bs.z - 1) / bs.z, (count_j + bs.y - 1) / bs.x, (count_i + bs.x - 1) / bs.x);
+    dim3 bd = dim3((count_k + bs.z - 1) / bs.z, (count_j + bs.y - 1) / bs.y, (count_i + bs.x - 1) / bs.x);
+
     gpu_memcpy_3d_kernel<<<bd, bs>>>(
         dst,
         src,
@@ -212,7 +213,8 @@ extern "C" void gpu_memcpy_3d(
         count_i,
         count_j,
         count_k,
-        bytes_per_elem);
+        bytes_per_elem
+    );
 }
 
 // Adapted from:
