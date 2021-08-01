@@ -352,3 +352,83 @@ impl Patch {
         Self::from_slice_function(subset, self.num_fields, f).copy_into(self);
     }
 }
+
+#[cfg(feature = "gpu")]
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::mesh;
+    use crate::sailfish::StructuredMesh;
+    use gridiron::index_space::{range2d, Axis};
+
+    #[test]
+    fn copy_patch_subset_from_host_to_device() {
+        for device in gpu_core::all_devices() {
+            let src_space = range2d(10..20, 0..200);
+            let dst_space = range2d(0..100, 0..200);
+            let src = Patch::from_vector_function(&src_space, |(i, j)| [i as f64, j as f64]);
+            let mut dst = Patch::zeros(2, &dst_space).into_device(device);
+            src.copy_into(&mut dst);
+            assert_eq!(
+                src.into_host().as_slice(),
+                dst.extract(&src_space).into_host().as_slice()
+            );
+        }
+    }
+
+    #[test]
+    fn fill_guard_regions_on_host() {
+        fill_guard_regions_impl(None)
+    }
+
+    #[test]
+    fn fill_guard_regions_on_device() {
+        fill_guard_regions_impl(Device::with_id(0))
+    }
+
+    fn fill_guard_regions_impl(device: Option<Device>) {
+        let setup = |(i, j)| [i as f64, j as f64, 0.0];
+
+        let global_structured_mesh = StructuredMesh::centered_square(10.0, 1024);
+        let local_space = range2d(0..256, 0..256);
+        let primitive = Patch::from_vector_function(&local_space, setup);
+
+        let local_space = primitive.index_space();
+        let local_space_ext = local_space.extend_all(2);
+        let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
+        let global_space_ext = global_mesh.index_space().extend_all(2);
+
+        let guard_spaces = [
+            global_space_ext.keep_lower(2, Axis::I),
+            global_space_ext.keep_upper(2, Axis::I),
+            global_space_ext.keep_lower(2, Axis::J),
+            global_space_ext.keep_upper(2, Axis::J),
+        ];
+
+        let mut primitive1 = Patch::zeros(3, &local_space.extend_all(2)).on(device);
+        primitive.copy_into(&mut primitive1);
+
+        for space in guard_spaces {
+            if let Some(overlap) = space.intersect(&local_space_ext) {
+                println!("{:?}", overlap);
+                Patch::from_vector_function(&overlap, setup).copy_into(&mut primitive1)
+            }
+        }
+
+        for (n, (x, y)) in primitive1
+            .extract(&local_space)
+            .into_host()
+            .as_slice()
+            .unwrap()
+            .into_iter()
+            .zip(primitive.as_slice().unwrap())
+            .enumerate()
+        {
+            assert_eq!(x, y, "unequal values at index {}", n)
+        }
+
+        if let Some(error) = device.as_ref().and_then(Device::last_error) {
+            panic!("{} on device {:?}", error, device)
+        }
+    }
+}
