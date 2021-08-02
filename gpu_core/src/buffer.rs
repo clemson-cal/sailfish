@@ -1,7 +1,9 @@
 //! Exports a `Buffer` enum which can represent a `Vec` or a `DeviceBuffer`.
-
 use cfg_if::cfg_if;
-use crate::{Device, DeviceBuffer};
+use crate::Device;
+
+#[cfg(feature = "gpu")]
+use crate::DeviceBuffer;
 
 #[derive(Clone)]
 pub enum Buffer<T: Copy> {
