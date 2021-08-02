@@ -1,25 +1,62 @@
 use cfg_if::cfg_if;
-use gpu_core::Buffer;
-use gpu_core::Device;
+use gpu_core::{Buffer, Device};
 use gridiron::index_space::IndexSpace;
 use gridiron::rect_map::Rectangle;
 use Buffer::*;
 
 mod serde_buffer {
-    use super::Buffer;
+    use gpu_core::Buffer;
+    use serde::de::{Error, Visitor};
+    use std::fmt;
+    use std::mem::size_of;
+    use Buffer::*;
 
-    pub fn serialize<S: serde::Serializer>(
-        _buffer: &Buffer<f64>,
-        _serializer: S,
-    ) -> Result<S::Ok, S::Error> {
-        todo!()
+    struct BufferVisitor;
+
+    impl<'de> Visitor<'de> for BufferVisitor {
+        type Value = Buffer<f64>;
+        fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
+            formatter.write_str("a buffer of bytes")
+        }
+        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
+        where
+            E: Error,
+        {
+            let data = v
+                .chunks_exact(8)
+                .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
+                .map(f64::from_le_bytes)
+                .collect();
+            Ok(Host(data))
+        }
     }
 
-    pub fn deserialize<'de, D>(_deserializer: D) -> Result<Buffer<f64>, D::Error>
+    pub fn serialize<S: serde::Serializer>(
+        buffer: &Buffer<f64>,
+        serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        let byte_vec = |data: &[f64]| {
+            let mut bytes = Vec::with_capacity(data.len() * size_of::<f64>());
+            for x in data {
+                for b in x.to_le_bytes() {
+                    bytes.push(b);
+                }
+            }
+            bytes
+        };
+        let bytes = match buffer {
+            Host(data) => byte_vec(data),
+            #[cfg(feature = "gpu")]
+            Device(data) => byte_vec(&data.to_vec()),
+        };
+        serializer.serialize_bytes(&bytes)
+    }
+
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<Buffer<f64>, D::Error>
     where
         D: serde::Deserializer<'de>,
     {
-        todo!()
+        deserializer.deserialize_bytes(BufferVisitor)
     }
 }
 
@@ -365,36 +402,3 @@ mod tests {
         );
     }
 }
-
-// impl Serialize for Buffer<f64> {
-//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-//     where
-//         S: Serializer,
-//     {
-//         let byte_vec = |data: &[f64]| {
-//             let mut bytes = Vec::with_capacity(data.len() * size_of::<f64>());
-//             for x in data {
-//                 for b in x.to_le_bytes() {
-//                     bytes.push(b);
-//                 }
-//             }
-//             bytes
-//         };
-
-//         let bytes = match self {
-//             Host(data) => byte_vec(data),
-//             #[cfg(feature = "gpu")]
-//             Device(data) => byte_vec(&data.to_vec()),
-//         };
-//         serializer.serialize_bytes(&bytes)
-//     }
-// }
-
-// impl<'de> Deserialize<'de> for Buffer<f64> {
-//     fn deserialize<D>(_deserializer: D) -> Result<Buffer<f64>, D::Error>
-//     where
-//         D: Deserializer<'de>,
-//     {
-//         todo!()
-//     }
-// }

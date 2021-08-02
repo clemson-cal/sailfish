@@ -326,8 +326,9 @@ pub fn run() -> Result<(), error::Error> {
 
     let edge_list = adjacency_list(&patch_map, 2);
     let mut solvers = vec![];
+    let mut devices = gpu_core::all_devices().cycle();
 
-    for ((_rect, patch), device) in patch_map.into_iter().zip(gpu_core::all_devices().cycle()) {
+    for (_rect, patch) in patch_map.into_iter() {
         let solver = Solver::new(
             0.0,
             patch,
@@ -335,7 +336,7 @@ pub fn run() -> Result<(), error::Error> {
             &edge_list,
             rk_order,
             cmdline.execution_mode(),
-            if cmdline.use_gpu { Some(device) } else { None },
+            devices.next().filter(|_| cmdline.use_gpu),
             setup.clone(),
         );
         solvers.push(solver)

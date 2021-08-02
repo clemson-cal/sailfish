@@ -1,14 +1,16 @@
 //! Exports a `DeviceBuffer` struct for interacting with memory allocations on
-//! a GPU device.
+//! a GPU.
 //!
-//! Abstractions are provided to obtain memory from a GPU device, free it, or
-//! transfer it to or from the host or other GPU devices, with Rust-like
-//! safety guarantees. You can obtain a pointer to a `DeviceBuffer` underlying
-//! memory in safe code. Dereferencing any pointer in Rust code is unsafe, and
-//! it *probably* undefined behavior to dereference a device pointer in Rust
-//! code. Dereferencing might be defined if the platform supports uniform
-//! virtual addressing (UVA), but don't try this. Instead, pass the device
-//! pointer to functions compiled with CUDA or HIP and exposed via FFI.
+//! Abstractions are provided to obtain memory from the device, free it, or
+//! transfer it to or from the host or other devices, with Rust-like safety
+//! guarantees. You can obtain a pointer to the `DeviceBuffer`'s underlying
+//! memory in safe Rust code. However, dereferencing any pointer in Rust code
+//! is unsafe, and it's *probably* undefined behavior to dereference a device
+//! pointer in Rust code. Note that dereferencing might be defined if the
+//! platform supports uniform virtual addressing (UVA), but this module
+//! operates indepdendently of UVA. The device pointer will be accessed when
+//! calling through an FFI to CUDA or HIP code, which in turn pass the pointer
+//! along to GPU kernel functions.
 #![cfg(feature = "gpu")]
 
 use crate::*;
