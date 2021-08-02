@@ -37,9 +37,9 @@ def file_load(indir, outdir, savefigbool, filename):
         file_count_str = str(file_count)
 
         if len(file_count_str) < max_file_count:
-            file_count_str = ('0' * (max_file_count - 1)) + file_count_str
+            file_count_str = ('0' * (max_file_count - len(file_count_str))) + file_count_str
 
-        fname = '{}/output-figures/{}.png'.format(current_path_name, file_count_str)
+        fname = '{}/output-figures/movie-{}.png'.format(current_path_name, file_count_str)
         print(fname)
         plt.savefig(fname)
 
@@ -51,7 +51,7 @@ def file_load(indir, outdir, savefigbool, filename):
 
 def make_movie(current_path, outdir, filename, max_count):
     Path('{}/{}'.format(current_path, outdir)).mkdir(parents=True, exist_ok=True)
-    command = "ffmpeg -f image2 -r 24 -i {}/output-figures/%0{}d.png -vcodec mpeg4 -y {}/{}.mp4".format(current_path, max_count, outdir, filename)
+    command = "ffmpeg -start_number 1 -f image2 -r 24 -i {}/output-figures/%0{}d.png -vcodec mpeg4 -y {}/movie-{}.mp4".format(current_path, max_count, outdir, filename)
 
     os.system(command)
 
