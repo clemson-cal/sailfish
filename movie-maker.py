@@ -6,12 +6,16 @@ import os
 from pathlib import Path
 import argparse
 
+
 plt.switch_backend('agg')
+
 
 def file_load(indir, outdir, savefigbool, filename):
     file_count = 0
     current_path_name = Path().resolve()
     Path('{}/output-figures'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
+    max_file_count = 5  # Number of digits in the filename.
+
     for name in Path(indir).iterdir():
         file_count += 1
         chkpt = msgpack.load(open(name, 'rb'))
@@ -29,19 +33,25 @@ def file_load(indir, outdir, savefigbool, filename):
         plt.colorbar()
         plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
         plt.title(r"{} $\Sigma^{{1/4}}$".format(name))
-        fname = '{}/output-figures/{}.png'.format(current_path_name, file_count)
+
+        file_count_str = str(file_count)
+
+        if len(file_count_str) < max_file_count:
+            file_count_str = ('0' * (max_file_count - 1)) + file_count_str
+
+        fname = '{}/output-figures/{}.png'.format(current_path_name, file_count_str)
         print(fname)
         plt.savefig(fname)
 
-    make_movie(current_path_name, outdir, name)
+    make_movie(current_path_name, outdir, filename, max_file_count)
 
     if savefigbool is False:
         os.system("rm -rf {}/{}".format(current_path_name, 'output-figures'))
 
 
-def make_movie(current_path, outdir, filename):
+def make_movie(current_path, outdir, filename, max_count):
     Path('{}/{}'.format(current_path, outdir)).mkdir(parents=True, exist_ok=True)
-    command = "ffmpeg -f image2 -r 24 -i {}/output-figures/%d.png -vcodec mpeg4 -y {}/{}.mp4".format(current_path, outdir, filename)
+    command = "ffmpeg -f image2 -r 24 -i {}/output-figures/%0{}d.png -vcodec mpeg4 -y {}/{}.mp4".format(current_path, max_count, outdir, filename)
 
     os.system(command)
 
