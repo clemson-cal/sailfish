@@ -11,13 +11,21 @@ pub enum Buffer<T: Copy> {
 }
 
 impl<T: Copy> Buffer<T> {
+    pub fn len(&self) -> usize {
+       match self {
+           Buffer::Host(data) => data.len(),
+           #[cfg(feature = "gpu")]
+           Buffer::Device(data) => data.len(),
+       } 
+    }
+
     /// Returns the device where the data buffer lives, if it's a device
     /// buffer, and `None` otherwise.
     pub fn device(&self) -> Option<Device> {
         match self {
             Buffer::Host(_) => None,
             #[cfg(feature = "gpu")]
-            Buffer::Device(ref data) => Some(data.device()),
+            Buffer::Device(data) => Some(data.device()),
         }
     }
 
@@ -25,7 +33,7 @@ impl<T: Copy> Buffer<T> {
     /// otherwise returns `None`.
     pub fn as_slice(&self) -> Option<&[T]> {
         match self {
-            Buffer::Host(ref data) => Some(data.as_slice()),
+            Buffer::Host(data) => Some(data.as_slice()),
             #[cfg(feature = "gpu")]
             Buffer::Device(_) => None,
         }
@@ -37,7 +45,7 @@ impl<T: Copy> Buffer<T> {
     pub fn as_device_buffer(&self) -> Option<&DeviceBuffer<T>> {
         match self {
             Buffer::Host(_) => None,
-            Buffer::Device(ref data) => Some(data),
+            Buffer::Device(data) => Some(data),
         }
     }
 
@@ -46,9 +54,9 @@ impl<T: Copy> Buffer<T> {
     /// on where the buffer resides.
     pub fn as_ptr(&self) -> *const T {
         match self {
-            Buffer::Host(ref data) => data.as_ptr(),
+            Buffer::Host(data) => data.as_ptr(),
             #[cfg(feature = "gpu")]
-            Buffer::Device(ref data) => data.as_device_ptr(),
+            Buffer::Device(data) => data.as_device_ptr(),
         }
     }
 
@@ -70,8 +78,8 @@ impl<T: Copy> Buffer<T> {
         cfg_if! {
             if #[cfg(feature = "gpu")] {
                 match self {
-                    Buffer::Host(ref data) => Buffer::Device(device.buffer_from(data)),
-                    Buffer::Device(ref data) => Buffer::Device(data.copy_to(device)),
+                    Buffer::Host(data) => Buffer::Device(device.buffer_from(data)),
+                    Buffer::Device(data) => Buffer::Device(data.copy_to(device)),
                 }
             } else {
                 std::convert::identity(device); // black-box
@@ -108,8 +116,8 @@ impl<T: Copy> Buffer<T> {
         cfg_if! {
             if #[cfg(feature = "gpu")] {
                 match self {
-                    Buffer::Host(ref data) => Buffer::Host(data.clone()),
-                    Buffer::Device(ref data) => Buffer::Host(data.to_vec()),
+                    Buffer::Host(data) => Buffer::Host(data.clone()),
+                    Buffer::Device(data) => Buffer::Host(data.to_vec()),
                 }
             } else {
                 self.clone()

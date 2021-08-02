@@ -132,7 +132,7 @@ impl Solver {
     pub fn max_wavespeed(&self) -> f64 {
         let setup = &self.setup;
         let eos = setup.equation_of_state();
-        let masses = setup.masses(self.time);
+        let masses = gpu_core::Buffer::Host(self.setup.masses(self.time)).on(self.device);
         let mut lock = self.wavespeeds.lock().unwrap();
         let wavespeeds = lock.deref_mut();
 
@@ -183,7 +183,7 @@ impl Solver {
     }
 
     pub fn advance_rk(&mut self, stage: usize) {
-        let masses = self.setup.masses(self.time);
+        let masses = gpu_core::Buffer::Host(self.setup.masses(self.time)).on(self.device);
         let dt = self.dt.unwrap();
 
         let a = match self.rk_order {
