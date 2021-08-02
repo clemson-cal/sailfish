@@ -1,14 +1,15 @@
 use cfg_if::cfg_if;
 
+pub mod buffer;
 pub mod device;
+pub use buffer::Buffer;
 pub use device::Device;
 
 cfg_if! {
     if #[cfg(feature = "gpu")] {
         use std::os::raw::{c_int, c_ulong, c_void, c_char};
-        pub mod buffer;        
-        pub use buffer::DeviceBuffer;
-        pub use buffer::Reduce;
+        pub mod device_buffer;        
+        pub use device_buffer::{DeviceBuffer, Reduce};
     }
 }
 
@@ -75,6 +76,7 @@ pub fn scope<T, F: FnMut() -> T>(device: Option<Device>, mut f: F) -> T {
     }
 }
 
+/// Returns an iterator over all the devices on this system.
 pub fn all_devices() -> impl Iterator<Item = Device> + Clone {
     cfg_if! {
         if #[cfg(feature = "gpu")] {

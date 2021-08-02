@@ -1,47 +1,23 @@
 use cfg_if::cfg_if;
+use gpu_core::Buffer;
 use gpu_core::Device;
 use gridiron::index_space::IndexSpace;
 use gridiron::rect_map::Rectangle;
-use serde::de::{Deserialize, Deserializer};
-use serde::ser::{Serialize, Serializer};
-use std::mem::size_of;
 use Buffer::*;
 
-#[derive(Clone)]
-enum Buffer<T: Copy> {
-    Host(Vec<T>),
-    #[cfg(feature = "gpu")]
-    Device(gpu_core::DeviceBuffer<T>),
-}
+mod serde_buffer {
+    use super::Buffer;
 
-impl Serialize for Buffer<f64> {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: Serializer,
-    {
-        let byte_vec = |data: &[f64]| {
-            let mut bytes = Vec::with_capacity(data.len() * size_of::<f64>());
-            for x in data {
-                for b in x.to_le_bytes() {
-                    bytes.push(b);
-                }
-            }
-            bytes
-        };
-
-        let bytes = match self {
-            Host(data) => byte_vec(data),
-            #[cfg(feature = "gpu")]
-            Device(data) => byte_vec(&data.to_vec()),
-        };
-        serializer.serialize_bytes(&bytes)
+    pub fn serialize<S: serde::Serializer>(
+        _buffer: &Buffer<f64>,
+        _serializer: S,
+    ) -> Result<S::Ok, S::Error> {
+        todo!()
     }
-}
 
-impl<'de> Deserialize<'de> for Buffer<f64> {
-    fn deserialize<D>(_deserializer: D) -> Result<Buffer<f64>, D::Error>
+    pub fn deserialize<'de, D>(_deserializer: D) -> Result<Buffer<f64>, D::Error>
     where
-        D: Deserializer<'de>,
+        D: serde::Deserializer<'de>,
     {
         todo!()
     }
@@ -56,6 +32,7 @@ pub struct Patch {
     num_fields: usize,
 
     /// The backing array of data on this patch.
+    #[serde(with = "serde_buffer")]
     data: Buffer<f64>,
 }
 
@@ -120,53 +97,34 @@ impl Patch {
     /// Returns the device where the data buffer lives, if it's a device
     /// buffer, and `None` otherwise.
     pub fn device(&self) -> Option<Device> {
-        match self.data {
-            Host(_) => None,
-            #[cfg(feature = "gpu")]
-            Device(ref data) => Some(data.device()),
-        }
+        self.data.device()
     }
 
     /// Returns the underlying data as a slice, if it lives on the host,
     /// otherwise returns `None`.
     pub fn as_slice(&self) -> Option<&[f64]> {
-        match self.data {
-            Host(ref data) => Some(data.as_slice()),
-            #[cfg(feature = "gpu")]
-            Device(_) => None,
-        }
+        self.data.as_slice()
     }
 
     /// Returns the underlying data as a device buffer, if it lives on a
     /// device, otherwise returns `None`.
     #[cfg(feature = "gpu")]
     pub fn as_device_buffer(&self) -> Option<&gpu_core::DeviceBuffer<f64>> {
-        match self.data {
-            Host(_) => None,
-            Device(ref data) => Some(data),
-        }
+        self.data.as_device_buffer()
     }
 
     /// Returns an immutable pointer to the underlying storage. The pointer
     /// will reference data on the host or one of the GPU devices, depending
     /// on where the buffer resides.
     pub fn as_ptr(&self) -> *const f64 {
-        match self.data {
-            Host(ref data) => data.as_ptr(),
-            #[cfg(feature = "gpu")]
-            Device(ref data) => data.as_device_ptr(),
-        }
+        self.data.as_ptr()
     }
 
     /// Returns a mutable pointer to the underlying storage. The pointer will
     /// reference data on the host or one of the GPU devices, depending on
     /// where the buffer resides.
     pub fn as_mut_ptr(&mut self) -> *mut f64 {
-        match self.data {
-            Host(ref mut data) => data.as_mut_ptr(),
-            #[cfg(feature = "gpu")]
-            Device(ref mut data) => data.as_mut_device_ptr(),
-        }
+        self.data.as_mut_ptr()
     }
 
     /// Makes a deep copy of this buffer on the given device. This buffer may
@@ -178,10 +136,7 @@ impl Patch {
                 Self {
                     rect: self.rect.clone(),
                     num_fields: self.num_fields,
-                    data: match self.data {
-                        Host(ref data) => Device(device.buffer_from(data)),
-                        Device(ref data) => Device(data.copy_to(device)),
-                    },
+                    data: self.data.to_device(device),
                 }
             } else {
                 std::convert::identity(device); // black-box
@@ -200,14 +155,7 @@ impl Patch {
                 Self {
                     rect: self.rect.clone(),
                     num_fields: self.num_fields,
-                    data: match self.data {
-                        Host(data) => Device(device.buffer_from(&data)),
-                        Device(data) => Device(if data.device() == device {
-                            data
-                        } else {
-                            data.copy_to(device)
-                        }),
-                    },
+                    data: self.data.into_device(device),
                 }
             } else {
                 std::convert::identity(device); // black-box
@@ -224,10 +172,7 @@ impl Patch {
                 Self {
                     rect: self.rect.clone(),
                     num_fields: self.num_fields,
-                    data: match self.data {
-                        Host(ref data) => Host(data.clone()),
-                        Device(ref data) => Host(data.to_vec()),
-                    },
+                    data: self.data.to_host(),
                 }
             } else {
                 self.clone()
@@ -244,10 +189,7 @@ impl Patch {
                 Self {
                     rect: self.rect.clone(),
                     num_fields: self.num_fields,
-                    data: match self.data {
-                        Host(data) => Host(data),
-                        Device(data) => Host(data.to_vec()),
-                    },
+                    data: self.data.into_host(),
                 }
             } else {
                 self
@@ -341,6 +283,8 @@ impl Patch {
                     dst_start, dst_shape, src, src_start, src_shape, src_count, nq,
                 )
             }
+
+            #[cfg(feature = "gpu")]
             _ => unreachable!(),
         }
     }
@@ -421,3 +365,36 @@ mod tests {
         );
     }
 }
+
+// impl Serialize for Buffer<f64> {
+//     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+//     where
+//         S: Serializer,
+//     {
+//         let byte_vec = |data: &[f64]| {
+//             let mut bytes = Vec::with_capacity(data.len() * size_of::<f64>());
+//             for x in data {
+//                 for b in x.to_le_bytes() {
+//                     bytes.push(b);
+//                 }
+//             }
+//             bytes
+//         };
+
+//         let bytes = match self {
+//             Host(data) => byte_vec(data),
+//             #[cfg(feature = "gpu")]
+//             Device(data) => byte_vec(&data.to_vec()),
+//         };
+//         serializer.serialize_bytes(&bytes)
+//     }
+// }
+
+// impl<'de> Deserialize<'de> for Buffer<f64> {
+//     fn deserialize<D>(_deserializer: D) -> Result<Buffer<f64>, D::Error>
+//     where
+//         D: Deserializer<'de>,
+//     {
+//         todo!()
+//     }
+// }

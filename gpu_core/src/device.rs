@@ -10,9 +10,6 @@
 #[cfg(feature = "gpu")]
 use crate::*;
 
-#[cfg(feature = "gpu")]
-use buffer::DeviceBuffer;
-
 #[derive(Debug, Clone, Copy, PartialEq, PartialOrd)]
 pub struct Device(pub(crate) i32);
 
