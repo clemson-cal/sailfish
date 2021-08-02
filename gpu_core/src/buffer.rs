@@ -47,10 +47,7 @@ impl<T: Copy> DeviceBuffer<T> {
     }
 
     /// Convenience method to copy memory to a `Vec`.
-    pub fn to_vec(&self) -> Vec<T>
-    where
-        T: Default,
-    {
+    pub fn to_vec(&self) -> Vec<T> {
         Vec::from(self)
     }
 
@@ -179,15 +176,13 @@ impl<T: Copy> DeviceBuffer<T> {
     }
 }
 
-impl<T: Copy> From<&DeviceBuffer<T>> for Vec<T>
-where
-    T: Default,
-{
+impl<T: Copy> From<&DeviceBuffer<T>> for Vec<T> {
     fn from(dvec: &DeviceBuffer<T>) -> Self {
         on_device(dvec.device_id, || {
-            let mut hvec = vec![T::default(); dvec.len()];
+            let mut hvec = Vec::with_capacity(dvec.len());
             let bytes = (dvec.len() * std::mem::size_of::<T>()) as c_ulong;
             unsafe {
+                hvec.set_len(dvec.len());
                 gpu_memcpy_dtoh(
                     hvec.as_mut_ptr() as *mut c_void,
                     dvec.ptr as *const c_void,

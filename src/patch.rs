@@ -415,20 +415,9 @@ mod tests {
             }
         }
 
-        for (n, (x, y)) in primitive1
-            .extract(&local_space)
-            .into_host()
-            .as_slice()
-            .unwrap()
-            .into_iter()
-            .zip(primitive.as_slice().unwrap())
-            .enumerate()
-        {
-            assert_eq!(x, y, "unequal values at index {}", n)
-        }
-
-        if let Some(error) = device.as_ref().and_then(Device::last_error) {
-            panic!("{} on device {:?}", error, device)
-        }
+        assert_eq!(
+            primitive1.extract(&local_space).into_host().as_slice(),
+            primitive.as_slice()
+        );
     }
 }
