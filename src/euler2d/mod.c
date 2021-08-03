@@ -116,6 +116,7 @@ static __host__ __device__ void point_mass_source_term(
     real x0 = mass->x;
     real y0 = mass->y;
     real mp = mass->mass;
+    real rs = mass->radius;
     real sigma = prim[0];
     real pres  = prim[3];
     real gamma = GAMMA_LAW_INDEX;
@@ -124,8 +125,7 @@ static __host__ __device__ void point_mass_source_term(
     real dx = x1 - x0;
     real dy = y1 - y0;
     real r2 = dx * dx + dy * dy;
-    real rs = 0.5 * h;
-    real r2_soft = r2 + rs * rs;
+    real r2_soft = r2 + pow(0.5 * h, 2.0);
     real dr = sqrt(r2);
     real mag = sigma * mp / r2_soft;
     real fx = -mag * dx / dr;
