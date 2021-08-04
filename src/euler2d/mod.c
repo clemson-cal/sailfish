@@ -301,7 +301,7 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
         rho = density_floor;
         vx  = 0.0;
         vy  = 0.0;
-        pres= pow(density_floor, gamma);
+        pres= pressure_floor;
     }
 
     prim[0] = rho;
