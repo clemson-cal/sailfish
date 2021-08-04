@@ -5,6 +5,8 @@ use crate::sailfish::{
 use crate::Setup;
 use cfg_if::cfg_if;
 
+pub mod solver;
+
 extern "C" {
     pub fn iso2d_primitive_to_conserved(
         mesh: StructuredMesh,

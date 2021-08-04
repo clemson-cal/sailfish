@@ -6,7 +6,7 @@ use Buffer::*;
 
 mod serde_buffer {
     use gpu_core::Buffer;
-    use serde::de::{Error, Visitor};
+    use serde::de::Visitor;
     use std::fmt;
     use std::mem::size_of;
     use Buffer::*;
@@ -18,10 +18,7 @@ mod serde_buffer {
         fn expecting(&self, formatter: &mut fmt::Formatter) -> fmt::Result {
             formatter.write_str("a buffer of bytes")
         }
-        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E>
-        where
-            E: Error,
-        {
+        fn visit_bytes<E>(self, v: &[u8]) -> Result<Self::Value, E> {
             let data = v
                 .chunks_exact(8)
                 .map(|c| [c[0], c[1], c[2], c[3], c[4], c[5], c[6], c[7]])
