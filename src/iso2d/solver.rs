@@ -40,6 +40,7 @@ pub struct Solver {
 }
 
 impl Solver {
+    #[allow(clippy::too_many_arguments)]
     pub fn new(
         time: f64,
         primitive: Patch,

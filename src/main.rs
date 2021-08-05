@@ -5,21 +5,19 @@ use crate::error::Error::*;
 use crate::setup::Setup;
 use crate::state::State;
 use cfg_if::cfg_if;
-use std::fmt::Write;
 use std::path::Path;
-use std::str::FromStr;
 
 pub mod cmdline;
 pub mod error;
 pub mod euler1d;
 pub mod iso2d;
 pub mod lookup_table;
+pub mod main_patches;
 pub mod mesh;
 pub mod patch;
 pub mod sailfish;
 pub mod setup;
 pub mod state;
-pub mod main_patches;
 
 fn time_exec<F>(device: Option<i32>, mut f: F) -> std::time::Duration
 where
@@ -45,35 +43,12 @@ fn split_at_first_colon(string: &str) -> (&str, &str) {
     (n, p)
 }
 
-fn possible_setups_info() -> error::Error {
-    let mut message = String::new();
-    writeln!(message, "specify setup:").unwrap();
-    writeln!(message, "    binary").unwrap();
-    writeln!(message, "    explosion").unwrap();
-    writeln!(message, "    shocktube").unwrap();
-    writeln!(message, "    collision").unwrap();
-    writeln!(message, "    sedov").unwrap();
-    PrintUserInformation(message)
-}
-
-fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, error::Error> {
-    use setup::*;
-    match setup_name {
-        "binary" => Ok(Box::new(Binary::from_str(parameters)?)),
-        "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
-        "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
-        "sedov" => Ok(Box::new(Sedov::from_str(parameters)?)),
-        "collision" => Ok(Box::new(Collision::from_str(parameters)?)),
-        _ => Err(possible_setups_info()),
-    }
-}
-
 fn new_state(
     command_line: CommandLine,
     setup_name: &str,
     parameters: &str,
 ) -> Result<State, error::Error> {
-    let setup = make_setup(setup_name, parameters)?;
+    let setup = setup::make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(command_line.resolution.unwrap_or(1024));
 
     let state = State {
@@ -100,7 +75,7 @@ fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
             new_state(cmdline.clone(), name, parameters)?
         }
     } else {
-        return Err(possible_setups_info());
+        return Err(setup::possible_setups_info());
     };
     if cmdline.upsample.unwrap_or(false) {
         Ok(state.upsample())
@@ -117,7 +92,7 @@ fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
     let mut state = make_state(&cmdline)?;
     let mut dt = 0.0;
-    let setup = make_setup(&state.setup_name, &state.parameters)?;
+    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
     let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
     let mut solver = match (state.setup_name.as_str(), &state.mesh) {
         ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => iso2d::solver(

@@ -61,7 +61,7 @@ pub fn run() -> Result<(), error::Error> {
         ExecutionMode::GPU => gpu_core::all_devices().count(),
     };
     let structured_mesh = StructuredMesh::centered_square(1.0, n as u32);
-    let mesh = mesh::Mesh::Structured(structured_mesh.clone());
+    let mesh = mesh::Mesh::Structured(structured_mesh);
     let min_spacing = mesh.min_spacing();
     let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
         .tile(num_patches)

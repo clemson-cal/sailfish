@@ -7,6 +7,45 @@ use crate::sailfish::{
 };
 use gridiron::index_space::IndexSpace;
 use kepler_two_body::{OrbitalElements, OrbitalState};
+use std::fmt::Write;
+use std::str::FromStr;
+
+// macro_rules! boxed_setup_closure {
+//     ($setup:ident) => {
+//         Box::new(|p| Ok(Box::new($setup::from_str(p)?)))
+//     };
+// }
+
+// type SetupFunction = Box<dyn Fn(&str) -> Result<Box<dyn Setup>, error::Error>>;
+
+// pub fn setups() -> Vec<(&'static str, SetupFunction)> {
+//     vec![
+//         ("binary", boxed_setup_closure!(Binary)),
+//         ("explosion", boxed_setup_closure!(Explosion)),
+//     ]
+// }
+
+pub fn possible_setups_info() -> error::Error {
+    let mut message = String::new();
+    writeln!(message, "specify setup:").unwrap();
+    writeln!(message, "    binary").unwrap();
+    writeln!(message, "    explosion").unwrap();
+    writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    collision").unwrap();
+    writeln!(message, "    sedov").unwrap();
+    PrintUserInformation(message)
+}
+
+pub fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, error::Error> {
+    match setup_name {
+        "binary" => Ok(Box::new(Binary::from_str(parameters)?)),
+        "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
+        "sedov" => Ok(Box::new(Sedov::from_str(parameters)?)),
+        "collision" => Ok(Box::new(Collision::from_str(parameters)?)),
+        _ => Err(possible_setups_info()),
+    }
+}
 
 pub trait Setup {
     fn print_parameters(&self);
