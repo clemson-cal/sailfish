@@ -1,7 +1,10 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::sailfish::{BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh};
+use crate::sailfish::{
+    BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh,
+};
+use crate::split_at_first;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 
 pub trait Setup {
@@ -118,30 +121,32 @@ pub struct Binary {
 impl std::str::FromStr for Binary {
     type Err = error::Error;
 
-    #[rustfmt::skip]
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        #[rustfmt::skip]
         let form = kind_config::Form::new()
             .item("domain_radius", 12.0, "half-size of the simulation domain (a)")
             .item("nu",            1e-3, "kinematic viscosity coefficient (Omega a^2)")
             .item("mach_number",   10.0, "mach number for locally isothermal EOS")
             .item("sink_radius",   0.05, "sink kernel radius (a)")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
-            .item("sink_rate",     10.0, "rate of mass subtraction in the sink (Omega)")
+            .item("sink_rate",   "10.0", "rate of mass subtraction in the sink (Omega)")
             .item("q",              1.0, "system mass ratio: [0-1]")
             .item("e",              0.0, "orbital eccentricity: [0-1]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        // Soon: parse the sink rate possibly as two comma-separated numbers
-        let sink_rate: f64 = form.get("sink_rate").into();
+        let sink_rate_string: String = form.get("sink_rate").into();
+        let (sr1, sr2) = split_at_first(&sink_rate_string, ',');
+        let sr1 = sr1.unwrap().parse().map_err(ParseFloatError)?;
+        let sr2 = sr2.map_or(Ok(sr1), |s| s.parse().map_err(ParseFloatError))?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             mach_number: form.get("mach_number").into(),
             sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sink_rate,
-            sink_rate2: sink_rate,
+            sink_rate1: sr1,
+            sink_rate2: sr2,
             sink_model: match form.get("sink_model").to_string().as_str() {
                 "none" => SinkModel::Inactive,
                 "af" => SinkModel::AccelerationFree,
@@ -156,7 +161,7 @@ impl std::str::FromStr for Binary {
 
 impl Setup for Binary {
     fn print_parameters(&self) {
-        for key in self.form.sorted_keys() {
+        for key in self.form.sorted_keys().into_iter().filter(|k| k != "sink_rate") {
             println!(
                 "{:.<20} {:<10} {}",
                 key,
@@ -164,6 +169,14 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
+        println!(
+            "{:.<20} {:<10} {}",
+            "sink_rate1", self.sink_rate1, "sink rate for primary",
+        );
+        println!(
+            "{:.<20} {:<10} {}",
+            "sink_rate2", self.sink_rate2, "sink rate for secondary",
+        );
     }
 
     #[allow(clippy::many_single_char_names)]
@@ -371,9 +384,7 @@ impl Setup for PulseCollision {
         let xr: f64 = 2.0;
         let dx: f64 = 0.05;
 
-        let gaussian = |x: f64, x0: f64| {
-            f64::exp(-(x - x0).powi(2) / dx.powi(2))
-        };
+        let gaussian = |x: f64, x0: f64| f64::exp(-(x - x0).powi(2) / dx.powi(2));
 
         let step = |x: f64, x0: f64| {
             if (x - x0).abs() < dx * 10.0 {
@@ -457,9 +468,9 @@ impl Setup for FastShell {
         let zones_per_decade = resolution;
         let r_inner = 1.0;
 
-        let faces = (0..(zones_per_decade * num_decades + 1) as u32).map(|i| {
-            r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64)
-        }).collect();
+        let faces = (0..(zones_per_decade * num_decades + 1) as u32)
+            .map(|i| r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64))
+            .collect();
 
         Mesh::FacePositions1D(faces)
     }

@@ -38,10 +38,10 @@ where
     start.elapsed()
 }
 
-fn split_at_first_colon(string: &str) -> (&str, &str) {
-    let mut a = string.splitn(2, ':');
-    let n = a.next().unwrap_or("");
-    let p = a.next().unwrap_or("");
+pub fn split_at_first(string: &str, character: char) -> (Option<&str>, Option<&str>) {
+    let mut a = string.splitn(2, character);
+    let n = a.next();//.unwrap_or("");
+    let p = a.next();//.unwrap_or("");
     (n, p)
 }
 
@@ -94,7 +94,9 @@ fn new_state(
 
 fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     let state = if let Some(ref setup_string) = cmdline.setup {
-        let (name, parameters) = split_at_first_colon(setup_string);
+        let (name, parameters) = split_at_first(setup_string, ':');
+        let (name, parameters) = (name.unwrap_or(""), parameters.unwrap_or(""));
+
         if name.ends_with(".sf") {
             state::State::from_checkpoint(name, parameters)?
         } else {
