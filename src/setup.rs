@@ -90,7 +90,7 @@ pub trait Setup {
     fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
         match mesh {
             Mesh::Structured(mesh) => {
-                crate::patch::Patch::from_slice_function(space, 3, |(i, j), prim| {
+                Patch::from_slice_function(space, 3, |(i, j), prim| {
                     let [x, y] = mesh.cell_coordinates(i, j);
                     self.initial_primitive(x, y, prim)
                 })

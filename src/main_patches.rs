@@ -1,14 +1,15 @@
 use crate::cmdline;
 use crate::error;
 use crate::iso2d;
-use crate::mesh;
+use crate::mesh::Mesh;
 use crate::patch::Patch;
-use crate::sailfish::{ExecutionMode, StructuredMesh};
-use crate::setup::{Setup, Explosion};
-use crate::state;
+use crate::sailfish::ExecutionMode;
+use crate::setup::{self, Explosion, Setup};
+use crate::split_at_first_colon;
+use crate::state::{RecurringTask, State};
+use crate::CommandLine;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton;
-use gridiron::index_space::range2d;
 use gridiron::rect_map::{Rectangle, RectangleMap};
 use iso2d::solver::Solver;
 use rayon::prelude::*;
@@ -27,6 +28,67 @@ fn adjacency_list(
         }
     }
     edges
+}
+
+fn new_state(
+    command_line: CommandLine,
+    setup_name: &str,
+    parameters: &str,
+) -> Result<State, error::Error> {
+    let setup = setup::make_setup(setup_name, parameters)?;
+    let mesh = setup.mesh(command_line.resolution.unwrap_or(1024));
+    let num_patches = match command_line.execution_mode() {
+        ExecutionMode::CPU => 512, // TODO: get patch count from command line
+        ExecutionMode::OMP => 1,
+        ExecutionMode::GPU => gpu_core::all_devices().count(),
+    };
+
+    let primitive_patches = match mesh {
+        Mesh::Structured(_) => mesh
+            .index_space()
+            .tile(num_patches)
+            .into_iter()
+            .map(|s| setup.initial_primitive_patch(&s, &mesh))
+            .collect(),
+        Mesh::FacePositions1D(_) => vec![],
+    };
+
+    let primitive = match mesh {
+        Mesh::Structured(_) => vec![],
+        Mesh::FacePositions1D(_) => setup.initial_primitive_vec(&mesh),
+    };
+
+    let state = State {
+        command_line,
+        mesh: mesh.clone(),
+        restart_file: None,
+        iteration: 0,
+        time: setup.initial_time(),
+        primitive,
+        primitive_patches,
+        checkpoint: RecurringTask::new(),
+        setup_name: setup_name.to_string(),
+        parameters: parameters.to_string(),
+    };
+    Ok(state)
+}
+
+fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
+    let state = if let Some(ref setup_string) = cmdline.setup {
+        let (name, parameters) = split_at_first_colon(setup_string);
+        if name.ends_with(".sf") {
+            State::from_checkpoint(name, parameters)?
+        } else {
+            new_state(cmdline.clone(), name, parameters)?
+        }
+    } else {
+        return Err(setup::possible_setups_info());
+    };
+    if cmdline.upsample.unwrap_or(false) {
+        Ok(state.upsample())
+    } else {
+        Ok(state)
+    }
 }
 
 pub fn max_wavespeed(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f64 {
@@ -49,33 +111,31 @@ pub fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
     let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion {});
 
-    let n = cmdline.resolution.unwrap_or(2048) as i64;
     let rk_order = cmdline.rk_order as usize;
     let fold = cmdline.fold;
     let cpi = cmdline.checkpoint_interval;
     let cfl = cmdline.cfl_number;
     let outdir = cmdline.outdir.as_deref().unwrap_or(".");
-    let num_patches = match cmdline.execution_mode() {
-        ExecutionMode::CPU => 512,
-        ExecutionMode::OMP => 1,
-        ExecutionMode::GPU => gpu_core::all_devices().count(),
-    };
-    let structured_mesh = StructuredMesh::centered_square(1.0, n as u32);
-    let mesh = mesh::Mesh::Structured(structured_mesh);
-    let min_spacing = mesh.min_spacing();
-    let patch_map: RectangleMap<_, _> = range2d(0..n, 0..n)
-        .tile(num_patches)
-        .into_iter()
-        .map(|s| (s.to_rect(), setup.initial_primitive_patch(&s, &mesh)))
+    let mut state = make_state(&cmdline)?;
+    let patch_map: RectangleMap<_, _> = state
+        .primitive_patches
+        .iter()
+        .map(|p| (p.rect(), p.clone()))
         .collect();
 
+    let min_spacing = state.mesh.min_spacing();
     let edge_list = adjacency_list(&patch_map, 2);
     let mut solvers = vec![];
     let mut devices = gpu_core::all_devices().cycle();
 
-    for (_rect, patch) in patch_map.into_iter() {
+    let structured_mesh = match state.mesh {
+        Mesh::Structured(mesh) => mesh,
+        Mesh::FacePositions1D(_) => todo!(),
+    };
+
+    for (_, patch) in patch_map.into_iter() {
         let solver = Solver::new(
-            0.0,
+            state.time,
             patch,
             structured_mesh,
             &edge_list,
@@ -86,19 +146,6 @@ pub fn run() -> Result<(), error::Error> {
         );
         solvers.push(solver)
     }
-
-    let mut state = state::State {
-        command_line: cmdline.clone(),
-        mesh,
-        restart_file: None,
-        iteration: 0,
-        time: setup.initial_time(),
-        primitive: vec![],
-        primitive_patches: solvers.iter().map(|s| s.primitive()).collect(),
-        checkpoint: state::RecurringTask::new(),
-        setup_name: String::new(),
-        parameters: String::new(),
-    };
 
     let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
         ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
@@ -132,7 +179,8 @@ pub fn run() -> Result<(), error::Error> {
             state.time += dt;
             state.iteration += 1;
         }
-        let mzps = (n * n * fold as i64) as f64 / 1e6 / start.elapsed().as_secs_f64();
+        let mzps =
+            (state.mesh.num_total_zones() * fold) as f64 / 1e6 / start.elapsed().as_secs_f64();
 
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
