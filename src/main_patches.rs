@@ -1,9 +1,8 @@
 use crate::cmdline;
 use crate::error;
-use crate::iso2d;
 use crate::mesh::Mesh;
 use crate::patch::Patch;
-use crate::sailfish::ExecutionMode;
+use crate::sailfish::{ExecutionMode, PatchBasedSolve, PatchBasedBuild};
 use crate::setup;
 use crate::split_at_first_colon;
 use crate::state::{RecurringTask, State};
@@ -11,7 +10,6 @@ use crate::CommandLine;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton;
 use gridiron::rect_map::{Rectangle, RectangleMap};
-use iso2d::solver::Solver;
 use rayon::prelude::*;
 
 fn adjacency_list(
@@ -90,7 +88,7 @@ fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     }
 }
 
-pub fn max_wavespeed(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f64 {
+pub fn max_wavespeed<Solver: PatchBasedSolve>(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f64 {
     if let Some(pool) = pool {
         pool.install(|| {
             solvers
@@ -106,7 +104,11 @@ pub fn max_wavespeed(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f6
     }
 }
 
-pub fn run() -> Result<(), error::Error> {
+pub fn run<Builder, Solver>(builder: Builder) -> Result<(), error::Error>
+where
+    Builder: PatchBasedBuild<Solver = Solver>,
+    Solver: PatchBasedSolve,
+{
     let cmdline = cmdline::parse_command_line()?;
 
     let rk_order = cmdline.rk_order as usize;
@@ -134,7 +136,7 @@ pub fn run() -> Result<(), error::Error> {
     };
 
     for (_, patch) in patch_map.into_iter() {
-        let solver = Solver::new(
+        let solver = builder.build(
             state.time,
             patch,
             structured_mesh,
@@ -163,7 +165,7 @@ pub fn run() -> Result<(), error::Error> {
         let mut dt = 0.0;
 
         for _ in 0..fold {
-            dt = cfl * min_spacing / max_wavespeed(&solvers, &pool);
+            dt = cfl * min_spacing / max_wavespeed(solvers.as_slice(), &pool);
 
             for solver in &mut solvers {
                 solver.set_timestep(dt)
