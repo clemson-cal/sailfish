@@ -111,25 +111,25 @@ fn new_state(
     Ok(state)
 }
 
-fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
-    let state = if let Some(ref setup_string) = cmdline.setup {
+fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
+    let state = if let Some(ref setup_string) = cline.setup {
         let (name, parameters) = split_at_first_colon(setup_string);
         if name.ends_with(".sf") {
             State::from_checkpoint(name, parameters)?
         } else {
-            new_state(cmdline.clone(), name, parameters)?
+            new_state(cline.clone(), name, parameters)?
         }
     } else {
         return Err(setup::possible_setups_info());
     };
-    if cmdline.upsample.unwrap_or(false) {
+    if cline.upsample.unwrap_or(false) {
         Ok(state.upsample())
     } else {
         Ok(state)
     }
 }
 
-pub fn max_wavespeed<Solver: PatchBasedSolve>(
+fn max_wavespeed<Solver: PatchBasedSolve>(
     solvers: &[Solver],
     pool: &Option<rayon::ThreadPool>,
 ) -> f64 {
@@ -148,22 +148,23 @@ pub fn max_wavespeed<Solver: PatchBasedSolve>(
     }
 }
 
-pub fn launch_patch_based<Builder, Solver>(builder: Builder) -> Result<(), error::Error>
+fn launch_patch_based<Builder, Solver>(
+    mut state: State,
+    cline: CommandLine,
+    builder: Builder,
+) -> Result<(), error::Error>
 where
     Builder: PatchBasedBuild<Solver = Solver>,
     Solver: PatchBasedSolve,
 {
-    let cmdline = cmdline::parse_command_line()?;
-
-    let rk_order = cmdline.rk_order as usize;
-    let fold = cmdline.fold;
-    let cpi = cmdline.checkpoint_interval;
-    let cfl = cmdline.cfl_number;
-    let outdir = cmdline.outdir.as_deref().unwrap_or(".");
-    let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
-    let mut state = make_state(&cmdline)?;
+    let rk_order = cline.rk_order as usize;
+    let fold = cline.fold;
+    let cpi = cline.checkpoint_interval;
+    let cfl = cline.cfl_number;
+    let outdir = cline.outdir.as_deref().unwrap_or(".");
+    let recompute_dt_each_iteration = cline.recompute_dt_each_iteration()?;
     let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
-    let end_time = cmdline
+    let end_time = cline
         .end_time
         .or_else(|| setup.end_time())
         .unwrap_or(f64::MAX);
@@ -181,7 +182,7 @@ where
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
-        Mesh::FacePositions1D(_) => todo!(),
+        Mesh::FacePositions1D(_) => panic!("the patch-based solver requires a StructuredMesh"),
     };
 
     for (_, patch) in patch_map.into_iter() {
@@ -191,14 +192,32 @@ where
             structured_mesh,
             &edge_list,
             rk_order,
-            cmdline.execution_mode(),
-            devices.next().filter(|_| cmdline.use_gpu),
+            cline.execution_mode(),
+            devices.next().filter(|_| cline.use_gpu),
             setup.clone(),
         );
         solvers.push(solver)
     }
 
-    let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
+    if let Some(mut resolution) = cline.resolution {
+        if cline.upsample.unwrap_or(false) {
+            resolution *= 2
+        }
+        if setup.mesh(resolution) != state.mesh {
+            return Err(InvalidSetup(
+                "cannot override domain parameters on restart".to_string(),
+            ));
+        }
+    }
+
+    if cline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
+        return Err(InvalidSetup(
+            "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
+        ));
+    }
+    setup.print_parameters();
+
+    let pool: Option<rayon::ThreadPool> = match cline.execution_mode() {
         ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
         ExecutionMode::OMP => None,
         ExecutionMode::GPU => None,
@@ -255,39 +274,28 @@ where
     Ok(())
 }
 
-fn launch_single_patch() -> Result<(), error::Error> {
-    let cmdline = cmdline::parse_command_line()?;
-    let mut state = make_state(&cmdline)?;
-    let mut dt = 0.0;
+fn launch_single_patch(mut state: State, cline: CommandLine) -> Result<(), error::Error> {
     let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
-    let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
-    let mut solver = match (state.setup_name.as_str(), &state.mesh) {
-        ("binary" | "explosion", mesh::Mesh::Structured(mesh)) => iso2d::solver(
-            cmdline.execution_mode(),
-            cmdline.device,
-            *mesh,
+    let recompute_dt_each_iteration = cline.recompute_dt_each_iteration()?;
+    let mut solver = match &state.mesh {
+        Mesh::FacePositions1D(faces) => euler1d::solver(
+            cline.execution_mode(),
+            cline.device,
+            faces,
             &state.primitive,
+            setup.coordinate_system(),
         )?,
-        ("shocktube" | "sedov" | "collision", mesh::Mesh::FacePositions1D(faces)) => {
-            euler1d::solver(
-                cmdline.execution_mode(),
-                cmdline.device,
-                faces,
-                &state.primitive,
-                setup.coordinate_system(),
-            )?
-        }
-        _ => panic!(),
+        _ => panic!("the single patch solver assumes you have a FacePositions mesh"),
     };
 
     let (mesh, cfl, fold, chkpt_interval, rk_order, velocity_ceiling, outdir) = (
         state.mesh.clone(),
-        cmdline.cfl_number,
-        cmdline.fold,
-        cmdline.checkpoint_interval,
-        cmdline.rk_order,
-        cmdline.velocity_ceiling,
-        cmdline
+        cline.cfl_number,
+        cline.fold,
+        cline.checkpoint_interval,
+        cline.rk_order,
+        cline.velocity_ceiling,
+        cline
             .outdir
             .or_else(|| {
                 state
@@ -298,47 +306,34 @@ fn launch_single_patch() -> Result<(), error::Error> {
             })
             .unwrap_or_else(|| String::from(".")),
     );
+    let mut dt = 0.0;
     let dx_min = mesh.min_spacing();
+    let end_time = cline
+        .end_time
+        .or_else(|| setup.end_time())
+        .unwrap_or(f64::MAX);
 
-    if let Some(mut resolution) = cmdline.resolution {
-        if cmdline.upsample.unwrap_or(false) {
-            resolution *= 2
-        }
-        if setup.mesh(resolution) != mesh {
-            return Err(InvalidSetup(
-                "cannot override domain parameters on restart".to_string(),
-            ));
-        }
-    }
-
-    if cmdline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
+    if cline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
         ));
     }
-
-    println!("outdir: {}", outdir);
     setup.print_parameters();
 
-    while state.time
-        < cmdline
-            .end_time
-            .or_else(|| setup.end_time())
-            .unwrap_or(f64::MAX)
-    {
+    while state.time < end_time {
         if state.checkpoint.is_due(state.time, chkpt_interval) {
             state.set_primitive(solver.primitive());
             state.write_checkpoint(&outdir)?;
         }
 
         if !recompute_dt_each_iteration {
-            dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
+            dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
         }
 
-        let elapsed = time_exec(cmdline.device, || {
+        let elapsed = time_exec(cline.device, || {
             for _ in 0..fold {
                 if recompute_dt_each_iteration {
-                    dt = dx_min / solver.max_wavespeed(state.time, setup.as_ref()) * cfl;
+                    dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
                 }
                 solver.advance(setup.as_ref(), rk_order, state.time, dt, velocity_ceiling);
                 state.time += dt;
@@ -357,13 +352,13 @@ fn launch_single_patch() -> Result<(), error::Error> {
     Ok(())
 }
 
-pub fn run() -> Result<(), error::Error> {
+fn run() -> Result<(), error::Error> {
     let cline = cmdline::parse_command_line()?;
     let state = make_state(&cline)?;
     let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
     match setup.solver_name().as_str() {
-        "iso2d" => launch_patch_based(iso2d::solver::Builder),
-        "euler1d" => launch_single_patch(),
+        "iso2d" => launch_patch_based(state, cline, iso2d::solver::Builder),
+        "euler1d" => launch_single_patch(state, cline),
         _ => panic!("unknown solver name"),
     }
 }
