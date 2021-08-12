@@ -5,15 +5,17 @@ use crate::sailfish::{
 use crate::Setup;
 use cfg_if::cfg_if;
 
+pub mod solver;
+
 extern "C" {
-    fn iso2d_primitive_to_conserved(
+    pub fn iso2d_primitive_to_conserved(
         mesh: StructuredMesh,
         primitive_ptr: *const f64,
         conserved_ptr: *mut f64,
         mode: ExecutionMode,
     );
 
-    fn iso2d_advance_rk(
+    pub fn iso2d_advance_rk(
         mesh: StructuredMesh,
         conserved_rk_ptr: *const f64,
         primitive_rd_ptr: *const f64,
@@ -29,7 +31,7 @@ extern "C" {
         mode: ExecutionMode,
     );
 
-    fn iso2d_wavespeed(
+    pub fn iso2d_wavespeed(
         mesh: StructuredMesh,
         primitive_ptr: *const f64,
         wavespeed_ptr: *mut f64,
@@ -38,6 +40,12 @@ extern "C" {
         num_masses: i32,
         mode: ExecutionMode,
     );
+
+    pub fn iso2d_maximum(
+        data: *const f64,
+        size: std::os::raw::c_ulong,
+        mode: ExecutionMode
+    ) -> f64;
 }
 
 pub fn solver(
@@ -158,6 +166,8 @@ pub mod cpu {
                     self.mode,
                 )
             };
+
+            // NOTE: no parallelization happens here, even in OMP mode
             wavespeeds.iter().cloned().fold(0.0, f64::max)
         }
     }

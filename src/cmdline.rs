@@ -44,27 +44,33 @@ impl CommandLine {
     }
 }
 
+impl Default for CommandLine {
+    fn default() -> Self {
+        Self {
+            use_omp: false,
+            use_gpu: false,
+            device: None,
+            upsample: None,
+            resolution: None,
+            fold: 10,
+            checkpoint_interval: 1.0,
+            checkpoint_logspace: None,
+            setup: None,
+            outdir: None,
+            end_time: None,
+            rk_order: 1,
+            cfl_number: 0.2,
+            recompute_timestep: None,
+            velocity_ceiling: 1e16,
+        }        
+    }
+}
+
 #[rustfmt::skip]
 pub fn parse_command_line() -> Result<CommandLine, Error> {
     use Error::*;
 
-    let mut c = CommandLine {
-        use_omp: false,
-        use_gpu: false,
-        device: None,
-        upsample: None,
-        resolution: None,
-        fold: 10,
-        checkpoint_interval: 1.0,
-        checkpoint_logspace: None,
-        setup: None,
-        outdir: None,
-        end_time: None,
-        rk_order: 1,
-        cfl_number: 0.2,
-        recompute_timestep: None,
-        velocity_ceiling: 1e16,
-    };
+    let mut c = CommandLine::default();
 
     enum State {
         Ready,
@@ -205,6 +211,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
     } else if !(1..=3).contains(&c.rk_order) {
         Err(Cmdline("rk-order must be 1, 2, or 3".into()))
+    } else if c.checkpoint_interval <= 0.0 {
+        Err(Cmdline("checkpoint interval --checkpoint (-c) must be >0".to_string()))
     } else if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
     } else {

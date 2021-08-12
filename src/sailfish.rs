@@ -1,6 +1,12 @@
-use std::ops::Range;
-use crate::Setup;
+use crate::patch::Patch;
+use crate::setup::Setup;
 use cfg_if::cfg_if;
+use gpu_core::Device;
+use gridiron::adjacency_list::AdjacencyList;
+use gridiron::automaton::Automaton;
+use gridiron::rect_map::Rectangle;
+use std::ops::Range;
+use std::sync::Arc;
 
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -124,11 +130,16 @@ impl StructuredMesh {
 
     /// Returns a new structured mesh covering the given index range of this
     /// one.
-    pub fn subset_mesh(&self, di: Range<i64>, dj: Range<i64>) -> Self {
+    pub fn sub_mesh(&self, di: Range<i64>, dj: Range<i64>) -> Self {
         let [x0, y0] = self.vertex_coordinates(di.start, dj.start);
         let [ni, nj] = [di.count() as i64, dj.count() as i64];
         Self {
-            ni, nj, x0, y0, dx: self.dx, dy: self.dy,
+            ni,
+            nj,
+            x0,
+            y0,
+            dx: self.dx,
+            dy: self.dy,
         }
     }
 }
@@ -156,14 +167,7 @@ pub trait Solve {
 
     /// Advances the primitive variable array by one low-storage Runge-Kutta
     /// sub-stup.
-    fn advance_rk(
-        &mut self,
-        setup: &dyn Setup,
-        time: f64,
-        a: f64,
-        dt: f64,
-        velocity_ceiling: f64,
-    );
+    fn advance_rk(&mut self, setup: &dyn Setup, time: f64, a: f64, dt: f64, velocity_ceiling: f64);
 
     /// Primitive variable array in a solver using first, second, or third-order
     /// Runge-Kutta time stepping.
@@ -196,6 +200,36 @@ pub trait Solve {
             }
         }
     }
+}
+
+pub trait PatchBasedBuild {
+    type Solver: PatchBasedSolve;
+
+    fn build(
+        &self,
+        time: f64,
+        primitive: Patch,
+        global_structured_mesh: StructuredMesh,
+        edge_list: &AdjacencyList<Rectangle<i64>>,
+        rk_order: usize,
+        mode: ExecutionMode,
+        device: Option<Device>,
+        setup: Arc<dyn Setup + Send + Sync>,
+    ) -> Self::Solver;
+}
+
+pub trait PatchBasedSolve: Automaton<Key = Rectangle<i64>, Value = Self, Message = Patch> + Send + Sync {
+    /// Returns the primitive variable array for this solver. The data is
+    /// row-major with contiguous primitive variable components. The array
+    /// includes guard zones.
+    fn primitive(&self) -> Patch;
+
+    /// Sets the time step size to be used in subsequent advance stages.
+    fn set_timestep(&mut self, dt: f64);
+
+    /// Returns the largest wavespeed among the zones in the solver's current
+    /// primitive array.
+    fn max_wavespeed(&self) -> f64;
 }
 
 pub fn compiled_with_omp() -> bool {

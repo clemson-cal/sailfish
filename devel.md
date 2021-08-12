@@ -4,7 +4,8 @@
 - [ ] Time series
 - [x] Upsampling
 - [x] HIP / ROCm port
-- [ ] Multi-GPU
+- [x] Multi-GPU
+- [ ] Multi-GPU + MPI
 - [ ] Physics
       - [ ] PLM runtime parameter
       - [x] Sink prescription

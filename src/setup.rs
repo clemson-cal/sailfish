@@ -1,14 +1,60 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
+use crate::patch::Patch;
 use crate::sailfish::{
     BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh,
 };
 use crate::split_at_first;
+use gridiron::index_space::IndexSpace;
 use kepler_two_body::{OrbitalElements, OrbitalState};
+use std::fmt::Write;
+use std::str::FromStr;
+use std::sync::Arc;
+
+// macro_rules! boxed_setup_closure {
+//     ($setup:ident) => {
+//         Box::new(|p| Ok(Box::new($setup::from_str(p)?)))
+//     };
+// }
+
+// type SetupFunction = Box<dyn Fn(&str) -> Result<Box<dyn Setup>, error::Error>>;
+
+// pub fn setups() -> Vec<(&'static str, SetupFunction)> {
+//     vec![
+//         ("binary", boxed_setup_closure!(Binary)),
+//         ("explosion", boxed_setup_closure!(Explosion)),
+//     ]
+// }
+
+pub fn possible_setups_info() -> error::Error {
+    let mut message = String::new();
+    writeln!(message, "specify setup:").unwrap();
+    writeln!(message, "    binary").unwrap();
+    writeln!(message, "    explosion").unwrap();
+    writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    collision").unwrap();
+    writeln!(message, "    sedov").unwrap();
+    PrintUserInformation(message)
+}
+
+pub fn make_setup(
+    setup_name: &str,
+    parameters: &str,
+) -> Result<Arc<dyn Setup + Send + Sync>, error::Error> {
+    match setup_name {
+        "binary" => Ok(Arc::new(Binary::from_str(parameters)?)),
+        "explosion" => Ok(Arc::new(Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Arc::new(Shocktube::from_str(parameters)?)),
+        "sedov" => Ok(Arc::new(Sedov::from_str(parameters)?)),
+        "collision" => Ok(Arc::new(Collision::from_str(parameters)?)),
+        _ => Err(possible_setups_info()),
+    }
+}
 
 pub trait Setup {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String;
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
     fn initial_time(&self) -> f64 {
         0.0
@@ -53,8 +99,18 @@ pub trait Setup {
             }
         }
     }
+    fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
+        match mesh {
+            Mesh::Structured(mesh) => Patch::from_slice_function(space, 3, |(i, j), prim| {
+                let [x, y] = mesh.cell_coordinates(i, j);
+                self.initial_primitive(x, y, prim)
+            }),
+            _ => unimplemented!(),
+        }
+    }
 }
 
+#[derive(Clone)]
 pub struct Explosion {}
 
 impl std::str::FromStr for Explosion {
@@ -73,6 +129,9 @@ impl std::str::FromStr for Explosion {
 
 impl Setup for Explosion {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
@@ -161,7 +220,12 @@ impl std::str::FromStr for Binary {
 
 impl Setup for Binary {
     fn print_parameters(&self) {
-        for key in self.form.sorted_keys().into_iter().filter(|k| k != "sink_rate") {
+        for key in self
+            .form
+            .sorted_keys()
+            .into_iter()
+            .filter(|k| k != "sink_rate")
+        {
             println!(
                 "{:.<20} {:<10} {}",
                 key,
@@ -177,6 +241,10 @@ impl Setup for Binary {
             "{:.<20} {:<10} {}",
             "sink_rate2", self.sink_rate2, "sink rate for secondary",
         );
+    }
+
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
     }
 
     #[allow(clippy::many_single_char_names)]
@@ -261,6 +329,9 @@ impl std::str::FromStr for Shocktube {
 
 impl Setup for Shocktube {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         if x < 0.5 {
             primitive[0] = 1.0;
@@ -297,6 +368,78 @@ impl Setup for Shocktube {
     }
 }
 
+pub struct Collision {}
+
+impl std::str::FromStr for Collision {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self {})
+        } else {
+            Err(InvalidSetup(format!(
+                "collision problem does not take any parameters, got {}",
+                parameters
+            )))
+        }
+    }
+}
+
+impl Setup for Collision {
+    fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        let xl: f64 = -0.25;
+        let xr: f64 = 0.25;
+        let dx: f64 = 0.025;
+
+        let gaussian = |x: f64, x0: f64| f64::exp(-(x - x0).powi(2) / dx.powi(2));
+
+        let step = |x: f64, x0: f64| {
+            if (x - x0).abs() < dx * 10.0 {
+                1.0
+            } else {
+                0.0
+            }
+        };
+
+        let rho = gaussian(x, xl) + gaussian(x, xr) + 1e-2;
+        let vel = step(x, xl) - step(x, xr);
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = rho * 1e-4;
+    }
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let x0 = -1.0;
+        let x1 = 1.0;
+        let dx = (x1 - x0) / resolution as f64;
+        let faces = (0..resolution + 1).map(|i| x0 + i as f64 * dx).collect();
+        Mesh::FacePositions1D(faces)
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(5.00)
+    }
+}
+
 pub struct Sedov {
     faces: Vec<f64>,
     table: LookupTable<4>,
@@ -329,6 +472,9 @@ impl std::str::FromStr for Sedov {
 
 impl Setup for Sedov {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "eiler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let row = self.table.sample(x);
         primitive[0] = row[1];
@@ -379,6 +525,10 @@ impl std::str::FromStr for PulseCollision {
 }
 
 impl Setup for PulseCollision {
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
+
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let xl: f64 = -2.0;
         let xr: f64 = 2.0;
@@ -404,11 +554,13 @@ impl Setup for PulseCollision {
         primitive[1] = vel;
         primitive[2] = p;
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
             gamma_law_index: 5.0 / 3.0,
         }
     }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         let x0 = -100.0;
         let x1 = 100.0;
@@ -416,9 +568,11 @@ impl Setup for PulseCollision {
         let faces = (0..resolution + 1).map(|i| x0 + i as f64 * dx).collect();
         Mesh::FacePositions1D(faces)
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
+
     fn end_time(&self) -> Option<f64> {
         Some(1.00)
     }
@@ -437,6 +591,10 @@ impl std::str::FromStr for FastShell {
 }
 
 impl Setup for FastShell {
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
+
     fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
         let r_shell: f64 = 10.0;
         let dr: f64 = 0.1;
@@ -458,11 +616,13 @@ impl Setup for FastShell {
         primitive[1] = vel;
         primitive[2] = pre;
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
             gamma_law_index: 5.0 / 3.0,
         }
     }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         let num_decades = 2;
         let zones_per_decade = resolution;
@@ -474,9 +634,11 @@ impl Setup for FastShell {
 
         Mesh::FacePositions1D(faces)
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::SphericalPolar
     }
+
     fn end_time(&self) -> Option<f64> {
         Some(1.0)
     }
