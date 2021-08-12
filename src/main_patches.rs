@@ -4,7 +4,7 @@ use crate::iso2d;
 use crate::mesh::Mesh;
 use crate::patch::Patch;
 use crate::sailfish::ExecutionMode;
-use crate::setup::{self, Explosion, Setup};
+use crate::setup;
 use crate::split_at_first_colon;
 use crate::state::{RecurringTask, State};
 use crate::CommandLine;
@@ -13,7 +13,6 @@ use gridiron::automaton;
 use gridiron::rect_map::{Rectangle, RectangleMap};
 use iso2d::solver::Solver;
 use rayon::prelude::*;
-use std::sync::Arc;
 
 fn adjacency_list(
     patches: &RectangleMap<i64, Patch>,
@@ -109,7 +108,6 @@ pub fn max_wavespeed(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f6
 
 pub fn run() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
-    let setup: Arc<dyn Setup + Send + Sync> = Arc::new(Explosion {});
 
     let rk_order = cmdline.rk_order as usize;
     let fold = cmdline.fold;
@@ -117,6 +115,8 @@ pub fn run() -> Result<(), error::Error> {
     let cfl = cmdline.cfl_number;
     let outdir = cmdline.outdir.as_deref().unwrap_or(".");
     let mut state = make_state(&cmdline)?;
+    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
+
     let patch_map: RectangleMap<_, _> = state
         .primitive_patches
         .iter()

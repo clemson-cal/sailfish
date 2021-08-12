@@ -9,6 +9,7 @@ use gridiron::index_space::IndexSpace;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
 use std::str::FromStr;
+use std::sync::Arc;
 
 // macro_rules! boxed_setup_closure {
 //     ($setup:ident) => {
@@ -36,13 +37,16 @@ pub fn possible_setups_info() -> error::Error {
     PrintUserInformation(message)
 }
 
-pub fn make_setup(setup_name: &str, parameters: &str) -> Result<Box<dyn Setup>, error::Error> {
+pub fn make_setup(
+    setup_name: &str,
+    parameters: &str,
+) -> Result<Arc<dyn Setup + Send + Sync>, error::Error> {
     match setup_name {
-        "binary" => Ok(Box::new(Binary::from_str(parameters)?)),
-        "explosion" => Ok(Box::new(Explosion::from_str(parameters)?)),
-        "shocktube" => Ok(Box::new(Shocktube::from_str(parameters)?)),
-        "sedov" => Ok(Box::new(Sedov::from_str(parameters)?)),
-        "collision" => Ok(Box::new(Collision::from_str(parameters)?)),
+        "binary" => Ok(Arc::new(Binary::from_str(parameters)?)),
+        "explosion" => Ok(Arc::new(Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Arc::new(Shocktube::from_str(parameters)?)),
+        "sedov" => Ok(Arc::new(Sedov::from_str(parameters)?)),
+        "collision" => Ok(Arc::new(Collision::from_str(parameters)?)),
         _ => Err(possible_setups_info()),
     }
 }
@@ -89,12 +93,10 @@ pub trait Setup {
     }
     fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
         match mesh {
-            Mesh::Structured(mesh) => {
-                Patch::from_slice_function(space, 3, |(i, j), prim| {
-                    let [x, y] = mesh.cell_coordinates(i, j);
-                    self.initial_primitive(x, y, prim)
-                })
-            }
+            Mesh::Structured(mesh) => Patch::from_slice_function(space, 3, |(i, j), prim| {
+                let [x, y] = mesh.cell_coordinates(i, j);
+                self.initial_primitive(x, y, prim)
+            }),
             _ => unimplemented!(),
         }
     }
