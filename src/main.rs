@@ -197,7 +197,7 @@ fn main() {
             Err(e) => print!("{}", e),
         }
     } else {
-        match main_patches::run(iso2d::solver::Builder) {
+        match main_patches::launch_patch_based(iso2d::solver::Builder) {
             Ok(_) => {}
             Err(e) => print!("{}", e),
         }

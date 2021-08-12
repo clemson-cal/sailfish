@@ -2,7 +2,7 @@ use crate::cmdline;
 use crate::error;
 use crate::mesh::Mesh;
 use crate::patch::Patch;
-use crate::sailfish::{ExecutionMode, PatchBasedSolve, PatchBasedBuild};
+use crate::sailfish::{ExecutionMode, PatchBasedBuild, PatchBasedSolve};
 use crate::setup;
 use crate::split_at_first_colon;
 use crate::state::{RecurringTask, State};
@@ -88,7 +88,10 @@ fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     }
 }
 
-pub fn max_wavespeed<Solver: PatchBasedSolve>(solvers: &[Solver], pool: &Option<rayon::ThreadPool>) -> f64 {
+pub fn max_wavespeed<Solver: PatchBasedSolve>(
+    solvers: &[Solver],
+    pool: &Option<rayon::ThreadPool>,
+) -> f64 {
     if let Some(pool) = pool {
         pool.install(|| {
             solvers
@@ -104,7 +107,7 @@ pub fn max_wavespeed<Solver: PatchBasedSolve>(solvers: &[Solver], pool: &Option<
     }
 }
 
-pub fn run<Builder, Solver>(builder: Builder) -> Result<(), error::Error>
+pub fn launch_patch_based<Builder, Solver>(builder: Builder) -> Result<(), error::Error>
 where
     Builder: PatchBasedBuild<Solver = Solver>,
     Solver: PatchBasedSolve,
@@ -116,8 +119,13 @@ where
     let cpi = cmdline.checkpoint_interval;
     let cfl = cmdline.cfl_number;
     let outdir = cmdline.outdir.as_deref().unwrap_or(".");
+    let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
     let mut state = make_state(&cmdline)?;
     let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
+    let end_time = cmdline
+        .end_time
+        .or_else(|| setup.end_time())
+        .unwrap_or(f64::MAX);
 
     let patch_map: RectangleMap<_, _> = state
         .primitive_patches
@@ -155,7 +163,15 @@ where
         ExecutionMode::GPU => None,
     };
 
-    while state.time < cmdline.end_time.unwrap_or(0.1) {
+    let set_timestep = |solvers: &mut [Solver]| {
+        let dt = cfl * min_spacing / max_wavespeed(solvers, &pool);
+        for solver in solvers {
+            solver.set_timestep(dt)
+        }
+        dt
+    };
+
+    while state.time < end_time {
         if state.checkpoint.is_due(state.time, cpi) {
             state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
             state.write_checkpoint(&outdir)?;
@@ -164,11 +180,13 @@ where
         let start = std::time::Instant::now();
         let mut dt = 0.0;
 
-        for _ in 0..fold {
-            dt = cfl * min_spacing / max_wavespeed(solvers.as_slice(), &pool);
+        if !recompute_dt_each_iteration {
+            dt = set_timestep(&mut solvers);
+        }
 
-            for solver in &mut solvers {
-                solver.set_timestep(dt)
+        for _ in 0..fold {
+            if recompute_dt_each_iteration {
+                dt = set_timestep(&mut solvers);
             }
             for _ in 0..rk_order {
                 solvers = match pool {
