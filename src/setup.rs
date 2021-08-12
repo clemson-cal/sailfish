@@ -53,6 +53,7 @@ pub fn make_setup(
 
 pub trait Setup {
     fn print_parameters(&self);
+    fn solver_name(&self) -> String;
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
     fn initial_time(&self) -> f64 {
         0.0
@@ -121,6 +122,9 @@ impl std::str::FromStr for Explosion {
 
 impl Setup for Explosion {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
@@ -217,6 +221,10 @@ impl Setup for Binary {
         }
     }
 
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
+    }
+
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
@@ -299,6 +307,9 @@ impl std::str::FromStr for Shocktube {
 
 impl Setup for Shocktube {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         if x < 0.5 {
             primitive[0] = 1.0;
@@ -353,6 +364,9 @@ impl std::str::FromStr for Collision {
 
 impl Setup for Collision {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let xl: f64 = -0.25;
         let xr: f64 = 0.25;
@@ -436,6 +450,9 @@ impl std::str::FromStr for Sedov {
 
 impl Setup for Sedov {
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "eiler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let row = self.table.sample(x);
         primitive[0] = row[1];

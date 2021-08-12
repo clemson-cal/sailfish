@@ -2,9 +2,16 @@
 extern crate openmp_sys;
 use crate::cmdline::CommandLine;
 use crate::error::Error::*;
+use crate::mesh::Mesh;
+use crate::patch::Patch;
+use crate::sailfish::{ExecutionMode, PatchBasedBuild, PatchBasedSolve};
 use crate::setup::Setup;
-use crate::state::State;
+use crate::state::{RecurringTask, State};
 use cfg_if::cfg_if;
+use gridiron::adjacency_list::AdjacencyList;
+use gridiron::automaton;
+use gridiron::rect_map::{Rectangle, RectangleMap};
+use rayon::prelude::*;
 use std::path::Path;
 
 pub mod cmdline;
@@ -12,7 +19,6 @@ pub mod error;
 pub mod euler1d;
 pub mod iso2d;
 pub mod lookup_table;
-pub mod main_patches;
 pub mod mesh;
 pub mod patch;
 pub mod sailfish;
@@ -43,6 +49,25 @@ fn split_at_first_colon(string: &str) -> (&str, &str) {
     (n, p)
 }
 
+fn parent_dir(path: &str) -> Option<&str> {
+    Path::new(path).parent().and_then(Path::to_str)
+}
+
+fn adjacency_list(
+    patches: &RectangleMap<i64, Patch>,
+    num_guard: usize,
+) -> AdjacencyList<Rectangle<i64>> {
+    let mut edges = AdjacencyList::new();
+    for (b, q) in patches.iter() {
+        for (a, p) in patches.query_rect(q.index_space().extend_all(num_guard as i64)) {
+            if a != b {
+                edges.insert(p.rect(), q.rect())
+            }
+        }
+    }
+    edges
+}
+
 fn new_state(
     command_line: CommandLine,
     setup_name: &str,
@@ -50,6 +75,26 @@ fn new_state(
 ) -> Result<State, error::Error> {
     let setup = setup::make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(command_line.resolution.unwrap_or(1024));
+    let num_patches = match command_line.execution_mode() {
+        ExecutionMode::CPU => 512, // TODO: get patch count from command line
+        ExecutionMode::OMP => 1,
+        ExecutionMode::GPU => gpu_core::all_devices().count(),
+    };
+
+    let primitive_patches = match mesh {
+        Mesh::Structured(_) => mesh
+            .index_space()
+            .tile(num_patches)
+            .into_iter()
+            .map(|s| setup.initial_primitive_patch(&s, &mesh))
+            .collect(),
+        Mesh::FacePositions1D(_) => vec![],
+    };
+
+    let primitive = match mesh {
+        Mesh::Structured(_) => vec![],
+        Mesh::FacePositions1D(_) => setup.initial_primitive_vec(&mesh),
+    };
 
     let state = State {
         command_line,
@@ -57,9 +102,9 @@ fn new_state(
         restart_file: None,
         iteration: 0,
         time: setup.initial_time(),
-        primitive: setup.initial_primitive_vec(&mesh),
-        primitive_patches: vec![],
-        checkpoint: state::RecurringTask::new(),
+        primitive,
+        primitive_patches,
+        checkpoint: RecurringTask::new(),
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
     };
@@ -70,7 +115,7 @@ fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     let state = if let Some(ref setup_string) = cmdline.setup {
         let (name, parameters) = split_at_first_colon(setup_string);
         if name.ends_with(".sf") {
-            state::State::from_checkpoint(name, parameters)?
+            State::from_checkpoint(name, parameters)?
         } else {
             new_state(cmdline.clone(), name, parameters)?
         }
@@ -84,11 +129,133 @@ fn make_state(cmdline: &CommandLine) -> Result<State, error::Error> {
     }
 }
 
-fn parent_dir(path: &str) -> Option<&str> {
-    Path::new(path).parent().and_then(Path::to_str)
+pub fn max_wavespeed<Solver: PatchBasedSolve>(
+    solvers: &[Solver],
+    pool: &Option<rayon::ThreadPool>,
+) -> f64 {
+    if let Some(pool) = pool {
+        pool.install(|| {
+            solvers
+                .par_iter()
+                .map(|s| s.max_wavespeed())
+                .reduce(|| 0.0, f64::max)
+        })
+    } else {
+        solvers
+            .iter()
+            .map(|s| s.max_wavespeed())
+            .fold(0.0, f64::max)
+    }
 }
 
-fn run() -> Result<(), error::Error> {
+pub fn launch_patch_based<Builder, Solver>(builder: Builder) -> Result<(), error::Error>
+where
+    Builder: PatchBasedBuild<Solver = Solver>,
+    Solver: PatchBasedSolve,
+{
+    let cmdline = cmdline::parse_command_line()?;
+
+    let rk_order = cmdline.rk_order as usize;
+    let fold = cmdline.fold;
+    let cpi = cmdline.checkpoint_interval;
+    let cfl = cmdline.cfl_number;
+    let outdir = cmdline.outdir.as_deref().unwrap_or(".");
+    let recompute_dt_each_iteration = cmdline.recompute_dt_each_iteration()?;
+    let mut state = make_state(&cmdline)?;
+    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
+    let end_time = cmdline
+        .end_time
+        .or_else(|| setup.end_time())
+        .unwrap_or(f64::MAX);
+
+    let patch_map: RectangleMap<_, _> = state
+        .primitive_patches
+        .iter()
+        .map(|p| (p.rect(), p.clone()))
+        .collect();
+
+    let min_spacing = state.mesh.min_spacing();
+    let edge_list = adjacency_list(&patch_map, 2);
+    let mut solvers = vec![];
+    let mut devices = gpu_core::all_devices().cycle();
+
+    let structured_mesh = match state.mesh {
+        Mesh::Structured(mesh) => mesh,
+        Mesh::FacePositions1D(_) => todo!(),
+    };
+
+    for (_, patch) in patch_map.into_iter() {
+        let solver = builder.build(
+            state.time,
+            patch,
+            structured_mesh,
+            &edge_list,
+            rk_order,
+            cmdline.execution_mode(),
+            devices.next().filter(|_| cmdline.use_gpu),
+            setup.clone(),
+        );
+        solvers.push(solver)
+    }
+
+    let pool: Option<rayon::ThreadPool> = match cmdline.execution_mode() {
+        ExecutionMode::CPU => Some(rayon::ThreadPoolBuilder::new().build().unwrap()),
+        ExecutionMode::OMP => None,
+        ExecutionMode::GPU => None,
+    };
+
+    let set_timestep = |solvers: &mut [Solver]| {
+        let dt = cfl * min_spacing / max_wavespeed(solvers, &pool);
+        for solver in solvers {
+            solver.set_timestep(dt)
+        }
+        dt
+    };
+
+    while state.time < end_time {
+        if state.checkpoint.is_due(state.time, cpi) {
+            state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
+            state.write_checkpoint(&outdir)?;
+        }
+
+        let start = std::time::Instant::now();
+        let mut dt = 0.0;
+
+        if !recompute_dt_each_iteration {
+            dt = set_timestep(&mut solvers);
+        }
+
+        for _ in 0..fold {
+            if recompute_dt_each_iteration {
+                dt = set_timestep(&mut solvers);
+            }
+            for _ in 0..rk_order {
+                solvers = match pool {
+                    Some(ref pool) => {
+                        pool.scope(|s| automaton::execute_rayon(s, solvers).collect())
+                    }
+                    None => automaton::execute(solvers).collect(),
+                };
+            }
+            state.time += dt;
+            state.iteration += 1;
+        }
+        let mzps =
+            (state.mesh.num_total_zones() * fold) as f64 / 1e6 / start.elapsed().as_secs_f64();
+
+        println!(
+            "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
+            state.iteration, state.time, dt, mzps,
+        );
+    }
+
+    state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
+    state.write_checkpoint(outdir)?;
+
+    Ok(())
+}
+
+fn launch_single_patch() -> Result<(), error::Error> {
     let cmdline = cmdline::parse_command_line()?;
     let mut state = make_state(&cmdline)?;
     let mut dt = 0.0;
@@ -190,16 +357,19 @@ fn run() -> Result<(), error::Error> {
     Ok(())
 }
 
+pub fn run() -> Result<(), error::Error> {
+    let cline = cmdline::parse_command_line()?;
+    let state = make_state(&cline)?;
+    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
+    match setup.solver_name().as_str() {
+        "iso2d" => launch_patch_based(iso2d::solver::Builder),
+        "euler1d" => launch_single_patch(),
+        _ => panic!("unknown solver name"),
+    }
+}
+
 fn main() {
-    if false {
-        match run() {
-            Ok(_) => {}
-            Err(e) => print!("{}", e),
-        }
-    } else {
-        match main_patches::launch_patch_based(iso2d::solver::Builder) {
-            Ok(_) => {}
-            Err(e) => print!("{}", e),
-        }
+    if let Err(e) = run() {
+        print!("{}", e)
     }
 }
