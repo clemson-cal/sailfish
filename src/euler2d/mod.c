@@ -911,8 +911,7 @@ EXTERN_C void euler2d_primitive_to_conserved(
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
-            // WARNING: should x & y be transposed for non-square grids?
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
             primitive_to_conserved_kernel<<<bd, bs>>>(mesh, primitive, conserved);
             #endif
             break;
@@ -1068,7 +1067,7 @@ EXTERN_C void euler2d_advance_rk(
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
             if (alpha == 0.0) {
                 advance_rk_kernel_inviscid<<<bd, bs>>>(
                     mesh,
@@ -1152,7 +1151,7 @@ EXTERN_C void euler2d_wavespeed(
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
+            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
             wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed);
             #endif
             break;
