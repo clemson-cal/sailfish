@@ -23,6 +23,7 @@
 #define PLM_THETA 1.5
 #define GAMMA_LAW_INDEX (5.0 / 3.0)
 
+
 // ============================ MATH ==========================================
 // ============================================================================
 #define real double
@@ -52,31 +53,7 @@ static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real 
 
 // ============================ GRAVITY =======================================
 // ============================================================================
-//static __host__ __device__ real gravitational_potential(
-//    struct PointMass *masses,
-//    int num_masses,
-//    real x1,
-//    real y1,
-//    real h)
-//{
-//    real phi = 0.0;
 
-//    for (int p = 0; p < num_masses; ++p)
-//    {
-//        real x0 = masses[p].x;
-//        real y0 = masses[p].y;
-//        real mp = masses[p].mass;
-//        //real rs = masses[p].radius;
-
-//        real dx = x1 - x0;
-//        real dy = y1 - y0;
-//        real r2 = dx * dx + dy * dy;
-//        real r2_soft = r2 + (0.5 * h) * (0.5 * h);
-
-//        phi -= mp / sqrt(r2_soft);
-//    }
-//    return phi;
-//}
 
 static __host__ __device__ real disk_height(
     struct PointMass *masses,
@@ -130,6 +107,8 @@ static __host__ __device__ void point_mass_source_term(
     real mag = sigma * mp / r2_soft;
     real fx = -mag * dx / dr;
     real fy = -mag * dy / dr;
+    real vx = prim[1];
+    real vy = prim[2];
     real sink_rate = 0.0;
 
     if (dr < 4.0 * rs)
@@ -147,7 +126,7 @@ static __host__ __device__ void point_mass_source_term(
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
-            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (prim[1] * prim[1] + prim[2] * prim[2])) + dt * (fx * prim[1] + fy * prim[2]);
+            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vx * vx + vy * vy)) + dt * (fx * vx + fy * vy);
             break;
         case TorqueFree: {
             real vx        = prim[1];
@@ -162,14 +141,14 @@ static __host__ __device__ void point_mass_source_term(
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * vxstar + dt * fx;
             delta_cons[2] = dt * mdot * vystar + dt * fy;
-            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vxstar * vxstar + vystar * vystar)) + dt * (fx * prim[1] + fy * prim[2]);
+            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vxstar * vxstar + vystar * vystar)) + dt * (fx * vx + fy * vy);
             break;
         }
         case ForceFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * fx;
             delta_cons[2] = dt * fy;
-            delta_cons[3] = dt * (fx * prim[1] + fy * prim[2]);
+            delta_cons[3] = dt * (fx * vx + fy * vy);
             break;
         default:
             delta_cons[0] = 0.0;
@@ -279,33 +258,45 @@ static __host__ __device__ void shear_strain(const real *gx, const real *gy, rea
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __host__ __device__ void cooling_term(real cooling_coefficient, real mach_ceiling, real dt, real *prim, real *cons)
+static __host__ __device__ void cooling_term(
+    real cooling_coefficient,
+    real mach_ceiling,
+    real dt,
+    real *prim,
+    real *cons)
 {
     real gamma = GAMMA_LAW_INDEX;
     real sigma = prim[0];
-    real eps   = prim[3] / prim[0] / (gamma - 1.0);
+    real eps = prim[3] / prim[0] / (gamma - 1.0);
     real eps_cooled = eps * pow(1.0 + 3.0 * cooling_coefficient / pow(sigma, 2.0) * pow(eps,3) * dt, -1.0 / 3.0);
+    real vx = prim[1];
+    real vy = prim[2];
 
-    real ek = 0.5 * (prim[1] * prim[1] + prim[2] * prim[2]);
+    real ek = 0.5 * (vx * vx + vy * vy);
     eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) / pow(mach_ceiling,2));
 
     cons[3] += sigma * (eps_cooled - eps);
 }
 
-static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim, real velocity_ceiling, real density_floor, real pressure_floor)
+static __host__ __device__ void conserved_to_primitive(
+    const real *cons,
+    real *prim,
+    real velocity_ceiling,
+    real density_floor,
+    real pressure_floor)
 {
     real gamma = GAMMA_LAW_INDEX;
     real pres  = max2(pressure_floor, (cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0]) * (gamma - 1.0));
-    real vx    = sign(cons[1]) * min2(fabs(cons[1] / cons[0]), velocity_ceiling);
-    real vy    = sign(cons[2]) * min2(fabs(cons[2] / cons[0]), velocity_ceiling);
-    real rho   = cons[0];
+    real vx = sign(cons[1]) * min2(fabs(cons[1] / cons[0]), velocity_ceiling);
+    real vy = sign(cons[2]) * min2(fabs(cons[2] / cons[0]), velocity_ceiling);
+    real rho = cons[0];
 
     if (cons[0] < density_floor)
     {
         rho = density_floor;
-        vx  = 0.0;
-        vy  = 0.0;
-        pres= pressure_floor;
+        vx = 0.0;
+        vy = 0.0;
+        pres = pressure_floor;
     }
 
     prim[0] = rho;
@@ -658,12 +649,8 @@ static __host__ __device__ void advance_rk_zone_inviscid(
 {
     real dx = mesh.dx;
     real dy = mesh.dy;
-    //real xl = mesh.x0 + (i + 0.0) * dx;
     real xc = mesh.x0 + (i + 0.5) * dx;
-    //real xr = mesh.x0 + (i + 1.0) * dx;
-    //real yl = mesh.y0 + (j + 0.0) * dy;
     real yc = mesh.y0 + (j + 0.5) * dy;
-    //real yr = mesh.y0 + (j + 1.0) * dy;
 
     real *un = GET(conserved_rk, i, j);
     real *pcc = GET(primitive_rd, i, j);
@@ -798,7 +785,26 @@ static void __global__ advance_rk_kernel(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
+        advance_rk_zone(
+            mesh,
+            conserved_rk,
+            primitive_rd,
+            primitive_wr,
+            eos,
+            buffer,
+            masses,
+            num_masses,
+            alpha,
+            a,
+            dt,
+            velocity_ceiling,
+            cooling_coefficient,
+            mach_ceiling,
+            density_floor,
+            pressure_floor,
+            i,
+            j
+        );
     }
 }
 
@@ -824,7 +830,25 @@ static void __global__ advance_rk_kernel_inviscid(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
+        advance_rk_zone_inviscid(
+            mesh,
+            conserved_rk,
+            primitive_rd,
+            primitive_wr,
+            eos,
+            buffer,
+            masses,
+            num_masses,
+            a,
+            dt,
+            velocity_ceiling,
+            cooling_coefficient,
+            mach_ceiling,
+            density_floor,
+            pressure_floor,
+            i,
+            j
+        );
     }
 }
 
@@ -832,9 +856,7 @@ static void __global__ wavespeed_kernel(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
-    struct Patch wavespeed,
-    struct PointMass *masses,
-    int num_masses)
+    struct Patch wavespeed)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -856,8 +878,8 @@ static void __global__ wavespeed_kernel(
  * Converts an array of primitive data to an array of conserved data. The
  * array index space must follow the descriptions below.
  * @param mesh               The mesh [ni,     nj]
- * @param primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
- * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [3]
+ * @param primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
+ * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [4]
  * @param mode               The execution mode
  */
 EXTERN_C void euler2d_primitive_to_conserved(
@@ -889,7 +911,8 @@ EXTERN_C void euler2d_primitive_to_conserved(
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
-            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y); // WARNING: should x & y be transposed for non-square grids?
+            // WARNING: should x & y be transposed for non-square grids?
+            dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
             primitive_to_conserved_kernel<<<bd, bs>>>(mesh, primitive, conserved);
             #endif
             break;
@@ -902,16 +925,21 @@ EXTERN_C void euler2d_primitive_to_conserved(
  * Updates an array of primitive data by advancing it a single Runge-Kutta
  * step.
  * @param mesh                  The mesh [ni,     nj]
- * @param conserved_rk_ptr[in]  [ 0,  0] [ni,     nj]     [3]
- * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
- * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [3]
+ * @param conserved_rk_ptr[in]  [ 0,  0] [ni,     nj]     [4]
+ * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
+ * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [4]
  * @param eos                   The EOS
  * @param buffer                The buffer region
  * @param masses[in]            A pointer a list of point mass objects
  * @param num_masses            The number of point masses
- * @param nu                    The viscosity coefficient
+ * @param alpha                 The alpha-viscosity parameter
  * @param a                     The RK averaging parameter
  * @param dt                    The time step
+ * @param velocity_ceiling      Safety parameters
+ * @param cooling_coefficient   Safety parameters
+ * @param mach_ceiling          Safety parameters
+ * @param density_floor         Safety parameters
+ * @param pressure_floor        Safety parameters
  * @param mode                  The execution mode
  */
 EXTERN_C void euler2d_advance_rk(
@@ -941,11 +969,46 @@ EXTERN_C void euler2d_advance_rk(
         case CPU: {
             if (alpha == 0.0) {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
+                    advance_rk_zone_inviscid(mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
+                        i,
+                        j
+                    );
                 }
             } else {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
+                    advance_rk_zone(mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        alpha,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
+                        i,
+                        j
+                    );
                 }
             }
             break;
@@ -955,11 +1018,46 @@ EXTERN_C void euler2d_advance_rk(
             #ifdef _OPENMP
             if (alpha == 0.0) {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
+                    advance_rk_zone_inviscid(mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
+                        i,
+                        j
+                    );
                 }
             } else {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor, i, j);
+                    advance_rk_zone(mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        alpha,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
+                        i,
+                        j
+                    );
                 }
             }
             break;
@@ -972,9 +1070,42 @@ EXTERN_C void euler2d_advance_rk(
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
             if (alpha == 0.0) {
-                advance_rk_kernel_inviscid<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor);
+                advance_rk_kernel_inviscid<<<bd, bs>>>(
+                    mesh,
+                    conserved_rk,
+                    primitive_rd,
+                    primitive_wr,
+                    eos,
+                    buffer,
+                    masses,
+                    num_masses,
+                    a,
+                    dt,
+                    velocity_ceiling,
+                    cooling_coefficient,
+                    mach_ceiling,
+                    density_floor,
+                    pressure_floor
+                );
             } else {
-                advance_rk_kernel<<<bd, bs>>>(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, alpha, a, dt, velocity_ceiling, cooling_coefficient, mach_ceiling, density_floor, pressure_floor);
+                advance_rk_kernel<<<bd, bs>>>(
+                    mesh,
+                    conserved_rk,
+                    primitive_rd,
+                    primitive_wr,
+                    eos,
+                    buffer,
+                    masses,
+                    num_masses,
+                    alpha,
+                    a,
+                    dt,
+                    velocity_ceiling,
+                    cooling_coefficient,
+                    mach_ceiling,
+                    density_floor,
+                    pressure_floor
+                );
             }
             #endif
             break;
@@ -986,11 +1117,9 @@ EXTERN_C void euler2d_advance_rk(
 /**
  * Fill a buffer with the maximum wavespeed in each zone.
  * @param  mesh               The mesh [ni,     nj]
- * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
  * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
  * @param eos                 The EOS
- * @param masses[in]          A pointer a list of point mass objects
- * @param num_masses          The number of point masses
  * @param mode                The execution mode
  */
 EXTERN_C void euler2d_wavespeed(
@@ -998,8 +1127,6 @@ EXTERN_C void euler2d_wavespeed(
     real *primitive_ptr,
     real *wavespeed_ptr,
     struct EquationOfState eos,
-    struct PointMass *masses,
-    int num_masses,
     enum ExecutionMode mode)
 {
     struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
@@ -1026,7 +1153,7 @@ EXTERN_C void euler2d_wavespeed(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.ni + bs.x - 1) / bs.x, (mesh.nj + bs.y - 1) / bs.y);
-            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed, masses, num_masses);
+            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed);
             #endif
             break;
         }
