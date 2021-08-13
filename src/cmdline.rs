@@ -204,7 +204,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Err(Cmdline("checkpoint interval --checkpoint (-c) must be >0".to_string()))
     } else if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
-    } else if [None, Some("iter"), Some("fold")].contains(&c.recompute_timestep.as_deref()) {
+    } else if ![None, Some("iter"), Some("fold")].contains(&c.recompute_timestep.as_deref()) {
         Err(Cmdline("invalid mode for --timestep, expected (iter|fold)".to_owned()))
     } else {
         Ok(c)
