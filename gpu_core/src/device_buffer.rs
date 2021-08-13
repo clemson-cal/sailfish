@@ -55,17 +55,17 @@ impl<T: Copy> DeviceBuffer<T> {
 
     /// Copy this buffer to a buffer on another device.
     pub fn copy_to(&self, device: Device) -> Self {
+        let buffer = unsafe { device.uninit_buffer(self.len()) };
         on_device(self.device_id, || unsafe {
-            let buffer = device.uninit_buffer(self.len());
             gpu_memcpy_peer(
                 buffer.ptr as *mut c_void,
                 device.0,
                 self.ptr as *const c_void,
                 self.device_id,
                 (self.len() * std::mem::size_of::<T>()) as c_ulong,
-            );
-            buffer
-        })
+            )
+        });
+        buffer
     }
 
     /// Insert the contents of a contiguous buffer into a subset of this one.
@@ -169,12 +169,12 @@ impl<T: Copy> DeviceBuffer<T> {
             )
         });
 
-        if let Some(error) = self.device().last_error() {
-            panic!(
-                "DeviceBuffer::memcpy_3d {} dst={:?}/{:?} src={:?}/{:?} count={:?}",
-                error, dst_start, dst_shape, src_start, src_shape, count,
-            );
-        }
+        // if let Some(error) = self.device().last_error() {
+        //     panic!(
+        //         "DeviceBuffer::memcpy_3d {} dst={:?}/{:?} src={:?}/{:?} count={:?}",
+        //         error, dst_start, dst_shape, src_start, src_shape, count,
+        //     );
+        // }
     }
 }
 
@@ -206,18 +206,17 @@ impl<T: Copy> Drop for DeviceBuffer<T> {
 
 impl<T: Copy> Clone for DeviceBuffer<T> {
     fn clone(&self) -> Self {
-        on_device(self.device_id, || {
-            let bytes = (self.len * std::mem::size_of::<T>()) as c_ulong;
-            unsafe {
-                let ptr = gpu_malloc(bytes);
-                gpu_memcpy_dtod(ptr, self.ptr as *const c_void, bytes);
-                Self {
-                    ptr: ptr as *mut T,
-                    len: self.len,
-                    device_id: self.device_id,
-                }
-            }
-        })
+        let bytes = (self.len * std::mem::size_of::<T>()) as c_ulong;
+        let ptr = on_device(self.device_id, || unsafe {
+            let ptr = gpu_malloc(bytes);
+            gpu_memcpy_dtod(ptr, self.ptr as *const c_void, bytes);
+            ptr
+        });
+        Self {
+            ptr: ptr as *mut T,
+            len: self.len,
+            device_id: self.device_id,
+        }
     }
 }
 
@@ -239,13 +238,11 @@ impl Reduce for DeviceBuffer<f64> {
         if self.is_empty() {
             None
         } else {
-            self.device().scope(|device| {
-                let mut result = device.buffer_from(&[0.0]);
-                unsafe {
-                    gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr())
-                };
-                Some(Vec::from(&result)[0])
-            })
+            let mut result = self.device().buffer_from(&[0.0]);
+            on_device(self.device_id, || unsafe {
+                gpu_vec_max_f64(self.ptr, self.len as c_ulong, result.as_mut_device_ptr())
+            });
+            Some(Vec::from(&result)[0])
         }
     }
 }

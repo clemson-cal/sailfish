@@ -68,23 +68,9 @@ impl Device {
         on_device(self.0, || unsafe { gpu_device_synchronize() })
     }
 
-    pub fn last_error(&self) -> Option<String> {
-        use std::ffi::CStr;
-
-        on_device(self.0, || {
-            let error_str = unsafe { gpu_get_last_error() };
-            if error_str == std::ptr::null() {
-                None
-            } else {
-                Some(
-                    unsafe { CStr::from_ptr(error_str) }
-                        .to_str()
-                        .unwrap()
-                        .to_owned(),
-                )
-            }
-        })
-    }
+    // pub fn last_error(&self) -> Option<String> {
+    //     last_error(self.0)
+    // }
 }
 
 impl Default for Device {

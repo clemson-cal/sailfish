@@ -1,4 +1,5 @@
 use cfg_if::cfg_if;
+use std::ffi::CStr;
 
 pub mod buffer;
 pub mod device;
@@ -8,7 +9,7 @@ pub use device::Device;
 cfg_if! {
     if #[cfg(feature = "gpu")] {
         use std::os::raw::{c_int, c_ulong, c_void, c_char};
-        pub mod device_buffer;        
+        pub mod device_buffer;
         pub use device_buffer::{DeviceBuffer, Reduce};
     }
 }
@@ -47,7 +48,8 @@ extern "C" {
         count_i: c_ulong,
         count_j: c_ulong,
         count_k: c_ulong,
-        bytes_per_elem: c_ulong);
+        bytes_per_elem: c_ulong,
+    );
 
     // Device control
     pub fn gpu_device_synchronize();
@@ -89,9 +91,39 @@ pub fn all_devices() -> impl Iterator<Item = Device> + Clone {
 
 #[cfg(feature = "gpu")]
 fn on_device<T, F: FnMut() -> T>(device: i32, mut f: F) -> T {
-    let orig = unsafe { gpu_get_device() };
-    unsafe { gpu_set_device(device) };
-    let result = f();
-    unsafe { gpu_set_device(orig) };
-    result
+    let (result, error_str) = unsafe {
+        let orig = gpu_get_device();
+        gpu_set_device(device);
+        let result = f();
+        let error_str = gpu_get_last_error();
+        let error_str = if error_str != std::ptr::null() {
+            Some(CStr::from_ptr(error_str).to_str().unwrap().to_owned())
+        } else {
+            None
+        };
+        gpu_set_device(orig);
+        (result, error_str)
+    };
+    if let Some(error_str) = error_str {
+        panic!("{}", error_str)
+    } else {
+        result
+    }
 }
+
+// #[cfg(feature = "gpu")]
+// fn last_error(device: i32) -> Option<String> {
+//     on_device(device, || {
+//         let error_str = unsafe { gpu_get_last_error() };
+//         if error_str == std::ptr::null() {
+//             None
+//         } else {
+//             Some(
+//                 unsafe { CStr::from_ptr(error_str) }
+//                     .to_str()
+//                     .unwrap()
+//                     .to_owned(),
+//             )
+//         }
+//     })
+// }
