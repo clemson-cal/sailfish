@@ -983,8 +983,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
-                        i,
-                        j
+                        i, j
                     );
                 }
             } else {
@@ -1005,8 +1004,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
-                        i,
-                        j
+                        i, j
                     );
                 }
             }
@@ -1032,8 +1030,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
-                        i,
-                        j
+                        i, j
                     );
                 }
             } else {
@@ -1054,8 +1051,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
-                        i,
-                        j
+                        i, j
                     );
                 }
             }

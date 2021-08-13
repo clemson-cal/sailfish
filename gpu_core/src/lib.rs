@@ -1,5 +1,4 @@
 use cfg_if::cfg_if;
-use std::ffi::CStr;
 
 pub mod buffer;
 pub mod device;
@@ -91,6 +90,7 @@ pub fn all_devices() -> impl Iterator<Item = Device> + Clone {
 
 #[cfg(feature = "gpu")]
 fn on_device<T, F: FnMut() -> T>(device: i32, mut f: F) -> T {
+    use std::ffi::CStr;
     let (result, error_str) = unsafe {
         let orig = gpu_get_device();
         gpu_set_device(device);

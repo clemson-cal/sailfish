@@ -839,11 +839,37 @@ EXTERN_C void iso2d_advance_rk(
         case CPU: {
             if (nu == 0.0) {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, i, j);
+                    advance_rk_zone_inviscid(
+                        mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        i, j
+                    );
                 }
             } else {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, i, j);
+                    advance_rk_zone(
+                        mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        nu,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        i, j);
                 }
             }
             break;
@@ -853,11 +879,36 @@ EXTERN_C void iso2d_advance_rk(
             #ifdef _OPENMP
             if (nu == 0.0) {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone_inviscid(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, a, dt, velocity_ceiling, i, j);
+                    advance_rk_zone_inviscid(
+                        mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        i, j);
                 }
             } else {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone(mesh, conserved_rk, primitive_rd, primitive_wr, eos, buffer, masses, num_masses, nu, a, dt, velocity_ceiling, i, j);
+                    advance_rk_zone(
+                        mesh,
+                        conserved_rk,
+                        primitive_rd,
+                        primitive_wr,
+                        eos,
+                        buffer,
+                        masses,
+                        num_masses,
+                        nu,
+                        a,
+                        dt,
+                        velocity_ceiling,
+                        i, j);
                 }
             }
             break;
