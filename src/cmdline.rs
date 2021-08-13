@@ -31,14 +31,12 @@ impl CommandLine {
         }
     }
 
-    pub fn recompute_dt_each_iteration(&self) -> Result<bool, Error> {
+    pub fn recompute_dt_each_iteration(&self) -> bool {
         match self.recompute_timestep.as_deref() {
-            None => Ok(true),
-            Some("iter") => Ok(true),
-            Some("fold") => Ok(false),
-            _ => Err(Error::Cmdline(
-                "invalid mode for --timestep, expected (iter|fold)".to_owned(),
-            )),
+            None => true,
+            Some("iter") => true,
+            Some("fold") => false,
+            _ => panic!(),
         }
     }
 }
@@ -60,7 +58,7 @@ impl Default for CommandLine {
             rk_order: 1,
             cfl_number: 0.2,
             recompute_timestep: None,
-        }        
+        }
     }
 }
 
@@ -206,6 +204,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Err(Cmdline("checkpoint interval --checkpoint (-c) must be >0".to_string()))
     } else if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
+    } else if [None, Some("iter"), Some("fold")].contains(&c.recompute_timestep.as_deref()) {
+        Err(Cmdline("invalid mode for --timestep, expected (iter|fold)".to_owned()))
     } else {
         Ok(c)
     }

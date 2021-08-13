@@ -2,7 +2,7 @@ use crate::euler2d;
 use crate::mesh;
 use crate::patch::Patch;
 use crate::sailfish::PatchBasedBuild;
-use crate::sailfish::{ExecutionMode, StructuredMesh, PatchBasedSolve};
+use crate::sailfish::{ExecutionMode, PatchBasedSolve, StructuredMesh};
 use crate::setup::Setup;
 use cfg_if::cfg_if;
 use gpu_core::Device;
@@ -181,7 +181,6 @@ impl PatchBasedBuild for Builder {
 }
 
 impl PatchBasedSolve for Solver {
-
     fn primitive(&self) -> Patch {
         self.primitive1.extract(&self.index_space)
     }

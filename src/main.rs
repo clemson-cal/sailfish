@@ -13,6 +13,7 @@ use gridiron::automaton;
 use gridiron::rect_map::{Rectangle, RectangleMap};
 use rayon::prelude::*;
 use std::path::Path;
+use std::sync::Arc;
 
 pub mod cmdline;
 pub mod error;
@@ -152,6 +153,7 @@ fn max_wavespeed<Solver: PatchBasedSolve>(
 
 fn launch_patch_based<Builder, Solver>(
     mut state: State,
+    setup: Arc<dyn Setup + Send + Sync>,
     cline: CommandLine,
     builder: Builder,
 ) -> Result<(), error::Error>
@@ -159,18 +161,28 @@ where
     Builder: PatchBasedBuild<Solver = Solver>,
     Solver: PatchBasedSolve,
 {
-    let rk_order = cline.rk_order as usize;
-    let fold = cline.fold;
-    let cpi = cline.checkpoint_interval;
-    let cfl = cline.cfl_number;
-    let outdir = cline.outdir.as_deref().unwrap_or(".");
-    let recompute_dt_each_iteration = cline.recompute_dt_each_iteration()?;
-    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
-    let end_time = cline
-        .end_time
-        .or_else(|| setup.end_time())
-        .unwrap_or(f64::MAX);
-
+    let (rk_order, fold, cpi, cfl, dt_each_iter, end_time, outdir) = (
+        cline.rk_order as usize,
+        cline.fold,
+        cline.checkpoint_interval,
+        cline.cfl_number,
+        cline.recompute_dt_each_iteration(),
+        cline
+            .end_time
+            .or_else(|| setup.end_time())
+            .unwrap_or(f64::MAX),
+        cline
+            .outdir
+            .clone()
+            .or_else(|| {
+                state
+                    .restart_file
+                    .as_deref()
+                    .and_then(parent_dir)
+                    .map(String::from)
+            })
+            .unwrap_or_else(|| String::from(".")),
+    );
     let patch_map: RectangleMap<_, _> = state
         .primitive_patches
         .iter()
@@ -211,7 +223,6 @@ where
             ));
         }
     }
-
     if cline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
@@ -242,12 +253,12 @@ where
         let start = std::time::Instant::now();
         let mut dt = 0.0;
 
-        if !recompute_dt_each_iteration {
+        if !dt_each_iter {
             dt = set_timestep(&mut solvers);
         }
 
         for _ in 0..fold {
-            if recompute_dt_each_iteration {
+            if dt_each_iter {
                 dt = set_timestep(&mut solvers);
             }
             for _ in 0..rk_order {
@@ -271,14 +282,39 @@ where
     }
 
     state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
-    state.write_checkpoint(outdir)?;
+    state.write_checkpoint(&outdir)?;
 
     Ok(())
 }
 
-fn launch_single_patch(mut state: State, cline: CommandLine) -> Result<(), error::Error> {
-    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
-    let recompute_dt_each_iteration = cline.recompute_dt_each_iteration()?;
+fn launch_single_patch(
+    mut state: State,
+    setup: Arc<dyn Setup + Send + Sync>,
+    cline: CommandLine,
+) -> Result<(), error::Error> {
+    let (mesh, cfl, fold, chkpt_interval, rk_order, dt_each_iter, end_time, outdir) = (
+        state.mesh.clone(),
+        cline.cfl_number,
+        cline.fold,
+        cline.checkpoint_interval,
+        cline.rk_order,
+        cline.recompute_dt_each_iteration(),
+        cline
+            .end_time
+            .or_else(|| setup.end_time())
+            .unwrap_or(f64::MAX),
+        cline
+            .outdir
+            .clone()
+            .or_else(|| {
+                state
+                    .restart_file
+                    .as_deref()
+                    .and_then(parent_dir)
+                    .map(String::from)
+            })
+            .unwrap_or_else(|| String::from(".")),
+    );
     let mut solver = match &state.mesh {
         Mesh::FacePositions1D(faces) => euler1d::solver(
             cline.execution_mode(),
@@ -290,29 +326,8 @@ fn launch_single_patch(mut state: State, cline: CommandLine) -> Result<(), error
         _ => panic!("the single patch solver assumes you have a FacePositions mesh"),
     };
 
-    let (mesh, cfl, fold, chkpt_interval, rk_order, outdir) = (
-        state.mesh.clone(),
-        cline.cfl_number,
-        cline.fold,
-        cline.checkpoint_interval,
-        cline.rk_order,
-        cline
-            .outdir
-            .or_else(|| {
-                state
-                    .restart_file
-                    .as_deref()
-                    .and_then(parent_dir)
-                    .map(String::from)
-            })
-            .unwrap_or_else(|| String::from(".")),
-    );
     let mut dt = 0.0;
     let dx_min = mesh.min_spacing();
-    let end_time = cline
-        .end_time
-        .or_else(|| setup.end_time())
-        .unwrap_or(f64::MAX);
 
     if cline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
@@ -327,13 +342,13 @@ fn launch_single_patch(mut state: State, cline: CommandLine) -> Result<(), error
             state.write_checkpoint(&outdir)?;
         }
 
-        if !recompute_dt_each_iteration {
+        if !dt_each_iter {
             dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
         }
 
         let elapsed = time_exec(cline.device, || {
             for _ in 0..fold {
-                if recompute_dt_each_iteration {
+                if dt_each_iter {
                     dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
                 }
                 solver.advance(setup.as_ref(), rk_order, state.time, dt);
@@ -358,9 +373,9 @@ fn run() -> Result<(), error::Error> {
     let state = make_state(&cline)?;
     let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
     match setup.solver_name().as_str() {
-        "iso2d" => launch_patch_based(state, cline, iso2d::solver::Builder),
-        "euler1d" => launch_single_patch(state, cline),
-        "euler2d" => launch_patch_based(state, cline, euler2d::solver::Builder),
+        "iso2d" => launch_patch_based(state, setup, cline, iso2d::solver::Builder),
+        "euler1d" => launch_single_patch(state, setup, cline),
+        "euler2d" => launch_patch_based(state, setup, cline, euler2d::solver::Builder),
         _ => panic!("unknown solver name"),
     }
 }
