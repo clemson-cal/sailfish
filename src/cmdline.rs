@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::sailfish::ExecutionMode;
+use crate::sailfish::{self, ExecutionMode};
 use std::fmt::Write;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -18,7 +18,6 @@ pub struct CommandLine {
     pub rk_order: u32,
     pub cfl_number: f64,
     pub recompute_timestep: Option<String>,
-    pub velocity_ceiling: f64,
 }
 
 impl CommandLine {
@@ -44,27 +43,32 @@ impl CommandLine {
     }
 }
 
+impl Default for CommandLine {
+    fn default() -> Self {
+        Self {
+            use_omp: false,
+            use_gpu: false,
+            device: None,
+            upsample: None,
+            resolution: None,
+            fold: 10,
+            checkpoint_interval: 1.0,
+            checkpoint_logspace: None,
+            setup: None,
+            outdir: None,
+            end_time: None,
+            rk_order: 1,
+            cfl_number: 0.2,
+            recompute_timestep: None,
+        }        
+    }
+}
+
 #[rustfmt::skip]
 pub fn parse_command_line() -> Result<CommandLine, Error> {
     use Error::*;
 
-    let mut c = CommandLine {
-        use_omp: false,
-        use_gpu: false,
-        device: None,
-        upsample: None,
-        resolution: None,
-        fold: 10,
-        checkpoint_interval: 1.0,
-        checkpoint_logspace: None,
-        setup: None,
-        outdir: None,
-        end_time: None,
-        rk_order: 1,
-        cfl_number: 0.2,
-        recompute_timestep: None,
-        velocity_ceiling: 1e16,
-    };
+    let mut c = CommandLine::default();
 
     enum State {
         Ready,
@@ -77,7 +81,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Cfl,
         Outdir,
         RecomputeTimestep,
-        VelocityCeiling
     }
     std::convert::identity(State::Device); // black-box
     let mut state = State::Ready;
@@ -110,11 +113,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "usage: sailfish [setup|chkpt] [--version] [--help] <[options]>").unwrap();
                     writeln!(message, "       --version             print the code version number").unwrap();
                     writeln!(message, "       -h|--help             display this help message").unwrap();
-                    #[cfg(feature = "omp")]
                     writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
-                    #[cfg(feature = "gpu")]
-                    writeln!(message, "       -g|--use-gpu          run with GPU acceleration [-p is ignored]").unwrap();
-                    #[cfg(feature = "gpu")]
+                    writeln!(message, "       -g|--use-gpu          run with GPU acceleration").unwrap();
                     writeln!(message, "       -d|--device           a device ID to run on ([0]-#gpus)").unwrap();
                     writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
                     writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
@@ -124,15 +124,11 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
                     writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
                     writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
-                    writeln!(message, "       -v|--velocity-ceiling component-wise velocity ceiling [1e16]").unwrap();
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
                     return Err(PrintUserInformation(message));
                 }
-                #[cfg(feature = "omp")]
                 "-p" | "--use-omp" => c.use_omp = true,
-                #[cfg(feature = "gpu")]
                 "-g" | "--use-gpu" => c.use_gpu = true,
-                #[cfg(feature = "gpu")]
                 "-d" | "--device" => state = State::Device,
                 "-u" | "--upsample" => c.upsample = Some(true),
                 "-n" | "--resolution" => state = State::GridResolution,
@@ -142,7 +138,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-o" | "--outdir" => state = State::Outdir,
                 "-e" | "--end-time" => state = State::EndTime,
                 "-r" | "--rk-order" => state = State::RkOrder,
-                "-v" | "--velocity-ceiling" => state = State::VelocityCeiling,
                 "--cfl" => state = State::Cfl,
                 _ => {
                     if arg.starts_with('-') {
@@ -188,10 +183,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 c.rk_order = arg.parse().map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?;
                 state = State::Ready;
             }
-            State::VelocityCeiling => {
-                c.velocity_ceiling = arg.parse().map_err(|e| Cmdline(format!("velocity-ceiling {}: {}", arg, e)))?;
-                state = State::Ready;
-            }
             State::EndTime => {
                 c.end_time = Some(arg.parse().map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?);
                 state = State::Ready;
@@ -203,10 +194,16 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         }
     }
 
-    if c.use_omp && c.use_gpu {
+    if c.use_omp && !sailfish::compiled_with_omp() {
+        Err(CompiledWithoutOpenMP)
+    } else if c.use_gpu && !sailfish::compiled_with_gpu() {
+        Err(CompiledWithoutGpu)
+    } else if c.use_omp && c.use_gpu {
         Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
     } else if !(1..=3).contains(&c.rk_order) {
         Err(Cmdline("rk-order must be 1, 2, or 3".into()))
+    } else if c.checkpoint_interval <= 0.0 {
+        Err(Cmdline("checkpoint interval --checkpoint (-c) must be >0".to_string()))
     } else if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
     } else {

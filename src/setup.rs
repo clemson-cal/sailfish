@@ -1,11 +1,62 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::sailfish::{BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh};
+use crate::patch::Patch;
+use crate::sailfish::{
+    BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh,
+};
+use crate::split_at_first;
+use gridiron::index_space::IndexSpace;
 use kepler_two_body::{OrbitalElements, OrbitalState};
+use std::fmt::Write;
+use std::str::FromStr;
+use std::sync::Arc;
+
+// macro_rules! boxed_setup_closure {
+//     ($setup:ident) => {
+//         Box::new(|p| Ok(Box::new($setup::from_str(p)?)))
+//     };
+// }
+
+// type SetupFunction = Box<dyn Fn(&str) -> Result<Box<dyn Setup>, error::Error>>;
+
+// pub fn setups() -> Vec<(&'static str, SetupFunction)> {
+//     vec![
+//         ("binary", boxed_setup_closure!(Binary)),
+//         ("explosion", boxed_setup_closure!(Explosion)),
+//     ]
+// }
+
+pub fn possible_setups_info() -> error::Error {
+    let mut message = String::new();
+    writeln!(message, "specify setup:").unwrap();
+    writeln!(message, "    binary").unwrap();
+    writeln!(message, "    binary-therm").unwrap();
+    writeln!(message, "    explosion").unwrap();
+    writeln!(message, "    shocktube").unwrap();
+    writeln!(message, "    collision").unwrap();
+    writeln!(message, "    sedov").unwrap();
+    PrintUserInformation(message)
+}
+
+pub fn make_setup(
+    setup_name: &str,
+    parameters: &str,
+) -> Result<Arc<dyn Setup + Send + Sync>, error::Error> {
+    match setup_name {
+        "binary" => Ok(Arc::new(Binary::from_str(parameters)?)),
+        "binary-therm" => Ok(Arc::new(BinaryWithThermodynamics::from_str(parameters)?)),
+        "explosion" => Ok(Arc::new(Explosion::from_str(parameters)?)),
+        "shocktube" => Ok(Arc::new(Shocktube::from_str(parameters)?)),
+        "sedov" => Ok(Arc::new(Sedov::from_str(parameters)?)),
+        "collision" => Ok(Arc::new(Collision::from_str(parameters)?)),
+        _ => Err(possible_setups_info()),
+    }
+}
 
 pub trait Setup {
-    fn print_parameters(&self);
+    fn print_parameters(&self) {}
+    fn solver_name(&self) -> String;
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
     fn initial_time(&self) -> f64 {
         0.0
@@ -13,14 +64,31 @@ pub trait Setup {
     fn end_time(&self) -> Option<f64> {
         None
     }
-    fn masses(&self, time: f64) -> Vec<PointMass>;
+    fn masses(&self, _time: f64) -> Vec<PointMass> {
+        vec![]
+    }
     fn equation_of_state(&self) -> EquationOfState;
-    fn buffer_zone(&self) -> BufferZone;
-    fn viscosity(&self) -> Option<f64>;
-    fn cooling_coefficient(&self) -> Option<f64>;
-    fn mach_ceiling(&self) -> Option<f64>;
-    fn density_floor(&self) -> Option<f64>;
-    fn pressure_floor(&self) -> Option<f64>;
+    fn buffer_zone(&self) -> BufferZone {
+        BufferZone::NoBuffer
+    }
+    fn viscosity(&self) -> Option<f64> {
+        None
+    }
+    fn cooling_coefficient(&self) -> Option<f64> {
+        None
+    }
+    fn mach_ceiling(&self) -> Option<f64> {
+        None
+    }
+    fn density_floor(&self) -> Option<f64> {
+        None
+    }
+    fn pressure_floor(&self) -> Option<f64> {
+        None
+    }
+    fn velocity_ceiling(&self) -> Option<f64> {
+        None
+    }
     fn mesh(&self, resolution: u32) -> Mesh;
     fn coordinate_system(&self) -> Coordinates;
     fn num_primitives(&self) -> usize;
@@ -50,8 +118,18 @@ pub trait Setup {
             }
         }
     }
+    fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
+        match mesh {
+            Mesh::Structured(mesh) => Patch::from_slice_function(space, self.num_primitives(), |(i, j), prim| {
+                let [x, y] = mesh.cell_coordinates(i, j);
+                self.initial_primitive(x, y, prim)
+            }),
+            _ => unimplemented!(),
+        }
+    }
 }
 
+#[derive(Clone)]
 pub struct Explosion {}
 
 impl std::str::FromStr for Explosion {
@@ -71,6 +149,9 @@ impl std::str::FromStr for Explosion {
 impl Setup for Explosion {
     fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
@@ -92,18 +173,6 @@ impl Setup for Explosion {
         BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
-        None
-    }
-    fn cooling_coefficient(&self) -> Option<f64> {
-        None
-    }
-    fn mach_ceiling(&self) -> Option<f64> {
-        None
-    }
-    fn density_floor(&self) -> Option<f64> {
-        None
-    }
-    fn pressure_floor(&self) -> Option<f64> {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -131,30 +200,32 @@ pub struct Binary {
 impl std::str::FromStr for Binary {
     type Err = error::Error;
 
-    #[rustfmt::skip]
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        #[rustfmt::skip]
         let form = kind_config::Form::new()
             .item("domain_radius", 12.0, "half-size of the simulation domain (a)")
             .item("nu",            1e-3, "kinematic viscosity coefficient (Omega a^2)")
             .item("mach_number",   10.0, "mach number for locally isothermal EOS")
             .item("sink_radius",   0.05, "sink kernel radius (a)")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
-            .item("sink_rate",     10.0, "rate of mass subtraction in the sink (Omega)")
+            .item("sink_rate",   "10.0", "rate of mass subtraction in the sink (Omega)")
             .item("q",              1.0, "system mass ratio: [0-1]")
             .item("e",              0.0, "orbital eccentricity: [0-1]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        // Soon: parse the sink rate possibly as two comma-separated numbers
-        let sink_rate: f64 = form.get("sink_rate").into();
+        let sink_rate_string: String = form.get("sink_rate").into();
+        let (sr1, sr2) = split_at_first(&sink_rate_string, ',');
+        let sr1 = sr1.unwrap().parse().map_err(ParseFloatError)?;
+        let sr2 = sr2.map_or(Ok(sr1), |s| s.parse().map_err(ParseFloatError))?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             mach_number: form.get("mach_number").into(),
             sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sink_rate,
-            sink_rate2: sink_rate,
+            sink_rate1: sr1,
+            sink_rate2: sr2,
             sink_model: match form.get("sink_model").to_string().as_str() {
                 "none" => SinkModel::Inactive,
                 "af" => SinkModel::AccelerationFree,
@@ -170,7 +241,12 @@ impl std::str::FromStr for Binary {
 impl Setup for Binary {
     fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {
-        for key in self.form.sorted_keys() {
+        for key in self
+            .form
+            .sorted_keys()
+            .into_iter()
+            .filter(|k| k != "sink_rate")
+        {
             println!(
                 "{:.<20} {:<10} {}",
                 key,
@@ -178,6 +254,18 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
+        println!(
+            "{:.<20} {:<10} {}",
+            "sink_rate1", self.sink_rate1, "sink rate for primary",
+        );
+        println!(
+            "{:.<20} {:<10} {}",
+            "sink_rate2", self.sink_rate2, "sink rate for secondary",
+        );
+    }
+
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
     }
 
     #[allow(clippy::many_single_char_names)]
@@ -233,18 +321,6 @@ impl Setup for Binary {
     fn viscosity(&self) -> Option<f64> {
         Some(self.nu)
     }
-    fn cooling_coefficient(&self) -> Option<f64> {
-        None
-    }
-    fn mach_ceiling(&self) -> Option<f64> {
-        None
-    }
-    fn density_floor(&self) -> Option<f64> {
-        None
-    }
-    fn pressure_floor(&self) -> Option<f64> {
-        None
-    }
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
@@ -267,6 +343,7 @@ pub struct BinaryWithThermodynamics {
     pub cooling_coefficient: f64,
     pub pressure_floor: f64,
     pub density_floor: f64,
+    pub velocity_ceiling: f64,
     pub initial_density: f64,
     pub initial_pressure: f64,
     pub mach_ceiling: f64,
@@ -286,10 +363,11 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .item("sink_rate",          10.0, "rate of mass subtraction in the sink (Omega)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
-            .item("gamma_law_index",   1.666, "adiabatic index")
+            .item("gamma_law_index",   1.6666666666666666, "adiabatic index")
             .item("cooling_coefficient", 0.0, "strength of T^4 cooling")
             .item("pressure_floor",      0.0, "pressure floor")
             .item("density_floor",       0.0, "density floor")
+            .item("velocity_ceiling",   1e16, "component-wise ceiling on the velocity (a * Omega)")
             .item("initial_density",     1.0, "initial surface density at r=a")
             .item("initial_pressure",   1e-2, "initial surface  pressure at r=a")
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
@@ -316,6 +394,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             cooling_coefficient: form.get("cooling_coefficient").into(),
             pressure_floor: form.get("pressure_floor").into(),
             density_floor: form.get("density_floor").into(),
+            velocity_ceiling: form.get("velocity_ceiling").into(),
             initial_density: form.get("initial_density").into(),
             initial_pressure: form.get("initial_pressure").into(),
             mach_ceiling: form.get("mach_ceiling").into(),
@@ -337,6 +416,9 @@ impl BinaryWithThermodynamics {
 }
 
 impl Setup for BinaryWithThermodynamics {
+    fn solver_name(&self) -> String {
+        "euler2d".to_owned()
+    }
     fn num_primitives(&self) -> usize { 4 }
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
@@ -412,6 +494,9 @@ impl Setup for BinaryWithThermodynamics {
     fn viscosity(&self) -> Option<f64> {
         Some(self.alpha)
     }
+    fn velocity_ceiling(&self) -> Option<f64> {
+        Some(self.velocity_ceiling)
+    }
     fn cooling_coefficient(&self) -> Option<f64> {
         Some(self.cooling_coefficient)
     }
@@ -454,6 +539,9 @@ impl std::str::FromStr for Shocktube {
 impl Setup for Shocktube {
     fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         if x < 0.5 {
             primitive[0] = 1.0;
@@ -475,18 +563,6 @@ impl Setup for Shocktube {
         BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
-        None
-    }
-    fn cooling_coefficient(&self) -> Option<f64> {
-        None
-    }
-    fn mach_ceiling(&self) -> Option<f64> {
-        None
-    }
-    fn density_floor(&self) -> Option<f64> {
-        None
-    }
-    fn pressure_floor(&self) -> Option<f64> {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -521,14 +597,15 @@ impl std::str::FromStr for Collision {
 impl Setup for Collision {
     fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let xl: f64 = -0.25;
         let xr: f64 = 0.25;
         let dx: f64 = 0.025;
 
-        let gaussian = |x: f64, x0: f64| {
-            f64::exp(-(x - x0).powi(2) / dx.powi(2))
-        };
+        let gaussian = |x: f64, x0: f64| f64::exp(-(x - x0).powi(2) / dx.powi(2));
 
         let step = |x: f64, x0: f64| {
             if (x - x0).abs() < dx * 10.0 {
@@ -557,18 +634,6 @@ impl Setup for Collision {
         BufferZone::NoBuffer
     }
     fn viscosity(&self) -> Option<f64> {
-        None
-    }
-    fn cooling_coefficient(&self) -> Option<f64> {
-        None
-    }
-    fn mach_ceiling(&self) -> Option<f64> {
-        None
-    }
-    fn density_floor(&self) -> Option<f64> {
-        None
-    }
-    fn pressure_floor(&self) -> Option<f64> {
         None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -619,6 +684,9 @@ impl std::str::FromStr for Sedov {
 impl Setup for Sedov {
     fn num_primitives(&self) -> usize { 3 }
     fn print_parameters(&self) {}
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let row = self.table.sample(x);
         primitive[0] = row[1];
@@ -639,18 +707,6 @@ impl Setup for Sedov {
     fn viscosity(&self) -> Option<f64> {
         None
     }
-    fn cooling_coefficient(&self) -> Option<f64> {
-        None
-    }
-    fn mach_ceiling(&self) -> Option<f64> {
-        None
-    }
-    fn density_floor(&self) -> Option<f64> {
-        None
-    }
-    fn pressure_floor(&self) -> Option<f64> {
-        None
-    }
     fn mesh(&self, _resolution: u32) -> Mesh {
         // Note: resolution is ignored. Consider making it an Option, and
         // returning Result in case it's given for problems that specify the
@@ -662,5 +718,142 @@ impl Setup for Sedov {
     }
     fn initial_time(&self) -> f64 {
         1.0
+    }
+}
+
+/// Models the collision of two fast pulses, in planar cartesian geometry. The
+/// fluid is non-relativistic. The setup does not have runtime model
+/// parameters (yet), it is hard-coded for a Mach number of 50, a domain
+/// extending from x=-100, to x=100, and the pulses have a mass ratio of
+/// 100:1. They move in the opposite direction but with equal momentum so the
+/// simulation is in the center-of-momentum frame.
+pub struct PulseCollision {}
+
+impl std::str::FromStr for PulseCollision {
+    type Err = error::Error;
+    fn from_str(_parameters: &str) -> Result<Self, Self::Err> {
+        Ok(Self {})
+    }
+}
+
+impl Setup for PulseCollision {
+    fn num_primitives(&self) -> usize { 3 }
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
+
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        let xl: f64 = -2.0;
+        let xr: f64 = 2.0;
+        let dx: f64 = 0.05;
+
+        let gaussian = |x: f64, x0: f64| f64::exp(-(x - x0).powi(2) / dx.powi(2));
+
+        let step = |x: f64, x0: f64| {
+            if (x - x0).abs() < dx * 10.0 {
+                1.0
+            } else {
+                0.0
+            }
+        };
+
+        let rho = 100.0 * gaussian(x, xl) + gaussian(x, xr) + 1e-7;
+        let vel = 0.01 * step(x, xl) - step(x, xr);
+        let mach = 50.0;
+        let vel_sound = vel / mach;
+        let p = 3.0 / 5.0 * vel_sound * vel_sound * rho + 1e-11;
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = p;
+    }
+
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let x0 = -100.0;
+        let x1 = 100.0;
+        let dx = (x1 - x0) / resolution as f64;
+        let faces = (0..resolution + 1).map(|i| x0 + i as f64 * dx).collect();
+        Mesh::FacePositions1D(faces)
+    }
+
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+
+    fn end_time(&self) -> Option<f64> {
+        Some(1.00)
+    }
+}
+
+/// Models the collision of a fast shell of material with a wind-like target
+/// medium in spherical polar geometry. The fluid is non-relativistic. The
+/// setup does not have runtime model parameters (yet).
+pub struct FastShell {}
+
+impl std::str::FromStr for FastShell {
+    type Err = error::Error;
+    fn from_str(_parameters: &str) -> Result<Self, Self::Err> {
+        Ok(Self {})
+    }
+}
+
+impl Setup for FastShell {
+    fn num_primitives(&self) -> usize { 3 }
+    fn solver_name(&self) -> String {
+        "euler1d".to_owned()
+    }
+
+    fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
+        let r_shell: f64 = 10.0;
+        let dr: f64 = 0.1;
+
+        let prof = |r: f64| {
+            if r > r_shell {
+                0.0
+            } else {
+                f64::exp((r - r_shell) / dr)
+            }
+        };
+
+        let rho_ambient = 1e-4 * r.powi(-2);
+        let rho = 1.0 * prof(r) + rho_ambient;
+        let vel = 1.0 * prof(r);
+        let pre = 1e-3 * rho;
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = pre;
+    }
+
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let num_decades = 2;
+        let zones_per_decade = resolution;
+        let r_inner = 1.0;
+
+        let faces = (0..(zones_per_decade * num_decades + 1) as u32)
+            .map(|i| r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64))
+            .collect();
+
+        Mesh::FacePositions1D(faces)
+    }
+
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::SphericalPolar
+    }
+
+    fn end_time(&self) -> Option<f64> {
+        Some(1.0)
     }
 }

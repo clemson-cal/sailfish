@@ -1028,3 +1028,44 @@ EXTERN_C void euler2d_wavespeed(
         }
     }
 }
+
+/**
+ * Obtain the maximum value in an array of double's, using either a sequential
+ * or an OpenMP reduction. Not implemented for GPU execution.
+ * 
+ * @param data          The data [size]
+ * @param size          The number of elements
+ * @param mode          The execution mode
+ */
+EXTERN_C real euler2d_maximum(
+    real *data,
+    unsigned long size,
+    enum ExecutionMode mode)
+{
+    real a_max = 0.0;
+
+    switch (mode) {
+        case CPU: {
+            for (unsigned long i = 0; i < size; ++i)
+            {
+                a_max = max2(a_max, data[i]);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            #pragma omp parallel for reduction(max:a_max)
+            for (unsigned long i = 0; i < size; ++i)
+            {
+                a_max = max2(a_max, data[i]);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: break; // Not implemented, use euler2d_wavespeed
+                         // followed by a GPU reduction.
+    }
+    return a_max;
+}
