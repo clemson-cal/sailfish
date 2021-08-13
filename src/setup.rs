@@ -12,30 +12,31 @@ use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::Arc;
 
-// macro_rules! boxed_setup_closure {
-//     ($setup:ident) => {
-//         Box::new(|p| Ok(Box::new($setup::from_str(p)?)))
-//     };
-// }
+macro_rules! setup_builder {
+    ($setup:ident) => {
+        Box::new(|p| Ok(Arc::new($setup::from_str(p)?)))
+    };
+}
 
-// type SetupFunction = Box<dyn Fn(&str) -> Result<Box<dyn Setup>, error::Error>>;
+type SetupFunction = Box<dyn Fn(&str) -> Result<Arc<dyn Setup + Send + Sync>, error::Error>>;
 
-// pub fn setups() -> Vec<(&'static str, SetupFunction)> {
-//     vec![
-//         ("binary", boxed_setup_closure!(Binary)),
-//         ("explosion", boxed_setup_closure!(Explosion)),
-//     ]
-// }
+fn setups() -> Vec<(&'static str, SetupFunction)> {
+    vec![
+        ("binary", setup_builder!(Binary)),
+        ("binary-therm", setup_builder!(BinaryWithThermodynamics)),
+        ("collision", setup_builder!(Collision)),
+        ("explosion", setup_builder!(Explosion)),
+        ("sedov", setup_builder!(Sedov)),
+        ("shocktube", setup_builder!(Shocktube)),
+    ]
+}
 
 pub fn possible_setups_info() -> error::Error {
     let mut message = String::new();
     writeln!(message, "specify setup:").unwrap();
-    writeln!(message, "    binary").unwrap();
-    writeln!(message, "    binary-therm").unwrap();
-    writeln!(message, "    explosion").unwrap();
-    writeln!(message, "    shocktube").unwrap();
-    writeln!(message, "    collision").unwrap();
-    writeln!(message, "    sedov").unwrap();
+    for (setup_name, _) in setups() {
+        writeln!(message, "    {}", setup_name).unwrap();
+    }
     PrintUserInformation(message)
 }
 
@@ -43,15 +44,11 @@ pub fn make_setup(
     setup_name: &str,
     parameters: &str,
 ) -> Result<Arc<dyn Setup + Send + Sync>, error::Error> {
-    match setup_name {
-        "binary" => Ok(Arc::new(Binary::from_str(parameters)?)),
-        "binary-therm" => Ok(Arc::new(BinaryWithThermodynamics::from_str(parameters)?)),
-        "explosion" => Ok(Arc::new(Explosion::from_str(parameters)?)),
-        "shocktube" => Ok(Arc::new(Shocktube::from_str(parameters)?)),
-        "sedov" => Ok(Arc::new(Sedov::from_str(parameters)?)),
-        "collision" => Ok(Arc::new(Collision::from_str(parameters)?)),
-        _ => Err(possible_setups_info()),
-    }
+    setups()
+        .into_iter()
+        .find(|&(n, _)| n == setup_name)
+        .map(|(_, f)| f(parameters))
+        .ok_or_else(|| possible_setups_info())?
 }
 
 pub trait Setup {
