@@ -136,6 +136,10 @@ static __host__ __device__ void point_mass_source_term(
     {
         sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
     }
+    //if (dr < 1.0 * rs)
+    //{
+    //    sink_rate = mass->rate * pow(1.0 - pow(dr / rs, 2.0), 2.0);
+    //}
     real mdot = sigma * sink_rate * -1.0;
 
     switch (mass->model) {
