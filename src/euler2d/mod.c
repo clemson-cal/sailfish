@@ -56,17 +56,17 @@ static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real 
 
 
 static __host__ __device__ real disk_height(
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real x1,
     real y1,
     real *prim)
 {
     real omegatilde2 = 0.0;
-    for (int p = 0; p < mass_list.count; ++p)
+    for (int p = 0; p < mass_list->count; ++p)
     {
-        real x0 = mass_list.masses[p].x;
-        real y0 = mass_list.masses[p].y;
-        real mp = mass_list.masses[p].mass;
+        real x0 = mass_list->masses[p].x;
+        real y0 = mass_list->masses[p].y;
+        real mp = mass_list->masses[p].mass;
 
         real dx = x1 - x0;
         real dy = y1 - y0;
@@ -81,7 +81,7 @@ static __host__ __device__ real disk_height(
 }
 
 static __host__ __device__ void point_mass_source_term(
-    struct PointMass mass,
+    struct PointMass *mass,
     real x1,
     real y1,
     real dt,
@@ -89,10 +89,10 @@ static __host__ __device__ void point_mass_source_term(
     real h,
     real *delta_cons)
 {
-    real x0 = mass.x;
-    real y0 = mass.y;
-    real mp = mass.mass;
-    real rs = mass.radius;
+    real x0 = mass->x;
+    real y0 = mass->y;
+    real mp = mass->mass;
+    real rs = mass->radius;
     real sigma = prim[0];
     real pres  = prim[3];
     real gamma = GAMMA_LAW_INDEX;
@@ -112,15 +112,15 @@ static __host__ __device__ void point_mass_source_term(
 
     if (dr < 4.0 * rs)
     {
-        sink_rate = mass.rate * exp(-pow(dr / rs, 4.0));
+        sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
     }
     //if (dr < 1.0 * rs)
     //{
-    //    sink_rate = mass.rate * pow(1.0 - pow(dr / rs, 2.0), 2.0);
+    //    sink_rate = mass->rate * pow(1.0 - pow(dr / rs, 2.0), 2.0);
     //}
     real mdot = sigma * sink_rate * -1.0;
 
-    switch (mass.model) {
+    switch (mass->model) {
         case AccelerationFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
@@ -130,8 +130,8 @@ static __host__ __device__ void point_mass_source_term(
         case TorqueFree: {
             real vx        = prim[1];
             real vy        = prim[2];
-            real vx0       = mass.vx;
-            real vy0       = mass.vy;
+            real vx0       = mass->vx;
+            real vy0       = mass->vy;
             real rhatx     = dx / dr;
             real rhaty     = dy / dr;
             real dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
@@ -159,7 +159,7 @@ static __host__ __device__ void point_mass_source_term(
 }
 
 static __host__ __device__ void point_masses_source_term(
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real x1,
     real y1,
     real dt,
@@ -167,10 +167,10 @@ static __host__ __device__ void point_masses_source_term(
     real h,
     real *cons)
 {
-    for (int p = 0; p < mass_list.count; ++p)
+    for (int p = 0; p < mass_list->count; ++p)
     {
         real delta_cons[NCONS];
-        point_mass_source_term(mass_list.masses[p], x1, y1, dt, prim, h, delta_cons);
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, h, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -453,7 +453,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real alpha,
     real a,
     real dt,
@@ -608,7 +608,7 @@ static __host__ __device__ void advance_rk_zone(
     fri[3] -= 0.5 * (nucc * pcc[0] * scc[1] * pcc[2] + nuri * pri[0] * sri[1] * pri[2]);
     flj[3] -= 0.5 * (nulj * plj[0] * slj[2] * plj[1] + nucc * pcc[0] * scc[2] * pcc[1]); // v^x \tau^y_x
     frj[3] -= 0.5 * (nucc * pcc[0] * scc[2] * pcc[1] + nurj * prj[0] * srj[2] * prj[1]);
-    flj[3] -= 0.5 * (nulj * plj[0] * slj[3] * plj[2] + nucc * pcc[0] * scc[3] * pcc[2]);  // v^y \tau^y_y
+    flj[3] -= 0.5 * (nulj * plj[0] * slj[3] * plj[2] + nucc * pcc[0] * scc[3] * pcc[2]); // v^y \tau^y_y
     frj[3] -= 0.5 * (nucc * pcc[0] * scc[3] * pcc[2] + nurj * prj[0] * srj[3] * prj[2]);
 
     primitive_to_conserved(pcc, ucc);
@@ -632,7 +632,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real a,
     real dt,
     real velocity_ceiling,
@@ -787,7 +787,7 @@ static void __global__ advance_rk_kernel(
             primitive_wr,
             eos,
             buffer,
-            mass_list,
+            &mass_list,
             alpha,
             a,
             dt,
@@ -830,7 +830,7 @@ static void __global__ advance_rk_kernel_inviscid(
             primitive_wr,
             eos,
             buffer,
-            mass_list,
+            &mass_list,
             a,
             dt,
             velocity_ceiling,
@@ -965,7 +965,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -984,7 +984,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         alpha,
                         a,
                         dt,
@@ -1010,7 +1010,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -1029,7 +1029,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         alpha,
                         a,
                         dt,

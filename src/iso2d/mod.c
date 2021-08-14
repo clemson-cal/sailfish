@@ -54,18 +54,18 @@ static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real 
 // ============================ GRAVITY =======================================
 // ============================================================================
 static __host__ __device__ real gravitational_potential(
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real x1,
     real y1)
 {
     real phi = 0.0;
 
-    for (int p = 0; p < mass_list.count; ++p)
+    for (int p = 0; p < mass_list->count; ++p)
     {
-        real x0 = mass_list.masses[p].x;
-        real y0 = mass_list.masses[p].y;
-        real mp = mass_list.masses[p].mass;
-        real rs = mass_list.masses[p].radius;
+        real x0 = mass_list->masses[p].x;
+        real y0 = mass_list->masses[p].y;
+        real mp = mass_list->masses[p].mass;
+        real rs = mass_list->masses[p].radius;
 
         real dx = x1 - x0;
         real dy = y1 - y0;
@@ -78,17 +78,17 @@ static __host__ __device__ real gravitational_potential(
 }
 
 static __host__ __device__ void point_mass_source_term(
-    struct PointMass mass,
+    struct PointMass *mass,
     real x1,
     real y1,
     real dt,
     real *prim,
     real *delta_cons)
 {
-    real x0 = mass.x;
-    real y0 = mass.y;
-    real mp = mass.mass;
-    real rs = mass.radius;
+    real x0 = mass->x;
+    real y0 = mass->y;
+    real mp = mass->mass;
+    real rs = mass->radius;
     real sigma = prim[0];
 
     real dx = x1 - x0;
@@ -103,11 +103,11 @@ static __host__ __device__ void point_mass_source_term(
 
     if (dr < 4.0 * rs)
     {
-        sink_rate = mass.rate * exp(-pow(dr / rs, 4.0));
+        sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
     }
     real mdot = sigma * sink_rate * -1.0;
 
-    switch (mass.model) {
+    switch (mass->model) {
         case AccelerationFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
@@ -116,8 +116,8 @@ static __host__ __device__ void point_mass_source_term(
         case TorqueFree: {
             real vx        = prim[1];
             real vy        = prim[2];
-            real vx0       = mass.vx;
-            real vy0       = mass.vy;
+            real vx0       = mass->vx;
+            real vy0       = mass->vy;
             real rhatx     = dx / dr;
             real rhaty     = dy / dr;
             real dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
@@ -142,17 +142,17 @@ static __host__ __device__ void point_mass_source_term(
 }
 
 static __host__ __device__ void point_masses_source_term(
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real x1,
     real y1,
     real dt,
     real *prim,
     real *cons)
 {
-    for (int p = 0; p < mass_list.count; ++p)
+    for (int p = 0; p < mass_list->count; ++p)
     {
         real delta_cons[NCONS];
-        point_mass_source_term(mass_list.masses[p], x1, y1, dt, prim, delta_cons);
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -168,7 +168,7 @@ static __host__ __device__ real sound_speed_squared(
     struct EquationOfState *eos,
     real x,
     real y,
-    struct PointMassList mass_list)
+    struct PointMassList *mass_list)
 {
     switch (eos->type)
     {
@@ -382,10 +382,10 @@ static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real 
 // ============================ SCHEME ========================================
 // ============================================================================
 static __host__ __device__ void primitive_to_conserved_zone(
-        struct Patch primitive,
-        struct Patch conserved,
-        int i,
-        int j)
+    struct Patch primitive,
+    struct Patch conserved,
+    int i,
+    int j)
 {
     real *p = GET(primitive, i, j);
     real *u = GET(conserved, i, j);
@@ -399,7 +399,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real nu,
     real a,
     real dt,
@@ -551,7 +551,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     real a,
     real dt,
     real velocity_ceiling,
@@ -648,7 +648,7 @@ static __host__ __device__ void wavespeed_zone(
     struct EquationOfState eos,
     struct Patch primitive,
     struct Patch wavespeed,
-    struct PointMassList mass_list,
+    struct PointMassList *mass_list,
     int i,
     int j)
 {
@@ -704,7 +704,7 @@ static void __global__ advance_rk_kernel(
             primitive_wr,
             eos,
             buffer,
-            mass_list,
+            &mass_list,
             nu,
             a,
             dt,
@@ -738,7 +738,7 @@ static void __global__ advance_rk_kernel_inviscid(
             primitive_wr,
             eos,
             buffer,
-            mass_list,
+            &mass_list,
             a,
             dt,
             velocity_ceiling,
@@ -759,7 +759,7 @@ static void __global__ wavespeed_kernel(
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        wavespeed_zone(mesh, eos, primitive, wavespeed, mass_list, i, j);
+        wavespeed_zone(mesh, eos, primitive, wavespeed, &mass_list, i, j);
     }
 }
 
@@ -861,7 +861,7 @@ EXTERN_C void iso2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -877,7 +877,7 @@ EXTERN_C void iso2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         nu,
                         a,
                         dt,
@@ -899,7 +899,7 @@ EXTERN_C void iso2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -914,7 +914,7 @@ EXTERN_C void iso2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        &mass_list,
                         nu,
                         a,
                         dt,
@@ -990,7 +990,7 @@ EXTERN_C void iso2d_wavespeed(
     switch (mode) {
         case CPU: {
             FOR_EACH(wavespeed) {
-                wavespeed_zone(mesh, eos, primitive, wavespeed, mass_list, i, j);
+                wavespeed_zone(mesh, eos, primitive, wavespeed, &mass_list, i, j);
             }
             break;
         }
@@ -998,7 +998,7 @@ EXTERN_C void iso2d_wavespeed(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(wavespeed) {
-                wavespeed_zone(mesh, eos, primitive, wavespeed, mass_list, i, j);
+                wavespeed_zone(mesh, eos, primitive, wavespeed, &mass_list, i, j);
             }
             #endif
             break;
