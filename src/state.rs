@@ -83,10 +83,10 @@ impl State {
         self.primitive = primitive;
     }
 
-    pub fn write_checkpoint(&mut self, outdir: &str) -> Result<(), error::Error> {
+    pub fn write_checkpoint(&mut self, unit_time: f64, outdir: &str) -> Result<(), error::Error> {
         self.checkpoint.next(
             self.time,
-            self.command_line.checkpoint_interval,
+            self.command_line.checkpoint_interval * unit_time,
             self.command_line.checkpoint_logspace.unwrap_or(false),
         );
         create_dir_all(outdir).map_err(error::Error::IOError)?;

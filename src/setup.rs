@@ -57,6 +57,9 @@ pub trait Setup: Send + Sync {
     fn end_time(&self) -> Option<f64> {
         None
     }
+    fn unit_time(&self) -> f64 {
+        1.0
+    }
     fn masses(&self, _time: f64) -> PointMassList {
         PointMassList::default()
     }
@@ -228,6 +231,10 @@ impl Setup for Binary {
         "iso2d".to_owned()
     }
 
+    fn unit_time(&self) -> f64 {
+        2.0 * std::f64::consts::PI
+    }
+
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
@@ -377,9 +384,11 @@ impl Setup for BinaryWithThermodynamics {
     fn solver_name(&self) -> String {
         "euler2d".to_owned()
     }
+
     fn num_primitives(&self) -> usize {
         4
     }
+
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
             println!(
@@ -389,6 +398,10 @@ impl Setup for BinaryWithThermodynamics {
                 self.form.about(&key)
             );
         }
+    }
+
+    fn unit_time(&self) -> f64 {
+        2.0 * std::f64::consts::PI
     }
 
     #[allow(clippy::many_single_char_names)]

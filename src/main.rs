@@ -183,13 +183,14 @@ where
     let (rk_order, fold, cpi, cfl, dt_each_iter, end_time, outdir) = (
         cline.rk_order as usize,
         cline.fold,
-        cline.checkpoint_interval,
+        cline.checkpoint_interval * setup.unit_time(),
         cline.cfl_number,
         cline.recompute_dt_each_iteration(),
         cline
             .end_time
             .or_else(|| setup.end_time())
-            .unwrap_or(f64::MAX),
+            .unwrap_or(f64::MAX)
+            * setup.unit_time(),
         cline
             .outdir
             .clone()
@@ -281,7 +282,7 @@ where
     while state.time < end_time {
         if state.checkpoint.is_due(state.time, cpi) {
             state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
-            state.write_checkpoint(&outdir)?;
+            state.write_checkpoint(setup.unit_time(), &outdir)?;
         }
 
         let start = std::time::Instant::now();
@@ -311,12 +312,15 @@ where
 
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
-            state.iteration, state.time, dt, mzps,
+            state.iteration,
+            state.time / setup.unit_time(),
+            dt / setup.unit_time(),
+            mzps,
         );
     }
 
     state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
-    state.write_checkpoint(&outdir)?;
+    state.write_checkpoint(setup.unit_time(), &outdir)?;
 
     Ok(())
 }
@@ -330,13 +334,14 @@ fn launch_single_patch(
         state.mesh.clone(),
         cline.cfl_number,
         cline.fold,
-        cline.checkpoint_interval,
+        cline.checkpoint_interval * setup.unit_time(),
         cline.rk_order,
         cline.recompute_dt_each_iteration(),
         cline
             .end_time
             .or_else(|| setup.end_time())
-            .unwrap_or(f64::MAX),
+            .unwrap_or(f64::MAX)
+            * setup.unit_time(),
         cline
             .outdir
             .clone()
@@ -373,7 +378,7 @@ fn launch_single_patch(
     while state.time < end_time {
         if state.checkpoint.is_due(state.time, chkpt_interval) {
             state.set_primitive(solver.primitive());
-            state.write_checkpoint(&outdir)?;
+            state.write_checkpoint(setup.unit_time(), &outdir)?;
         }
 
         if !dt_each_iter {
@@ -394,11 +399,11 @@ fn launch_single_patch(
         let mzps = (mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64();
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
-            state.iteration, state.time, dt, mzps,
+            state.iteration, state.time / setup.unit_time(), dt / setup.unit_time(), mzps,
         );
     }
     state.set_primitive(solver.primitive());
-    state.write_checkpoint(&outdir)?;
+    state.write_checkpoint(setup.unit_time(), &outdir)?;
     Ok(())
 }
 
