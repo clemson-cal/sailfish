@@ -9,6 +9,7 @@ pub enum Error {
     CompiledWithoutGpu,
     PrintUserInformation(String),
     Cmdline(String),
+    UnknownEnumVariant { enum_type: String, variant: String },
     InvalidSetup(String),
     InvalidCheckpoint(String),
     InvalidDevice(i32),
@@ -30,6 +31,9 @@ impl Display for Error {
             }
             Self::Cmdline(message) => {
                 writeln!(fmt, "error: {}", message)
+            }
+            Self::UnknownEnumVariant { enum_type, variant } => {
+                writeln!(fmt, "unknown mode '{}' for {}", variant, enum_type)
             }
             Self::InvalidSetup(info) => {
                 writeln!(fmt, "invalid setup: {}", info)

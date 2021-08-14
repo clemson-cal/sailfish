@@ -44,14 +44,33 @@ where
     start.elapsed()
 }
 
-pub fn split_at_first(string: &str, character: char) -> (Option<&str>, Option<&str>) {
-    let mut a = string.splitn(2, character);
+/// Takes a string, and splits it into two pieces, separated by the first
+/// instance of the given character. The first item in the pair is `Some`
+/// unless the input string is empty. The second item in the pair is `None` if
+/// `separator` is not found in the string.
+pub fn split_at_first(string: &str, separator: char) -> (Option<&str>, Option<&str>) {
+    let mut a = string.splitn(2, separator);
     let n = a.next();
     let p = a.next();
     (n, p)
 }
 
-fn parent_dir(path: &str) -> Option<&str> {
+/// Takes a string, and splits it into two pieces, separated by the first
+/// instance of the given character. Each part is then parsed, and the whole
+/// call fails if either one fails.
+pub fn parse_f64_pair(
+    string: &str,
+    separator: char,
+) -> Result<(Option<f64>, Option<f64>), std::num::ParseFloatError> {
+    let (sr1, sr2) = split_at_first(&string, separator);
+    let sr1 = sr1.map(|s| s.parse()).transpose()?;
+    let sr2 = sr2.map(|s| s.parse()).transpose()?;
+    Ok((sr1, sr2))
+}
+
+/// Returns the parent directory for a path string, or `None` if no parent
+/// directory exists.
+pub fn parent_dir(path: &str) -> Option<&str> {
     Path::new(path).parent().and_then(Path::to_str)
 }
 

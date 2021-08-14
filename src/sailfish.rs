@@ -1,3 +1,4 @@
+use crate::error;
 use crate::patch::Patch;
 use crate::setup::Setup;
 use cfg_if::cfg_if;
@@ -6,6 +7,7 @@ use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::Automaton;
 use gridiron::rect_map::Rectangle;
 use std::ops::Range;
+use std::str::FromStr;
 use std::sync::Arc;
 
 #[repr(C)]
@@ -19,10 +21,37 @@ pub enum ExecutionMode {
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum SinkModel {
+    /// No mass or momentum is subtracted around this point mass
     Inactive,
+
+    /// The sink removes mass and momentum at the same rate so that the gas
+    /// velocity is unchanged (most conventional)
     AccelerationFree,
+
+    /// The sink does not change the fluid angular momentum, with respect to
+    /// its position (most favorable)
     TorqueFree,
+
+    /// The sink removes mass but not momentum (least favorable)
     ForceFree,
+}
+
+impl FromStr for SinkModel {
+    type Err = error::Error;
+    /// Tries to create a `SinkModel` from a string description. Returns
+    /// an error if no match is found.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "inactive" | "none" => Ok(SinkModel::Inactive),
+            "acceleration-free" | "af" => Ok(SinkModel::AccelerationFree),
+            "torque-free" | "tf" => Ok(SinkModel::TorqueFree),
+            "force-free" | "ff" => Ok(SinkModel::ForceFree),
+            _ => Err(error::Error::UnknownEnumVariant {
+                enum_type: "sink model".to_owned(),
+                variant: s.to_owned(),
+            }),
+        }
+    }
 }
 
 #[repr(C)]

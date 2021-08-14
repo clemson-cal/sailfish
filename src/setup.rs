@@ -5,7 +5,6 @@ use crate::patch::Patch;
 use crate::sailfish::{
     BufferZone, Coordinates, EquationOfState, PointMass, PointMassList, SinkModel, StructuredMesh,
 };
-use crate::split_at_first;
 use gridiron::index_space::IndexSpace;
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
@@ -61,7 +60,6 @@ pub trait Setup: Send + Sync {
     fn masses(&self, _time: f64) -> PointMassList {
         PointMassList::default()
     }
-    fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::NoBuffer
     }
@@ -83,31 +81,21 @@ pub trait Setup: Send + Sync {
     fn velocity_ceiling(&self) -> Option<f64> {
         None
     }
+    fn equation_of_state(&self) -> EquationOfState;
     fn mesh(&self, resolution: u32) -> Mesh;
     fn coordinate_system(&self) -> Coordinates;
     fn num_primitives(&self) -> usize;
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
-        let nvars = self.num_primitives();
         match mesh {
-            Mesh::Structured(mesh) => {
-                let mut primitive =
-                    vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * (nvars as i64)) as usize];
-                let si = (nvars as i64) * (mesh.nj + 4);
-                let sj = nvars as i64;
-                for i in -2..mesh.ni + 2 {
-                    for j in -2..mesh.nj + 2 {
-                        let n = ((i + 2) * si + (j + 2) * sj) as usize;
-                        let [x, y] = mesh.cell_coordinates(i, j);
-                        self.initial_primitive(x, y, &mut primitive[n..n + nvars])
-                    }
-                }
-                primitive
+            Mesh::Structured(_) => {
+                panic!("Setup::initial_primitive_vec is only compatible with Mesh::FacePositions1D")
             }
             Mesh::FacePositions1D(faces) => {
-                let mut primitive = vec![0.0; (faces.len() - 1) * nvars];
+                let nq = self.num_primitives();
+                let mut primitive = vec![0.0; (faces.len() - 1) * nq];
                 for i in 0..faces.len() - 1 {
                     let x = 0.5 * (faces[i] + faces[i + 1]);
-                    self.initial_primitive(x, 0.0, &mut primitive[nvars * i..nvars * i + nvars]);
+                    self.initial_primitive(x, 0.0, &mut primitive[nq * i..nq * i + nq]);
                 }
                 primitive
             }
@@ -147,7 +135,6 @@ impl Setup for Explosion {
     fn num_primitives(&self) -> usize {
         3
     }
-    fn print_parameters(&self) {}
     fn solver_name(&self) -> String {
         "iso2d".to_owned()
     }
@@ -164,12 +151,6 @@ impl Setup for Explosion {
         EquationOfState::Isothermal {
             sound_speed_squared: 1.0,
         }
-    }
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
-    }
-    fn viscosity(&self) -> Option<f64> {
-        None
     }
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
@@ -210,25 +191,17 @@ impl std::str::FromStr for Binary {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let sink_rate_string: String = form.get("sink_rate").into();
-        let (sr1, sr2) = split_at_first(&sink_rate_string, ',');
-        let sr1 = sr1.unwrap().parse().map_err(ParseFloatError)?;
-        let sr2 = sr2.map_or(Ok(sr1), |s| s.parse().map_err(ParseFloatError))?;
+        let (sr1, sr2) =
+            crate::parse_f64_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             mach_number: form.get("mach_number").into(),
             sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sr1,
-            sink_rate2: sr2,
-            sink_model: match form.get("sink_model").to_string().as_str() {
-                "none" => SinkModel::Inactive,
-                "af" => SinkModel::AccelerationFree,
-                "tf" => SinkModel::TorqueFree,
-                "ff" => SinkModel::ForceFree,
-                _ => return Err(InvalidSetup("invalid sink_model".into())),
-            },
+            sink_rate1: sr1.unwrap(),
+            sink_rate2: sr2.or(sr1).unwrap(),
+            sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             form,
         })
     }
@@ -238,13 +211,9 @@ impl Setup for Binary {
     fn num_primitives(&self) -> usize {
         3
     }
+
     fn print_parameters(&self) {
-        for key in self
-            .form
-            .sorted_keys()
-            .into_iter()
-            .filter(|k| k != "sink_rate")
-        {
+        for key in self.form.sorted_keys() {
             println!(
                 "{:.<20} {:<10} {}",
                 key,
@@ -252,14 +221,7 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
-        println!(
-            "{:.<20} {:<10} {}",
-            "sink_rate1", self.sink_rate1, "sink rate for primary",
-        );
-        println!(
-            "{:.<20} {:<10} {}",
-            "sink_rate2", self.sink_rate2, "sink rate for secondary",
-        );
+        println!("sink rates are [{}, {}]", self.sink_rate1, self.sink_rate2);
     }
 
     fn solver_name(&self) -> String {
@@ -279,6 +241,7 @@ impl Setup for Binary {
         primitive[1] = u;
         primitive[2] = v;
     }
+
     fn masses(&self, time: f64) -> PointMassList {
         let a: f64 = 1.0;
         let m: f64 = 1.0;
@@ -308,23 +271,28 @@ impl Setup for Binary {
         };
         PointMassList::from_slice(&[mass1, mass2])
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::LocallyIsothermal {
             mach_number_squared: self.mach_number.powi(2),
         }
     }
+
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::NoBuffer
     }
+
     fn viscosity(&self) -> Option<f64> {
         Some(self.nu)
     }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
             resolution,
         ))
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
@@ -351,17 +319,17 @@ pub struct BinaryWithThermodynamics {
 impl std::str::FromStr for BinaryWithThermodynamics {
     type Err = error::Error;
 
-    #[rustfmt::skip]
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        #[rustfmt::skip]
         let form = kind_config::Form::new()
             .item("domain_radius",      12.0, "half-size of the simulation domain (a)")
             .item("alpha",               0.1, "alpha-viscosity coefficient (dimensionless)")
             .item("sink_radius",        0.05, "sink kernel radius (a)")
             .item("sink_model",         "af", "sink prescription: [none|af|tf|ff]")
-            .item("sink_rate",          10.0, "rate of mass subtraction in the sink (Omega)")
+            .item("sink_rate",        "10.0", "rate of mass subtraction in the sink (Omega)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
-            .item("gamma_law_index",   1.6666666666666666, "adiabatic index")
+            .item("gamma_law_index",     1.6666666666666666, "adiabatic index")
             .item("cooling_coefficient", 0.0, "strength of T^4 cooling")
             .item("pressure_floor",      0.0, "pressure floor")
             .item("density_floor",       0.0, "density floor")
@@ -372,22 +340,16 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        // Soon: parse the sink rate possibly as two comma-separated numbers
-        let sink_rate: f64 = form.get("sink_rate").into();
+        let (sr1, sr2) =
+            crate::parse_f64_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             alpha: form.get("alpha").into(),
             sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sink_rate,
-            sink_rate2: sink_rate,
-            sink_model: match form.get("sink_model").to_string().as_str() {
-                "none" => SinkModel::Inactive,
-                "af" => SinkModel::AccelerationFree,
-                "tf" => SinkModel::TorqueFree,
-                "ff" => SinkModel::ForceFree,
-                _ => return Err(InvalidSetup("invalid sink_model".into())),
-            },
+            sink_rate1: sr1.unwrap(),
+            sink_rate2: sr2.or(sr1).unwrap(),
+            sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             gamma_law_index: form.get("gamma_law_index").into(),
             cooling_coefficient: form.get("cooling_coefficient").into(),
             pressure_floor: form.get("pressure_floor").into(),
@@ -448,6 +410,7 @@ impl Setup for BinaryWithThermodynamics {
         primitive[2] = v;
         primitive[3] = p;
     }
+
     fn masses(&self, time: f64) -> PointMassList {
         let a: f64 = 1.0;
         let m: f64 = 1.0;
@@ -477,11 +440,13 @@ impl Setup for BinaryWithThermodynamics {
         };
         PointMassList::from_slice(&[mass1, mass2])
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
             gamma_law_index: self.gamma_law_index,
         }
     }
+
     fn buffer_zone(&self) -> BufferZone {
         let rbuf = self.domain_radius - 0.2;
         BufferZone::Keplerian {
@@ -493,30 +458,38 @@ impl Setup for BinaryWithThermodynamics {
             onset_width: 0.1,
         }
     }
+
     fn viscosity(&self) -> Option<f64> {
         Some(self.alpha)
     }
+
     fn velocity_ceiling(&self) -> Option<f64> {
         Some(self.velocity_ceiling)
     }
+
     fn cooling_coefficient(&self) -> Option<f64> {
         Some(self.cooling_coefficient)
     }
+
     fn mach_ceiling(&self) -> Option<f64> {
         Some(self.mach_ceiling)
     }
+
     fn density_floor(&self) -> Option<f64> {
         Some(self.density_floor)
     }
+
     fn pressure_floor(&self) -> Option<f64> {
         Some(self.pressure_floor)
     }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
             resolution,
         ))
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
@@ -542,10 +515,11 @@ impl Setup for Shocktube {
     fn num_primitives(&self) -> usize {
         3
     }
-    fn print_parameters(&self) {}
+
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
     }
+
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         if x < 0.5 {
             primitive[0] = 1.0;
@@ -555,25 +529,31 @@ impl Setup for Shocktube {
             primitive[2] = 0.125;
         }
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
             gamma_law_index: 5.0 / 3.0,
         }
     }
+
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::NoBuffer
     }
+
     fn viscosity(&self) -> Option<f64> {
         None
     }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         let dx = 1.0 / resolution as f64;
         let faces = (0..resolution + 1).map(|i| i as f64 * dx).collect();
         Mesh::FacePositions1D(faces)
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
+
     fn end_time(&self) -> Option<f64> {
         Some(0.15)
     }
@@ -599,10 +579,11 @@ impl Setup for Collision {
     fn num_primitives(&self) -> usize {
         3
     }
-    fn print_parameters(&self) {}
+
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
     }
+
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let xl: f64 = -0.25;
         let xr: f64 = 0.25;
@@ -625,17 +606,21 @@ impl Setup for Collision {
         primitive[1] = vel;
         primitive[2] = rho * 1e-4;
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
             gamma_law_index: 5.0 / 3.0,
         }
     }
+
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::NoBuffer
     }
+
     fn viscosity(&self) -> Option<f64> {
         None
     }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         let x0 = -1.0;
         let x1 = 1.0;
@@ -643,9 +628,11 @@ impl Setup for Collision {
         let faces = (0..resolution + 1).map(|i| x0 + i as f64 * dx).collect();
         Mesh::FacePositions1D(faces)
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
+
     fn end_time(&self) -> Option<f64> {
         Some(5.00)
     }
@@ -685,36 +672,43 @@ impl Setup for Sedov {
     fn num_primitives(&self) -> usize {
         3
     }
-    fn print_parameters(&self) {}
+
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
     }
+
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
         let row = self.table.sample(x);
         primitive[0] = row[1];
         primitive[1] = row[2];
         primitive[2] = row[3];
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
             gamma_law_index: 5.0 / 3.0,
         }
     }
+
     fn buffer_zone(&self) -> BufferZone {
         BufferZone::NoBuffer
     }
+
     fn viscosity(&self) -> Option<f64> {
         None
     }
+
     fn mesh(&self, _resolution: u32) -> Mesh {
         // Note: resolution is ignored. Consider making it an Option, and
-        // returning Result in case it's given for problems that specify the
+        // returning `Result` in case it's given for problems that specify the
         // resolution internally.
         Mesh::FacePositions1D(self.faces.clone())
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::SphericalPolar
     }
+
     fn initial_time(&self) -> f64 {
         1.0
     }
@@ -739,6 +733,7 @@ impl Setup for PulseCollision {
     fn num_primitives(&self) -> usize {
         3
     }
+
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
     }
@@ -795,12 +790,12 @@ impl Setup for PulseCollision {
 /// Models the collision of a fast shell of material with a wind-like target
 /// medium in spherical polar geometry. The fluid is non-relativistic. The
 /// setup does not have runtime model parameters (yet).
-pub struct FastShell {}
+pub struct FastShell;
 
 impl std::str::FromStr for FastShell {
     type Err = error::Error;
     fn from_str(_parameters: &str) -> Result<Self, Self::Err> {
-        Ok(Self {})
+        Ok(Self)
     }
 }
 
