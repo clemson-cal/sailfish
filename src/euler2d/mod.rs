@@ -1,4 +1,4 @@
-use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, PointMass, StructuredMesh};
+use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, PointMassList, StructuredMesh};
 
 pub mod solver;
 
@@ -17,8 +17,7 @@ extern "C" {
         primitive_wr_ptr: *mut f64,
         eos: EquationOfState,
         buffer: BufferZone,
-        masses: *const PointMass,
-        num_masses: i32,
+        mass_list: PointMassList,
         alpha: f64,
         a: f64,
         dt: f64,

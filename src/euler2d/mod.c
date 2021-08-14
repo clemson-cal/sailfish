@@ -56,18 +56,17 @@ static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real 
 
 
 static __host__ __device__ real disk_height(
-    struct PointMass *masses,
-    int num_masses,
+    struct PointMassList mass_list,
     real x1,
     real y1,
     real *prim)
 {
     real omegatilde2 = 0.0;
-    for (int p = 0; p < num_masses; ++p)
+    for (int p = 0; p < mass_list.count; ++p)
     {
-        real x0 = masses[p].x;
-        real y0 = masses[p].y;
-        real mp = masses[p].mass;
+        real x0 = mass_list.masses[p].x;
+        real y0 = mass_list.masses[p].y;
+        real mp = mass_list.masses[p].mass;
 
         real dx = x1 - x0;
         real dy = y1 - y0;
@@ -82,7 +81,7 @@ static __host__ __device__ real disk_height(
 }
 
 static __host__ __device__ void point_mass_source_term(
-    struct PointMass *mass,
+    struct PointMass mass,
     real x1,
     real y1,
     real dt,
@@ -90,10 +89,10 @@ static __host__ __device__ void point_mass_source_term(
     real h,
     real *delta_cons)
 {
-    real x0 = mass->x;
-    real y0 = mass->y;
-    real mp = mass->mass;
-    real rs = mass->radius;
+    real x0 = mass.x;
+    real y0 = mass.y;
+    real mp = mass.mass;
+    real rs = mass.radius;
     real sigma = prim[0];
     real pres  = prim[3];
     real gamma = GAMMA_LAW_INDEX;
@@ -113,15 +112,15 @@ static __host__ __device__ void point_mass_source_term(
 
     if (dr < 4.0 * rs)
     {
-        sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
+        sink_rate = mass.rate * exp(-pow(dr / rs, 4.0));
     }
     //if (dr < 1.0 * rs)
     //{
-    //    sink_rate = mass->rate * pow(1.0 - pow(dr / rs, 2.0), 2.0);
+    //    sink_rate = mass.rate * pow(1.0 - pow(dr / rs, 2.0), 2.0);
     //}
     real mdot = sigma * sink_rate * -1.0;
 
-    switch (mass->model) {
+    switch (mass.model) {
         case AccelerationFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
@@ -131,8 +130,8 @@ static __host__ __device__ void point_mass_source_term(
         case TorqueFree: {
             real vx        = prim[1];
             real vy        = prim[2];
-            real vx0       = mass->vx;
-            real vy0       = mass->vy;
+            real vx0       = mass.vx;
+            real vy0       = mass.vy;
             real rhatx     = dx / dr;
             real rhaty     = dy / dr;
             real dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
@@ -160,8 +159,7 @@ static __host__ __device__ void point_mass_source_term(
 }
 
 static __host__ __device__ void point_masses_source_term(
-    struct PointMass* masses,
-    int num_masses,
+    struct PointMassList mass_list,
     real x1,
     real y1,
     real dt,
@@ -169,10 +167,10 @@ static __host__ __device__ void point_masses_source_term(
     real h,
     real *cons)
 {
-    for (int p = 0; p < num_masses; ++p)
+    for (int p = 0; p < mass_list.count; ++p)
     {
         real delta_cons[NCONS];
-        point_mass_source_term(&masses[p], x1, y1, dt, prim, h, delta_cons);
+        point_mass_source_term(mass_list.masses[p], x1, y1, dt, prim, h, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -438,10 +436,10 @@ static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real 
 // ============================ SCHEME ========================================
 // ============================================================================
 static __host__ __device__ void primitive_to_conserved_zone(
-        struct Patch primitive,
-        struct Patch conserved,
-        int i,
-        int j)
+    struct Patch primitive,
+    struct Patch conserved,
+    int i,
+    int j)
 {
     real *p = GET(primitive, i, j);
     real *u = GET(conserved, i, j);
@@ -455,8 +453,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
+    struct PointMassList mass_list,
     real alpha,
     real a,
     real dt,
@@ -584,11 +581,11 @@ static __host__ __device__ void advance_rk_zone(
     shear_strain(gxcc, gycc, dx, dy, scc);
 
     real cs2cc = sound_speed_squared(&eos, pcc);
-    real hcc = disk_height(masses, num_masses, xc, yc, pcc);
-    real hli = disk_height(masses, num_masses, xl, yc, pli);
-    real hri = disk_height(masses, num_masses, xr, yc, pri);
-    real hlj = disk_height(masses, num_masses, xc, yl, plj);
-    real hrj = disk_height(masses, num_masses, xc, yr, prj);
+    real hcc = disk_height(mass_list, xc, yc, pcc);
+    real hli = disk_height(mass_list, xl, yc, pli);
+    real hri = disk_height(mass_list, xr, yc, pri);
+    real hlj = disk_height(mass_list, xc, yl, plj);
+    real hrj = disk_height(mass_list, xc, yr, prj);
 
     real nucc = alpha * hcc * sqrt(cs2cc);
     real nuli = alpha * hli * sqrt(cs2li);
@@ -616,7 +613,7 @@ static __host__ __device__ void advance_rk_zone(
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc, hcc, ucc);
+    point_masses_source_term(mass_list, xc, yc, dt, pcc, hcc, ucc);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -635,8 +632,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
+    struct PointMassList mass_list,
     real a,
     real dt,
     real velocity_ceiling,
@@ -715,10 +711,10 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     riemann_hlle(pljm, pljp, flj, cs2lj, 1);
     riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-    real h = disk_height(masses, num_masses, xc, yc, pcc);
+    real h = disk_height(mass_list, xc, yc, pcc);
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(masses, num_masses, xc, yc, dt, pcc, h, ucc);
+    point_masses_source_term(mass_list, xc, yc, dt, pcc, h, ucc);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -769,8 +765,7 @@ static void __global__ advance_rk_kernel(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
+    struct PointMassList mass_list,
     real alpha,
     real a,
     real dt,
@@ -792,8 +787,7 @@ static void __global__ advance_rk_kernel(
             primitive_wr,
             eos,
             buffer,
-            masses,
-            num_masses,
+            mass_list,
             alpha,
             a,
             dt,
@@ -815,8 +809,7 @@ static void __global__ advance_rk_kernel_inviscid(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
+    struct PointMassList mass_list,
     real a,
     real dt,
     real velocity_ceiling,
@@ -837,8 +830,7 @@ static void __global__ advance_rk_kernel_inviscid(
             primitive_wr,
             eos,
             buffer,
-            masses,
-            num_masses,
+            mass_list,
             a,
             dt,
             velocity_ceiling,
@@ -948,8 +940,7 @@ EXTERN_C void euler2d_advance_rk(
     real *primitive_wr_ptr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMass *masses,
-    int num_masses,
+    struct PointMassList mass_list,
     real alpha,
     real a,
     real dt,
@@ -974,8 +965,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        masses,
-                        num_masses,
+                        mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -994,8 +984,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        masses,
-                        num_masses,
+                        mass_list,
                         alpha,
                         a,
                         dt,
@@ -1021,8 +1010,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        masses,
-                        num_masses,
+                        mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -1041,8 +1029,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        masses,
-                        num_masses,
+                        mass_list,
                         alpha,
                         a,
                         dt,
@@ -1072,8 +1059,7 @@ EXTERN_C void euler2d_advance_rk(
                     primitive_wr,
                     eos,
                     buffer,
-                    masses,
-                    num_masses,
+                    mass_list,
                     a,
                     dt,
                     velocity_ceiling,
@@ -1090,8 +1076,7 @@ EXTERN_C void euler2d_advance_rk(
                     primitive_wr,
                     eos,
                     buffer,
-                    masses,
-                    num_masses,
+                    mass_list,
                     alpha,
                     a,
                     dt,
@@ -1154,6 +1139,7 @@ EXTERN_C void euler2d_wavespeed(
         }
     }
 }
+
 
 /**
  * Obtain the maximum value in an array of double's, using either a sequential

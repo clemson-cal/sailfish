@@ -55,7 +55,6 @@ impl Solver {
     }
 
     pub fn advance_rk(&mut self, stage: usize) {
-        let masses = gpu_core::Buffer::Host(self.setup.masses(self.time)).on(self.device);
         let dt = self.dt.unwrap();
 
         let a = match self.rk_order {
@@ -85,8 +84,7 @@ impl Solver {
                 self.primitive2.as_mut_ptr(),
                 self.setup.equation_of_state(),
                 self.setup.buffer_zone(),
-                masses.as_ptr(),
-                masses.len() as i32,
+                self.setup.masses(self.time),
                 self.setup.viscosity().unwrap_or(0.0),
                 a,
                 dt,

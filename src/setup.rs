@@ -3,7 +3,7 @@ use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
 use crate::patch::Patch;
 use crate::sailfish::{
-    BufferZone, Coordinates, EquationOfState, PointMass, SinkModel, StructuredMesh,
+    BufferZone, Coordinates, EquationOfState, PointMass, PointMassList, SinkModel, StructuredMesh,
 };
 use crate::split_at_first;
 use gridiron::index_space::IndexSpace;
@@ -40,10 +40,7 @@ pub fn possible_setups_info() -> error::Error {
     PrintUserInformation(message)
 }
 
-pub fn make_setup(
-    setup_name: &str,
-    parameters: &str,
-) -> Result<Arc<dyn Setup>, error::Error> {
+pub fn make_setup(setup_name: &str, parameters: &str) -> Result<Arc<dyn Setup>, error::Error> {
     setups()
         .into_iter()
         .find(|&(n, _)| n == setup_name)
@@ -61,8 +58,8 @@ pub trait Setup: Send + Sync {
     fn end_time(&self) -> Option<f64> {
         None
     }
-    fn masses(&self, _time: f64) -> Vec<PointMass> {
-        vec![]
+    fn masses(&self, _time: f64) -> PointMassList {
+        PointMassList::default()
     }
     fn equation_of_state(&self) -> EquationOfState;
     fn buffer_zone(&self) -> BufferZone {
@@ -93,7 +90,8 @@ pub trait Setup: Send + Sync {
         let nvars = self.num_primitives();
         match mesh {
             Mesh::Structured(mesh) => {
-                let mut primitive = vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * (nvars as i64)) as usize];
+                let mut primitive =
+                    vec![0.0; ((mesh.ni + 4) * (mesh.nj + 4) * (nvars as i64)) as usize];
                 let si = (nvars as i64) * (mesh.nj + 4);
                 let sj = nvars as i64;
                 for i in -2..mesh.ni + 2 {
@@ -117,10 +115,12 @@ pub trait Setup: Send + Sync {
     }
     fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
         match mesh {
-            Mesh::Structured(mesh) => Patch::from_slice_function(space, self.num_primitives(), |(i, j), prim| {
-                let [x, y] = mesh.cell_coordinates(i, j);
-                self.initial_primitive(x, y, prim)
-            }),
+            Mesh::Structured(mesh) => {
+                Patch::from_slice_function(space, self.num_primitives(), |(i, j), prim| {
+                    let [x, y] = mesh.cell_coordinates(i, j);
+                    self.initial_primitive(x, y, prim)
+                })
+            }
             _ => unimplemented!(),
         }
     }
@@ -144,7 +144,9 @@ impl std::str::FromStr for Explosion {
 }
 
 impl Setup for Explosion {
-    fn num_primitives(&self) -> usize { 3 }
+    fn num_primitives(&self) -> usize {
+        3
+    }
     fn print_parameters(&self) {}
     fn solver_name(&self) -> String {
         "iso2d".to_owned()
@@ -157,9 +159,6 @@ impl Setup for Explosion {
         }
         primitive[1] = 0.0;
         primitive[2] = 0.0;
-    }
-    fn masses(&self, _time: f64) -> Vec<PointMass> {
-        vec![]
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::Isothermal {
@@ -236,7 +235,9 @@ impl std::str::FromStr for Binary {
 }
 
 impl Setup for Binary {
-    fn num_primitives(&self) -> usize { 3 }
+    fn num_primitives(&self) -> usize {
+        3
+    }
     fn print_parameters(&self) {
         for key in self
             .form
@@ -278,7 +279,7 @@ impl Setup for Binary {
         primitive[1] = u;
         primitive[2] = v;
     }
-    fn masses(&self, time: f64) -> Vec<PointMass> {
+    fn masses(&self, time: f64) -> PointMassList {
         let a: f64 = 1.0;
         let m: f64 = 1.0;
         let q: f64 = self.form.get("q").into();
@@ -305,7 +306,7 @@ impl Setup for Binary {
             radius: self.sink_radius,
             model: self.sink_model,
         };
-        vec![mass1, mass2]
+        PointMassList::from_slice(&[mass1, mass2])
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::LocallyIsothermal {
@@ -401,7 +402,6 @@ impl std::str::FromStr for BinaryWithThermodynamics {
 }
 
 impl BinaryWithThermodynamics {
-
     fn density_scaling(&self, r: f64) -> f64 {
         r.powf(-3.0 / 5.0) // Eq. (A2) from Goodman (2003)
     }
@@ -409,14 +409,15 @@ impl BinaryWithThermodynamics {
     fn pressure_scaling(&self, r: f64) -> f64 {
         r.powf(-3.0 / 2.0) // Derived from Goodman (2003)
     }
-
 }
 
 impl Setup for BinaryWithThermodynamics {
     fn solver_name(&self) -> String {
         "euler2d".to_owned()
     }
-    fn num_primitives(&self) -> usize { 4 }
+    fn num_primitives(&self) -> usize {
+        4
+    }
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
             println!(
@@ -434,8 +435,12 @@ impl Setup for BinaryWithThermodynamics {
         let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
-        let d = self.initial_density  * self.density_scaling(rs)  * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
-        let p = self.initial_pressure * self.pressure_scaling(rs) * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
+        let d = self.initial_density
+            * self.density_scaling(rs)
+            * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
+        let p = self.initial_pressure
+            * self.pressure_scaling(rs)
+            * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
         let u = phi_hat_x / rs.sqrt();
         let v = phi_hat_y / rs.sqrt();
         primitive[0] = d;
@@ -443,7 +448,7 @@ impl Setup for BinaryWithThermodynamics {
         primitive[2] = v;
         primitive[3] = p;
     }
-    fn masses(&self, time: f64) -> Vec<PointMass> {
+    fn masses(&self, time: f64) -> PointMassList {
         let a: f64 = 1.0;
         let m: f64 = 1.0;
         let q: f64 = self.form.get("q").into();
@@ -470,7 +475,7 @@ impl Setup for BinaryWithThermodynamics {
             radius: self.sink_radius,
             model: self.sink_model,
         };
-        vec![mass1, mass2]
+        PointMassList::from_slice(&[mass1, mass2])
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
@@ -534,7 +539,9 @@ impl std::str::FromStr for Shocktube {
 }
 
 impl Setup for Shocktube {
-    fn num_primitives(&self) -> usize { 3 }
+    fn num_primitives(&self) -> usize {
+        3
+    }
     fn print_parameters(&self) {}
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
@@ -547,9 +554,6 @@ impl Setup for Shocktube {
             primitive[0] = 0.1;
             primitive[2] = 0.125;
         }
-    }
-    fn masses(&self, _time: f64) -> Vec<PointMass> {
-        vec![]
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
@@ -592,7 +596,9 @@ impl std::str::FromStr for Collision {
 }
 
 impl Setup for Collision {
-    fn num_primitives(&self) -> usize { 3 }
+    fn num_primitives(&self) -> usize {
+        3
+    }
     fn print_parameters(&self) {}
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
@@ -618,9 +624,6 @@ impl Setup for Collision {
         primitive[0] = rho;
         primitive[1] = vel;
         primitive[2] = rho * 1e-4;
-    }
-    fn masses(&self, _time: f64) -> Vec<PointMass> {
-        vec![]
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
@@ -679,7 +682,9 @@ impl std::str::FromStr for Sedov {
 }
 
 impl Setup for Sedov {
-    fn num_primitives(&self) -> usize { 3 }
+    fn num_primitives(&self) -> usize {
+        3
+    }
     fn print_parameters(&self) {}
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
@@ -689,9 +694,6 @@ impl Setup for Sedov {
         primitive[0] = row[1];
         primitive[1] = row[2];
         primitive[2] = row[3];
-    }
-    fn masses(&self, _time: f64) -> Vec<PointMass> {
-        vec![]
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
@@ -734,7 +736,9 @@ impl std::str::FromStr for PulseCollision {
 }
 
 impl Setup for PulseCollision {
-    fn num_primitives(&self) -> usize { 3 }
+    fn num_primitives(&self) -> usize {
+        3
+    }
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
     }
@@ -801,7 +805,10 @@ impl std::str::FromStr for FastShell {
 }
 
 impl Setup for FastShell {
-    fn num_primitives(&self) -> usize { 3 }
+    fn num_primitives(&self) -> usize {
+        3
+    }
+
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
     }

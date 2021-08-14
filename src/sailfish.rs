@@ -46,6 +46,45 @@ pub struct PointMass {
     pub model: SinkModel,
 }
 
+impl Default for PointMass {
+    fn default() -> Self {
+        Self {
+            x: 0.0,
+            y: 0.0,
+            vx: 0.0,
+            vy: 0.0,
+            mass: 0.0,
+            rate: 0.0,
+            radius: 0.0,
+            model: SinkModel::Inactive,
+        }
+    }
+}
+
+#[repr(C)]
+#[derive(Debug, Clone, Copy)]
+pub struct PointMassList {
+    masses: [PointMass; 2],
+    count: i32,
+}
+
+impl PointMassList {
+    pub fn from_slice(slice: &[PointMass]) -> Self {
+        let mut masses = [PointMass::default(); 2];
+        masses[..slice.len()].copy_from_slice(slice);
+        Self {
+            masses,
+            count: slice.len() as i32,
+        }
+    }
+}
+
+impl Default for PointMassList {
+    fn default() -> Self {
+        Self::from_slice(&[])
+    }
+}
+
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum BufferZone {
@@ -172,13 +211,7 @@ pub trait Solve {
 
     /// Primitive variable array in a solver using first, second, or third-order
     /// Runge-Kutta time stepping.
-    fn advance(
-        &mut self,
-        setup: &dyn Setup,
-        rk_order: u32,
-        time: f64,
-        dt: f64,
-    ) {
+    fn advance(&mut self, setup: &dyn Setup, rk_order: u32, time: f64, dt: f64) {
         self.primitive_to_conserved();
         match rk_order {
             1 => {
@@ -218,7 +251,9 @@ pub trait PatchBasedBuild {
     ) -> Self::Solver;
 }
 
-pub trait PatchBasedSolve: Automaton<Key = Rectangle<i64>, Value = Self, Message = Patch> + Send + Sync {
+pub trait PatchBasedSolve:
+    Automaton<Key = Rectangle<i64>, Value = Self, Message = Patch> + Send + Sync
+{
     /// Returns the primitive variable array for this solver. The data is
     /// row-major with contiguous primitive variable components. The array
     /// includes guard zones.

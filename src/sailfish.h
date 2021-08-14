@@ -26,6 +26,12 @@ struct PointMass
     enum SinkModel model;
 };
 
+struct PointMassList
+{
+    struct PointMass masses[2];
+    int count;
+};
+
 enum EquationOfStateType
 {
     Isothermal,
