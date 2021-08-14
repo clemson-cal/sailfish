@@ -114,6 +114,13 @@ static __host__ __device__ void point_mass_source_term(
     {
         sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
     }
+    if (dr < rs)
+    {
+        r2_soft = r2 + rs * rs;
+        mag = sigma * mp / r2_soft;
+        fx = -mag * dx / dr;
+        fy = -mag * dy / dr;
+    }
     //if (dr < 1.0 * rs)
     //{
     //    sink_rate = mass->rate * pow(1.0 - pow(dr / rs, 2.0), 2.0);
