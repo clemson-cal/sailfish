@@ -230,6 +230,10 @@ pub trait PatchBasedSolve: Automaton<Key = Rectangle<i64>, Value = Self, Message
     /// Returns the largest wavespeed among the zones in the solver's current
     /// primitive array.
     fn max_wavespeed(&self) -> f64;
+
+    /// Returns the GPU device this patch should be computed on, or `None` if
+    /// the execution should be on the CPU.
+    fn device(&self) -> Option<Device>;
 }
 
 pub fn compiled_with_omp() -> bool {

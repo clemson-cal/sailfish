@@ -153,6 +153,10 @@ impl PatchBasedSolve for Solver {
     fn set_timestep(&mut self, dt: f64) {
         self.dt = Some(dt)
     }
+
+    fn device(&self) -> Option<Device> {
+        self.device
+    }
 }
 
 impl Automaton for Solver {

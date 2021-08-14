@@ -110,20 +110,3 @@ fn on_device<T, F: FnMut() -> T>(device: i32, mut f: F) -> T {
         result
     }
 }
-
-// #[cfg(feature = "gpu")]
-// fn last_error(device: i32) -> Option<String> {
-//     on_device(device, || {
-//         let error_str = unsafe { gpu_get_last_error() };
-//         if error_str == std::ptr::null() {
-//             None
-//         } else {
-//             Some(
-//                 unsafe { CStr::from_ptr(error_str) }
-//                     .to_str()
-//                     .unwrap()
-//                     .to_owned(),
-//             )
-//         }
-//     })
-// }

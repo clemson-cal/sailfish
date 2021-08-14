@@ -28,33 +28,30 @@ impl Device {
     /// Returns a new buffer allocated on this device by copying data from the
     /// given slice.
     pub fn buffer_from<T: Copy>(&self, slice: &[T]) -> DeviceBuffer<T> {
-        on_device(self.0, || {
-            let bytes = (slice.len() * std::mem::size_of::<T>()) as c_ulong;
-            unsafe {
-                let ptr = gpu_malloc(bytes);
-                gpu_memcpy_htod(ptr, slice.as_ptr() as *const c_void, bytes);
-                DeviceBuffer {
-                    ptr: ptr as *mut T,
-                    len: slice.len(),
-                    device_id: self.0,
-                }
-            }
-        })
+        let bytes = (slice.len() * std::mem::size_of::<T>()) as c_ulong;
+        let ptr = on_device(self.0, || unsafe {
+            let ptr = gpu_malloc(bytes);
+            gpu_memcpy_htod(ptr, slice.as_ptr() as *const c_void, bytes);
+            ptr
+        });
+        DeviceBuffer {
+            ptr: ptr as *mut T,
+            len: slice.len(),
+            device_id: self.0,
+        }
     }
 
     /// Returns an unitialized buffer of the given size on this device.
     pub unsafe fn uninit_buffer<T: Copy>(&self, len: usize) -> DeviceBuffer<T> {
-        on_device(self.0, || {
-            let bytes = (len * std::mem::size_of::<T>()) as c_ulong;
-            unsafe {
-                let ptr = gpu_malloc(bytes);
-                DeviceBuffer {
-                    ptr: ptr as *mut T,
-                    len,
-                    device_id: self.0,
-                }
-            }
-        })
+        let bytes = (len * std::mem::size_of::<T>()) as c_ulong;
+        let ptr = on_device(self.0, || unsafe {
+            gpu_malloc(bytes)
+        });
+        DeviceBuffer {
+            ptr: ptr as *mut T,
+            len,
+            device_id: self.0,
+        }
     }
 
     /// Executes the given closure on this device. This function restores the
@@ -67,10 +64,6 @@ impl Device {
     pub fn synchronize(&self) {
         on_device(self.0, || unsafe { gpu_device_synchronize() })
     }
-
-    // pub fn last_error(&self) -> Option<String> {
-    //     last_error(self.0)
-    // }
 }
 
 impl Default for Device {
