@@ -192,7 +192,13 @@ where
     let min_spacing = state.mesh.min_spacing();
     let edge_list = adjacency_list(&patch_map, 2);
     let mut solvers = vec![];
-    let mut devices = gpu_core::all_devices().cycle();
+    let mut devices = if let Some(device) = cline.device {
+        vec![gpu_core::Device::with_id(device).unwrap()]
+    } else {
+        gpu_core::all_devices().collect::<Vec<_>>()
+    }
+    .into_iter()
+    .cycle();
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
