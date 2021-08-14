@@ -15,7 +15,7 @@ pub struct Device(pub(crate) i32);
 
 #[cfg(feature = "gpu")]
 impl Device {
-    /// Returns a new `Device` handle from an integer ID. Returns `Non` if a
+    /// Returns a new `Device` handle from an integer ID. Returns `NaN` if a
     /// device with the given ID does not exist.
     pub fn with_id(id: i32) -> Option<Self> {
         if id < unsafe { gpu_get_device_count() } as i32 {

@@ -173,19 +173,17 @@ impl<T: Copy> DeviceBuffer<T> {
 
 impl<T: Copy> From<&DeviceBuffer<T>> for Vec<T> {
     fn from(dvec: &DeviceBuffer<T>) -> Self {
-        on_device(dvec.device_id, || {
-            let mut hvec = Vec::with_capacity(dvec.len());
-            let bytes = (dvec.len() * std::mem::size_of::<T>()) as c_ulong;
-            unsafe {
-                hvec.set_len(dvec.len());
-                gpu_memcpy_dtoh(
-                    hvec.as_mut_ptr() as *mut c_void,
-                    dvec.ptr as *const c_void,
-                    bytes,
-                )
-            };
-            hvec
-        })
+        let bytes = (dvec.len() * std::mem::size_of::<T>()) as c_ulong;
+        let mut hvec = Vec::with_capacity(dvec.len());
+        unsafe { hvec.set_len(dvec.len()) };
+        on_device(dvec.device_id, || unsafe {
+            gpu_memcpy_dtoh(
+                hvec.as_mut_ptr() as *mut c_void,
+                dvec.ptr as *const c_void,
+                bytes,
+            )
+        });
+        hvec
     }
 }
 
