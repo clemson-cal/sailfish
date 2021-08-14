@@ -18,7 +18,7 @@ macro_rules! setup_builder {
     };
 }
 
-type SetupFunction = Box<dyn Fn(&str) -> Result<Arc<dyn Setup + Send + Sync>, error::Error>>;
+type SetupFunction = Box<dyn Fn(&str) -> Result<Arc<dyn Setup>, error::Error>>;
 
 fn setups() -> Vec<(&'static str, SetupFunction)> {
     vec![
@@ -43,7 +43,7 @@ pub fn possible_setups_info() -> error::Error {
 pub fn make_setup(
     setup_name: &str,
     parameters: &str,
-) -> Result<Arc<dyn Setup + Send + Sync>, error::Error> {
+) -> Result<Arc<dyn Setup>, error::Error> {
     setups()
         .into_iter()
         .find(|&(n, _)| n == setup_name)
@@ -51,7 +51,7 @@ pub fn make_setup(
         .ok_or_else(|| possible_setups_info())?
 }
 
-pub trait Setup {
+pub trait Setup: Send + Sync {
     fn print_parameters(&self) {}
     fn solver_name(&self) -> String;
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);

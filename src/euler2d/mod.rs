@@ -1,9 +1,4 @@
-//use crate::error::Error;
-use crate::sailfish::{
-    BufferZone, EquationOfState, ExecutionMode, PointMass, StructuredMesh, //Solve
-};
-//use crate::Setup;
-//use cfg_if::cfg_if;
+use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, PointMass, StructuredMesh};
 
 pub mod solver;
 
@@ -46,6 +41,6 @@ extern "C" {
     pub fn euler2d_maximum(
         data: *const f64,
         size: std::os::raw::c_ulong,
-        mode: ExecutionMode
+        mode: ExecutionMode,
     ) -> f64;
 }

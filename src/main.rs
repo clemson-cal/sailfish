@@ -153,7 +153,7 @@ fn max_wavespeed<Solver: PatchBasedSolve>(
 
 fn launch_patch_based<Builder, Solver>(
     mut state: State,
-    setup: Arc<dyn Setup + Send + Sync>,
+    setup: Arc<dyn Setup>,
     cline: CommandLine,
     builder: Builder,
 ) -> Result<(), error::Error>
@@ -289,7 +289,7 @@ where
 
 fn launch_single_patch(
     mut state: State,
-    setup: Arc<dyn Setup + Send + Sync>,
+    setup: Arc<dyn Setup>,
     cline: CommandLine,
 ) -> Result<(), error::Error> {
     let (mesh, cfl, fold, chkpt_interval, rk_order, dt_each_iter, end_time, outdir) = (

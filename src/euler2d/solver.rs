@@ -37,7 +37,7 @@ pub struct Solver {
     mesh: StructuredMesh,
     mode: ExecutionMode,
     device: Option<Device>,
-    setup: Arc<dyn Setup + Send + Sync>,
+    setup: Arc<dyn Setup>,
 }
 
 impl Solver {
@@ -105,77 +105,6 @@ impl Solver {
             SolverState::NotReady
         } else {
             SolverState::RungeKuttaStage(stage + 1)
-        }
-    }
-}
-
-pub struct Builder;
-
-impl PatchBasedBuild for Builder {
-    type Solver = Solver;
-
-    fn build(
-        &self,
-        time: f64,
-        primitive: Patch,
-        global_structured_mesh: StructuredMesh,
-        edge_list: &AdjacencyList<Rectangle<i64>>,
-        rk_order: usize,
-        mode: ExecutionMode,
-        device: Option<Device>,
-        setup: Arc<dyn Setup + Send + Sync>,
-    ) -> Self::Solver {
-        assert! {
-            (device.is_none() && std::matches!(mode, ExecutionMode::CPU | ExecutionMode::OMP)) ||
-            (device.is_some() && std::matches!(mode, ExecutionMode::GPU)),
-            "device must be Some if and only if execution mode is GPU"
-        };
-        let rect = primitive.rect();
-        let local_space = primitive.index_space();
-        let local_space_ext = local_space.extend_all(2);
-        let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
-        let global_space_ext = global_mesh.index_space().extend_all(2);
-
-        let guard_spaces = [
-            global_space_ext.keep_lower(2, Axis::I),
-            global_space_ext.keep_upper(2, Axis::I),
-            global_space_ext.keep_lower(2, Axis::J),
-            global_space_ext.keep_upper(2, Axis::J),
-        ];
-
-        let primitive1 = Patch::zeros(4, &local_space.extend_all(2)).on(device);
-        let conserved0 = Patch::zeros(4, &local_space).on(device);
-        let wavespeeds = Patch::zeros(1, &local_space).on(device);
-
-        let mut primitive1 = primitive1;
-        primitive.copy_into(&mut primitive1);
-
-        for space in guard_spaces {
-            if let Some(overlap) = space.intersect(&local_space_ext) {
-                setup
-                    .initial_primitive_patch(&overlap, &global_mesh)
-                    .copy_into(&mut primitive1);
-            }
-        }
-
-        Solver {
-            time,
-            time0: time,
-            state: SolverState::NotReady,
-            dt: None,
-            rk_order,
-            primitive2: primitive1.clone(),
-            primitive1,
-            conserved0,
-            wavespeeds: Arc::new(Mutex::new(wavespeeds)),
-            outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
-            incoming_count: edge_list.incoming_edges(&rect).count(),
-            received_count: 0,
-            index_space: local_space,
-            mode,
-            device,
-            mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
-            setup,
         }
     }
 }
@@ -269,5 +198,76 @@ impl Automaton for Solver {
             self.advance_rk(stage)
         }
         self
+    }
+}
+
+pub struct Builder;
+
+impl PatchBasedBuild for Builder {
+    type Solver = Solver;
+
+    fn build(
+        &self,
+        time: f64,
+        primitive: Patch,
+        global_structured_mesh: StructuredMesh,
+        edge_list: &AdjacencyList<Rectangle<i64>>,
+        rk_order: usize,
+        mode: ExecutionMode,
+        device: Option<Device>,
+        setup: Arc<dyn Setup>,
+    ) -> Self::Solver {
+        assert! {
+            (device.is_none() && std::matches!(mode, ExecutionMode::CPU | ExecutionMode::OMP)) ||
+            (device.is_some() && std::matches!(mode, ExecutionMode::GPU)),
+            "device must be Some if and only if execution mode is GPU"
+        };
+        let rect = primitive.rect();
+        let local_space = primitive.index_space();
+        let local_space_ext = local_space.extend_all(2);
+        let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
+        let global_space_ext = global_mesh.index_space().extend_all(2);
+
+        let guard_spaces = [
+            global_space_ext.keep_lower(2, Axis::I),
+            global_space_ext.keep_upper(2, Axis::I),
+            global_space_ext.keep_lower(2, Axis::J),
+            global_space_ext.keep_upper(2, Axis::J),
+        ];
+
+        let primitive1 = Patch::zeros(4, &local_space.extend_all(2)).on(device);
+        let conserved0 = Patch::zeros(4, &local_space).on(device);
+        let wavespeeds = Patch::zeros(1, &local_space).on(device);
+
+        let mut primitive1 = primitive1;
+        primitive.copy_into(&mut primitive1);
+
+        for space in guard_spaces {
+            if let Some(overlap) = space.intersect(&local_space_ext) {
+                setup
+                    .initial_primitive_patch(&overlap, &global_mesh)
+                    .copy_into(&mut primitive1);
+            }
+        }
+
+        Solver {
+            time,
+            time0: time,
+            state: SolverState::NotReady,
+            dt: None,
+            rk_order,
+            primitive2: primitive1.clone(),
+            primitive1,
+            conserved0,
+            wavespeeds: Arc::new(Mutex::new(wavespeeds)),
+            outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
+            incoming_count: edge_list.incoming_edges(&rect).count(),
+            received_count: 0,
+            index_space: local_space,
+            mode,
+            device,
+            mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
+            setup,
+        }
     }
 }

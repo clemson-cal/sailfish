@@ -214,7 +214,7 @@ pub trait PatchBasedBuild {
         rk_order: usize,
         mode: ExecutionMode,
         device: Option<Device>,
-        setup: Arc<dyn Setup + Send + Sync>,
+        setup: Arc<dyn Setup>,
     ) -> Self::Solver;
 }
 
