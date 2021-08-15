@@ -26,5 +26,7 @@ fn main() {
         .compile("iso2d_mod");
     plat.build_src("src/euler1d/mod", use_omp())
         .compile("euler1d_mod");
+    plat.build_src("src/euler2d/mod", use_omp())
+        .compile("euler2d_mod");
     plat.emit_link_flags();
 }

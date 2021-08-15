@@ -1,4 +1,5 @@
 use crate::sailfish;
+use gridiron::index_space::IndexSpace;
 
 #[derive(Clone, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
@@ -20,6 +21,12 @@ impl Mesh {
             Self::FacePositions1D(faces) => {
                 faces.windows(2).map(|w| w[1] - w[0]).fold(f64::MAX, f64::min)
             }
+        }
+    }
+    pub fn index_space(&self) -> IndexSpace {
+        match self {
+            Self::Structured(mesh) => IndexSpace::new(0..mesh.ni, 0..mesh.nj),
+            Self::FacePositions1D(faces) => IndexSpace::new(0..faces.len() as i64 - 1, 0..1),
         }
     }
 }

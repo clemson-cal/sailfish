@@ -1,5 +1,7 @@
 use crate::error::Error;
 use crate::sailfish::{self, ExecutionMode};
+use crate::setup::Setup;
+use crate::state::Recurrence;
 use std::fmt::Write;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -15,10 +17,9 @@ pub struct CommandLine {
     pub checkpoint_logspace: Option<bool>,
     pub outdir: Option<String>,
     pub end_time: Option<f64>,
-    pub rk_order: u32,
+    pub rk_order: usize,
     pub cfl_number: f64,
     pub recompute_timestep: Option<String>,
-    pub velocity_ceiling: f64,
 }
 
 impl CommandLine {
@@ -32,14 +33,60 @@ impl CommandLine {
         }
     }
 
-    pub fn recompute_dt_each_iteration(&self) -> Result<bool, Error> {
+    pub fn recompute_dt_each_iteration(&self) -> bool {
         match self.recompute_timestep.as_deref() {
-            None => Ok(true),
-            Some("iter") => Ok(true),
-            Some("fold") => Ok(false),
-            _ => Err(Error::Cmdline(
-                "invalid mode for --timestep, expected (iter|fold)".to_owned(),
-            )),
+            None => true,
+            Some("iter") => true,
+            Some("fold") => false,
+            _ => panic!(),
+        }
+    }
+
+    pub fn checkpoint_rule(&self, setup: &dyn Setup) -> Recurrence {
+        if self.checkpoint_logspace.unwrap_or(false) {
+            Recurrence::Log(self.checkpoint_interval)
+        } else {
+            Recurrence::Linear(self.checkpoint_interval * setup.unit_time())
+        }
+    }
+
+    pub fn simulation_end_time(&self, setup: &dyn Setup) -> f64 {
+        self.end_time
+            .or_else(|| setup.end_time())
+            .map(|t| t * setup.unit_time())
+            .unwrap_or(f64::MAX)
+    }
+
+    pub fn output_directory(&self, restart_file: &Option<String>) -> String {
+        self.outdir
+            .clone()
+            .or_else(|| {
+                restart_file
+                    .as_deref()
+                    .and_then(crate::parent_dir)
+                    .map(String::from)
+            })
+            .unwrap_or_else(|| String::from("."))
+    }
+}
+
+impl Default for CommandLine {
+    fn default() -> Self {
+        Self {
+            use_omp: false,
+            use_gpu: false,
+            device: None,
+            upsample: None,
+            resolution: None,
+            fold: 10,
+            checkpoint_interval: 1.0,
+            checkpoint_logspace: None,
+            setup: None,
+            outdir: None,
+            end_time: None,
+            rk_order: 1,
+            cfl_number: 0.2,
+            recompute_timestep: None,
         }
     }
 }
@@ -48,23 +95,7 @@ impl CommandLine {
 pub fn parse_command_line() -> Result<CommandLine, Error> {
     use Error::*;
 
-    let mut c = CommandLine {
-        use_omp: false,
-        use_gpu: false,
-        device: None,
-        upsample: None,
-        resolution: None,
-        fold: 10,
-        checkpoint_interval: 1.0,
-        checkpoint_logspace: None,
-        setup: None,
-        outdir: None,
-        end_time: None,
-        rk_order: 1,
-        cfl_number: 0.2,
-        recompute_timestep: None,
-        velocity_ceiling: 1e16,
-    };
+    let mut c = CommandLine::default();
 
     enum State {
         Ready,
@@ -77,7 +108,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Cfl,
         Outdir,
         RecomputeTimestep,
-        VelocityCeiling
     }
     std::convert::identity(State::Device); // black-box
     let mut state = State::Ready;
@@ -121,7 +151,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
                     writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
                     writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
-                    writeln!(message, "       -v|--velocity-ceiling component-wise velocity ceiling [1e16]").unwrap();
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
                     return Err(PrintUserInformation(message));
                 }
@@ -136,7 +165,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "-o" | "--outdir" => state = State::Outdir,
                 "-e" | "--end-time" => state = State::EndTime,
                 "-r" | "--rk-order" => state = State::RkOrder,
-                "-v" | "--velocity-ceiling" => state = State::VelocityCeiling,
                 "--cfl" => state = State::Cfl,
                 _ => {
                     if arg.starts_with('-') {
@@ -182,10 +210,6 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 c.rk_order = arg.parse().map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?;
                 state = State::Ready;
             }
-            State::VelocityCeiling => {
-                c.velocity_ceiling = arg.parse().map_err(|e| Cmdline(format!("velocity-ceiling {}: {}", arg, e)))?;
-                state = State::Ready;
-            }
             State::EndTime => {
                 c.end_time = Some(arg.parse().map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?);
                 state = State::Ready;
@@ -205,8 +229,12 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
     } else if !(1..=3).contains(&c.rk_order) {
         Err(Cmdline("rk-order must be 1, 2, or 3".into()))
+    } else if c.checkpoint_interval <= 0.0 {
+        Err(Cmdline("checkpoint interval --checkpoint (-c) must be >0".to_string()))
     } else if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
+    } else if ![None, Some("iter"), Some("fold")].contains(&c.recompute_timestep.as_deref()) {
+        Err(Cmdline("invalid mode for --timestep, expected (iter|fold)".to_owned()))
     } else {
         Ok(c)
     }

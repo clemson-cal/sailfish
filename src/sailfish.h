@@ -26,6 +26,12 @@ struct PointMass
     enum SinkModel model;
 };
 
+struct PointMassList
+{
+    struct PointMass masses[2];
+    int count;
+};
+
 enum EquationOfStateType
 {
     Isothermal,
@@ -76,6 +82,7 @@ struct BufferZone
         struct
         {
             real surface_density;
+            real surface_pressure;
             real central_mass;
             real driving_rate;
             real outer_radius;

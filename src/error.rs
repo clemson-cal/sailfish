@@ -1,6 +1,7 @@
 use std::error;
 use std::fmt;
 use std::fmt::Display;
+use std::num::ParseFloatError;
 
 #[derive(Debug)]
 pub enum Error {
@@ -8,9 +9,11 @@ pub enum Error {
     CompiledWithoutGpu,
     PrintUserInformation(String),
     Cmdline(String),
+    UnknownEnumVariant { enum_type: String, variant: String },
     InvalidSetup(String),
     InvalidCheckpoint(String),
     InvalidDevice(i32),
+    ParseFloatError(ParseFloatError),
     IOError(std::io::Error),
 }
 
@@ -29,6 +32,9 @@ impl Display for Error {
             Self::Cmdline(message) => {
                 writeln!(fmt, "error: {}", message)
             }
+            Self::UnknownEnumVariant { enum_type, variant } => {
+                writeln!(fmt, "unknown mode '{}' for {}", variant, enum_type)
+            }
             Self::InvalidSetup(info) => {
                 writeln!(fmt, "invalid setup: {}", info)
             }
@@ -37,6 +43,9 @@ impl Display for Error {
             }
             Self::InvalidDevice(id) => {
                 writeln!(fmt, "invalid device id: {}", id)
+            }
+            Self::ParseFloatError(error) => {
+                writeln!(fmt, "{}", error)
             }
             Self::IOError(error) => {
                 writeln!(fmt, "{}", error)
