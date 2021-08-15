@@ -180,28 +180,14 @@ where
     Builder: PatchBasedBuild<Solver = Solver>,
     Solver: PatchBasedSolve,
 {
-    let (rk_order, fold, cpi, cfl, dt_each_iter, end_time, outdir) = (
-        cline.rk_order as usize,
-        cline.fold,
-        cline.checkpoint_interval * setup.unit_time(),
+    let (cfl, fold, rk_order, checkpoint_rule, dt_each_iter, end_time, outdir) = (
         cline.cfl_number,
+        cline.fold,
+        cline.rk_order as usize,
+        cline.checkpoint_rule(setup.as_ref()),
         cline.recompute_dt_each_iteration(),
-        cline
-            .end_time
-            .or_else(|| setup.end_time())
-            .unwrap_or(f64::MAX)
-            * setup.unit_time(),
-        cline
-            .outdir
-            .clone()
-            .or_else(|| {
-                state
-                    .restart_file
-                    .as_deref()
-                    .and_then(parent_dir)
-                    .map(String::from)
-            })
-            .unwrap_or_else(|| String::from(".")),
+        cline.simulation_end_time(setup.as_ref()),
+        cline.output_directory(&state.restart_file),
     );
     let patch_map: RectangleMap<_, _> = state
         .primitive_patches
@@ -258,7 +244,7 @@ where
             ));
         }
     }
-    if cline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
+    if std::matches!(checkpoint_rule, state::Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
         ));
@@ -280,9 +266,9 @@ where
     };
 
     while state.time < end_time {
-        if state.checkpoint.is_due(state.time, cpi) {
+        if state.checkpoint.is_due(state.time, checkpoint_rule) {
             state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
-            state.write_checkpoint(setup.unit_time(), &outdir)?;
+            state.write_checkpoint(setup.as_ref(), &outdir)?;
         }
 
         let start = std::time::Instant::now();
@@ -320,7 +306,7 @@ where
     }
 
     state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
-    state.write_checkpoint(setup.unit_time(), &outdir)?;
+    state.write_checkpoint(setup.as_ref(), &outdir)?;
 
     Ok(())
 }
@@ -330,29 +316,14 @@ fn launch_single_patch(
     setup: Arc<dyn Setup>,
     cline: CommandLine,
 ) -> Result<(), error::Error> {
-    let (mesh, cfl, fold, chkpt_interval, rk_order, dt_each_iter, end_time, outdir) = (
-        state.mesh.clone(),
+    let (cfl, fold, rk_order, checkpoint_rule, dt_each_iter, end_time, outdir) = (
         cline.cfl_number,
         cline.fold,
-        cline.checkpoint_interval * setup.unit_time(),
         cline.rk_order,
+        cline.checkpoint_rule(setup.as_ref()),
         cline.recompute_dt_each_iteration(),
-        cline
-            .end_time
-            .or_else(|| setup.end_time())
-            .unwrap_or(f64::MAX)
-            * setup.unit_time(),
-        cline
-            .outdir
-            .clone()
-            .or_else(|| {
-                state
-                    .restart_file
-                    .as_deref()
-                    .and_then(parent_dir)
-                    .map(String::from)
-            })
-            .unwrap_or_else(|| String::from(".")),
+        cline.simulation_end_time(setup.as_ref()),
+        cline.output_directory(&state.restart_file),
     );
     let mut solver = match &state.mesh {
         Mesh::FacePositions1D(faces) => euler1d::solver(
@@ -366,9 +337,9 @@ fn launch_single_patch(
     };
 
     let mut dt = 0.0;
-    let dx_min = mesh.min_spacing();
+    let dx_min = state.mesh.min_spacing();
 
-    if cline.checkpoint_logspace.unwrap_or(false) && setup.initial_time() <= 0.0 {
+    if std::matches!(checkpoint_rule, state::Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
         ));
@@ -376,9 +347,9 @@ fn launch_single_patch(
     setup.print_parameters();
 
     while state.time < end_time {
-        if state.checkpoint.is_due(state.time, chkpt_interval) {
+        if state.checkpoint.is_due(state.time, checkpoint_rule) {
             state.set_primitive(solver.primitive());
-            state.write_checkpoint(setup.unit_time(), &outdir)?;
+            state.write_checkpoint(setup.as_ref(), &outdir)?;
         }
 
         if !dt_each_iter {
@@ -390,20 +361,23 @@ fn launch_single_patch(
                 if dt_each_iter {
                     dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
                 }
-                solver.advance(setup.as_ref(), rk_order, state.time, dt);
+                solver.advance(setup.as_ref(), rk_order as u32, state.time, dt);
                 state.time += dt;
                 state.iteration += 1;
             }
         });
 
-        let mzps = (mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64();
+        let mzps = (state.mesh.num_total_zones() * fold) as f64 / 1e6 / elapsed.as_secs_f64();
         println!(
             "[{}] t={:.3} dt={:.3e} Mzps={:.3}",
-            state.iteration, state.time / setup.unit_time(), dt / setup.unit_time(), mzps,
+            state.iteration,
+            state.time / setup.unit_time(),
+            dt / setup.unit_time(),
+            mzps,
         );
     }
     state.set_primitive(solver.primitive());
-    state.write_checkpoint(setup.unit_time(), &outdir)?;
+    state.write_checkpoint(setup.as_ref(), &outdir)?;
     Ok(())
 }
 

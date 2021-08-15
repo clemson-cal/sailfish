@@ -2,9 +2,16 @@ use crate::cmdline::CommandLine;
 use crate::error;
 use crate::mesh;
 use crate::patch::Patch;
+use crate::setup::Setup;
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
 use std::io::Write;
+
+#[derive(Clone, Copy)]
+pub enum Recurrence {
+    Linear(f64),
+    Log(f64),
+}
 
 #[derive(Clone, serde::Serialize, serde::Deserialize)]
 pub struct RecurringTask {
@@ -25,19 +32,22 @@ impl RecurringTask {
             last_time: None,
         }
     }
-    pub fn next(&mut self, current_time: f64, interval: f64, logspace: bool) {
-        if self.last_time.is_none() {
-            self.last_time = Some(current_time);
-        } else if !logspace {
-            self.last_time = Some(self.last_time.unwrap() + interval);
-        } else {
-            self.last_time = Some(self.last_time.unwrap() * (1.0 + interval))
-        }
+    pub fn next(&mut self, current_time: f64, recurrence: Recurrence) {
+        self.last_time = Some(self.next_time(current_time, recurrence));
         self.number += 1;
     }
-    pub fn is_due(&self, time: f64, interval: f64) -> bool {
-        self.last_time
-            .map_or(true, |last_time| time >= last_time + interval)
+    pub fn next_time(&self, current_time: f64, recurrence: Recurrence) -> f64 {
+        if let Some(last_time) = self.last_time {
+            match recurrence {
+                Recurrence::Linear(interval) => last_time + interval,
+                Recurrence::Log(multiplier) => last_time * (1.0 + multiplier),
+            }
+        } else {
+            current_time
+        }
+    }
+    pub fn is_due(&self, current_time: f64, recurrence: Recurrence) -> bool {
+        current_time >= self.next_time(current_time, recurrence)
     }
 }
 
@@ -83,12 +93,13 @@ impl State {
         self.primitive = primitive;
     }
 
-    pub fn write_checkpoint(&mut self, unit_time: f64, outdir: &str) -> Result<(), error::Error> {
-        self.checkpoint.next(
-            self.time,
-            self.command_line.checkpoint_interval * unit_time,
-            self.command_line.checkpoint_logspace.unwrap_or(false),
-        );
+    pub fn write_checkpoint(
+        &mut self,
+        setup: &dyn Setup,
+        outdir: &str,
+    ) -> Result<(), error::Error> {
+        self.checkpoint
+            .next(self.time, self.command_line.checkpoint_rule(setup));
         create_dir_all(outdir).map_err(error::Error::IOError)?;
         let bytes = rmp_serde::to_vec_named(self).unwrap();
         let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);

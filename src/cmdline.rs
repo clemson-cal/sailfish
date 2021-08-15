@@ -1,5 +1,7 @@
 use crate::error::Error;
 use crate::sailfish::{self, ExecutionMode};
+use crate::setup::Setup;
+use crate::state::Recurrence;
 use std::fmt::Write;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -15,7 +17,7 @@ pub struct CommandLine {
     pub checkpoint_logspace: Option<bool>,
     pub outdir: Option<String>,
     pub end_time: Option<f64>,
-    pub rk_order: u32,
+    pub rk_order: usize,
     pub cfl_number: f64,
     pub recompute_timestep: Option<String>,
 }
@@ -38,6 +40,33 @@ impl CommandLine {
             Some("fold") => false,
             _ => panic!(),
         }
+    }
+
+    pub fn checkpoint_rule(&self, setup: &dyn Setup) -> Recurrence {
+        if self.checkpoint_logspace.unwrap_or(false) {
+            Recurrence::Log(self.checkpoint_interval)
+        } else {
+            Recurrence::Linear(self.checkpoint_interval * setup.unit_time())
+        }
+    }
+
+    pub fn simulation_end_time(&self, setup: &dyn Setup) -> f64 {
+        self.end_time
+            .or_else(|| setup.end_time())
+            .map(|t| t * setup.unit_time())
+            .unwrap_or(f64::MAX)
+    }
+
+    pub fn output_directory(&self, restart_file: &Option<String>) -> String {
+        self.outdir
+            .clone()
+            .or_else(|| {
+                restart_file
+                    .as_deref()
+                    .and_then(crate::parent_dir)
+                    .map(String::from)
+            })
+            .unwrap_or_else(|| String::from("."))
     }
 }
 
