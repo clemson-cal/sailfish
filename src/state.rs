@@ -2,6 +2,7 @@ use crate::cmdline::CommandLine;
 use crate::error;
 use crate::mesh;
 use crate::patch::Patch;
+use crate::sailfish::PointMass;
 use crate::setup::Setup;
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
@@ -61,6 +62,8 @@ pub struct State {
     pub primitive: Vec<f64>,
     pub primitive_patches: Vec<Patch>,
     pub time: f64,
+    #[serde(default)]
+    pub masses: Vec<PointMass>,
     pub iteration: u64,
     pub checkpoint: RecurringTask,
 }
@@ -100,6 +103,7 @@ impl State {
     ) -> Result<(), error::Error> {
         self.checkpoint
             .next(self.time, self.command_line.checkpoint_rule(setup));
+        self.masses = setup.masses(self.time).to_vec();
         create_dir_all(outdir).map_err(error::Error::IOError)?;
         let bytes = rmp_serde::to_vec_named(self).unwrap();
         let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);

@@ -19,7 +19,8 @@ pub enum ExecutionMode {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
+#[serde(tag = "type")]
 pub enum SinkModel {
     /// No mass or momentum is subtracted around this point mass
     Inactive,
@@ -63,7 +64,7 @@ pub enum EquationOfState {
 }
 
 #[repr(C)]
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct PointMass {
     pub x: f64,
     pub y: f64,
@@ -105,6 +106,9 @@ impl PointMassList {
             masses,
             count: slice.len() as i32,
         }
+    }
+    pub fn to_vec(&self) -> Vec<PointMass> {
+        self.masses[..self.count as usize].to_vec()
     }
 }
 

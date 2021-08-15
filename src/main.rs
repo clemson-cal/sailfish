@@ -128,6 +128,7 @@ fn new_state(
         checkpoint: RecurringTask::new(),
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
+        masses: setup.masses(setup.initial_time()).to_vec(),
     };
     Ok(state)
 }
