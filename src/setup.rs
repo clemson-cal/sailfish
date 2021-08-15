@@ -195,7 +195,7 @@ impl std::str::FromStr for Binary {
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let (sr1, sr2) =
-            crate::parse_f64_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
+            crate::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
@@ -348,7 +348,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let (sr1, sr2) =
-            crate::parse_f64_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
+            crate::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),

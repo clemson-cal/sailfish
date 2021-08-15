@@ -44,34 +44,38 @@ where
     start.elapsed()
 }
 
-/// Takes a string, and splits it into two pieces, separated by the first
+/// Takes a string, and splits it into two parts, separated by the first
 /// instance of the given character. The first item in the pair is `Some`
 /// unless the input string is empty. The second item in the pair is `None` if
 /// `separator` is not found in the string.
-pub fn split_at_first(string: &str, separator: char) -> (Option<&str>, Option<&str>) {
+pub fn split_pair(string: &str, separator: char) -> (Option<&str>, Option<&str>) {
     let mut a = string.splitn(2, separator);
     let n = a.next();
     let p = a.next();
     (n, p)
 }
 
-/// Takes a string, and splits it into two pieces, separated by the first
+/// Takes a string, and splits it into two parts, separated by the first
 /// instance of the given character. Each part is then parsed, and the whole
 /// call fails if either one fails.
-pub fn parse_f64_pair(
+pub fn parse_pair<T: std::str::FromStr<Err = E>, E>(
     string: &str,
     separator: char,
-) -> Result<(Option<f64>, Option<f64>), std::num::ParseFloatError> {
-    let (sr1, sr2) = split_at_first(&string, separator);
+) -> Result<(Option<T>, Option<T>), E> {
+    let (sr1, sr2) = split_pair(&string, separator);
     let sr1 = sr1.map(|s| s.parse()).transpose()?;
     let sr2 = sr2.map(|s| s.parse()).transpose()?;
     Ok((sr1, sr2))
 }
 
-/// Returns the parent directory for a path string, or `None` if no parent
-/// directory exists.
+/// Returns the parent directory for an absolute path string, or `None` if no
+/// parent directory exists. If the path is relative this function returns
+/// `Some(".")`.
 pub fn parent_dir(path: &str) -> Option<&str> {
-    Path::new(path).parent().and_then(Path::to_str)
+    Path::new(path)
+        .parent()
+        .and_then(Path::to_str)
+        .map(|s| if s.is_empty() { "." } else { s })
 }
 
 fn adjacency_list(
@@ -135,7 +139,7 @@ fn new_state(
 
 fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
     let state = if let Some(ref setup_string) = cline.setup {
-        let (name, parameters) = split_at_first(setup_string, ':');
+        let (name, parameters) = split_pair(setup_string, ':');
         let (name, parameters) = (name.unwrap_or(""), parameters.unwrap_or(""));
         if name.ends_with(".sf") {
             State::from_checkpoint(name, parameters)?
