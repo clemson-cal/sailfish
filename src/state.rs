@@ -101,69 +101,33 @@ impl State {
         setup: &dyn Setup,
         outdir: &str,
     ) -> Result<(), error::Error> {
+        let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number);
+        println!("write {}", filename);
+
         self.checkpoint
             .next(self.time, self.command_line.checkpoint_rule(setup));
+
         self.masses = setup.masses(self.time).to_vec();
         create_dir_all(outdir).map_err(error::Error::IOError)?;
         let bytes = rmp_serde::to_vec_named(self).unwrap();
-        let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number - 1);
         let mut file = File::create(&filename).map_err(error::Error::IOError)?;
-        println!("write {}", filename);
         file.write_all(&bytes).map_err(error::Error::IOError)?;
         Ok(())
     }
 
-    pub fn upsample(self) -> Self {
-        todo!("upsampling feature is currently disabled")
-        // let mut mesh = match self.mesh {
-        //     mesh::Mesh::Structured(ref mut mesh) => mesh,
-        //     _ => panic!("can only upsample structured mesh"),
-        // };
-        // let ni = mesh.ni;
-        // let nj = mesh.nj;
-        // let mi = 2 * ni;
-        // let mj = 2 * nj;
-        // let mut new_primitive = vec![0.0; (mi as usize + 4) * (mj as usize + 4) * 3];
+    pub fn upsample(mut self) -> Self {
+        let mut mesh = match self.mesh {
+            mesh::Mesh::Structured(ref mut mesh) => mesh,
+            _ => panic!("can only upsample structured mesh"),
+        };
 
-        // for i in -2..ni + 2 {
-        //     for j in -2..nj + 2 {
-        //         let i0 = 2 * i;
-        //         let i1 = 2 * i + 1;
-        //         let j0 = 2 * j;
-        //         let j1 = 2 * j + 1;
-
-        //         for q in 0..3 {
-        //             let p = self.primitive
-        //                 [(i + 2) as usize * (nj as usize + 4) * 3 + (j + 2) as usize * 3 + q];
-
-        //             if (-2..mi + 2).contains(&i0) && (-2..mj + 2).contains(&j0) {
-        //                 new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3
-        //                     + (j0 + 2) as usize * 3
-        //                     + q] = p;
-        //             }
-        //             if (-2..mi + 2).contains(&i0) && (-2..mj + 2).contains(&j1) {
-        //                 new_primitive[(i0 + 2) as usize * (mj as usize + 4) * 3
-        //                     + (j1 + 2) as usize * 3
-        //                     + q] = p;
-        //             }
-        //             if (-2..mi + 2).contains(&i1) && (-2..mj + 2).contains(&j0) {
-        //                 new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3
-        //                     + (j0 + 2) as usize * 3
-        //                     + q] = p;
-        //             }
-        //             if (-2..mi + 2).contains(&i1) && (-2..mj + 2).contains(&j1) {
-        //                 new_primitive[(i1 + 2) as usize * (mj as usize + 4) * 3
-        //                     + (j1 + 2) as usize * 3
-        //                     + q] = p;
-        //             }
-        //         }
-        //     }
-        // }
-        // self.primitive = new_primitive;
-        // mesh.ni *= 2;
-        // mesh.nj *= 2;
-        // mesh.dx *= 0.5;
-        // mesh.dy *= 0.5;
-        // self
+        for patch in &mut self.primitive_patches {
+            patch.upsample_mut()
+        }
+        mesh.ni *= 2;
+        mesh.nj *= 2;
+        mesh.dx *= 0.5;
+        mesh.dy *= 0.5;
+        self
     }
 }

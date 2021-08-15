@@ -230,14 +230,14 @@ where
         solvers.push(solver)
     }
 
-    for (n, solver) in solvers.iter().enumerate() {
-        println!(
-            "solver {} running on device {:?} covering {:?}",
-            n,
-            solver.device(),
-            solver.primitive().index_space()
-        );
-    }
+    // for (n, solver) in solvers.iter().enumerate() {
+    //     println!(
+    //         "solver {} running on device {:?} covering {:?}",
+    //         n,
+    //         solver.device(),
+    //         solver.primitive().index_space()
+    //     );
+    // }
 
     if let Some(mut resolution) = cline.resolution {
         if cline.upsample.unwrap_or(false) {
