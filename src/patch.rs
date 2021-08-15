@@ -329,6 +329,36 @@ impl Patch {
     {
         Self::from_slice_function(subset, self.num_fields, f).copy_into(self);
     }
+
+    /// Returns a new patch, upsampled to twice the resolution as this one.
+    /// The new index space is scaled by a factor of two. No interpolation is
+    /// performed; the new patch has uniform values within 2x2 cell regions.
+    /// The resulting patch resides on the same device as this one, but the
+    /// upsampling is done on the CPU, so, invoked on device patches, this
+    /// function bears the penalty of the dreaded D -> H -> D round trip.
+    pub fn upsample(&self) -> Self {
+        match &self.data {
+            Host(ref data) => {
+                let (_i, nj) = self.index_space().dim();
+                let (i0, j0) = self.index_space().start();
+                let nq = self.num_fields;
+                let si = nq * nj;
+                let sj = nq;
+                let space = self.index_space().refine_by(2);
+                Self::from_slice_function(&space, nq, |(i, j), slice| {
+                    let n = (i / 2 - i0) as usize * si + (j / 2 - j0) as usize * sj;
+                    slice.copy_from_slice(&data[n..n + nq])
+                })
+            }
+            #[cfg(feature = "gpu")]
+            Device(ref data) => self.to_host().upsample().to_device(data.device()),
+        }
+    }
+
+    /// Convenience method to upsample this patch in-place.
+    pub fn upsample_mut(&mut self) {
+        *self = self.upsample()
+    }
 }
 
 #[cfg(feature = "gpu")]
