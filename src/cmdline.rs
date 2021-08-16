@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::sailfish::{self, ExecutionMode};
+use crate::ExecutionMode;
 use crate::setup::Setup;
 use crate::state::Recurrence;
 use std::fmt::Write;
@@ -45,9 +45,9 @@ impl CommandLine {
     pub fn validate(&self) -> Result<(), Error> {
         use Error::*;
 
-        if self.use_omp() && !sailfish::compiled_with_omp() {
+        if self.use_omp() && !crate::compiled_with_omp() {
             Err(CompiledWithoutOpenMP)
-        } else if self.use_gpu() && !sailfish::compiled_with_gpu() {
+        } else if self.use_gpu() && !crate::compiled_with_gpu() {
             Err(CompiledWithoutGpu)
         } else if self.use_omp() && self.use_gpu() {
             Err(Cmdline(
@@ -132,7 +132,7 @@ impl CommandLine {
             .or_else(|| {
                 restart_file
                     .as_deref()
-                    .and_then(crate::parent_dir)
+                    .and_then(crate::parse::parent_dir)
                     .map(String::from)
             })
             .unwrap_or_else(|| String::from("."))

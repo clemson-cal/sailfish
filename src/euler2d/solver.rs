@@ -1,8 +1,8 @@
 use crate::euler2d;
 use crate::mesh;
 use crate::patch::Patch;
-use crate::sailfish::PatchBasedBuild;
-use crate::sailfish::{ExecutionMode, PatchBasedSolve, StructuredMesh};
+use crate::PatchBasedBuild;
+use crate::{ExecutionMode, PatchBasedSolve, StructuredMesh};
 use crate::setup::Setup;
 use cfg_if::cfg_if;
 use gpu_core::Device;

@@ -1,10 +1,9 @@
-use crate::sailfish;
-use gridiron::index_space::IndexSpace;
+use crate::IndexSpace;
 
 #[derive(Clone, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum Mesh {
-    Structured(sailfish::StructuredMesh),
+    Structured(crate::StructuredMesh),
     FacePositions1D(Vec<f64>),
 }
 

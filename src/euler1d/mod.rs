@@ -1,5 +1,5 @@
 use crate::error::Error;
-use crate::sailfish::{Coordinates, ExecutionMode, Solve};
+use crate::{Coordinates, ExecutionMode, Solve};
 use crate::Setup;
 use cfg_if::cfg_if;
 

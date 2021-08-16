@@ -1,8 +1,22 @@
-use crate::error;
-use crate::patch::Patch;
-use crate::setup::Setup;
+pub mod cmdline;
+pub mod error;
+pub mod euler1d;
+pub mod euler2d;
+pub mod iso2d;
+pub mod lookup_table;
+pub mod mesh;
+pub mod parse;
+pub mod patch;
+pub mod setup;
+pub mod state;
+
+pub use crate::patch::Patch;
+pub use crate::setup::Setup;
+pub use gpu_core::Device;
+pub use gridiron::index_space::IndexSpace;
+pub use mesh::Mesh;
+
 use cfg_if::cfg_if;
-use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::Automaton;
 use gridiron::rect_map::Rectangle;
@@ -10,29 +24,36 @@ use std::ops::Range;
 use std::str::FromStr;
 use std::sync::Arc;
 
+/// Execution modes. These modes are referenced by Rust driver code, and by
+/// solver code written in C.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum ExecutionMode {
+    /// Execution is either single core, or parallelized using thread-pool
+    /// over a patch-based domain, without the help of OpenMP.
     CPU,
+    /// Execution is parallelized in C code via OpenMP. If the domain is
+    /// decomposed into patches, the patches are processed sequentially.
     OMP,
+    /// Solver execution is performed on a GPU device, if available.
     GPU,
 }
 
+/// Description of sink model to model accretion onto a (possibly) unresolved
+/// object in gravitation hydrodynamics. C equivalent is defined in
+/// sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
 pub enum SinkModel {
     /// No mass or momentum is subtracted around this point mass
     Inactive,
-
     /// The sink removes mass and momentum at the same rate so that the gas
     /// velocity is unchanged (most conventional)
     AccelerationFree,
-
     /// The sink does not change the fluid angular momentum, with respect to
     /// its position (most favorable)
     TorqueFree,
-
     /// The sink removes mass but not momentum (least favorable)
     ForceFree,
 }
@@ -55,6 +76,9 @@ impl FromStr for SinkModel {
     }
 }
 
+/// Description of basic equations of state supported by various solvers. C
+/// equivalent is defined in sailfish.h. Note: some solvers might be
+/// hard-coded to use a particular equation of state.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum EquationOfState {
@@ -63,6 +87,7 @@ pub enum EquationOfState {
     GammaLaw { gamma_law_index: f64 },
 }
 
+/// A gravitating point mass. C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct PointMass {
@@ -91,6 +116,8 @@ impl Default for PointMass {
     }
 }
 
+/// A fixed-length list of 0, 1, or 2 point masses. C equivalent is defined in
+/// sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct PointMassList {
@@ -118,6 +145,8 @@ impl Default for PointMassList {
     }
 }
 
+/// A description of a wave-damping (or buffer) zone to be used in
+/// context-specific solver code. C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum BufferZone {
@@ -217,6 +246,9 @@ impl StructuredMesh {
     }
 }
 
+/// Describes a st of curvilinear coordinates to use. C equivalent is defined
+/// in sailfish.h. Note: some solvers might be hard-coded to use a particular
+/// coordinate system.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum Coordinates {

@@ -1,4 +1,4 @@
-use crate::sailfish::{
+use crate::{
     BufferZone, EquationOfState, ExecutionMode, PointMassList, StructuredMesh,
 };
 

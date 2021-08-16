@@ -1,9 +1,8 @@
 use crate::iso2d;
 use crate::mesh;
 use crate::patch::Patch;
-use crate::sailfish::PatchBasedBuild;
-use crate::sailfish::{ExecutionMode, PatchBasedSolve, StructuredMesh};
 use crate::setup::Setup;
+use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, StructuredMesh};
 use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
