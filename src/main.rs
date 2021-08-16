@@ -195,16 +195,16 @@ where
     //     );
     // }
 
-    if let Some(mut resolution) = cline.resolution {
-        if cline.upsample.unwrap_or(false) {
-            resolution *= 2
-        }
-        if setup.mesh(resolution) != state.mesh {
-            return Err(InvalidSetup(
-                "cannot override domain parameters on restart".to_string(),
-            ));
-        }
-    }
+    // if let Some(mut resolution) = cline.resolution {
+    //     if cline.upsample.unwrap_or(false) {
+    //         resolution *= 2
+    //     }
+    //     if setup.mesh(resolution) != state.mesh {
+    //         return Err(InvalidSetup(
+    //             "cannot override domain parameters on restart".to_string(),
+    //         ));
+    //     }
+    // }
     if std::matches!(checkpoint_rule, Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),

@@ -187,20 +187,20 @@ impl CommandLine {
     }
 
     pub fn update(&mut self, newer: &Self) -> Result<(), Error> {
-        newer.use_omp.map(|x| self.use_omp.get_or_insert(x));
-        newer.use_gpu.map(|x| self.use_gpu.get_or_insert(x));
-        newer.device.map(|x| self.device.get_or_insert(x));
-        // newer.upsample.map(|x| self.upsample.get_or_insert(x));
-        // newer.setup.as_ref().map(|x| self.setup.get_or_insert(x.to_string()));
-        // newer.resolution.map(|x| self.resolution.get_or_insert(x));
-        newer.fold.map(|x| self.fold.get_or_insert(x));
-        newer.checkpoint_interval.map(|x| self.checkpoint_interval.get_or_insert(x));
-        newer.checkpoint_logspace.map(|x| self.checkpoint_logspace.get_or_insert(x));
-        newer.outdir.as_ref().map(|x| self.outdir.get_or_insert(x.to_string()));
-        newer.end_time.map(|x| self.end_time.get_or_insert(x));
-        newer.rk_order.map(|x| self.rk_order.get_or_insert(x));
-        newer.cfl_number.map(|x| self.cfl_number.get_or_insert(x));
-        newer.recompute_timestep.as_ref().map(|x| self.recompute_timestep.get_or_insert(x.to_string()));
+        newer.use_omp.map(|x| self.use_omp.insert(x));
+        newer.use_gpu.map(|x| self.use_gpu.insert(x));
+        newer.device.map(|x| self.device.insert(x));
+        self.upsample = newer.upsample;
+        // newer.setup.as_ref().map(|x| self.setup.insert(x.to_string()));
+        // newer.resolution.map(|x| self.resolution.insert(x));
+        newer.fold.map(|x| self.fold.insert(x));
+        newer.checkpoint_interval.map(|x| self.checkpoint_interval.insert(x));
+        newer.checkpoint_logspace.map(|x| self.checkpoint_logspace.insert(x));
+        newer.outdir.as_ref().map(|x| self.outdir.insert(x.to_string()));
+        newer.end_time.map(|x| self.end_time.insert(x));
+        newer.rk_order.map(|x| self.rk_order.insert(x));
+        newer.cfl_number.map(|x| self.cfl_number.insert(x));
+        newer.recompute_timestep.as_ref().map(|x| self.recompute_timestep.insert(x.to_string()));
 
         self.validate()
     }

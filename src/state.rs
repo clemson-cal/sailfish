@@ -118,6 +118,8 @@ impl State {
     }
 
     pub fn upsample(mut self) -> Self {
+        println!("upsample grid resolution");
+
         let mut mesh = match self.mesh {
             Mesh::Structured(ref mut mesh) => mesh,
             _ => panic!("can only upsample structured mesh"),
