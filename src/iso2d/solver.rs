@@ -86,7 +86,7 @@ impl Solver {
                 self.setup.viscosity().unwrap_or(0.0),
                 a,
                 dt,
-                f64::MAX,
+                self.setup.velocity_ceiling().unwrap_or(f64::MAX),
                 self.mode,
             );
         });
