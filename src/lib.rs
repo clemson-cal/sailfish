@@ -7,7 +7,7 @@ pub mod lookup_table;
 pub mod mesh;
 pub mod parse;
 pub mod patch;
-pub mod setup;
+pub mod setups;
 pub mod state;
 pub mod traits;
 

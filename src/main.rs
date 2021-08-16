@@ -10,7 +10,7 @@ use gridiron::automaton;
 use gridiron::rect_map::{Rectangle, RectangleMap};
 
 use sailfish::error::{self, Error::*};
-use sailfish::setup;
+use sailfish::setups;
 use sailfish::{euler1d, euler2d, iso2d};
 use sailfish::{
     CommandLine, ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve, Recurrence,
@@ -54,7 +54,7 @@ fn new_state(
     setup_name: &str,
     parameters: &str,
 ) -> Result<State, error::Error> {
-    let setup = setup::make_setup(setup_name, parameters)?;
+    let setup = setups::make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(command_line.resolution.unwrap_or(1024));
     let num_patches = match command_line.execution_mode() {
         ExecutionMode::CPU => 512, // TODO: get patch count from command line
@@ -103,7 +103,7 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
             new_state(cline.clone(), name, parameters)?
         }
     } else {
-        return Err(setup::possible_setups_info());
+        return Err(setups::possible_setups_info());
     };
     if cline.upsample.unwrap_or(false) {
         Ok(state.upsample())
@@ -345,7 +345,7 @@ fn launch_single_patch(
 fn run() -> Result<(), error::Error> {
     let cline = sailfish::CommandLine::parse()?;
     let state = make_state(&cline)?;
-    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
+    let setup = setups::make_setup(&state.setup_name, &state.parameters)?;
     let cline = state.command_line.clone();
 
     match setup.solver_name().as_str() {
