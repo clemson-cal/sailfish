@@ -69,7 +69,11 @@ pub struct State {
 }
 
 impl State {
-    pub fn from_checkpoint(filename: &str, new_parameters: &str) -> Result<State, error::Error> {
+    pub fn from_checkpoint(
+        filename: &str,
+        new_parameters: &str,
+        command_line: &CommandLine,
+    ) -> Result<State, error::Error> {
         println!("read {}", filename);
 
         let mut f = File::open(filename).map_err(error::Error::IOError)?;
@@ -84,6 +88,7 @@ impl State {
         }
         state.parameters += new_parameters;
         state.restart_file = Some(filename.to_string());
+        state.command_line.update(&command_line)?;
 
         Ok(state)
     }
