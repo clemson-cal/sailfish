@@ -1,4 +1,3 @@
-#include <stdio.h>
 #include <math.h>
 #include "../sailfish.h"
 
@@ -20,8 +19,9 @@
 
 // ============================ PHYSICS =======================================
 // ============================================================================
-#define NCONS 3
+#define NCONS 4
 #define PLM_THETA 1.5
+#define GAMMA_LAW_INDEX (5.0 / 3.0)
 
 
 // ============================ MATH ==========================================
@@ -53,28 +53,31 @@ static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real 
 
 // ============================ GRAVITY =======================================
 // ============================================================================
-static __host__ __device__ real gravitational_potential(
+
+
+static __host__ __device__ real disk_height(
     struct PointMassList *mass_list,
     real x1,
-    real y1)
+    real y1,
+    real *prim)
 {
-    real phi = 0.0;
-
+    real omegatilde2 = 0.0;
     for (int p = 0; p < mass_list->count; ++p)
     {
         real x0 = mass_list->masses[p].x;
         real y0 = mass_list->masses[p].y;
         real mp = mass_list->masses[p].mass;
-        real rs = mass_list->masses[p].radius;
 
         real dx = x1 - x0;
         real dy = y1 - y0;
-        real r2 = dx * dx + dy * dy;
-        real r2_soft = r2 + rs * rs;
-
-        phi -= mp / sqrt(r2_soft);
+        real r2 = dx * dx + dy * dy + 1e-12;
+        real r  = sqrt(r2);
+        omegatilde2 += mp / pow(r, 3);
     }
-    return phi;
+    real sigma = prim[0];
+    real pres  = prim[3];
+
+    return sqrt(pres / sigma) / sqrt(omegatilde2);
 }
 
 static __host__ __device__ void point_mass_source_term(
@@ -83,6 +86,7 @@ static __host__ __device__ void point_mass_source_term(
     real y1,
     real dt,
     real *prim,
+    real h,
     real *delta_cons)
 {
     real x0 = mass->x;
@@ -90,21 +94,37 @@ static __host__ __device__ void point_mass_source_term(
     real mp = mass->mass;
     real rs = mass->radius;
     real sigma = prim[0];
+    real pres  = prim[3];
+    real gamma = GAMMA_LAW_INDEX;
+    real eps = pres / (gamma - 1.0) / sigma;
 
     real dx = x1 - x0;
     real dy = y1 - y0;
     real r2 = dx * dx + dy * dy;
-    real r2_soft = r2 + rs * rs;
+    real r2_soft = r2 + pow(0.5 * h, 2.0);
     real dr = sqrt(r2);
     real mag = sigma * mp / r2_soft;
     real fx = -mag * dx / dr;
     real fy = -mag * dy / dr;
+    real vx = prim[1];
+    real vy = prim[2];
     real sink_rate = 0.0;
 
     if (dr < 4.0 * rs)
     {
         sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
     }
+    if (dr < rs)
+    {
+        r2_soft = r2 + rs * rs;
+        mag = sigma * mp / r2_soft;
+        fx = -mag * dx / dr;
+        fy = -mag * dy / dr;
+    }
+    //if (dr < 1.0 * rs)
+    //{
+    //    sink_rate = mass->rate * pow(1.0 - pow(dr / rs, 2.0), 2.0);
+    //}
     real mdot = sigma * sink_rate * -1.0;
 
     switch (mass->model) {
@@ -112,6 +132,7 @@ static __host__ __device__ void point_mass_source_term(
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
+            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vx * vx + vy * vy)) + dt * (fx * vx + fy * vy);
             break;
         case TorqueFree: {
             real vx        = prim[1];
@@ -126,17 +147,20 @@ static __host__ __device__ void point_mass_source_term(
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * vxstar + dt * fx;
             delta_cons[2] = dt * mdot * vystar + dt * fy;
+            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vxstar * vxstar + vystar * vystar)) + dt * (fx * vx + fy * vy);
             break;
         }
         case ForceFree:
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * fx;
             delta_cons[2] = dt * fy;
+            delta_cons[3] = dt * (fx * vx + fy * vy);
             break;
         default:
             delta_cons[0] = 0.0;
             delta_cons[1] = 0.0;
             delta_cons[2] = 0.0;
+            delta_cons[3] = 0.0;
             break;
     }
 }
@@ -147,12 +171,13 @@ static __host__ __device__ void point_masses_source_term(
     real y1,
     real dt,
     real *prim,
+    real h,
     real *cons)
 {
     for (int p = 0; p < mass_list->count; ++p)
     {
         real delta_cons[NCONS];
-        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, h, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -166,16 +191,12 @@ static __host__ __device__ void point_masses_source_term(
 // ============================================================================
 static __host__ __device__ real sound_speed_squared(
     struct EquationOfState *eos,
-    real x,
-    real y,
-    struct PointMassList *mass_list)
+    real *prim)
 {
     switch (eos->type)
     {
-        case Isothermal:
-            return eos->isothermal.sound_speed_squared;
-        case LocallyIsothermal:
-            return -gravitational_potential(mass_list, x, y) / eos->locally_isothermal.mach_number_squared;
+        case GammaLaw:
+            return prim[3] / prim[0] * GAMMA_LAW_INDEX;
         default:
             return 1.0; // WARNING
     }
@@ -198,6 +219,7 @@ static __host__ __device__ void buffer_source_term(
         {
             real rc = sqrt(xc * xc + yc * yc);
             real surface_density = buffer->keplerian.surface_density;
+            real surface_pressure = buffer->keplerian.surface_pressure;
             real central_mass = buffer->keplerian.central_mass;
             real driving_rate = buffer->keplerian.driving_rate;
             real outer_radius = buffer->keplerian.outer_radius;
@@ -209,7 +231,9 @@ static __host__ __device__ void buffer_source_term(
                 real pf = surface_density * sqrt(central_mass / rc);
                 real px = pf * (-yc / rc);
                 real py = pf * ( xc / rc);
-                real u0[NCONS] = {surface_density, px, py};
+                real kinetic_energy = 0.5 * (px * px + py * py) / surface_density;
+                real energy = surface_pressure / (GAMMA_LAW_INDEX - 1.0) + kinetic_energy;
+                real u0[NCONS] = {surface_density, px, py, energy};
 
                 real omega_outer = sqrt(central_mass / pow(onset_radius, 3.0));
                 real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
@@ -239,30 +263,68 @@ static __host__ __device__ void shear_strain(const real *gx, const real *gy, rea
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim, real velocity_ceiling)
+static __host__ __device__ void cooling_term(
+    real cooling_coefficient,
+    real mach_ceiling,
+    real dt,
+    real *prim,
+    real *cons)
 {
+    real gamma = GAMMA_LAW_INDEX;
+    real sigma = prim[0];
+    real eps = prim[3] / prim[0] / (gamma - 1.0);
+    real eps_cooled = eps * pow(1.0 + 3.0 * cooling_coefficient / pow(sigma, 2.0) * pow(eps,3) * dt, -1.0 / 3.0);
+    real vx = prim[1];
+    real vy = prim[2];
+
+    real ek = 0.5 * (vx * vx + vy * vy);
+    eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) / pow(mach_ceiling,2));
+
+    cons[3] += sigma * (eps_cooled - eps);
+}
+
+static __host__ __device__ void conserved_to_primitive(
+    const real *cons,
+    real *prim,
+    real velocity_ceiling,
+    real density_floor,
+    real pressure_floor)
+{
+    real gamma = GAMMA_LAW_INDEX;
+    real pres  = max2(pressure_floor, (cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0]) * (gamma - 1.0));
+    real vx = sign(cons[1]) * min2(fabs(cons[1] / cons[0]), velocity_ceiling);
+    real vy = sign(cons[2]) * min2(fabs(cons[2] / cons[0]), velocity_ceiling);
     real rho = cons[0];
-    real px = cons[1];
-    real py = cons[2];
-    real vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
-    real vy = sign(py) * min2(fabs(py / rho), velocity_ceiling);
+
+    if (cons[0] < density_floor)
+    {
+        rho = density_floor;
+        vx = 0.0;
+        vy = 0.0;
+        pres = pressure_floor;
+    }
 
     prim[0] = rho;
     prim[1] = vx;
     prim[2] = vy;
+    prim[3] = pres;
 }
 
 static __host__ __device__ void primitive_to_conserved(const real *prim, real *cons)
 {
+    real gamma = GAMMA_LAW_INDEX;
     real rho = prim[0];
     real vx = prim[1];
     real vy = prim[2];
+    real pres = prim[3];
     real px = vx * rho;
     real py = vy * rho;
+    real en = pres / (gamma - 1.0) + 0.5 * rho * (vx * vx + vy * vy);
 
     cons[0] = rho;
     cons[1] = px;
     cons[2] = py;
+    cons[3] = en;
 }
 
 static __host__ __device__ real primitive_to_velocity(const real *prim, int direction)
@@ -279,16 +341,15 @@ static __host__ __device__ void primitive_to_flux(
     const real *prim,
     const real *cons,
     real *flux,
-    real cs2,
     int direction)
 {
     real vn = primitive_to_velocity(prim, direction);
-    real rho = prim[0];
-    real pressure = rho * cs2;
+    real pressure = prim[3];
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pressure * (direction == 0);
     flux[2] = vn * cons[2] + pressure * (direction == 1);
+    flux[3] = vn * (cons[3] + pressure);
 }
 
 static __host__ __device__ void primitive_to_outer_wavespeeds(
@@ -324,8 +385,8 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 
     primitive_to_conserved(pl, ul);
     primitive_to_conserved(pr, ur);
-    primitive_to_flux(pl, ul, fl, cs2, direction);
-    primitive_to_flux(pr, ur, fr, cs2, direction);
+    primitive_to_flux(pl, ul, fl, direction);
+    primitive_to_flux(pr, ur, fr, direction);
     primitive_to_outer_wavespeeds(pl, al, cs2, direction);
     primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
 
@@ -400,10 +461,14 @@ static __host__ __device__ void advance_rk_zone(
     struct EquationOfState eos,
     struct BufferZone buffer,
     struct PointMassList *mass_list,
-    real nu,
+    real alpha,
     real a,
     real dt,
     real velocity_ceiling,
+    real cooling_coefficient,
+    real mach_ceiling,
+    real density_floor,
+    real pressure_floor,
     int i,
     int j)
 {
@@ -500,10 +565,10 @@ static __host__ __device__ void advance_rk_zone(
     real frj[NCONS];
     real ucc[NCONS];
 
-    real cs2li = sound_speed_squared(&eos, xl, yc, mass_list);
-    real cs2ri = sound_speed_squared(&eos, xr, yc, mass_list);
-    real cs2lj = sound_speed_squared(&eos, xc, yl, mass_list);
-    real cs2rj = sound_speed_squared(&eos, xc, yr, mass_list);
+    real cs2li = sound_speed_squared(&eos, pli);
+    real cs2ri = sound_speed_squared(&eos, pri);
+    real cs2lj = sound_speed_squared(&eos, plj);
+    real cs2rj = sound_speed_squared(&eos, prj);
 
     riemann_hlle(plim, plip, fli, cs2li, 0);
     riemann_hlle(prim, prip, fri, cs2ri, 0);
@@ -522,18 +587,41 @@ static __host__ __device__ void advance_rk_zone(
     shear_strain(gxrj, gyrj, dx, dy, srj);
     shear_strain(gxcc, gycc, dx, dy, scc);
 
-    fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-    fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-    fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-    fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-    flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-    flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-    frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-    frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+    real cs2cc = sound_speed_squared(&eos, pcc);
+    real hcc = disk_height(mass_list, xc, yc, pcc);
+    real hli = disk_height(mass_list, xl, yc, pli);
+    real hri = disk_height(mass_list, xr, yc, pri);
+    real hlj = disk_height(mass_list, xc, yl, plj);
+    real hrj = disk_height(mass_list, xc, yr, prj);
+
+    real nucc = alpha * hcc * sqrt(cs2cc);
+    real nuli = alpha * hli * sqrt(cs2li);
+    real nuri = alpha * hri * sqrt(cs2ri);
+    real nulj = alpha * hlj * sqrt(cs2lj);
+    real nurj = alpha * hrj * sqrt(cs2rj);
+
+    fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
+    fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
+    fri[1] -= 0.5 * (nucc * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
+    fri[2] -= 0.5 * (nucc * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
+    flj[1] -= 0.5 * (nulj * plj[0] * slj[2] + nucc * pcc[0] * scc[2]); // y-x
+    flj[2] -= 0.5 * (nulj * plj[0] * slj[3] + nucc * pcc[0] * scc[3]); // y-y
+    frj[1] -= 0.5 * (nucc * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
+    frj[2] -= 0.5 * (nucc * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
+
+    fli[3] -= 0.5 * (nuli * pli[0] * sli[0] * pli[1] + nucc * pcc[0] * scc[0] * pcc[1]); // v^x \tau^x_x
+    fri[3] -= 0.5 * (nucc * pcc[0] * scc[0] * pcc[1] + nuri * pri[0] * sri[0] * pri[1]);
+    fli[3] -= 0.5 * (nuli * pli[0] * sli[1] * pli[2] + nucc * pcc[0] * scc[1] * pcc[2]); // v^y \tau^x_y
+    fri[3] -= 0.5 * (nucc * pcc[0] * scc[1] * pcc[2] + nuri * pri[0] * sri[1] * pri[2]);
+    flj[3] -= 0.5 * (nulj * plj[0] * slj[2] * plj[1] + nucc * pcc[0] * scc[2] * pcc[1]); // v^x \tau^y_x
+    frj[3] -= 0.5 * (nucc * pcc[0] * scc[2] * pcc[1] + nurj * prj[0] * srj[2] * prj[1]);
+    flj[3] -= 0.5 * (nulj * plj[0] * slj[3] * plj[2] + nucc * pcc[0] * scc[3] * pcc[2]); // v^y \tau^y_y
+    frj[3] -= 0.5 * (nucc * pcc[0] * scc[3] * pcc[2] + nurj * prj[0] * srj[3] * prj[2]);
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(mass_list, xc, yc, dt, pcc, ucc);
+    point_masses_source_term(mass_list, xc, yc, dt, pcc, hcc, ucc);
+    cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -541,7 +629,7 @@ static __host__ __device__ void advance_rk_zone(
         ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i, j);
-    conserved_to_primitive(ucc, pout, velocity_ceiling);
+    conserved_to_primitive(ucc, pout, velocity_ceiling, density_floor, pressure_floor);
 }
 
 static __host__ __device__ void advance_rk_zone_inviscid(
@@ -555,17 +643,17 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     real a,
     real dt,
     real velocity_ceiling,
+    real cooling_coefficient,
+    real mach_ceiling,
+    real density_floor,
+    real pressure_floor,
     int i,
     int j)
 {
     real dx = mesh.dx;
     real dy = mesh.dy;
-    real xl = mesh.x0 + (i + 0.0) * dx;
     real xc = mesh.x0 + (i + 0.5) * dx;
-    real xr = mesh.x0 + (i + 1.0) * dx;
-    real yl = mesh.y0 + (j + 0.0) * dy;
     real yc = mesh.y0 + (j + 0.5) * dy;
-    real yr = mesh.y0 + (j + 1.0) * dy;
 
     real *un = GET(conserved_rk, i, j);
     real *pcc = GET(primitive_rd, i, j);
@@ -620,19 +708,21 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     real frj[NCONS];
     real ucc[NCONS];
 
-    real cs2li = sound_speed_squared(&eos, xl, yc, mass_list);
-    real cs2ri = sound_speed_squared(&eos, xr, yc, mass_list);
-    real cs2lj = sound_speed_squared(&eos, xc, yl, mass_list);
-    real cs2rj = sound_speed_squared(&eos, xc, yr, mass_list);
+    real cs2li = sound_speed_squared(&eos, pli);
+    real cs2ri = sound_speed_squared(&eos, pri);
+    real cs2lj = sound_speed_squared(&eos, plj);
+    real cs2rj = sound_speed_squared(&eos, prj);
 
     riemann_hlle(plim, plip, fli, cs2li, 0);
     riemann_hlle(prim, prip, fri, cs2ri, 0);
     riemann_hlle(pljm, pljp, flj, cs2lj, 1);
     riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
+    real h = disk_height(mass_list, xc, yc, pcc);
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(mass_list, xc, yc, dt, pcc, ucc);
+    point_masses_source_term(mass_list, xc, yc, dt, pcc, h, ucc);
+    cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -640,22 +730,18 @@ static __host__ __device__ void advance_rk_zone_inviscid(
         ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i, j);
-    conserved_to_primitive(ucc, pout, velocity_ceiling);
+    conserved_to_primitive(ucc, pout, velocity_ceiling, density_floor, pressure_floor);
 }
 
 static __host__ __device__ void wavespeed_zone(
-    struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
     struct Patch wavespeed,
-    struct PointMassList *mass_list,
     int i,
     int j)
 {
     real *pc = GET(primitive, i, j);
-    real x = mesh.x0 + (i + 0.5) * mesh.dx;
-    real y = mesh.y0 + (j + 0.5) * mesh.dy;
-    real cs2 = sound_speed_squared(&eos, x, y, mass_list);
+    real cs2 = sound_speed_squared(&eos, pc);
     real a = primitive_max_wavespeed(pc, cs2);
     GET(wavespeed, i, j)[0] = a;
 }
@@ -687,10 +773,14 @@ static void __global__ advance_rk_kernel(
     struct EquationOfState eos,
     struct BufferZone buffer,
     struct PointMassList mass_list,
-    real nu,
+    real alpha,
     real a,
     real dt,
-    real velocity_ceiling)
+    real velocity_ceiling,
+    real cooling_coefficient,
+    real mach_ceiling,
+    real density_floor,
+    real pressure_floor)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -705,11 +795,16 @@ static void __global__ advance_rk_kernel(
             eos,
             buffer,
             &mass_list,
-            nu,
+            alpha,
             a,
             dt,
             velocity_ceiling,
-            i, j
+            cooling_coefficient,
+            mach_ceiling,
+            density_floor,
+            pressure_floor,
+            i,
+            j
         );
     }
 }
@@ -724,7 +819,11 @@ static void __global__ advance_rk_kernel_inviscid(
     struct PointMassList mass_list,
     real a,
     real dt,
-    real velocity_ceiling)
+    real velocity_ceiling,
+    real cooling_coefficient,
+    real mach_ceiling,
+    real density_floor,
+    real pressure_floor)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -742,7 +841,12 @@ static void __global__ advance_rk_kernel_inviscid(
             a,
             dt,
             velocity_ceiling,
-            i, j
+            cooling_coefficient,
+            mach_ceiling,
+            density_floor,
+            pressure_floor,
+            i,
+            j
         );
     }
 }
@@ -751,15 +855,14 @@ static void __global__ wavespeed_kernel(
     struct Mesh mesh,
     struct EquationOfState eos,
     struct Patch primitive,
-    struct Patch wavespeed,
-    struct PointMassList mass_list)
+    struct Patch wavespeed)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        wavespeed_zone(mesh, eos, primitive, wavespeed, &mass_list, i, j);
+        wavespeed_zone(eos, primitive, wavespeed, i, j);
     }
 }
 
@@ -774,18 +877,18 @@ static void __global__ wavespeed_kernel(
  * Converts an array of primitive data to an array of conserved data. The
  * array index space must follow the descriptions below.
  * @param mesh               The mesh [ni,     nj]
- * @param primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
- * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [3]
+ * @param primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
+ * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [4]
  * @param mode               The execution mode
  */
-EXTERN_C void iso2d_primitive_to_conserved(
+EXTERN_C void euler2d_primitive_to_conserved(
     struct Mesh mesh,
     real *primitive_ptr,
     real *conserved_ptr,
     enum ExecutionMode mode)
 {
     struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
-    struct Patch conserved = patch(mesh, NCONS, 0, conserved_ptr);    
+    struct Patch conserved = patch(mesh, NCONS, 0, conserved_ptr);
 
     switch (mode) {
         case CPU: {
@@ -820,19 +923,24 @@ EXTERN_C void iso2d_primitive_to_conserved(
  * Updates an array of primitive data by advancing it a single Runge-Kutta
  * step.
  * @param mesh                  The mesh [ni,     nj]
- * @param conserved_rk_ptr[in]  [ 0,  0] [ni,     nj]     [3]
- * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
- * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [3]
+ * @param conserved_rk_ptr[in]  [ 0,  0] [ni,     nj]     [4]
+ * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
+ * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [4]
  * @param eos                   The EOS
  * @param buffer                The buffer region
  * @param masses[in]            A pointer a list of point mass objects
  * @param num_masses            The number of point masses
- * @param nu                    The viscosity coefficient
+ * @param alpha                 The alpha-viscosity parameter
  * @param a                     The RK averaging parameter
  * @param dt                    The time step
+ * @param velocity_ceiling      Safety parameters
+ * @param cooling_coefficient   Safety parameters
+ * @param mach_ceiling          Safety parameters
+ * @param density_floor         Safety parameters
+ * @param pressure_floor        Safety parameters
  * @param mode                  The execution mode
  */
-EXTERN_C void iso2d_advance_rk(
+EXTERN_C void euler2d_advance_rk(
     struct Mesh mesh,
     real *conserved_rk_ptr,
     real *primitive_rd_ptr,
@@ -840,10 +948,14 @@ EXTERN_C void iso2d_advance_rk(
     struct EquationOfState eos,
     struct BufferZone buffer,
     struct PointMassList mass_list,
-    real nu,
+    real alpha,
     real a,
     real dt,
     real velocity_ceiling,
+    real cooling_coefficient,
+    real mach_ceiling,
+    real density_floor,
+    real pressure_floor,
     enum ExecutionMode mode)
 {
     struct Patch conserved_rk = patch(mesh, NCONS, 0, conserved_rk_ptr);
@@ -852,10 +964,9 @@ EXTERN_C void iso2d_advance_rk(
 
     switch (mode) {
         case CPU: {
-            if (nu == 0.0) {
+            if (alpha == 0.0) {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone_inviscid(
-                        mesh,
+                    advance_rk_zone_inviscid(mesh,
                         conserved_rk,
                         primitive_rd,
                         primitive_wr,
@@ -865,24 +976,32 @@ EXTERN_C void iso2d_advance_rk(
                         a,
                         dt,
                         velocity_ceiling,
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
                         i, j
                     );
                 }
             } else {
                 FOR_EACH(conserved_rk) {
-                    advance_rk_zone(
-                        mesh,
+                    advance_rk_zone(mesh,
                         conserved_rk,
                         primitive_rd,
                         primitive_wr,
                         eos,
                         buffer,
                         &mass_list,
-                        nu,
+                        alpha,
                         a,
                         dt,
                         velocity_ceiling,
-                        i, j);
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
+                        i, j
+                    );
                 }
             }
             break;
@@ -890,10 +1009,9 @@ EXTERN_C void iso2d_advance_rk(
 
         case OMP: {
             #ifdef _OPENMP
-            if (nu == 0.0) {
+            if (alpha == 0.0) {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone_inviscid(
-                        mesh,
+                    advance_rk_zone_inviscid(mesh,
                         conserved_rk,
                         primitive_rd,
                         primitive_wr,
@@ -903,23 +1021,32 @@ EXTERN_C void iso2d_advance_rk(
                         a,
                         dt,
                         velocity_ceiling,
-                        i, j);
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
+                        i, j
+                    );
                 }
             } else {
                 FOR_EACH_OMP(conserved_rk) {
-                    advance_rk_zone(
-                        mesh,
+                    advance_rk_zone(mesh,
                         conserved_rk,
                         primitive_rd,
                         primitive_wr,
                         eos,
                         buffer,
                         &mass_list,
-                        nu,
+                        alpha,
                         a,
                         dt,
                         velocity_ceiling,
-                        i, j);
+                        cooling_coefficient,
+                        mach_ceiling,
+                        density_floor,
+                        pressure_floor,
+                        i, j
+                    );
                 }
             }
             break;
@@ -931,7 +1058,7 @@ EXTERN_C void iso2d_advance_rk(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
-            if (nu == 0.0) {
+            if (alpha == 0.0) {
                 advance_rk_kernel_inviscid<<<bd, bs>>>(
                     mesh,
                     conserved_rk,
@@ -942,7 +1069,11 @@ EXTERN_C void iso2d_advance_rk(
                     mass_list,
                     a,
                     dt,
-                    velocity_ceiling
+                    velocity_ceiling,
+                    cooling_coefficient,
+                    mach_ceiling,
+                    density_floor,
+                    pressure_floor
                 );
             } else {
                 advance_rk_kernel<<<bd, bs>>>(
@@ -953,10 +1084,14 @@ EXTERN_C void iso2d_advance_rk(
                     eos,
                     buffer,
                     mass_list,
-                    nu,
+                    alpha,
                     a,
                     dt,
-                    velocity_ceiling
+                    velocity_ceiling,
+                    cooling_coefficient,
+                    mach_ceiling,
+                    density_floor,
+                    pressure_floor
                 );
             }
             #endif
@@ -969,19 +1104,16 @@ EXTERN_C void iso2d_advance_rk(
 /**
  * Fill a buffer with the maximum wavespeed in each zone.
  * @param  mesh               The mesh [ni,     nj]
- * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
+ * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
  * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
  * @param eos                 The EOS
- * @param masses[in]          A pointer a list of point mass objects
- * @param num_masses          The number of point masses
  * @param mode                The execution mode
  */
-EXTERN_C void iso2d_wavespeed(
+EXTERN_C void euler2d_wavespeed(
     struct Mesh mesh,
     real *primitive_ptr,
     real *wavespeed_ptr,
     struct EquationOfState eos,
-    struct PointMassList mass_list,
     enum ExecutionMode mode)
 {
     struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
@@ -990,7 +1122,7 @@ EXTERN_C void iso2d_wavespeed(
     switch (mode) {
         case CPU: {
             FOR_EACH(wavespeed) {
-                wavespeed_zone(mesh, eos, primitive, wavespeed, &mass_list, i, j);
+                wavespeed_zone(eos, primitive, wavespeed, i, j);
             }
             break;
         }
@@ -998,7 +1130,7 @@ EXTERN_C void iso2d_wavespeed(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(wavespeed) {
-                wavespeed_zone(mesh, eos, primitive, wavespeed, &mass_list, i, j);
+                wavespeed_zone(eos, primitive, wavespeed, i, j);
             }
             #endif
             break;
@@ -1008,7 +1140,7 @@ EXTERN_C void iso2d_wavespeed(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
-            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed, mass_list);
+            wavespeed_kernel<<<bd, bs>>>(mesh, eos, primitive, wavespeed);
             #endif
             break;
         }
@@ -1024,7 +1156,7 @@ EXTERN_C void iso2d_wavespeed(
  * @param size          The number of elements
  * @param mode          The execution mode
  */
-EXTERN_C real iso2d_maximum(
+EXTERN_C real euler2d_maximum(
     real *data,
     unsigned long size,
     enum ExecutionMode mode)
@@ -1051,7 +1183,7 @@ EXTERN_C real iso2d_maximum(
             break;
         }
 
-        case GPU: break; // Not implemented, use iso2d_wavespeed
+        case GPU: break; // Not implemented, use euler2d_wavespeed
                          // followed by a GPU reduction.
     }
     return a_max;

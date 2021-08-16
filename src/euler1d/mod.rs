@@ -117,7 +117,6 @@ pub mod cpu {
             _time: f64,
             a: f64,
             dt: f64,
-            _velocity_ceiling: f64,
         ) {
             unsafe {
                 euler1d_advance_rk(
@@ -167,9 +166,8 @@ pub mod omp {
             time: f64,
             a: f64,
             dt: f64,
-            velocity_ceiling: f64,
         ) {
-            self.0.advance_rk(setup, time, a, dt, velocity_ceiling)
+            self.0.advance_rk(setup, time, a, dt)
         }
         fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
             self.0.max_wavespeed(time, setup)
@@ -241,7 +239,6 @@ pub mod gpu {
             _time: f64,
             a: f64,
             dt: f64,
-            _velocity_ceiling: f64,
         ) {
             self.device.scope(|_| {
                 unsafe {
