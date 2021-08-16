@@ -28,8 +28,6 @@ def file_load(indir, outdir, savefigbool, filename):
             local_prim = np.array(np.frombuffer(patch['data'])).reshape([i1 - i0, j1 - j0, 3])
             prim[i0:i1, j0:j1] = local_prim
         plt.imshow(prim[:,:,0].T, origin='lower')
-        plt.colorbar()
-        plt.subplots_adjust(left=0.05, right=0.95, top=0.95, bottom=0.05)
         plt.title(r"{} $\Sigma^{{1/4}}$".format(name))
 
         file_count_str = str(file_count)
