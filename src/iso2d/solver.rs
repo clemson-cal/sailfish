@@ -1,8 +1,7 @@
 use crate::iso2d;
 use crate::mesh;
 use crate::patch::Patch;
-use crate::setup::Setup;
-use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, StructuredMesh};
+use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh};
 use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;

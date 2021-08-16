@@ -1,7 +1,5 @@
 use crate::error::Error;
-use crate::ExecutionMode;
-use crate::setup::Setup;
-use crate::state::Recurrence;
+use crate::{ExecutionMode, Setup, Recurrence};
 use std::fmt::Write;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
@@ -23,6 +21,171 @@ pub struct CommandLine {
 }
 
 impl CommandLine {
+    pub fn parse() -> Result<Self, Error> {
+        use Error::*;
+        let mut c = Self::default();
+
+        enum State {
+            Ready,
+            Device,
+            GridResolution,
+            Fold,
+            Checkpoint,
+            EndTime,
+            RkOrder,
+            Cfl,
+            Outdir,
+            RecomputeTimestep,
+        }
+        std::convert::identity(State::Device); // black-box
+        let mut state = State::Ready;
+
+        for arg in std::env::args()
+            .skip(1)
+            .flat_map(|arg| {
+                if arg.starts_with('-') {
+                    arg.split('=').map(str::to_string).collect::<Vec<_>>()
+                } else {
+                    vec![arg]
+                }
+            })
+            .flat_map(|arg| {
+                if arg.starts_with('-') && !arg.starts_with("--") && arg.len() > 2 {
+                    let (a, b) = arg.split_at(2);
+                    vec![a.to_string(), b.to_string()]
+                } else {
+                    vec![arg]
+                }
+            })
+        {
+            match state {
+                State::Ready => match arg.as_str() {
+                    "--version" => {
+                        return Err(PrintUserInformation("sailfish 0.2.0\n".to_string()));
+                    }
+
+                    #[rustfmt::skip]
+                    "-h" | "--help" => {
+                        let mut message = String::new();
+                        writeln!(message, "usage: sailfish [setup|chkpt] [--version] [--help] <[options]>").unwrap();
+                        writeln!(message, "       --version             print the code version number").unwrap();
+                        writeln!(message, "       -h|--help             display this help message").unwrap();
+                        writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
+                        writeln!(message, "       -g|--use-gpu          run with GPU acceleration").unwrap();
+                        writeln!(message, "       -d|--device           a device ID to run on ([0]-#gpus)").unwrap();
+                        writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
+                        writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
+                        writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
+                        writeln!(message, "       --timestep            when to recompute time step ([iter]|fold)").unwrap();
+                        writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints [1.0]").unwrap();
+                        writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
+                        writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
+                        writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
+                        writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
+                        return Err(PrintUserInformation(message));
+                    }
+                    "-p" | "--use-omp" => c.use_omp = Some(true),
+                    "-g" | "--use-gpu" => c.use_gpu = Some(true),
+                    "-d" | "--device" => state = State::Device,
+                    "-u" | "--upsample" => c.upsample = Some(true),
+                    "-n" | "--resolution" => state = State::GridResolution,
+                    "-f" | "--fold" => state = State::Fold,
+                    "--timestep" => state = State::RecomputeTimestep,
+                    "-c" | "--checkpoint" => state = State::Checkpoint,
+                    "-o" | "--outdir" => state = State::Outdir,
+                    "-e" | "--end-time" => state = State::EndTime,
+                    "-r" | "--rk-order" => state = State::RkOrder,
+                    "--cfl" => state = State::Cfl,
+                    _ => {
+                        if arg.starts_with('-') {
+                            return Err(Cmdline(format!("unrecognized option {}", arg)));
+                        } else if c.setup.is_some() {
+                            return Err(Cmdline(format!("extra positional argument {}", arg)));
+                        } else {
+                            c.setup = Some(arg)
+                        }
+                    }
+                },
+                State::Device => {
+                    c.device = Some(
+                        arg.parse()
+                            .map_err(|e| Cmdline(format!("device {}: {}", arg, e)))?,
+                    );
+                    state = State::Ready;
+                }
+                State::GridResolution => {
+                    c.resolution = Some(
+                        arg.parse()
+                            .map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?,
+                    );
+                    state = State::Ready;
+                }
+                State::Fold => {
+                    c.fold = Some(
+                        arg.parse()
+                            .map_err(|e| Cmdline(format!("fold {}: {}", arg, e)))?,
+                    );
+                    state = State::Ready;
+                }
+                State::RecomputeTimestep => {
+                    c.recompute_timestep = Some(arg);
+                    state = State::Ready;
+                }
+                State::Checkpoint => {
+                    let mut args = arg.splitn(2, ':');
+                    c.checkpoint_interval = Some(
+                        args.next()
+                            .unwrap_or("")
+                            .parse()
+                            .map_err(|e| Cmdline(format!("checkpoint {}: {}", arg, e)))?,
+                    );
+                    c.checkpoint_logspace = match args.next() {
+                        Some("log") => Some(true),
+                        Some("linear") | None => Some(false),
+                        _ => {
+                            return Err(Cmdline(
+                                "checkpoint mode must be (log|linear) if given".to_string(),
+                            ))
+                        }
+                    };
+                    state = State::Ready;
+                }
+                State::Outdir => {
+                    c.outdir = Some(arg);
+                    state = State::Ready;
+                }
+                State::RkOrder => {
+                    c.rk_order = Some(
+                        arg.parse()
+                            .map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?,
+                    );
+                    state = State::Ready;
+                }
+                State::EndTime => {
+                    c.end_time = Some(
+                        arg.parse()
+                            .map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?,
+                    );
+                    state = State::Ready;
+                }
+                State::Cfl => {
+                    c.cfl_number = Some(
+                        arg.parse()
+                            .map_err(|e| Cmdline(format!("cfl {}: {}", arg, e)))?,
+                    );
+                    state = State::Ready;
+                }
+            }
+        }
+
+        if !std::matches!(state, State::Ready) {
+            Err(Cmdline("missing argument".to_string()))
+        } else {
+            c.validate()?;
+            Ok(c)
+        }
+    }
+
     pub fn update(&mut self, newer: &Self) -> Result<(), Error> {
         newer.use_omp.map(|x| self.use_omp.get_or_insert(x));
         newer.use_gpu.map(|x| self.use_gpu.get_or_insert(x));
@@ -157,171 +320,5 @@ impl Default for CommandLine {
             cfl_number: None,
             recompute_timestep: None,
         }
-    }
-}
-
-pub fn parse_command_line() -> Result<CommandLine, Error> {
-    use Error::*;
-
-    let mut c = CommandLine::default();
-
-    enum State {
-        Ready,
-        Device,
-        GridResolution,
-        Fold,
-        Checkpoint,
-        EndTime,
-        RkOrder,
-        Cfl,
-        Outdir,
-        RecomputeTimestep,
-    }
-    std::convert::identity(State::Device); // black-box
-    let mut state = State::Ready;
-
-    for arg in std::env::args()
-        .skip(1)
-        .flat_map(|arg| {
-            if arg.starts_with('-') {
-                arg.split('=').map(str::to_string).collect::<Vec<_>>()
-            } else {
-                vec![arg]
-            }
-        })
-        .flat_map(|arg| {
-            if arg.starts_with('-') && !arg.starts_with("--") && arg.len() > 2 {
-                let (a, b) = arg.split_at(2);
-                vec![a.to_string(), b.to_string()]
-            } else {
-                vec![arg]
-            }
-        })
-    {
-        match state {
-            State::Ready => match arg.as_str() {
-                "--version" => {
-                    return Err(PrintUserInformation("sailfish 0.2.0\n".to_string()));
-                }
-
-                #[rustfmt::skip]
-                "-h" | "--help" => {
-                    let mut message = String::new();
-                    writeln!(message, "usage: sailfish [setup|chkpt] [--version] [--help] <[options]>").unwrap();
-                    writeln!(message, "       --version             print the code version number").unwrap();
-                    writeln!(message, "       -h|--help             display this help message").unwrap();
-                    writeln!(message, "       -p|--use-omp          run with OpenMP (reads OMP_NUM_THREADS)").unwrap();
-                    writeln!(message, "       -g|--use-gpu          run with GPU acceleration").unwrap();
-                    writeln!(message, "       -d|--device           a device ID to run on ([0]-#gpus)").unwrap();
-                    writeln!(message, "       -u|--upsample         upsample the grid resolution by a factor of 2").unwrap();
-                    writeln!(message, "       -n|--resolution       grid resolution [1024]").unwrap();
-                    writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
-                    writeln!(message, "       --timestep            when to recompute time step ([iter]|fold)").unwrap();
-                    writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints [1.0]").unwrap();
-                    writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
-                    writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
-                    writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
-                    writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
-                    return Err(PrintUserInformation(message));
-                }
-                "-p" | "--use-omp" => c.use_omp = Some(true),
-                "-g" | "--use-gpu" => c.use_gpu = Some(true),
-                "-d" | "--device" => state = State::Device,
-                "-u" | "--upsample" => c.upsample = Some(true),
-                "-n" | "--resolution" => state = State::GridResolution,
-                "-f" | "--fold" => state = State::Fold,
-                "--timestep" => state = State::RecomputeTimestep,
-                "-c" | "--checkpoint" => state = State::Checkpoint,
-                "-o" | "--outdir" => state = State::Outdir,
-                "-e" | "--end-time" => state = State::EndTime,
-                "-r" | "--rk-order" => state = State::RkOrder,
-                "--cfl" => state = State::Cfl,
-                _ => {
-                    if arg.starts_with('-') {
-                        return Err(Cmdline(format!("unrecognized option {}", arg)));
-                    } else if c.setup.is_some() {
-                        return Err(Cmdline(format!("extra positional argument {}", arg)));
-                    } else {
-                        c.setup = Some(arg)
-                    }
-                }
-            },
-            State::Device => {
-                c.device = Some(
-                    arg.parse()
-                        .map_err(|e| Cmdline(format!("device {}: {}", arg, e)))?,
-                );
-                state = State::Ready;
-            }
-            State::GridResolution => {
-                c.resolution = Some(
-                    arg.parse()
-                        .map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?,
-                );
-                state = State::Ready;
-            }
-            State::Fold => {
-                c.fold = Some(
-                    arg.parse()
-                        .map_err(|e| Cmdline(format!("fold {}: {}", arg, e)))?,
-                );
-                state = State::Ready;
-            }
-            State::RecomputeTimestep => {
-                c.recompute_timestep = Some(arg);
-                state = State::Ready;
-            }
-            State::Checkpoint => {
-                let mut args = arg.splitn(2, ':');
-                c.checkpoint_interval = Some(
-                    args.next()
-                        .unwrap_or("")
-                        .parse()
-                        .map_err(|e| Cmdline(format!("checkpoint {}: {}", arg, e)))?,
-                );
-                c.checkpoint_logspace = match args.next() {
-                    Some("log") => Some(true),
-                    Some("linear") | None => Some(false),
-                    _ => {
-                        return Err(Cmdline(
-                            "checkpoint mode must be (log|linear) if given".to_string(),
-                        ))
-                    }
-                };
-                state = State::Ready;
-            }
-            State::Outdir => {
-                c.outdir = Some(arg);
-                state = State::Ready;
-            }
-            State::RkOrder => {
-                c.rk_order = Some(
-                    arg.parse()
-                        .map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?,
-                );
-                state = State::Ready;
-            }
-            State::EndTime => {
-                c.end_time = Some(
-                    arg.parse()
-                        .map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?,
-                );
-                state = State::Ready;
-            }
-            State::Cfl => {
-                c.cfl_number = Some(
-                    arg.parse()
-                        .map_err(|e| Cmdline(format!("cfl {}: {}", arg, e)))?,
-                );
-                state = State::Ready;
-            }
-        }
-    }
-
-    if !std::matches!(state, State::Ready) {
-        Err(Cmdline("missing argument".to_string()))
-    } else {
-        c.validate()?;
-        Ok(c)
     }
 }

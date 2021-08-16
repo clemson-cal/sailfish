@@ -9,12 +9,14 @@ use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton;
 use gridiron::rect_map::{Rectangle, RectangleMap};
 
-use sailfish::cmdline::{self, CommandLine};
 use sailfish::error::{self, Error::*};
-use sailfish::setup::{self, Setup};
-use sailfish::state::{Recurrence, RecurringTask, State};
+use sailfish::setup;
 use sailfish::{euler1d, euler2d, iso2d};
-use sailfish::{ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve};
+use sailfish::{
+    CommandLine,
+    ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve, Recurrence, RecurringTask, Setup,
+    State,
+};
 
 fn time_exec<F>(device: Option<i32>, mut f: F) -> std::time::Duration
 where
@@ -342,7 +344,7 @@ fn launch_single_patch(
 }
 
 fn run() -> Result<(), error::Error> {
-    let cline = cmdline::parse_command_line()?;
+    let cline = sailfish::CommandLine::parse()?;
     let state = make_state(&cline)?;
     let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
     let cline = state.command_line.clone();

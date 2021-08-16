@@ -8,21 +8,21 @@ pub mod mesh;
 pub mod parse;
 pub mod patch;
 pub mod setup;
+// pub mod setups;
 pub mod state;
+pub mod traits;
 
+pub use crate::cmdline::CommandLine;
 pub use crate::patch::Patch;
-pub use crate::setup::Setup;
+pub use crate::state::{Recurrence, RecurringTask, State};
+pub use crate::traits::{PatchBasedBuild, PatchBasedSolve, Setup, Solve};
 pub use gpu_core::Device;
 pub use gridiron::index_space::IndexSpace;
 pub use mesh::Mesh;
 
 use cfg_if::cfg_if;
-use gridiron::adjacency_list::AdjacencyList;
-use gridiron::automaton::Automaton;
-use gridiron::rect_map::Rectangle;
 use std::ops::Range;
 use std::str::FromStr;
-use std::sync::Arc;
 
 /// Execution modes. These modes are referenced by Rust driver code, and by
 /// solver code written in C.
@@ -256,86 +256,8 @@ pub enum Coordinates {
     SphericalPolar,
 }
 
-pub trait Solve {
-    /// Returns the primitive variable array for this solver. The data is
-    /// row-major with contiguous primitive variable components. The array
-    /// includes guard zones.
-    fn primitive(&self) -> Vec<f64>;
-
-    /// Converts the internal primitive variable array to a conserved variable
-    /// array, and stores that array in the solver's conserved variable buffer.
-    fn primitive_to_conserved(&mut self);
-
-    /// Returns the largest wavespeed among the zones in the solver's current
-    /// primitive array.
-    fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64;
-
-    /// Advances the primitive variable array by one low-storage Runge-Kutta
-    /// sub-stup.
-    fn advance_rk(&mut self, setup: &dyn Setup, time: f64, a: f64, dt: f64);
-
-    /// Primitive variable array in a solver using first, second, or third-order
-    /// Runge-Kutta time stepping.
-    fn advance(&mut self, setup: &dyn Setup, rk_order: u32, time: f64, dt: f64) {
-        self.primitive_to_conserved();
-        match rk_order {
-            1 => {
-                self.advance_rk(setup, time, 0.0, dt);
-            }
-            2 => {
-                self.advance_rk(setup, time + 0.0 * dt, 0.0, dt);
-                self.advance_rk(setup, time + 1.0 * dt, 0.5, dt);
-            }
-            3 => {
-                // t1 = a1 * tn + (1 - a1) * (tn + dt) =     tn +     (      dt) = tn +     dt [a1 = 0]
-                // t2 = a2 * tn + (1 - a2) * (t1 + dt) = 3/4 tn + 1/4 (tn + 2dt) = tn + 1/2 dt [a2 = 3/4]
-                self.advance_rk(setup, time + 0.0 * dt, 0. / 1., dt);
-                self.advance_rk(setup, time + 1.0 * dt, 3. / 4., dt);
-                self.advance_rk(setup, time + 0.5 * dt, 1. / 3., dt);
-            }
-            _ => {
-                panic!("invalid RK order")
-            }
-        }
-    }
-}
-
-pub trait PatchBasedBuild {
-    type Solver: PatchBasedSolve;
-
-    fn build(
-        &self,
-        time: f64,
-        primitive: Patch,
-        global_structured_mesh: StructuredMesh,
-        edge_list: &AdjacencyList<Rectangle<i64>>,
-        rk_order: usize,
-        mode: ExecutionMode,
-        device: Option<Device>,
-        setup: Arc<dyn Setup>,
-    ) -> Self::Solver;
-}
-
-pub trait PatchBasedSolve:
-    Automaton<Key = Rectangle<i64>, Value = Self, Message = Patch> + Send + Sync
-{
-    /// Returns the primitive variable array for this solver. The data is
-    /// row-major with contiguous primitive variable components. The array
-    /// includes guard zones.
-    fn primitive(&self) -> Patch;
-
-    /// Sets the time step size to be used in subsequent advance stages.
-    fn set_timestep(&mut self, dt: f64);
-
-    /// Returns the largest wavespeed among the zones in the solver's current
-    /// primitive array.
-    fn max_wavespeed(&self) -> f64;
-
-    /// Returns the GPU device this patch should be computed on, or `None` if
-    /// the execution should be on the CPU.
-    fn device(&self) -> Option<Device>;
-}
-
+/// Returns whether the code has been compiled with OpenMP support,
+/// `feature=omp`.
 pub fn compiled_with_omp() -> bool {
     cfg_if! {
         if #[cfg(feature = "omp")] {
@@ -346,6 +268,8 @@ pub fn compiled_with_omp() -> bool {
     }
 }
 
+/// Returns whether the code has been compiled with GPU support
+/// (`feature=gpu`) either via CUDA or HIP.
 pub fn compiled_with_gpu() -> bool {
     cfg_if! {
         if #[cfg(feature = "gpu")] {
