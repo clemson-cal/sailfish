@@ -8,7 +8,6 @@ pub mod mesh;
 pub mod parse;
 pub mod patch;
 pub mod setup;
-// pub mod setups;
 pub mod state;
 pub mod traits;
 
@@ -40,8 +39,9 @@ pub enum ExecutionMode {
 }
 
 /// Description of sink model to model accretion onto a (possibly) unresolved
-/// object in gravitation hydrodynamics. C equivalent is defined in
-/// sailfish.h.
+/// object in gravitation hydrodynamics.
+/// 
+/// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 #[serde(tag = "type")]
@@ -76,9 +76,12 @@ impl FromStr for SinkModel {
     }
 }
 
-/// Description of basic equations of state supported by various solvers. C
-/// equivalent is defined in sailfish.h. Note: some solvers might be
-/// hard-coded to use a particular equation of state.
+/// Description of basic equations of state supported by various solvers.
+/// 
+/// C equivalent is defined in sailfish.h.
+/// 
+/// Note: some solvers might be hard-coded to use a particular equation of
+/// state.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum EquationOfState {
@@ -87,7 +90,9 @@ pub enum EquationOfState {
     GammaLaw { gamma_law_index: f64 },
 }
 
-/// A gravitating point mass. C equivalent is defined in sailfish.h.
+/// A gravitating point mass.
+/// 
+/// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
 pub struct PointMass {
@@ -116,8 +121,9 @@ impl Default for PointMass {
     }
 }
 
-/// A fixed-length list of 0, 1, or 2 point masses. C equivalent is defined in
-/// sailfish.h.
+/// A fixed-length list of 0, 1, or 2 point masses.
+/// 
+/// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub struct PointMassList {
@@ -146,7 +152,9 @@ impl Default for PointMassList {
 }
 
 /// A description of a wave-damping (or buffer) zone to be used in
-/// context-specific solver code. C equivalent is defined in sailfish.h.
+/// context-specific solver code.
+/// 
+/// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum BufferZone {
@@ -161,8 +169,9 @@ pub enum BufferZone {
     },
 }
 
-/// A logically cartesian 2d mesh with uniform grid spacing. C equivalent is
-/// defined in sailfish.h.
+/// A logically cartesian 2d mesh with uniform grid spacing.
+/// 
+/// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct StructuredMesh {
@@ -246,9 +255,12 @@ impl StructuredMesh {
     }
 }
 
-/// Describes a st of curvilinear coordinates to use. C equivalent is defined
-/// in sailfish.h. Note: some solvers might be hard-coded to use a particular
-/// coordinate system.
+/// Describes a st of curvilinear coordinates to use.
+/// 
+/// C equivalent is defined in sailfish.h.
+/// 
+/// Note: some solvers might be hard-coded to use a particular coordinate
+/// system.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
 pub enum Coordinates {
