@@ -37,7 +37,7 @@ def file_load(indir, outdir, savefigbool, filename):
 
         fname = '{}/output-figures/movie-{}.png'.format(current_path_name, file_count_str)
         print(fname)
-        plt.savefig(fname)
+        plt.savefig(fname, dpi=600)
 
     make_movie(current_path_name, outdir, filename, max_file_count)
 
@@ -47,9 +47,7 @@ def file_load(indir, outdir, savefigbool, filename):
 
 def make_movie(current_path, outdir, filename, max_count):
     Path('{}/{}'.format(current_path, outdir)).mkdir(parents=True, exist_ok=True)
-    # command = "ffmpeg -start_number 1 -f image2 -r 24 -i {}/output-figures/%0{}d.png -vcodec mpeg4 -y {}/movie-{}.mp4".format(current_path, max_count, outdir, filename)
-
-    command = "ffmpeg -start_number 1 -i {}/output-figures/%0{}d.png -c:v libx264 -vb 20M -r 30 -pix_fmt yuv420p -filter:v 'setpts=2*PTS' -y {}/movie-{}.mp4".format(current_path, max_count, outdir, filename)
+    command = "ffmpeg -start_number 1 -i {}/output-figures/movie-%0{}d.png -c:v libx264 -vb 20M -r 30 -pix_fmt yuv420p -filter:v 'setpts=2*PTS' -y {}/movie-{}.mp4".format(current_path, max_count, outdir, filename)
 
     os.system(command)
 
