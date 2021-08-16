@@ -6,27 +6,96 @@ use std::fmt::Write;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct CommandLine {
-    pub use_omp: bool,
-    pub use_gpu: bool,
+    pub use_omp: Option<bool>,
+    pub use_gpu: Option<bool>,
     pub device: Option<i32>,
     pub upsample: Option<bool>,
     pub setup: Option<String>,
     pub resolution: Option<u32>,
-    pub fold: usize,
-    pub checkpoint_interval: f64,
+    pub fold: Option<usize>,
+    pub checkpoint_interval: Option<f64>,
     pub checkpoint_logspace: Option<bool>,
     pub outdir: Option<String>,
     pub end_time: Option<f64>,
-    pub rk_order: usize,
-    pub cfl_number: f64,
+    pub rk_order: Option<usize>,
+    pub cfl_number: Option<f64>,
     pub recompute_timestep: Option<String>,
 }
 
 impl CommandLine {
+    pub fn update(&mut self, newer: &Self) -> Result<(), Error> {
+        newer.use_omp.map(|x| self.use_omp.get_or_insert(x));
+        newer.use_gpu.map(|x| self.use_gpu.get_or_insert(x));
+        newer.device.map(|x| self.device.get_or_insert(x));
+        // newer.upsample.map(|x| self.upsample.get_or_insert(x));
+        // newer.setup.as_ref().map(|x| self.setup.get_or_insert(x.to_string()));
+        // newer.resolution.map(|x| self.resolution.get_or_insert(x));
+        newer.fold.map(|x| self.fold.get_or_insert(x));
+        newer.checkpoint_interval.map(|x| self.checkpoint_interval.get_or_insert(x));
+        newer.checkpoint_logspace.map(|x| self.checkpoint_logspace.get_or_insert(x));
+        newer.outdir.as_ref().map(|x| self.outdir.get_or_insert(x.to_string()));
+        newer.end_time.map(|x| self.end_time.get_or_insert(x));
+        newer.rk_order.map(|x| self.rk_order.get_or_insert(x));
+        newer.cfl_number.map(|x| self.cfl_number.get_or_insert(x));
+        newer.recompute_timestep.as_ref().map(|x| self.recompute_timestep.get_or_insert(x.to_string()));
+
+        self.validate()
+    }
+
+    pub fn validate(&self) -> Result<(), Error> {
+        use Error::*;
+
+        if self.use_omp() && !sailfish::compiled_with_omp() {
+            Err(CompiledWithoutOpenMP)
+        } else if self.use_gpu() && !sailfish::compiled_with_gpu() {
+            Err(CompiledWithoutGpu)
+        } else if self.use_omp() && self.use_gpu() {
+            Err(Cmdline(
+                "--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string(),
+            ))
+        } else if !(1..=3).contains(&self.rk_order()) {
+            Err(Cmdline("rk-order must be 1, 2, or 3".into()))
+        } else if self.checkpoint_interval() <= 0.0 {
+            Err(Cmdline(
+                "checkpoint interval --checkpoint (-c) must be >0".to_string(),
+            ))
+        } else if ![None, Some("iter"), Some("fold")].contains(&self.recompute_timestep.as_deref()) {
+            Err(Cmdline(
+                "invalid mode for --timestep, expected (iter|fold)".to_owned(),
+            ))
+        } else {
+            Ok(())
+        }
+    }
+
+    pub fn use_omp(&self) -> bool {
+        self.use_omp.unwrap_or(false)
+    }
+
+    pub fn use_gpu(&self) -> bool {
+        self.use_gpu.unwrap_or(false)
+    }
+
+    pub fn checkpoint_interval(&self) -> f64 {
+        self.checkpoint_interval.unwrap_or(1.0)
+    }
+
+    pub fn rk_order(&self) -> usize {
+        self.rk_order.unwrap_or(1)
+    }
+
+    pub fn fold(&self) -> usize {
+        self.fold.unwrap_or(10)
+    }
+
+    pub fn cfl_number(&self) -> f64 {
+        self.cfl_number.unwrap_or(0.2)
+    }
+
     pub fn execution_mode(&self) -> ExecutionMode {
-        if self.use_gpu {
+        if self.use_gpu() {
             ExecutionMode::GPU
-        } else if self.use_omp {
+        } else if self.use_omp() {
             ExecutionMode::OMP
         } else {
             ExecutionMode::CPU
@@ -44,9 +113,9 @@ impl CommandLine {
 
     pub fn checkpoint_rule(&self, setup: &dyn Setup) -> Recurrence {
         if self.checkpoint_logspace.unwrap_or(false) {
-            Recurrence::Log(self.checkpoint_interval)
+            Recurrence::Log(self.checkpoint_interval())
         } else {
-            Recurrence::Linear(self.checkpoint_interval * setup.unit_time())
+            Recurrence::Linear(self.checkpoint_interval() * setup.unit_time())
         }
     }
 
@@ -73,25 +142,24 @@ impl CommandLine {
 impl Default for CommandLine {
     fn default() -> Self {
         Self {
-            use_omp: false,
-            use_gpu: false,
+            use_omp: None,
+            use_gpu: None,
             device: None,
             upsample: None,
             resolution: None,
-            fold: 10,
-            checkpoint_interval: 1.0,
+            fold: None,
+            checkpoint_interval: None,
             checkpoint_logspace: None,
             setup: None,
             outdir: None,
             end_time: None,
-            rk_order: 1,
-            cfl_number: 0.2,
+            rk_order: None,
+            cfl_number: None,
             recompute_timestep: None,
         }
     }
 }
 
-#[rustfmt::skip]
 pub fn parse_command_line() -> Result<CommandLine, Error> {
     use Error::*;
 
@@ -133,8 +201,10 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         match state {
             State::Ready => match arg.as_str() {
                 "--version" => {
-                    return Err(PrintUserInformation("sailfish 0.1.0\n".to_string()));
+                    return Err(PrintUserInformation("sailfish 0.2.0\n".to_string()));
                 }
+
+                #[rustfmt::skip]
                 "-h" | "--help" => {
                     let mut message = String::new();
                     writeln!(message, "usage: sailfish [setup|chkpt] [--version] [--help] <[options]>").unwrap();
@@ -154,8 +224,8 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                     writeln!(message, "       --cfl                 CFL number [0.2]").unwrap();
                     return Err(PrintUserInformation(message));
                 }
-                "-p" | "--use-omp" => c.use_omp = true,
-                "-g" | "--use-gpu" => c.use_gpu = true,
+                "-p" | "--use-omp" => c.use_omp = Some(true),
+                "-g" | "--use-gpu" => c.use_gpu = Some(true),
                 "-d" | "--device" => state = State::Device,
                 "-u" | "--upsample" => c.upsample = Some(true),
                 "-n" | "--resolution" => state = State::GridResolution,
@@ -168,24 +238,33 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 "--cfl" => state = State::Cfl,
                 _ => {
                     if arg.starts_with('-') {
-                        return Err(Cmdline(format!("unrecognized option {}", arg)))
+                        return Err(Cmdline(format!("unrecognized option {}", arg)));
                     } else if c.setup.is_some() {
-                        return Err(Cmdline(format!("extra positional argument {}", arg)))
+                        return Err(Cmdline(format!("extra positional argument {}", arg)));
                     } else {
                         c.setup = Some(arg)
                     }
                 }
             },
             State::Device => {
-                c.device = Some(arg.parse().map_err(|e| Cmdline(format!("device {}: {}", arg, e)))?);
-                state = State::Ready;                
+                c.device = Some(
+                    arg.parse()
+                        .map_err(|e| Cmdline(format!("device {}: {}", arg, e)))?,
+                );
+                state = State::Ready;
             }
             State::GridResolution => {
-                c.resolution = Some(arg.parse().map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?);
+                c.resolution = Some(
+                    arg.parse()
+                        .map_err(|e| Cmdline(format!("resolution {}: {}", arg, e)))?,
+                );
                 state = State::Ready;
             }
             State::Fold => {
-                c.fold = arg.parse().map_err(|e| Cmdline(format!("fold {}: {}", arg, e)))?;
+                c.fold = Some(
+                    arg.parse()
+                        .map_err(|e| Cmdline(format!("fold {}: {}", arg, e)))?,
+                );
                 state = State::Ready;
             }
             State::RecomputeTimestep => {
@@ -194,11 +273,20 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
             }
             State::Checkpoint => {
                 let mut args = arg.splitn(2, ':');
-                c.checkpoint_interval = args.next().unwrap_or("").parse().map_err(|e| Cmdline(format!("checkpoint {}: {}", arg, e)))?;
+                c.checkpoint_interval = Some(
+                    args.next()
+                        .unwrap_or("")
+                        .parse()
+                        .map_err(|e| Cmdline(format!("checkpoint {}: {}", arg, e)))?,
+                );
                 c.checkpoint_logspace = match args.next() {
                     Some("log") => Some(true),
-                    Some("linear")|None => Some(false),
-                    _ => return Err(Cmdline("checkpoint mode must be (log|linear) if given".to_string()))
+                    Some("linear") | None => Some(false),
+                    _ => {
+                        return Err(Cmdline(
+                            "checkpoint mode must be (log|linear) if given".to_string(),
+                        ))
+                    }
                 };
                 state = State::Ready;
             }
@@ -207,35 +295,33 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
                 state = State::Ready;
             }
             State::RkOrder => {
-                c.rk_order = arg.parse().map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?;
+                c.rk_order = Some(
+                    arg.parse()
+                        .map_err(|e| Cmdline(format!("rk-order {}: {}", arg, e)))?,
+                );
                 state = State::Ready;
             }
             State::EndTime => {
-                c.end_time = Some(arg.parse().map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?);
+                c.end_time = Some(
+                    arg.parse()
+                        .map_err(|e| Cmdline(format!("end-time {}: {}", arg, e)))?,
+                );
                 state = State::Ready;
             }
             State::Cfl => {
-                c.cfl_number = arg.parse().map_err(|e| Cmdline(format!("cfl {}: {}", arg, e)))?;
+                c.cfl_number = Some(
+                    arg.parse()
+                        .map_err(|e| Cmdline(format!("cfl {}: {}", arg, e)))?,
+                );
                 state = State::Ready;
             }
         }
     }
 
-    if c.use_omp && !sailfish::compiled_with_omp() {
-        Err(CompiledWithoutOpenMP)
-    } else if c.use_gpu && !sailfish::compiled_with_gpu() {
-        Err(CompiledWithoutGpu)
-    } else if c.use_omp && c.use_gpu {
-        Err(Cmdline("--use-omp (-p) and --use-gpu (-g) are mutually exclusive".to_string()))
-    } else if !(1..=3).contains(&c.rk_order) {
-        Err(Cmdline("rk-order must be 1, 2, or 3".into()))
-    } else if c.checkpoint_interval <= 0.0 {
-        Err(Cmdline("checkpoint interval --checkpoint (-c) must be >0".to_string()))
-    } else if !std::matches!(state, State::Ready) {
+    if !std::matches!(state, State::Ready) {
         Err(Cmdline("missing argument".to_string()))
-    } else if ![None, Some("iter"), Some("fold")].contains(&c.recompute_timestep.as_deref()) {
-        Err(Cmdline("invalid mode for --timestep, expected (iter|fold)".to_owned()))
     } else {
+        c.validate()?;
         Ok(c)
     }
 }

@@ -142,7 +142,7 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
         let (name, parameters) = split_pair(setup_string, ':');
         let (name, parameters) = (name.unwrap_or(""), parameters.unwrap_or(""));
         if name.ends_with(".sf") {
-            State::from_checkpoint(name, parameters)?
+            State::from_checkpoint(name, parameters, cline)?
         } else {
             new_state(cline.clone(), name, parameters)?
         }
@@ -186,9 +186,9 @@ where
     Solver: PatchBasedSolve,
 {
     let (cfl, fold, rk_order, checkpoint_rule, dt_each_iter, end_time, outdir) = (
-        cline.cfl_number,
-        cline.fold,
-        cline.rk_order as usize,
+        cline.cfl_number(),
+        cline.fold(),
+        cline.rk_order(),
         cline.checkpoint_rule(setup.as_ref()),
         cline.recompute_dt_each_iteration(),
         cline.simulation_end_time(setup.as_ref()),
@@ -224,7 +224,7 @@ where
             &edge_list,
             rk_order,
             cline.execution_mode(),
-            devices.next().filter(|_| cline.use_gpu),
+            devices.next().filter(|_| cline.use_gpu()),
             setup.clone(),
         );
         solvers.push(solver)
@@ -322,9 +322,9 @@ fn launch_single_patch(
     cline: CommandLine,
 ) -> Result<(), error::Error> {
     let (cfl, fold, rk_order, checkpoint_rule, dt_each_iter, end_time, outdir) = (
-        cline.cfl_number,
-        cline.fold,
-        cline.rk_order,
+        cline.cfl_number(),
+        cline.fold(),
+        cline.rk_order(),
         cline.checkpoint_rule(setup.as_ref()),
         cline.recompute_dt_each_iteration(),
         cline.simulation_end_time(setup.as_ref()),
@@ -390,6 +390,8 @@ fn run() -> Result<(), error::Error> {
     let cline = cmdline::parse_command_line()?;
     let state = make_state(&cline)?;
     let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
+    let cline = state.command_line.clone();
+
     match setup.solver_name().as_str() {
         "iso2d" => launch_patch_based(state, setup, cline, iso2d::solver::Builder),
         "euler1d" => launch_single_patch(state, setup, cline),
