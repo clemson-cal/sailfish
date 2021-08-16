@@ -140,7 +140,7 @@ impl PointMassList {
             count: slice.len() as i32,
         }
     }
-    pub fn to_vec(&self) -> Vec<PointMass> {
+    pub fn to_vec(self) -> Vec<PointMass> {
         self.masses[..self.count as usize].to_vec()
     }
 }

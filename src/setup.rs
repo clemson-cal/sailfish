@@ -44,7 +44,7 @@ pub fn make_setup(setup_name: &str, parameters: &str) -> Result<Arc<dyn Setup>, 
         .into_iter()
         .find(|&(n, _)| n == setup_name)
         .map(|(_, f)| f(parameters))
-        .ok_or_else(|| possible_setups_info())?
+        .ok_or_else(possible_setups_info)?
 }
 
 #[derive(Clone)]
@@ -266,7 +266,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .item("sink_rate",        "10.0", "rate of mass subtraction in the sink (Omega)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
-            .item("gamma_law_index",     1.6666666666666666, "adiabatic index")
+            .item("gamma_law_index",     1.666666666666666, "adiabatic index")
             .item("cooling_coefficient", 0.0, "strength of T^4 cooling")
             .item("pressure_floor",      0.0, "pressure floor")
             .item("density_floor",       0.0, "density floor")

@@ -63,6 +63,7 @@ pub trait Solve {
 pub trait PatchBasedBuild {
     type Solver: PatchBasedSolve;
 
+    #[allow(clippy::too_many_arguments)]
     fn build(
         &self,
         time: f64,

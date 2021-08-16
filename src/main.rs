@@ -13,9 +13,8 @@ use sailfish::error::{self, Error::*};
 use sailfish::setup;
 use sailfish::{euler1d, euler2d, iso2d};
 use sailfish::{
-    CommandLine,
-    ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve, Recurrence, RecurringTask, Setup,
-    State,
+    CommandLine, ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve, Recurrence,
+    RecurringTask, Setup, State,
 };
 
 fn time_exec<F>(device: Option<i32>, mut f: F) -> std::time::Duration
@@ -80,7 +79,7 @@ fn new_state(
 
     let state = State {
         command_line,
-        mesh: mesh.clone(),
+        mesh,
         restart_file: None,
         iteration: 0,
         time: setup.initial_time(),
