@@ -201,7 +201,7 @@ pub fn parse_command_line() -> Result<CommandLine, Error> {
         match state {
             State::Ready => match arg.as_str() {
                 "--version" => {
-                    return Err(PrintUserInformation("sailfish 0.1.0\n".to_string()));
+                    return Err(PrintUserInformation("sailfish 0.2.0\n".to_string()));
                 }
 
                 #[rustfmt::skip]

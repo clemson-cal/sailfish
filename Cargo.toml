@@ -1,9 +1,13 @@
 [package]
 name = "sailfish"
-version = "0.1.0"
+description = "GPU-accelerated astrophysics gas dynamics code"
+version = "0.2.0"
 edition = "2018"
-authors = ["J. Zrake <jzrake@clemson.edu>", "A. MacFadyen <macfadyen@nyu.edu>"]
-description = "fast code to simulate binary accretion"
+authors = [
+	"J. Zrake <jzrake@clemson.edu>",
+	"A. MacFadyen <macfadyen@nyu.edu>",
+	"R. Westernacher-Schneider <wester5@clemson.edu>",
+]
 
 [dependencies]
 cfg-if          = { version = "1.0" }
