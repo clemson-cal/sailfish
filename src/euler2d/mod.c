@@ -236,7 +236,8 @@ static __host__ __device__ void buffer_source_term(
                 real u0[NCONS] = {surface_density, px, py, energy};
 
                 real omega_outer = sqrt(central_mass / pow(onset_radius, 3.0));
-                real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+                //real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+                real buffer_rate = driving_rate * omega_outer * (rc-onset_radius) / outer_radius;
 
                 for (int q = 0; q < NCONS; ++q)
                 {
