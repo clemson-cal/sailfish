@@ -1,4 +1,4 @@
-use crate::sailfish::{BufferZone, EquationOfState, ExecutionMode, PointMassList, StructuredMesh};
+use crate::{BufferZone, EquationOfState, ExecutionMode, PointMassList, StructuredMesh};
 
 pub mod solver;
 

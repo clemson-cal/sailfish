@@ -1,6 +1,6 @@
-use crate::error::Error;
-use crate::sailfish::{Coordinates, ExecutionMode, Solve};
 use crate::Setup;
+use crate::error::Error;
+use crate::{Coordinates, ExecutionMode, Solve};
 use cfg_if::cfg_if;
 
 extern "C" {

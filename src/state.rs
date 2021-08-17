@@ -1,9 +1,6 @@
 use crate::cmdline::CommandLine;
 use crate::error;
-use crate::mesh;
-use crate::patch::Patch;
-use crate::sailfish::PointMass;
-use crate::setup::Setup;
+use crate::{Mesh, Patch, PointMass, Setup};
 use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
 use std::io::Write;
@@ -56,7 +53,7 @@ impl RecurringTask {
 pub struct State {
     pub command_line: CommandLine,
     pub restart_file: Option<String>,
-    pub mesh: mesh::Mesh,
+    pub mesh: Mesh,
     pub setup_name: String,
     pub parameters: String,
     pub primitive: Vec<f64>,
@@ -121,8 +118,10 @@ impl State {
     }
 
     pub fn upsample(mut self) -> Self {
+        println!("upsample grid resolution");
+
         let mut mesh = match self.mesh {
-            mesh::Mesh::Structured(ref mut mesh) => mesh,
+            Mesh::Structured(ref mut mesh) => mesh,
             _ => panic!("can only upsample structured mesh"),
         };
 

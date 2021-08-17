@@ -1,11 +1,11 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::patch::Patch;
-use crate::sailfish::{
-    BufferZone, Coordinates, EquationOfState, PointMass, PointMassList, SinkModel, StructuredMesh,
+use crate::{
+    BufferZone, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
+    StructuredMesh,
 };
-use gridiron::index_space::IndexSpace;
+
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
 use std::str::FromStr;
@@ -44,77 +44,7 @@ pub fn make_setup(setup_name: &str, parameters: &str) -> Result<Arc<dyn Setup>, 
         .into_iter()
         .find(|&(n, _)| n == setup_name)
         .map(|(_, f)| f(parameters))
-        .ok_or_else(|| possible_setups_info())?
-}
-
-pub trait Setup: Send + Sync {
-    fn print_parameters(&self) {}
-    fn solver_name(&self) -> String;
-    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
-    fn initial_time(&self) -> f64 {
-        0.0
-    }
-    fn end_time(&self) -> Option<f64> {
-        None
-    }
-    fn unit_time(&self) -> f64 {
-        1.0
-    }
-    fn masses(&self, _time: f64) -> PointMassList {
-        PointMassList::default()
-    }
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
-    }
-    fn viscosity(&self) -> Option<f64> {
-        None
-    }
-    fn cooling_coefficient(&self) -> Option<f64> {
-        None
-    }
-    fn mach_ceiling(&self) -> Option<f64> {
-        None
-    }
-    fn density_floor(&self) -> Option<f64> {
-        None
-    }
-    fn pressure_floor(&self) -> Option<f64> {
-        None
-    }
-    fn velocity_ceiling(&self) -> Option<f64> {
-        None
-    }
-    fn equation_of_state(&self) -> EquationOfState;
-    fn mesh(&self, resolution: u32) -> Mesh;
-    fn coordinate_system(&self) -> Coordinates;
-    fn num_primitives(&self) -> usize;
-    fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
-        match mesh {
-            Mesh::Structured(_) => {
-                panic!("Setup::initial_primitive_vec is only compatible with Mesh::FacePositions1D")
-            }
-            Mesh::FacePositions1D(faces) => {
-                let nq = self.num_primitives();
-                let mut primitive = vec![0.0; (faces.len() - 1) * nq];
-                for i in 0..faces.len() - 1 {
-                    let x = 0.5 * (faces[i] + faces[i + 1]);
-                    self.initial_primitive(x, 0.0, &mut primitive[nq * i..nq * i + nq]);
-                }
-                primitive
-            }
-        }
-    }
-    fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
-        match mesh {
-            Mesh::Structured(mesh) => {
-                Patch::from_slice_function(space, self.num_primitives(), |(i, j), prim| {
-                    let [x, y] = mesh.cell_coordinates(i, j);
-                    self.initial_primitive(x, y, prim)
-                })
-            }
-            _ => unimplemented!(),
-        }
-    }
+        .ok_or_else(possible_setups_info)?
 }
 
 #[derive(Clone)]
@@ -195,7 +125,7 @@ impl std::str::FromStr for Binary {
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let (sr1, sr2) =
-            crate::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
+            crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
@@ -336,7 +266,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .item("sink_rate",        "10.0", "rate of mass subtraction in the sink (Omega)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
-            .item("gamma_law_index",     1.6666666666666666, "adiabatic index")
+            .item("gamma_law_index",     1.666666666666666, "adiabatic index")
             .item("cooling_coefficient", 0.0, "strength of T^4 cooling")
             .item("pressure_floor",      0.0, "pressure floor")
             .item("density_floor",       0.0, "density floor")
@@ -348,7 +278,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let (sr1, sr2) =
-            crate::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
+            crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),

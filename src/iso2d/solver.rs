@@ -1,9 +1,7 @@
 use crate::iso2d;
 use crate::mesh;
 use crate::patch::Patch;
-use crate::sailfish::PatchBasedBuild;
-use crate::sailfish::{ExecutionMode, PatchBasedSolve, StructuredMesh};
-use crate::setup::Setup;
+use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh};
 use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
@@ -88,7 +86,7 @@ impl Solver {
                 self.setup.viscosity().unwrap_or(0.0),
                 a,
                 dt,
-                f64::MAX,
+                self.setup.velocity_ceiling().unwrap_or(f64::MAX),
                 self.mode,
             );
         });

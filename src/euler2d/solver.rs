@@ -1,11 +1,4 @@
-use crate::euler2d;
-use crate::mesh;
-use crate::patch::Patch;
-use crate::sailfish::PatchBasedBuild;
-use crate::sailfish::{ExecutionMode, PatchBasedSolve, StructuredMesh};
-use crate::setup::Setup;
 use cfg_if::cfg_if;
-use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{Automaton, Status};
 use gridiron::index_space::{Axis, IndexSpace};
@@ -14,6 +7,12 @@ use std::mem::swap;
 use std::ops::DerefMut;
 use std::os::raw::c_ulong;
 use std::sync::{Arc, Mutex};
+
+use crate::euler2d;
+use crate::mesh;
+use crate::{
+    Device, ExecutionMode, Patch, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh,
+};
 
 enum SolverState {
     NotReady,

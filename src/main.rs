@@ -1,31 +1,21 @@
 #[cfg(feature = "omp")]
 extern crate openmp_sys;
-use crate::cmdline::CommandLine;
-use crate::error::Error::*;
-use crate::mesh::Mesh;
-use crate::patch::Patch;
-use crate::sailfish::{ExecutionMode, PatchBasedBuild, PatchBasedSolve};
-use crate::setup::Setup;
-use crate::state::{RecurringTask, State};
+
 use cfg_if::cfg_if;
+use rayon::prelude::*;
+use std::sync::Arc;
+
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton;
 use gridiron::rect_map::{Rectangle, RectangleMap};
-use rayon::prelude::*;
-use std::path::Path;
-use std::sync::Arc;
 
-pub mod cmdline;
-pub mod error;
-pub mod euler1d;
-pub mod euler2d;
-pub mod iso2d;
-pub mod lookup_table;
-pub mod mesh;
-pub mod patch;
-pub mod sailfish;
-pub mod setup;
-pub mod state;
+use sailfish::error::{self, Error::*};
+use sailfish::setups;
+use sailfish::{euler1d, euler2d, iso2d};
+use sailfish::{
+    CommandLine, ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve, Recurrence,
+    RecurringTask, Setup, State,
+};
 
 fn time_exec<F>(device: Option<i32>, mut f: F) -> std::time::Duration
 where
@@ -42,40 +32,6 @@ where
         }
     }
     start.elapsed()
-}
-
-/// Takes a string, and splits it into two parts, separated by the first
-/// instance of the given character. The first item in the pair is `Some`
-/// unless the input string is empty. The second item in the pair is `None` if
-/// `separator` is not found in the string.
-pub fn split_pair(string: &str, separator: char) -> (Option<&str>, Option<&str>) {
-    let mut a = string.splitn(2, separator);
-    let n = a.next();
-    let p = a.next();
-    (n, p)
-}
-
-/// Takes a string, and splits it into two parts, separated by the first
-/// instance of the given character. Each part is then parsed, and the whole
-/// call fails if either one fails.
-pub fn parse_pair<T: std::str::FromStr<Err = E>, E>(
-    string: &str,
-    separator: char,
-) -> Result<(Option<T>, Option<T>), E> {
-    let (sr1, sr2) = split_pair(&string, separator);
-    let sr1 = sr1.map(|s| s.parse()).transpose()?;
-    let sr2 = sr2.map(|s| s.parse()).transpose()?;
-    Ok((sr1, sr2))
-}
-
-/// Returns the parent directory for an absolute path string, or `None` if no
-/// parent directory exists. If the path is relative this function returns
-/// `Some(".")`.
-pub fn parent_dir(path: &str) -> Option<&str> {
-    Path::new(path)
-        .parent()
-        .and_then(Path::to_str)
-        .map(|s| if s.is_empty() { "." } else { s })
 }
 
 fn adjacency_list(
@@ -98,7 +54,7 @@ fn new_state(
     setup_name: &str,
     parameters: &str,
 ) -> Result<State, error::Error> {
-    let setup = setup::make_setup(setup_name, parameters)?;
+    let setup = setups::make_setup(setup_name, parameters)?;
     let mesh = setup.mesh(command_line.resolution.unwrap_or(1024));
     let num_patches = match command_line.execution_mode() {
         ExecutionMode::CPU => 512, // TODO: get patch count from command line
@@ -123,7 +79,7 @@ fn new_state(
 
     let state = State {
         command_line,
-        mesh: mesh.clone(),
+        mesh,
         restart_file: None,
         iteration: 0,
         time: setup.initial_time(),
@@ -139,7 +95,7 @@ fn new_state(
 
 fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
     let state = if let Some(ref setup_string) = cline.setup {
-        let (name, parameters) = split_pair(setup_string, ':');
+        let (name, parameters) = sailfish::parse::split_pair(setup_string, ':');
         let (name, parameters) = (name.unwrap_or(""), parameters.unwrap_or(""));
         if name.ends_with(".sf") {
             State::from_checkpoint(name, parameters, cline)?
@@ -147,7 +103,7 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
             new_state(cline.clone(), name, parameters)?
         }
     } else {
-        return Err(setup::possible_setups_info());
+        return Err(setups::possible_setups_info());
     };
     if cline.upsample.unwrap_or(false) {
         Ok(state.upsample())
@@ -239,17 +195,17 @@ where
     //     );
     // }
 
-    if let Some(mut resolution) = cline.resolution {
-        if cline.upsample.unwrap_or(false) {
-            resolution *= 2
-        }
-        if setup.mesh(resolution) != state.mesh {
-            return Err(InvalidSetup(
-                "cannot override domain parameters on restart".to_string(),
-            ));
-        }
-    }
-    if std::matches!(checkpoint_rule, state::Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
+    // if let Some(mut resolution) = cline.resolution {
+    //     if cline.upsample.unwrap_or(false) {
+    //         resolution *= 2
+    //     }
+    //     if setup.mesh(resolution) != state.mesh {
+    //         return Err(InvalidSetup(
+    //             "cannot override domain parameters on restart".to_string(),
+    //         ));
+    //     }
+    // }
+    if std::matches!(checkpoint_rule, Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
         ));
@@ -344,7 +300,7 @@ fn launch_single_patch(
     let mut dt = 0.0;
     let dx_min = state.mesh.min_spacing();
 
-    if std::matches!(checkpoint_rule, state::Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
+    if std::matches!(checkpoint_rule, Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
         ));
@@ -387,9 +343,9 @@ fn launch_single_patch(
 }
 
 fn run() -> Result<(), error::Error> {
-    let cline = cmdline::parse_command_line()?;
+    let cline = sailfish::CommandLine::parse()?;
     let state = make_state(&cline)?;
-    let setup = setup::make_setup(&state.setup_name, &state.parameters)?;
+    let setup = setups::make_setup(&state.setup_name, &state.parameters)?;
     let cline = state.command_line.clone();
 
     match setup.solver_name().as_str() {

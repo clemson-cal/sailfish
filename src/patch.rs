@@ -366,7 +366,7 @@ impl Patch {
 mod tests {
     use super::*;
     use crate::mesh;
-    use crate::sailfish::StructuredMesh;
+    use crate::StructuredMesh;
     use gridiron::index_space::{range2d, Axis};
 
     #[test]
