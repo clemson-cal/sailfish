@@ -26,6 +26,7 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("binary", setup_builder!(Binary)),
         ("binary-therm", setup_builder!(BinaryWithThermodynamics)),
         ("explosion", setup_builder!(Explosion)),
+        ("fast-shell", setup_builder!(FastShell)),
         ("pulse-collision", setup_builder!(PulseCollision)),
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
