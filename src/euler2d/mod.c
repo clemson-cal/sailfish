@@ -116,7 +116,7 @@ static __host__ __device__ void point_mass_source_term(
     }
     if (dr < rs)
     {
-        r2_soft = r2 + rs * rs;
+        r2_soft = r2 + pow(max2(rs, 0.5 * h), 2.0);
         mag = sigma * mp / r2_soft;
         fx = -mag * dx / dr;
         fy = -mag * dy / dr;
