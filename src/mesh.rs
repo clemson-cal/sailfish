@@ -1,5 +1,8 @@
+//! Generalizes over mesh data structures used by different solvers.
+
 use crate::IndexSpace;
 
+/// Either a [`crate::StructuredMesh`] or a `Vec` of face positions in 1D.
 #[derive(Clone, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
 #[serde(untagged)]
 pub enum Mesh {
