@@ -391,13 +391,13 @@ impl Setup for BinaryWithThermodynamics {
     }
 
     fn buffer_zone(&self) -> BufferZone {
-        let rbuf = self.domain_radius - 0.2;
+        let onset_radius = self.domain_radius - 0.1;
         BufferZone::Keplerian {
-            surface_density: self.initial_density * self.density_scaling(rbuf),
-            surface_pressure: self.initial_pressure * self.pressure_scaling(rbuf),
+            surface_density: self.initial_density * self.density_scaling(onset_radius),
+            surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
             central_mass: 1.0,
             driving_rate: 1000.0,
-            outer_radius: rbuf,
+            outer_radius: self.domain_radius,
             onset_width: 0.1,
         }
     }
