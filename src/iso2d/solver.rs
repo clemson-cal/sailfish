@@ -144,6 +144,10 @@ impl PatchBasedSolve for Solver {
         }
     }
 
+    fn reductions(&self) -> Vec<f64> {
+        vec![]
+    }
+
     fn set_timestep(&mut self, dt: f64) {
         self.dt = Some(dt)
     }

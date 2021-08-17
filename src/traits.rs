@@ -84,9 +84,10 @@ pub trait PatchBasedBuild {
 pub trait PatchBasedSolve:
     Automaton<Key = Rectangle<i64>, Value = Self, Message = Patch> + Send + Sync
 {
-    /// Returns the primitive variable array for this solver. The data is
-    /// row-major with contiguous primitive variable components. The array
-    /// includes guard zones.
+    /// Returns the primitive variable array for this solver.
+    ///
+    /// The data is row-major with contiguous primitive variable components.
+    /// The array does not include guard zones.
     fn primitive(&self) -> Patch;
 
     /// Sets the time step size to be used in subsequent advance stages.
@@ -94,11 +95,27 @@ pub trait PatchBasedSolve:
 
     /// Returns the largest wavespeed among the zones in the solver's current
     /// primitive array.
+    ///
+    /// This function should be as performant as possible, although if the
+    /// reduction required to obtain the maximum wavespeed is slow, the effect
+    /// might be mitigated by living on the edge and re-computing the timestep
+    /// less frequently than every time step.
     fn max_wavespeed(&self) -> f64;
 
     /// Returns the GPU device this patch should be computed on, or `None` if
     /// the execution should be on the CPU.
     fn device(&self) -> Option<Device>;
+
+    /// Returns a short sequence of floating-point numbers summarizing the
+    /// solver state.
+    ///
+    /// This function is probably not called every iteration, so it's expected
+    /// to be as performant as the advance function. The driver will request
+    /// the reductions from each grid patch at a user-specified time interval,
+    /// and record them in in a time series corresponding to this patch.
+    fn reductions(&self) -> Vec<f64> {
+        vec![]
+    }
 }
 
 /// A trait describing a simulation model setup.
