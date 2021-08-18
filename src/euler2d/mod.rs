@@ -1,4 +1,4 @@
-use crate::{BufferZone, EquationOfState, ExecutionMode, PointMass, PointMassList, StructuredMesh};
+use crate::{BufferZone, EquationOfState, ExecutionMode, PointMassList, StructuredMesh};
 
 pub mod solver;
 
@@ -26,14 +26,6 @@ extern "C" {
         mach_ceiling: f64,
         density_floor: f64,
         pressure_floor: f64,
-        mode: ExecutionMode,
-    );
-
-    pub fn iso2d_point_mass_source_term(
-        mesh: StructuredMesh,
-        primitive_ptr: *const f64,
-        cons_rate_ptr: *const f64,
-        mass: PointMass,
         mode: ExecutionMode,
     );
 

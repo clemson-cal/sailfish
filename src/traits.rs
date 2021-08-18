@@ -109,10 +109,18 @@ pub trait PatchBasedSolve:
     /// Returns a short sequence of floating-point numbers summarizing the
     /// solver state.
     ///
-    /// This function is probably not called every iteration, so it's expected
-    /// to be as performant as the advance function. The driver will request
-    /// the reductions from each grid patch at a user-specified time interval,
-    /// and record them in in a time series corresponding to this patch.
+    /// This function is probably not called every iteration, so it's not
+    /// expected to be as performant as the advance function. The driver will
+    /// request the reductions from each grid patch at a user-specified time
+    /// interval.
+    ///
+    /// The data should be extrinsic quantities, integrated rather than
+    /// averaged over this grid patch, because the driver will sum the results
+    /// over all grid patches to create a global reduction. Also for that
+    /// reason, all grid patches must return a vector of the same length. The
+    /// driver will append the user time to the start of the vector before
+    /// recording a time series entry. No time series data will be recorded
+    /// if an empty vector is returned here.
     fn reductions(&self) -> Vec<f64> {
         vec![]
     }
