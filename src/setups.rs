@@ -698,8 +698,19 @@ impl Setup for FastShell {
     }
 
     fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
+        // The deceleration radius is defined as the radius at which the shell
+        // will have transferred its kinetic energy to the ambient medium. In
+        // non-relativistic hydrodynamics, this is the radius the shell
+        // expands to when it as swept up its own mass. The shell width is dr,
+        // and its mass is roughly rho_1 * dr * 4 * pi * r^2. The deceleration
+        // radius is r_dec = dr * rho_1 / rho_0. For the fiducial setup below,
+        // r_dec is 100.
+
         let r_shell: f64 = 10.0;
-        let dr: f64 = 0.1;
+        let dr = 1.0;
+        let rho_0 = 0.01;
+        let rho_1 = 1.0;
+        let v_max = 1.0;
 
         let prof = |r: f64| {
             if r > r_shell {
@@ -709,10 +720,10 @@ impl Setup for FastShell {
             }
         };
 
-        let rho_ambient = 1e-4 * r.powi(-2);
-        let rho = 1.0 * prof(r) + rho_ambient;
-        let vel = 1.0 * prof(r);
-        let pre = 1e-3 * rho;
+        let rho_ambient = rho_0 * (r / r_shell).powi(-2);
+        let rho = rho_1 * prof(r) + rho_ambient;
+        let vel = v_max * prof(r);
+        let pre = 1e-3 * rho_ambient;
 
         primitive[0] = rho;
         primitive[1] = vel;
