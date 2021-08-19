@@ -1,4 +1,9 @@
+use crate::euler2d;
+use crate::mesh;
+use crate::patch::Patch;
+use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh};
 use cfg_if::cfg_if;
+use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{Automaton, Status};
 use gridiron::index_space::{Axis, IndexSpace};
@@ -8,11 +13,11 @@ use std::ops::DerefMut;
 use std::os::raw::c_ulong;
 use std::sync::{Arc, Mutex};
 
-use crate::euler2d;
-use crate::mesh;
-use crate::{
-    Device, ExecutionMode, Patch, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh,
-};
+//use crate::euler2d;
+//use crate::mesh;
+//use crate::{
+//    Device, ExecutionMode, Patch, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh,
+//};
 
 enum SolverState {
     NotReady,
@@ -28,6 +33,7 @@ pub struct Solver {
     primitive1: Patch,
     primitive2: Patch,
     conserved0: Patch,
+    source_buf: Arc<Mutex<Patch>>,
     wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
     incoming_count: usize,
@@ -148,6 +154,39 @@ impl PatchBasedSolve for Solver {
         }
     }
 
+    fn reductions(&self) -> Vec<f64> {
+        let mut lock = self.source_buf.lock().unwrap();
+        let cons_rate = lock.deref_mut();
+        let mut result = vec![];
+        let mass_list = self.setup.masses(self.time);
+
+        for mass in mass_list.to_vec() {
+            gpu_core::scope(self.device, || unsafe {
+                euler2d::euler2d_point_mass_source_term(
+                    self.mesh,
+                    self.primitive1.as_ptr(),
+                    cons_rate.as_ptr(),
+                    mass_list,
+                    mass,
+                    self.mode,
+                )
+            });
+            let mut udot = cons_rate
+                .to_host()
+                .as_slice()
+                .unwrap()
+                .chunks_exact(3)
+                .fold([0.0, 0.0, 0.0], |a: [f64; 3], b: &[f64]| {
+                    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+                });
+            for ud in &mut udot {
+                *ud *= self.mesh.dx * self.mesh.dy;
+            }
+            result.extend(udot)
+        }
+        result
+    }
+
     fn set_timestep(&mut self, dt: f64) {
         self.dt = Some(dt)
     }
@@ -223,6 +262,12 @@ impl PatchBasedBuild for Builder {
             (device.is_some() && std::matches!(mode, ExecutionMode::GPU)),
             "device must be Some if and only if execution mode is GPU"
         };
+        assert_eq! {
+            setup.num_primitives(),
+            3,
+            "this solver is hard-coded for 4 primitive variable fields"
+        };
+
         let rect = primitive.rect();
         let local_space = primitive.index_space();
         let local_space_ext = local_space.extend_all(2);
@@ -238,6 +283,7 @@ impl PatchBasedBuild for Builder {
 
         let primitive1 = Patch::zeros(4, &local_space.extend_all(2)).on(device);
         let conserved0 = Patch::zeros(4, &local_space).on(device);
+        let source_buf = Patch::zeros(4, &local_space).on(device);
         let wavespeeds = Patch::zeros(1, &local_space).on(device);
 
         let mut primitive1 = primitive1;
@@ -260,6 +306,7 @@ impl PatchBasedBuild for Builder {
             primitive2: primitive1.clone(),
             primitive1,
             conserved0,
+            source_buf: Arc::new(Mutex::new(source_buf)),
             wavespeeds: Arc::new(Mutex::new(wavespeeds)),
             outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
             incoming_count: edge_list.incoming_edges(&rect).count(),
