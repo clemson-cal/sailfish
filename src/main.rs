@@ -86,6 +86,8 @@ fn new_state(
         primitive,
         primitive_patches,
         checkpoint: RecurringTask::new(),
+        time_series_task: RecurringTask::new(),
+        time_series: vec![],
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
         masses: setup.masses(setup.initial_time()).to_vec(),
@@ -141,10 +143,11 @@ where
     Builder: PatchBasedBuild<Solver = Solver>,
     Solver: PatchBasedSolve,
 {
-    let (cfl, fold, rk_order, checkpoint_rule, dt_each_iter, end_time, outdir) = (
+    let (cfl, fold, rk_order, checkpoint_rule, time_series_rule, dt_each_iter, end_time, outdir) = (
         cline.cfl_number(),
         cline.fold(),
         cline.rk_order(),
+        cline.time_series_rule(setup.as_ref()),
         cline.checkpoint_rule(setup.as_ref()),
         cline.recompute_dt_each_iteration(),
         cline.simulation_end_time(setup.as_ref()),
@@ -227,6 +230,10 @@ where
     };
 
     while state.time < end_time {
+        if state.time_series_task.is_due(state.time, time_series_rule) {
+
+        }
+
         if state.checkpoint.is_due(state.time, checkpoint_rule) {
             state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
             state.write_checkpoint(setup.as_ref(), &outdir)?;

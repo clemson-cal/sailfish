@@ -59,10 +59,17 @@ pub struct State {
     pub primitive: Vec<f64>,
     pub primitive_patches: Vec<Patch>,
     pub time: f64,
-    #[serde(default)]
-    pub masses: Vec<PointMass>,
     pub iteration: u64,
     pub checkpoint: RecurringTask,
+
+    #[serde(default)]
+    pub time_series_task: RecurringTask,
+
+    #[serde(default)]
+    pub masses: Vec<PointMass>,
+
+    #[serde(default)]
+    pub time_series: Vec<Vec<f64>>,
 }
 
 impl State {
