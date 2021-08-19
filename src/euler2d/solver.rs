@@ -13,12 +13,6 @@ use std::ops::DerefMut;
 use std::os::raw::c_ulong;
 use std::sync::{Arc, Mutex};
 
-//use crate::euler2d;
-//use crate::mesh;
-//use crate::{
-//    Device, ExecutionMode, Patch, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh,
-//};
-
 enum SolverState {
     NotReady,
     RungeKuttaStage(usize),
@@ -175,9 +169,9 @@ impl PatchBasedSolve for Solver {
                 .to_host()
                 .as_slice()
                 .unwrap()
-                .chunks_exact(3)
-                .fold([0.0, 0.0, 0.0], |a: [f64; 3], b: &[f64]| {
-                    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+                .chunks_exact(4)
+                .fold([0.0, 0.0, 0.0, 0.0], |a: [f64; 4], b: &[f64]| {
+                    [a[0] + b[0], a[1] + b[1], a[2] + b[2], a[3] + b[3]]
                 });
             for ud in &mut udot {
                 *ud *= self.mesh.dx * self.mesh.dy;
@@ -264,7 +258,7 @@ impl PatchBasedBuild for Builder {
         };
         assert_eq! {
             setup.num_primitives(),
-            3,
+            4,
             "this solver is hard-coded for 4 primitive variable fields"
         };
 
