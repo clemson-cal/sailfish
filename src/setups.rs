@@ -250,6 +250,7 @@ pub struct BinaryWithThermodynamics {
     pub initial_density: f64,
     pub initial_pressure: f64,
     pub mach_ceiling: f64,
+    pub test_model: bool,
     form: kind_config::Form,
 }
 
@@ -274,6 +275,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             .item("initial_density",     1.0, "initial surface density at r=a")
             .item("initial_pressure",   1e-2, "initial surface  pressure at r=a")
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
+            .item("test_model",        false, "use test model")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -295,6 +297,7 @@ impl std::str::FromStr for BinaryWithThermodynamics {
             initial_density: form.get("initial_density").into(),
             initial_pressure: form.get("initial_pressure").into(),
             mach_ceiling: form.get("mach_ceiling").into(),
+            test_model: form.get("test_model").into(),
             form,
         })
     }
@@ -336,22 +339,42 @@ impl Setup for BinaryWithThermodynamics {
 
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-        let r = (x * x + y * y).sqrt();
-        let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
-        let phi_hat_x = -y / r.max(1e-12);
-        let phi_hat_y = x / r.max(1e-12);
-        let d = self.initial_density
-            * self.density_scaling(rs)
-            * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
-        let p = self.initial_pressure
-            * self.pressure_scaling(rs)
-            * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
-        let u = phi_hat_x / rs.sqrt();
-        let v = phi_hat_y / rs.sqrt();
-        primitive[0] = d;
-        primitive[1] = u;
-        primitive[2] = v;
-        primitive[3] = p;
+        match self.test_model {
+            false => {
+                let r = (x * x + y * y).sqrt();
+                let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
+                let phi_hat_x = -y / r.max(1e-12);
+                let phi_hat_y = x / r.max(1e-12);
+                let d = self.initial_density
+                    * self.density_scaling(rs)
+                    * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
+                let p = self.initial_pressure
+                    * self.pressure_scaling(rs)
+                    * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
+                let u = phi_hat_x / rs.sqrt();
+                let v = phi_hat_y / rs.sqrt();
+                primitive[0] = d;
+                primitive[1] = u;
+                primitive[2] = v;
+                primitive[3] = p;
+            },
+            true => {
+                let r = (x * x + y * y).sqrt();
+                let phi = f64::atan2(x, y);
+                let r1 = ((x - 1.0).powi(2) + (y - 1.0).powi(2)).sqrt();
+                let r2 = ((x + 1.0).powi(2) + (y + 1.0).powi(2)).sqrt();
+                let d = 1.0 + f64::exp(-r1.powi(2));
+                let p = 1.0 + f64::exp(-r2.powi(2));
+                let vp = r.powf(-0.5) * f64::exp(-5.0 / r - r.powi(2) / 3.0);
+                let vr = f64::sin(phi - 3.14159 / 4.0) * f64::exp(-5.0 / r - r.powi(2) / 3.0);
+                let u = vp * (-y / r) + vr * (x / r);
+                let v = vp * (x / r) + vr * (y / r);
+                primitive[0] = d;
+                primitive[1] = u;
+                primitive[2] = v;
+                primitive[3] = p;
+            },
+        } 
     }
 
     fn masses(&self, time: f64) -> PointMassList {
