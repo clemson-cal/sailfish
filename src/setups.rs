@@ -68,7 +68,7 @@ impl FromStr for Shocktube {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup(format!("setup does not take any parameters")))
+            Err(InvalidSetup("setup does not take any parameters".to_string()))
         }
     }
 }
@@ -127,7 +127,7 @@ impl FromStr for Explosion {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup(format!("setup does not take any parameters")))
+            Err(InvalidSetup("setup does not take any parameters".to_string()))
         }
     }
 }
@@ -606,7 +606,7 @@ impl FromStr for PulseCollision {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup(format!("setup does not take any parameters")))
+            Err(InvalidSetup("setup does not take any parameters".to_string()))
         }
     }
 }
@@ -682,7 +682,7 @@ impl FromStr for FastShell {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup(format!("setup does not take any parameters")))
+            Err(InvalidSetup("setup does not take any parameters".to_string()))
         }
     }
 }
