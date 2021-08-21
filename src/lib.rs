@@ -38,8 +38,7 @@ pub enum ExecutionMode {
     GPU,
 }
 
-/// Description of sink model to model accretion onto a (possibly) unresolved
-/// object in gravitation hydrodynamics.
+/// Description of sink model to model accretion onto a gravitating object.
 /// 
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]

@@ -410,12 +410,7 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 _Pragma("omp parallel for") \
     for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
     for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
-#define CONTAINS(p, q) \
-        (p.start[0] <= q.start[0] && p.start[0] + p.count[0] >= q.start[0] + q.count[0]) && \
-        (p.start[1] <= q.start[1] && p.start[1] + p.count[1] >= q.start[1] + q.count[1])
 #define GET(p, i, j) (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
-#define ELEMENTS(p) (p.count[0] * p.count[1] * p.num_fields)
-#define BYTES(p) (ELEMENTS(p) * sizeof(real))
 
 struct Patch
 {
@@ -461,7 +456,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMassList *mass_list,
+    struct PointMassList mass_list,
     real alpha,
     real a,
     real dt,
@@ -589,11 +584,11 @@ static __host__ __device__ void advance_rk_zone(
     shear_strain(gxcc, gycc, dx, dy, scc);
 
     real cs2cc = sound_speed_squared(&eos, pcc);
-    real hcc = disk_height(mass_list, xc, yc, pcc);
-    real hli = disk_height(mass_list, xl, yc, pli);
-    real hri = disk_height(mass_list, xr, yc, pri);
-    real hlj = disk_height(mass_list, xc, yl, plj);
-    real hrj = disk_height(mass_list, xc, yr, prj);
+    real hcc = disk_height(&mass_list, xc, yc, pcc);
+    real hli = disk_height(&mass_list, xl, yc, pli);
+    real hri = disk_height(&mass_list, xr, yc, pri);
+    real hlj = disk_height(&mass_list, xc, yl, plj);
+    real hrj = disk_height(&mass_list, xc, yr, prj);
 
     real nucc = alpha * hcc * sqrt(cs2cc);
     real nuli = alpha * hli * sqrt(cs2li);
@@ -621,7 +616,7 @@ static __host__ __device__ void advance_rk_zone(
 
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(mass_list, xc, yc, dt, pcc, hcc, ucc);
+    point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -640,7 +635,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_wr,
     struct EquationOfState eos,
     struct BufferZone buffer,
-    struct PointMassList *mass_list,
+    struct PointMassList mass_list,
     real a,
     real dt,
     real velocity_ceiling,
@@ -719,10 +714,10 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     riemann_hlle(pljm, pljp, flj, cs2lj, 1);
     riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-    real h = disk_height(mass_list, xc, yc, pcc);
+    real h = disk_height(&mass_list, xc, yc, pcc);
     primitive_to_conserved(pcc, ucc);
     buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(mass_list, xc, yc, dt, pcc, h, ucc);
+    point_masses_source_term(&mass_list, xc, yc, dt, pcc, h, ucc);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -732,6 +727,23 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     }
     real *pout = GET(primitive_wr, i, j);
     conserved_to_primitive(ucc, pout, velocity_ceiling, density_floor, pressure_floor);
+}
+
+static __host__ __device__ void point_mass_source_term_zone(
+    struct Mesh mesh,
+    struct Patch primitive,
+    struct Patch cons_rate,
+    struct PointMassList mass_list,
+    struct PointMass mass,
+    int i,
+    int j)
+{
+    real *pc = GET(primitive, i, j);
+    real *sc = GET(cons_rate, i, j);
+    real x = mesh.x0 + (i + 0.5) * mesh.dx;
+    real y = mesh.y0 + (j + 0.5) * mesh.dy;
+    real h = disk_height(&mass_list, x, y, pc);
+    point_mass_source_term(&mass, x, y, 1.0, pc, h, sc);
 }
 
 static __host__ __device__ void wavespeed_zone(
@@ -795,7 +807,7 @@ static void __global__ advance_rk_kernel(
             primitive_wr,
             eos,
             buffer,
-            &mass_list,
+            mass_list,
             alpha,
             a,
             dt,
@@ -838,7 +850,7 @@ static void __global__ advance_rk_kernel_inviscid(
             primitive_wr,
             eos,
             buffer,
-            &mass_list,
+            mass_list,
             a,
             dt,
             velocity_ceiling,
@@ -849,6 +861,22 @@ static void __global__ advance_rk_kernel_inviscid(
             i,
             j
         );
+    }
+}
+
+static void __global__ point_mass_source_term_kernel(
+    struct Mesh mesh,
+    struct Patch primitive,
+    struct Patch cons_rate,
+    struct PointMassList mass_list,
+    struct PointMass mass)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, i, j);
     }
 }
 
@@ -973,7 +1001,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        &mass_list,
+                        mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -992,7 +1020,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        &mass_list,
+                        mass_list,
                         alpha,
                         a,
                         dt,
@@ -1018,7 +1046,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        &mass_list,
+                        mass_list,
                         a,
                         dt,
                         velocity_ceiling,
@@ -1037,7 +1065,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_wr,
                         eos,
                         buffer,
-                        &mass_list,
+                        mass_list,
                         alpha,
                         a,
                         dt,
@@ -1095,6 +1123,57 @@ EXTERN_C void euler2d_advance_rk(
                     pressure_floor
                 );
             }
+            #endif
+            break;
+        }
+    }
+}
+
+
+/**
+ * Fill a buffer with the source terms that would result from a single point
+ * mass. The result is the rate of surface density addition (will be negative
+ * for positive sink rate), and the gravitational force surface densities in
+ * each zone.
+ * @param mesh                The mesh [ni,     nj]
+ * @param primitive_ptr[in]   [-2, -2] [ni + 4, nj + 4] [4]
+ * @param cons_rate_ptr[out]  [ 0,  0] [ni,     nj]     [1]
+ * @param mass                A point mass
+ * @param mode                The execution mode
+ */
+EXTERN_C void euler2d_point_mass_source_term(
+    struct Mesh mesh,
+    real *primitive_ptr,
+    real *cons_rate_ptr,
+    struct PointMassList mass_list,
+    struct PointMass mass,
+    enum ExecutionMode mode)
+{
+    struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
+    struct Patch cons_rate = patch(mesh, NCONS, 0, cons_rate_ptr);
+
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(cons_rate) {
+                point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(cons_rate) {
+                point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #if defined(__NVCC__) || defined(__ROCM__)
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
+            point_mass_source_term_kernel<<<bd, bs>>>(mesh, primitive, cons_rate, mass_list, mass);
             #endif
             break;
         }

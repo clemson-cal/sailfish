@@ -86,6 +86,8 @@ fn new_state(
         primitive,
         primitive_patches,
         checkpoint: RecurringTask::new(),
+        time_series: RecurringTask::new(),
+        time_series_data: vec![],
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
         masses: setup.masses(setup.initial_time()).to_vec(),
@@ -110,6 +112,15 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
     } else {
         Ok(state)
     }
+}
+
+fn global_reduction<Solver: PatchBasedSolve>(solvers: &[Solver]) -> Vec<f64> {
+    let patch_reductions: Vec<_> = solvers.iter().map(Solver::reductions).collect();
+    let start = vec![0.0; patch_reductions[0].len()];
+
+    patch_reductions.iter().fold(start, |a, b| {
+        a.into_iter().zip(b).map(|(a, b)| a + b).collect()
+    })
 }
 
 fn max_wavespeed<Solver: PatchBasedSolve>(
@@ -141,11 +152,12 @@ where
     Builder: PatchBasedBuild<Solver = Solver>,
     Solver: PatchBasedSolve,
 {
-    let (cfl, fold, rk_order, checkpoint_rule, dt_each_iter, end_time, outdir) = (
+    let (cfl, fold, rk_order, checkpoint_rule, time_series_rule, dt_each_iter, end_time, outdir) = (
         cline.cfl_number(),
         cline.fold(),
         cline.rk_order(),
         cline.checkpoint_rule(setup.as_ref()),
+        cline.time_series_rule(setup.as_ref()),
         cline.recompute_dt_each_iteration(),
         cline.simulation_end_time(setup.as_ref()),
         cline.output_directory(&state.restart_file),
@@ -165,7 +177,8 @@ where
         gpu_core::all_devices().collect::<Vec<_>>()
     }
     .into_iter()
-    .cycle();
+    .cycle()
+    .filter(|_| cline.use_gpu());
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
@@ -180,31 +193,12 @@ where
             &edge_list,
             rk_order,
             cline.execution_mode(),
-            devices.next().filter(|_| cline.use_gpu()),
+            devices.next(),
             setup.clone(),
         );
         solvers.push(solver)
     }
 
-    // for (n, solver) in solvers.iter().enumerate() {
-    //     println!(
-    //         "solver {} running on device {:?} covering {:?}",
-    //         n,
-    //         solver.device(),
-    //         solver.primitive().index_space()
-    //     );
-    // }
-
-    // if let Some(mut resolution) = cline.resolution {
-    //     if cline.upsample.unwrap_or(false) {
-    //         resolution *= 2
-    //     }
-    //     if setup.mesh(resolution) != state.mesh {
-    //         return Err(InvalidSetup(
-    //             "cannot override domain parameters on restart".to_string(),
-    //         ));
-    //     }
-    // }
     if std::matches!(checkpoint_rule, Recurrence::Log(_)) && setup.initial_time() <= 0.0 {
         return Err(InvalidSetup(
             "checkpoints can only be log-spaced if the initial time is > 0.0".to_string(),
@@ -227,9 +221,20 @@ where
     };
 
     while state.time < end_time {
+        if state.time_series.is_due(state.time, time_series_rule) {
+            let mut reductions = global_reduction(&solvers);
+            reductions.insert(0, state.time);
+            state.time_series_data.push(reductions);
+            state.time_series.next(state.time, time_series_rule);
+            println!(
+                "record time series sample {} (length {})",
+                state.time_series_data.len(),
+                state.time_series_data.last().unwrap().len(),
+            );
+        }
         if state.checkpoint.is_due(state.time, checkpoint_rule) {
             state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();
-            state.write_checkpoint(setup.as_ref(), &outdir)?;
+            state.write_checkpoint(setup.as_ref(), &outdir)?
         }
 
         let start = std::time::Instant::now();

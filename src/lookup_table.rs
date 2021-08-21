@@ -1,3 +1,6 @@
+//! Provides a `LookupTable` data structure for working with 1D tabulated
+//! data.
+
 use std::num::ParseFloatError;
 use std::fs::read_to_string;
 
