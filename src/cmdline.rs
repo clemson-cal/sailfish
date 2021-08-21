@@ -13,6 +13,8 @@ pub struct CommandLine {
     pub fold: Option<usize>,
     pub checkpoint_interval: Option<f64>,
     pub checkpoint_logspace: Option<bool>,
+    pub time_series_interval: Option<f64>,
+    pub time_series_logspace: Option<bool>,
     pub outdir: Option<String>,
     pub end_time: Option<f64>,
     pub rk_order: Option<usize>,
@@ -31,6 +33,7 @@ impl CommandLine {
             GridResolution,
             Fold,
             Checkpoint,
+            TimeSeries,
             EndTime,
             RkOrder,
             Cfl,
@@ -61,7 +64,7 @@ impl CommandLine {
             match state {
                 State::Ready => match arg.as_str() {
                     "--version" => {
-                        return Err(PrintUserInformation("sailfish 0.2.0\n".to_string()));
+                        return Err(PrintUserInformation("sailfish 0.3.0\n".to_string()));
                     }
 
                     #[rustfmt::skip]
@@ -78,6 +81,7 @@ impl CommandLine {
                         writeln!(message, "       -f|--fold             number of iterations between messages [10]").unwrap();
                         writeln!(message, "       --timestep            when to recompute time step ([iter]|fold)").unwrap();
                         writeln!(message, "       -c|--checkpoint       amount of time between writing checkpoints [1.0]").unwrap();
+                        writeln!(message, "       -t|--timeseries       amount of time between sampling reductions [0=none]").unwrap();
                         writeln!(message, "       -o|--outdir           data output directory [current]").unwrap();
                         writeln!(message, "       -e|--end-time         simulation end time [never]").unwrap();
                         writeln!(message, "       -r|--rk-order         Runge-Kutta integration order ([1]|2|3)").unwrap();
@@ -92,6 +96,7 @@ impl CommandLine {
                     "-f" | "--fold" => state = State::Fold,
                     "--timestep" => state = State::RecomputeTimestep,
                     "-c" | "--checkpoint" => state = State::Checkpoint,
+                    "-t" | "--timeseries" => state = State::TimeSeries,
                     "-o" | "--outdir" => state = State::Outdir,
                     "-e" | "--end-time" => state = State::EndTime,
                     "-r" | "--rk-order" => state = State::RkOrder,
@@ -144,7 +149,26 @@ impl CommandLine {
                         Some("linear") | None => Some(false),
                         _ => {
                             return Err(Cmdline(
-                                "checkpoint mode must be (log|linear) if given".to_string(),
+                                "checkpoint mode must be (log|linear) if given".to_owned(),
+                            ))
+                        }
+                    };
+                    state = State::Ready;
+                }
+                State::TimeSeries => {
+                    let mut args = arg.splitn(2, ':');
+                    c.time_series_interval = Some(
+                        args.next()
+                            .unwrap_or("")
+                            .parse()
+                            .map_err(|e| Cmdline(format!("timeseries {}: {}", arg, e)))?,
+                    );
+                    c.time_series_logspace = match args.next() {
+                        Some("log") => Some(true),
+                        Some("linear") | None => Some(false),
+                        _ => {
+                            return Err(Cmdline(
+                                "timeseries mode must be (log|linear) if given".to_owned(),
                             ))
                         }
                     };
@@ -196,12 +220,13 @@ impl CommandLine {
         newer.fold.map(|x| self.fold.insert(x));
         newer.checkpoint_interval.map(|x| self.checkpoint_interval.insert(x));
         newer.checkpoint_logspace.map(|x| self.checkpoint_logspace.insert(x));
+        newer.time_series_interval.map(|x| self.time_series_interval.insert(x));
+        newer.time_series_logspace.map(|x| self.time_series_logspace.insert(x));
         newer.outdir.as_ref().map(|x| self.outdir.insert(x.to_string()));
         newer.end_time.map(|x| self.end_time.insert(x));
         newer.rk_order.map(|x| self.rk_order.insert(x));
         newer.cfl_number.map(|x| self.cfl_number.insert(x));
         newer.recompute_timestep.as_ref().map(|x| self.recompute_timestep.insert(x.to_string()));
-
         self.validate()
     }
 
@@ -222,6 +247,10 @@ impl CommandLine {
             Err(Cmdline(
                 "checkpoint interval --checkpoint (-c) must be >0".to_string(),
             ))
+        } else if self.time_series_interval() <= 0.0 {
+            Err(Cmdline(
+                "time series interval --timeseries (-t) must be >0".to_string(),
+            ))
         } else if ![None, Some("iter"), Some("fold")].contains(&self.recompute_timestep.as_deref()) {
             Err(Cmdline(
                 "invalid mode for --timestep, expected (iter|fold)".to_owned(),
@@ -237,10 +266,6 @@ impl CommandLine {
 
     pub fn use_gpu(&self) -> bool {
         self.use_gpu.unwrap_or(false)
-    }
-
-    pub fn checkpoint_interval(&self) -> f64 {
-        self.checkpoint_interval.unwrap_or(1.0)
     }
 
     pub fn rk_order(&self) -> usize {
@@ -274,11 +299,27 @@ impl CommandLine {
         }
     }
 
+    pub fn checkpoint_interval(&self) -> f64 {
+        self.checkpoint_interval.unwrap_or(1.0)
+    }
+
+    pub fn time_series_interval(&self) -> f64 {
+        self.time_series_interval.unwrap_or(1.0)
+    }
+
     pub fn checkpoint_rule(&self, setup: &dyn Setup) -> Recurrence {
         if self.checkpoint_logspace.unwrap_or(false) {
             Recurrence::Log(self.checkpoint_interval())
         } else {
             Recurrence::Linear(self.checkpoint_interval() * setup.unit_time())
+        }
+    }
+
+    pub fn time_series_rule(&self, setup: &dyn Setup) -> Recurrence {
+        if self.time_series_logspace.unwrap_or(false) {
+            Recurrence::Log(self.time_series_interval())
+        } else {
+            Recurrence::Linear(self.time_series_interval() * setup.unit_time())
         }
     }
 
@@ -313,6 +354,8 @@ impl Default for CommandLine {
             fold: None,
             checkpoint_interval: None,
             checkpoint_logspace: None,
+            time_series_interval: None,
+            time_series_logspace: None,
             setup: None,
             outdir: None,
             end_time: None,

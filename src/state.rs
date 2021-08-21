@@ -5,13 +5,13 @@ use std::fs::{create_dir_all, File};
 use std::io::prelude::*;
 use std::io::Write;
 
-#[derive(Clone, Copy)]
+#[derive(Debug, Clone, Copy)]
 pub enum Recurrence {
     Linear(f64),
     Log(f64),
 }
 
-#[derive(Clone, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct RecurringTask {
     pub number: u64,
     pub last_time: Option<f64>,
@@ -59,10 +59,17 @@ pub struct State {
     pub primitive: Vec<f64>,
     pub primitive_patches: Vec<Patch>,
     pub time: f64,
-    #[serde(default)]
-    pub masses: Vec<PointMass>,
     pub iteration: u64,
     pub checkpoint: RecurringTask,
+
+    #[serde(default)]
+    pub time_series: RecurringTask,
+
+    #[serde(default)]
+    pub masses: Vec<PointMass>,
+
+    #[serde(default)]
+    pub time_series_data: Vec<Vec<f64>>,
 }
 
 impl State {
