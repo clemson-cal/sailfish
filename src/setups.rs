@@ -320,6 +320,7 @@ pub struct BinaryWithThermodynamics {
     pub initial_pressure: f64,
     pub mach_ceiling: f64,
     pub test_model: bool,
+    pub one_body: bool,
     form: kind_config::Form,
 }
 
@@ -345,6 +346,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("initial_pressure",   1e-2, "initial surface  pressure at r=a")
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
             .item("test_model",        false, "use test model")
+            .item("one_body",          false, "use one point mass")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -367,6 +369,7 @@ impl FromStr for BinaryWithThermodynamics {
             initial_pressure: form.get("initial_pressure").into(),
             mach_ceiling: form.get("mach_ceiling").into(),
             test_model: form.get("test_model").into(),
+            one_body: form.get("one_body").into(),
             form,
         })
     }
@@ -447,33 +450,50 @@ impl Setup for BinaryWithThermodynamics {
     }
 
     fn masses(&self, time: f64) -> PointMassList {
-        let a: f64 = 1.0;
-        let m: f64 = 1.0;
-        let q: f64 = self.form.get("q").into();
-        let e: f64 = self.form.get("e").into();
-        let binary = OrbitalElements(a, m, q, e);
-        let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
-        let mass1 = PointMass {
-            x: mass1.position_x(),
-            y: mass1.position_y(),
-            vx: mass1.velocity_x(),
-            vy: mass1.velocity_y(),
-            mass: mass1.mass(),
-            rate: self.sink_rate1,
-            radius: self.sink_radius,
-            model: self.sink_model,
-        };
-        let mass2 = PointMass {
-            x: mass2.position_x(),
-            y: mass2.position_y(),
-            vx: mass2.velocity_x(),
-            vy: mass2.velocity_y(),
-            mass: mass2.mass(),
-            rate: self.sink_rate2,
-            radius: self.sink_radius,
-            model: self.sink_model,
-        };
-        PointMassList::from_slice(&[mass1, mass2])
+        match self.one_body {
+            false => {
+                let a: f64 = 1.0;
+                let m: f64 = 1.0;
+                let q: f64 = self.form.get("q").into();
+                let e: f64 = self.form.get("e").into();
+                let binary = OrbitalElements(a, m, q, e);
+                let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
+                let mass1 = PointMass {
+                    x: mass1.position_x(),
+                    y: mass1.position_y(),
+                    vx: mass1.velocity_x(),
+                    vy: mass1.velocity_y(),
+                    mass: mass1.mass(),
+                    rate: self.sink_rate1,
+                    radius: self.sink_radius,
+                    model: self.sink_model,
+                };
+                let mass2 = PointMass {
+                    x: mass2.position_x(),
+                    y: mass2.position_y(),
+                    vx: mass2.velocity_x(),
+                    vy: mass2.velocity_y(),
+                    mass: mass2.mass(),
+                    rate: self.sink_rate2,
+                    radius: self.sink_radius,
+                    model: self.sink_model,
+                };
+                PointMassList::from_slice(&[mass1, mass2])
+            },
+            true => {
+                let mass1 = PointMass {
+                    x: 0.0,
+                    y: 0.0,
+                    vx: 0.0,
+                    vy: 0.0,
+                    mass: 1.0,
+                    rate: self.sink_rate1,
+                    radius: self.sink_radius,
+                    model: self.sink_model,
+                };
+                PointMassList::from_slice(&[mass1])
+            }
+        }
     }
 
     fn equation_of_state(&self) -> EquationOfState {
@@ -483,14 +503,28 @@ impl Setup for BinaryWithThermodynamics {
     }
 
     fn buffer_zone(&self) -> BufferZone {
-        let onset_radius = self.domain_radius - 0.1;
-        BufferZone::Keplerian {
-            surface_density: self.initial_density * self.density_scaling(onset_radius),
-            surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
-            central_mass: 1.0,
-            driving_rate: 1000.0,
-            outer_radius: self.domain_radius,
-            onset_width: 0.1,
+        match self.test_model {
+            false => {
+                let onset_radius = self.domain_radius - 0.1;
+                BufferZone::Keplerian {
+                    surface_density: self.initial_density * self.density_scaling(onset_radius),
+                    surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
+                    central_mass: 1.0,
+                    driving_rate: 1000.0,
+                    outer_radius: self.domain_radius,
+                    onset_width: 0.1,
+                }
+            },
+            true => {
+                BufferZone::Keplerian { //don't change this
+                    surface_density: 1.0,
+                    surface_pressure: 1.0,
+                    central_mass: 0.0,
+                    driving_rate: 10.0,
+                    outer_radius: self.domain_radius,
+                    onset_width: 0.1,
+                }
+            }
         }
     }
 
