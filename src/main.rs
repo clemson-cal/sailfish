@@ -99,10 +99,11 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
     let state = if let Some(ref setup_string) = cline.setup {
         let (name, parameters) = sailfish::parse::split_pair(setup_string, ':');
         let (name, parameters) = (name.unwrap_or(""), parameters.unwrap_or(""));
+
         if name.ends_with(".sf") {
-            State::from_checkpoint(name, parameters, cline)?
+            State::from_checkpoint(name, &parameters, cline)?
         } else {
-            new_state(cline.clone(), name, parameters)?
+            new_state(cline.clone(), name, &parameters)?
         }
     } else {
         return Err(setups::possible_setups_info());
@@ -226,11 +227,7 @@ where
             reductions.insert(0, state.time);
             state.time_series_data.push(reductions);
             state.time_series.next(state.time, time_series_rule);
-            println!(
-                "record time series sample {} (length {})",
-                state.time_series_data.len(),
-                state.time_series_data.last().unwrap().len(),
-            );
+            println!("record time series sample {}", state.time_series_data.len(),);
         }
         if state.checkpoint.is_due(state.time, checkpoint_rule) {
             state.primitive_patches = solvers.iter().map(|s| s.primitive()).collect();

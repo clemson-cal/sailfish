@@ -46,7 +46,7 @@ pub fn possible_setups_info() -> error::Error {
 
 /// Tries to construct a dynamic setup from a string key and model parameter
 /// string.
-/// 
+///
 /// The result is put under `Arc` so it can be attached to solver instances
 /// and shared safely between threads. If no setup matches the given name, a
 /// `PrintUserInformation` error is returned listing the available setups. If
@@ -69,7 +69,7 @@ impl FromStr for Shocktube {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup("setup does not take any parameters".to_string()))
+            Err(InvalidSetup("setup does not take any parameters".into()))
         }
     }
 }
@@ -128,7 +128,7 @@ impl FromStr for Explosion {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup("setup does not take any parameters".to_string()))
+            Err(InvalidSetup("setup does not take any parameters".into()))
         }
     }
 }
@@ -224,6 +224,14 @@ impl Setup for Binary {
             );
         }
         println!("sink rates are [{}, {}]", self.sink_rate1, self.sink_rate2);
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
     }
 
     fn solver_name(&self) -> String {
@@ -394,6 +402,14 @@ impl Setup for BinaryWithThermodynamics {
         4
     }
 
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
             println!(
@@ -411,88 +427,82 @@ impl Setup for BinaryWithThermodynamics {
 
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-        match self.test_model {
-            false => {
-                let r = (x * x + y * y).sqrt();
-                let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
-                let phi_hat_x = -y / r.max(1e-12);
-                let phi_hat_y = x / r.max(1e-12);
-                let d = self.initial_density
-                    * self.density_scaling(rs)
-                    * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
-                let p = self.initial_pressure
-                    * self.pressure_scaling(rs)
-                    * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
-                let u = phi_hat_x / rs.sqrt();
-                let v = phi_hat_y / rs.sqrt();
-                primitive[0] = d;
-                primitive[1] = u;
-                primitive[2] = v;
-                primitive[3] = p;
-            },
-            true => {
-                let r = (x * x + y * y).sqrt();
-                let phi = f64::atan2(x, y);
-                let r1 = ((x - 1.0).powi(2) + (y - 1.0).powi(2)).sqrt();
-                let r2 = ((x + 1.0).powi(2) + (y + 1.0).powi(2)).sqrt();
-                let d = 1.0 + f64::exp(-r1.powi(2));
-                let p = 1.0 + f64::exp(-r2.powi(2));
-                let vp = r.powf(-0.5) * f64::exp(-5.0 / r - r.powi(2) / 3.0);
-                let vr = f64::sin(phi - 3.14159 / 4.0) * f64::exp(-5.0 / r - r.powi(2) / 3.0);
-                let u = vp * (-y / r) + vr * (x / r);
-                let v = vp * (x / r) + vr * (y / r);
-                primitive[0] = d;
-                primitive[1] = u;
-                primitive[2] = v;
-                primitive[3] = p;
-            },
-        } 
+        if !self.test_model {
+            let r = (x * x + y * y).sqrt();
+            let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
+            let phi_hat_x = -y / r.max(1e-12);
+            let phi_hat_y = x / r.max(1e-12);
+            let d = self.initial_density
+                * self.density_scaling(rs)
+                * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
+            let p = self.initial_pressure
+                * self.pressure_scaling(rs)
+                * (0.0001 + 0.9999 * f64::exp(-(2.0 / rs).powi(30)));
+            let u = phi_hat_x / rs.sqrt();
+            let v = phi_hat_y / rs.sqrt();
+            primitive[0] = d;
+            primitive[1] = u;
+            primitive[2] = v;
+            primitive[3] = p;
+        } else {
+            let r = (x * x + y * y).sqrt();
+            let phi = f64::atan2(x, y);
+            let r1 = ((x - 1.0).powi(2) + (y - 1.0).powi(2)).sqrt();
+            let r2 = ((x + 1.0).powi(2) + (y + 1.0).powi(2)).sqrt();
+            let d = 1.0 + f64::exp(-r1.powi(2));
+            let p = 1.0 + f64::exp(-r2.powi(2));
+            let vp = r.powf(-0.5) * f64::exp(-5.0 / r - r.powi(2) / 3.0);
+            let vr = f64::sin(phi - 3.14159 / 4.0) * f64::exp(-5.0 / r - r.powi(2) / 3.0);
+            let u = vp * (-y / r) + vr * (x / r);
+            let v = vp * (x / r) + vr * (y / r);
+            primitive[0] = d;
+            primitive[1] = u;
+            primitive[2] = v;
+            primitive[3] = p;
+        }
     }
 
     fn masses(&self, time: f64) -> PointMassList {
-        match self.one_body {
-            false => {
-                let a: f64 = 1.0;
-                let m: f64 = 1.0;
-                let q: f64 = self.form.get("q").into();
-                let e: f64 = self.form.get("e").into();
-                let binary = OrbitalElements(a, m, q, e);
-                let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
-                let mass1 = PointMass {
-                    x: mass1.position_x(),
-                    y: mass1.position_y(),
-                    vx: mass1.velocity_x(),
-                    vy: mass1.velocity_y(),
-                    mass: mass1.mass(),
-                    rate: self.sink_rate1,
-                    radius: self.sink_radius,
-                    model: self.sink_model,
-                };
-                let mass2 = PointMass {
-                    x: mass2.position_x(),
-                    y: mass2.position_y(),
-                    vx: mass2.velocity_x(),
-                    vy: mass2.velocity_y(),
-                    mass: mass2.mass(),
-                    rate: self.sink_rate2,
-                    radius: self.sink_radius,
-                    model: self.sink_model,
-                };
-                PointMassList::from_slice(&[mass1, mass2])
-            },
-            true => {
-                let mass1 = PointMass {
-                    x: 0.0,
-                    y: 0.0,
-                    vx: 0.0,
-                    vy: 0.0,
-                    mass: 1.0,
-                    rate: self.sink_rate1,
-                    radius: self.sink_radius,
-                    model: self.sink_model,
-                };
-                PointMassList::from_slice(&[mass1])
-            }
+        if !self.one_body {
+            let a: f64 = 1.0;
+            let m: f64 = 1.0;
+            let q: f64 = self.form.get("q").into();
+            let e: f64 = self.form.get("e").into();
+            let binary = OrbitalElements(a, m, q, e);
+            let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
+            let mass1 = PointMass {
+                x: mass1.position_x(),
+                y: mass1.position_y(),
+                vx: mass1.velocity_x(),
+                vy: mass1.velocity_y(),
+                mass: mass1.mass(),
+                rate: self.sink_rate1,
+                radius: self.sink_radius,
+                model: self.sink_model,
+            };
+            let mass2 = PointMass {
+                x: mass2.position_x(),
+                y: mass2.position_y(),
+                vx: mass2.velocity_x(),
+                vy: mass2.velocity_y(),
+                mass: mass2.mass(),
+                rate: self.sink_rate2,
+                radius: self.sink_radius,
+                model: self.sink_model,
+            };
+            PointMassList::from_slice(&[mass1, mass2])
+        } else {
+            let mass1 = PointMass {
+                x: 0.0,
+                y: 0.0,
+                vx: 0.0,
+                vy: 0.0,
+                mass: 1.0,
+                rate: self.sink_rate1,
+                radius: self.sink_radius,
+                model: self.sink_model,
+            };
+            PointMassList::from_slice(&[mass1])
         }
     }
 
@@ -503,27 +513,25 @@ impl Setup for BinaryWithThermodynamics {
     }
 
     fn buffer_zone(&self) -> BufferZone {
-        match self.test_model {
-            false => {
-                let onset_radius = self.domain_radius - 0.1;
-                BufferZone::Keplerian {
-                    surface_density: self.initial_density * self.density_scaling(onset_radius),
-                    surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
-                    central_mass: 1.0,
-                    driving_rate: 1000.0,
-                    outer_radius: self.domain_radius,
-                    onset_width: 0.1,
-                }
-            },
-            true => {
-                BufferZone::Keplerian { //don't change this
-                    surface_density: 1.0,
-                    surface_pressure: 1.0,
-                    central_mass: 0.0,
-                    driving_rate: 10.0,
-                    outer_radius: self.domain_radius,
-                    onset_width: 0.1,
-                }
+        if !self.test_model {
+            let onset_radius = self.domain_radius - 0.1;
+            BufferZone::Keplerian {
+                surface_density: self.initial_density * self.density_scaling(onset_radius),
+                surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
+                central_mass: 1.0,
+                driving_rate: 1000.0,
+                outer_radius: self.domain_radius,
+                onset_width: 0.1,
+            }
+        } else {
+            BufferZone::Keplerian {
+                // don't change this
+                surface_density: 1.0,
+                surface_pressure: 1.0,
+                central_mass: 0.0,
+                driving_rate: 10.0,
+                outer_radius: self.domain_radius,
+                onset_width: 0.1,
             }
         }
     }
@@ -565,7 +573,7 @@ impl Setup for BinaryWithThermodynamics {
 }
 
 /// Sedov-Taylor explosion setup, with tabulated initial condition.
-/// 
+///
 /// This problem uses an ASCII table for the initial data. The table must
 /// contain rows of data with columns `(r, rho, vr, pre)`. The radial
 /// coordinate is that of the cell center. Faces are constructed at the
@@ -573,6 +581,7 @@ impl Setup for BinaryWithThermodynamics {
 pub struct Sedov {
     faces: Vec<f64>,
     table: LookupTable<4>,
+    filename: String,
 }
 
 impl FromStr for Sedov {
@@ -584,8 +593,7 @@ impl FromStr for Sedov {
         let table = if filename.is_empty() {
             Err(InvalidSetup("usage -- sedov:input.dat".to_owned()))
         } else {
-            LookupTable::<4>::from_ascii_file(filename)
-               .map_err(|e| InvalidSetup(format!("{}", e)))
+            LookupTable::<4>::from_ascii_file(filename).map_err(|e| InvalidSetup(format!("{}", e)))
         }?;
 
         if table.len() < 2 {
@@ -599,7 +607,11 @@ impl FromStr for Sedov {
             .chain(cell_centers.windows(2).map(|w| 0.5 * (w[0] + w[1])))
             .chain(once(cell_centers[n - 1] + 0.5 * dxr))
             .collect();
-        Ok(Self { faces, table })
+        Ok(Self {
+            faces,
+            table,
+            filename: filename.to_string(),
+        })
     }
 }
 
@@ -610,6 +622,10 @@ impl Setup for Sedov {
 
     fn solver_name(&self) -> String {
         "euler1d".to_owned()
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.filename.clone()
     }
 
     fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
@@ -650,7 +666,7 @@ impl Setup for Sedov {
 }
 
 /// Collision of counter-propagating planar mass shells.
-/// 
+///
 /// The fluid is non-relativistic. The setup does not have runtime model
 /// parameters, it is hard-coded for a Mach number of 50, a domain extending
 /// from x=-100, to x=100, and the pulses have a mass ratio of 100:1. They
@@ -664,7 +680,7 @@ impl FromStr for PulseCollision {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup("setup does not take any parameters".to_string()))
+            Err(InvalidSetup("setup does not take any parameters".into()))
         }
     }
 }
@@ -729,7 +745,7 @@ impl Setup for PulseCollision {
 
 /// Collision of a fast shell with a wind-like target medium in spherical
 /// geometry.
-/// 
+///
 /// The fluid is non-relativistic. The setup does not have runtime model
 /// parameters yet.
 pub struct FastShell;
@@ -740,7 +756,7 @@ impl FromStr for FastShell {
         if parameters.is_empty() {
             Ok(Self)
         } else {
-            Err(InvalidSetup("setup does not take any parameters".to_string()))
+            Err(InvalidSetup("setup does not take any parameters".into()))
         }
     }
 }

@@ -113,10 +113,11 @@ impl State {
         let filename = format!("{}/chkpt.{:04}.sf", outdir, self.checkpoint.number);
         println!("write {}", filename);
 
+        self.masses = setup.masses(self.time).to_vec();
+        self.parameters = setup.model_parameter_string();
         self.checkpoint
             .next(self.time, self.command_line.checkpoint_rule(setup));
 
-        self.masses = setup.masses(self.time).to_vec();
         create_dir_all(outdir).map_err(error::Error::IOError)?;
         let bytes = rmp_serde::to_vec_named(self).unwrap();
         let mut file = File::create(&filename).map_err(error::Error::IOError)?;
