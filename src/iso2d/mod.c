@@ -96,7 +96,7 @@ static __host__ __device__ void point_mass_source_term(
     real r2 = dx * dx + dy * dy;
     real r2_soft = r2 + rs * rs;
     real dr = sqrt(r2);
-    real mag = sigma * mp / pow(r2_soft, 1.5);
+    real mag = sigma * mp * pow(r2_soft, -1.5);
     real fx = -mag * dx;
     real fy = -mag * dy;
     real sink_rate = 0.0;
@@ -211,7 +211,7 @@ static __host__ __device__ void buffer_source_term(
                 real py = pf * ( xc / rc);
                 real u0[NCONS] = {surface_density, px, py};
 
-                real omega_outer = sqrt(central_mass / pow(onset_radius, 3.0));
+                real omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
                 real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
 
                 for (int q = 0; q < NCONS; ++q)
