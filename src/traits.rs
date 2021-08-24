@@ -207,6 +207,14 @@ pub trait Setup: Send + Sync {
     /// print its configuration to stdout.
     fn print_parameters(&self) {}
 
+    /// This method should be implemented by setups which accept runtime model
+    /// parameters. All setups implement `FromStr` (see the [`crate::setups`]
+    /// module), and that method should be able to restore this setup from the
+    /// string returned by this method.
+    fn model_parameter_string(&self) -> String {
+        String::new()
+    }
+
     /// Invoked by solver modules which support a gravitational field sourced
     /// by point-like test masses.
     /// 
