@@ -74,10 +74,10 @@ struct BufferZone
 
     union
     {
-        struct
+        /* struct
         {
 
-        } none;
+        } none; */
 
         struct
         {
