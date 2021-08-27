@@ -72,7 +72,7 @@ static __host__ __device__ real disk_height(
         real dy = y1 - y0;
         real r2 = dx * dx + dy * dy + 1e-12;
         real r  = sqrt(r2);
-        omegatilde2 += mp / pow(r, 3);
+        omegatilde2 += mp * pow(r, -3.0);
     }
     real sigma = prim[0];
     real pres  = prim[3];
@@ -103,9 +103,9 @@ static __host__ __device__ void point_mass_source_term(
     real r2 = dx * dx + dy * dy;
     real r2_soft = r2 + pow(0.5 * h, 2.0);
     real dr = sqrt(r2);
-    real mag = sigma * mp / r2_soft;
-    real fx = -mag * dx / dr;
-    real fy = -mag * dy / dr;
+    real mag = sigma * mp * pow(r2_soft, -1.5);
+    real fx = -mag * dx;
+    real fy = -mag * dy;
     real vx = prim[1];
     real vy = prim[2];
     real sink_rate = 0.0;
@@ -116,10 +116,10 @@ static __host__ __device__ void point_mass_source_term(
     }
     if (dr < rs)
     {
-        r2_soft = r2 + rs * rs;
-        mag = sigma * mp / r2_soft;
-        fx = -mag * dx / dr;
-        fy = -mag * dy / dr;
+        r2_soft = r2 + pow(max2(rs, 0.5 * h), 2.0);
+        mag = sigma * mp * pow(r2_soft, -1.5);
+        fx = -mag * dx;
+        fy = -mag * dy;
     }
     //if (dr < 1.0 * rs)
     //{
@@ -139,8 +139,8 @@ static __host__ __device__ void point_mass_source_term(
             real vy        = prim[2];
             real vx0       = mass->vx;
             real vy0       = mass->vy;
-            real rhatx     = dx / dr;
-            real rhaty     = dy / dr;
+            real rhatx     = dx / (dr + 1e-12);
+            real rhaty     = dy / (dr + 1e-12);
             real dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
             real vxstar    = dvdotrhat * rhatx + vx0;
             real vystar    = dvdotrhat * rhaty + vy0;
@@ -235,8 +235,9 @@ static __host__ __device__ void buffer_source_term(
                 real energy = surface_pressure / (GAMMA_LAW_INDEX - 1.0) + kinetic_energy;
                 real u0[NCONS] = {surface_density, px, py, energy};
 
-                real omega_outer = sqrt(central_mass / pow(onset_radius, 3.0));
-                real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+                real omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
+                //real buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+                real buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -273,12 +274,12 @@ static __host__ __device__ void cooling_term(
     real gamma = GAMMA_LAW_INDEX;
     real sigma = prim[0];
     real eps = prim[3] / prim[0] / (gamma - 1.0);
-    real eps_cooled = eps * pow(1.0 + 3.0 * cooling_coefficient / pow(sigma, 2.0) * pow(eps,3) * dt, -1.0 / 3.0);
+    real eps_cooled = eps * pow(1.0 + 3.0 * cooling_coefficient * pow(sigma, -2.0) * pow(eps, 3.0) * dt, -1.0 / 3.0);
     real vx = prim[1];
     real vy = prim[2];
 
     real ek = 0.5 * (vx * vx + vy * vy);
-    eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) / pow(mach_ceiling,2));
+    eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) * pow(mach_ceiling, -2.0));
 
     cons[3] += sigma * (eps_cooled - eps);
 }
