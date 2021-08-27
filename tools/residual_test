@@ -4,7 +4,7 @@ import subprocess
 import numpy as np
 import matplotlib.pyplot as plt
 
-long_or_short = str(input("Short test [s] or long test [l]? Short ~ 3 min, Long ~ 20 min   "))
+long_or_short = str(input("Short test [s] or long test [l]?"))
 if long_or_short=='s':
 	tfinal="0.05"
 	nts=59
@@ -16,10 +16,15 @@ else:
 	tfinal="0.05"
 	nts=120
 
+gpu = str(input("Use GPU? [y/n]"))
+
 subprocess.run(["mkdir", "-p", "./tempdir_residual_test/low_res"])
 subprocess.run(["mkdir", "-p", "./tempdir_residual_test/high_res"])
 
-subprocess.run(["cargo run --release --no-default-features binary-therm:sink_model=tf:cooling_coefficient=0.025:gamma_law_index=1.6666666666666666:sink_radius=1.0:sink_rate=0.05:alpha=0.001:domain_radius=6:test_model=true -r2 -c0.00001 -n256 --fold=1 -o./tempdir_residual_test/low_res -e"+tfinal], shell=True)
+if gpu!='y':
+    subprocess.run(["cargo run --release --no-default-features binary-therm:sink_model=tf:cooling_coefficient=0.025:gamma_law_index=1.6666666666666666:sink_radius=1.0:sink_rate=0.05:alpha=0.001:domain_radius=6:test_model=true -r2 -c0.00001 -n256 --fold=1 -o./tempdir_residual_test/low_res -e"+tfinal], shell=True)
+else:
+    subprocess.run(["cargo run --release binary-therm:sink_model=tf:cooling_coefficient=0.025:gamma_law_index=1.6666666666666666:sink_radius=1.0:sink_rate=0.05:alpha=0.001:domain_radius=6:test_model=true -r2 -c0.00001 -n256 --fold=1 -o./tempdir_residual_test/low_res -g -e"+tfinal], shell=True)
 
 fn         = "./tempdir_residual_test/low_res/"
 Nchkpts    = range(0,int(nts+3),1)
@@ -30,7 +35,10 @@ momyres_L2_low = momyres_L2*1
 enres_L2_low   =   enres_L2*1
 t_low          =          t*1
 
-subprocess.run(["cargo run --release --no-default-features binary-therm:sink_model=tf:cooling_coefficient=0.025:gamma_law_index=1.6666666666666666:sink_radius=1:sink_rate=0.05:alpha=0.001:domain_radius=6:test_model=true -r2 -c0.00001 -n512 --fold=1 -o./tempdir_residual_test/high_res -e"+tfinal], shell=True)
+if gpu!='y':
+    subprocess.run(["cargo run --release --no-default-features binary-therm:sink_model=tf:cooling_coefficient=0.025:gamma_law_index=1.6666666666666666:sink_radius=1:sink_rate=0.05:alpha=0.001:domain_radius=6:test_model=true -r2 -c0.00001 -n512 --fold=1 -o./tempdir_residual_test/high_res -e"+tfinal], shell=True)
+else:
+    subprocess.run(["cargo run --release binary-therm:sink_model=tf:cooling_coefficient=0.025:gamma_law_index=1.6666666666666666:sink_radius=1:sink_rate=0.05:alpha=0.001:domain_radius=6:test_model=true -r2 -c0.00001 -n512 --fold=1 -o./tempdir_residual_test/high_res -g -e"+tfinal], shell=True)
 
 fn         = "./tempdir_residual_test/high_res/"
 Nchkpts    = range(0,int(2*nts+2),1)
