@@ -7,3 +7,4 @@ edition = "2018"
 
 [dependencies]
 cc = "1.0"
+which = "4.2.2"

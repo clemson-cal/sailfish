@@ -1,16 +1,27 @@
-use std::env;
-use std::fs;
+//use std::env;
+//use std::fs;
+use which::which;
+
+//fn is_program_in_path(program: &str) -> bool {
+//    if let Ok(path) = env::var("PATH") {
+//        for p in path.split(":") { //should be ; generally, but corrected for now for windows
+//            let p_str = format!("{}/{}", p, program);
+//            println!("{}", p_str); //for testing purposes; remove later
+//            if fs::metadata(p_str).is_ok() {
+//                return true;
+//            }
+//        }
+//    }
+//    false
+//}
 
 fn is_program_in_path(program: &str) -> bool {
-    if let Ok(path) = env::var("PATH") {
-        for p in path.split(":") {
-            let p_str = format!("{}/{}", p, program);
-            if fs::metadata(p_str).is_ok() {
-                return true;
-            }
-        }
+    let result = which(program);
+    if result.is_ok(){
+        return true;
+    } else {
+        return false;
     }
-    false
 }
 
 pub enum Platform {
@@ -34,6 +45,8 @@ impl Platform {
         match self {
             Platform::NoGpu => {}
             Platform::Cuda => {
+                //The line below this one is temporarily hard-coded in
+                println!("cargo:rustc-link-search=native=C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.3/lib/x64");
                 println!("cargo:rustc-link-lib=dylib=cudart");
             }
             Platform::Rocm => {
