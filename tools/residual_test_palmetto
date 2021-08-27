@@ -10,11 +10,11 @@ if long_or_short=='s':
 	nts=59
 elif long_or_short=='l':
 	tfinal="0.25"
-	nts=669
+	nts=290
 else:
 	print("Input wasn't s or l. Assuming s.")
 	tfinal="0.05"
-	nts=120
+	nts=59
 
 gpu = str(input("Use GPU? [y/n]"))
 
