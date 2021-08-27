@@ -28,7 +28,7 @@ else:
 
 fn         = "./tempdir_residual_test/low_res/"
 Nchkpts    = range(0,int(nts+3),1)
-exec(open('indep_res_analysis.py').read())
+exec(open('indep_res_analysis_palmetto.py').read())
 rhores_L2_low  =  rhores_L2*1
 momxres_L2_low = momxres_L2*1
 momyres_L2_low = momyres_L2*1
@@ -42,7 +42,7 @@ else:
 
 fn         = "./tempdir_residual_test/high_res/"
 Nchkpts    = range(0,int(2*nts+2),1)
-exec(open('./indep_res_analysis.py').read())
+exec(open('./indep_res_analysis_palmetto.py').read())
 rhores_L2_high  =  rhores_L2*1
 momxres_L2_high = momxres_L2*1
 momyres_L2_high = momyres_L2*1
