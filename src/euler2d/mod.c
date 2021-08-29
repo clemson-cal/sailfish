@@ -1128,7 +1128,7 @@ EXTERN_C void euler2d_advance_rk(
                     cooling_coefficient,
                     mach_ceiling,
                     density_floor,
-                    pressure_floor
+                    pressure_floor,
                     constant_softening
                 );
             } else {
