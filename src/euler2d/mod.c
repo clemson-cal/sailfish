@@ -1129,7 +1129,7 @@ EXTERN_C void euler2d_advance_rk(
                     mach_ceiling,
                     density_floor,
                     pressure_floor
-                    constant_softening,
+                    constant_softening
                 );
             } else {
                 advance_rk_kernel<<<bd, bs>>>(
@@ -1148,7 +1148,7 @@ EXTERN_C void euler2d_advance_rk(
                     mach_ceiling,
                     density_floor,
                     pressure_floor,
-                    constant_softening,
+                    constant_softening
                 );
             }
             #endif
