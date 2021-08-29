@@ -167,7 +167,8 @@ pub struct Binary {
     pub domain_radius: f64,
     pub nu: f64,
     pub mach_number: f64,
-    pub sink_radius: f64,
+    pub sink_radius1: f64,
+    pub sink_radius2: f64,
     pub sink_rate1: f64,
     pub sink_rate2: f64,
     pub sink_model: SinkModel,
@@ -183,24 +184,28 @@ impl FromStr for Binary {
             .item("domain_radius", 12.0, "half-size of the simulation domain (a)")
             .item("nu",            1e-3, "kinematic viscosity coefficient (Omega a^2)")
             .item("mach_number",   10.0, "mach number for locally isothermal EOS")
-            .item("sink_radius",   0.05, "sink kernel radius (a)")
+            .item("sink_radius", "0.05", "sink kernel radii (a)")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
-            .item("sink_rate",   "10.0", "rate of mass subtraction in the sink (Omega)")
+            .item("sink_rate",   "10.0", "rate(s) of mass subtraction in the sink (Omega)")
             .item("q",              1.0, "system mass ratio: [0-1]")
             .item("e",              0.0, "orbital eccentricity: [0-1]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sr1, sr2) =
+        let (sradius1, sradius2) =
+            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+
+        let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             mach_number: form.get("mach_number").into(),
-            sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sr1.unwrap(),
-            sink_rate2: sr2.or(sr1).unwrap(),
+            sink_radius1: sradius1.unwrap(),
+            sink_radius2: sradius2.or(sradius1).unwrap(),
+            sink_rate1: srate1.unwrap(),
+            sink_rate2: srate2.or(srate1).unwrap(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             form,
         })
@@ -221,6 +226,7 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
+        println!("sink radii are [{}, {}]", self.sink_radius1, self.sink_radius2);
         println!("sink rates are [{}, {}]", self.sink_rate1, self.sink_rate2);
     }
 
@@ -243,7 +249,7 @@ impl Setup for Binary {
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
-        let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
+        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt();//use primary sink radius for both masses
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
         let d = 1.0;
@@ -268,7 +274,7 @@ impl Setup for Binary {
             vy: mass1.velocity_y(),
             mass: mass1.mass(),
             rate: self.sink_rate1,
-            radius: self.sink_radius,
+            radius: self.sink_radius1,
             model: self.sink_model,
         };
         let mass2 = PointMass {
@@ -278,7 +284,7 @@ impl Setup for Binary {
             vy: mass2.velocity_y(),
             mass: mass2.mass(),
             rate: self.sink_rate2,
-            radius: self.sink_radius,
+            radius: self.sink_radius2,
             model: self.sink_model,
         };
         PointMassList::from_slice(&[mass1, mass2])
@@ -313,7 +319,8 @@ impl Setup for Binary {
 pub struct BinaryWithThermodynamics {
     pub domain_radius: f64,
     pub alpha: f64,
-    pub sink_radius: f64,
+    pub sink_radius1: f64,
+    pub sink_radius2: f64,
     pub sink_rate1: f64,
     pub sink_rate2: f64,
     pub sink_model: SinkModel,
@@ -339,9 +346,9 @@ impl FromStr for BinaryWithThermodynamics {
         let form = kind_config::Form::new()
             .item("domain_radius",      12.0, "half-size of the simulation domain (a)")
             .item("alpha",               0.1, "alpha-viscosity coefficient (dimensionless)")
-            .item("sink_radius",        0.05, "sink kernel radius (a)")
+            .item("sink_radius",      "0.05", "sink kernel radii (a)")
             .item("sink_model",         "af", "sink prescription: [none|af|tf|ff]")
-            .item("sink_rate",        "10.0", "rate of mass subtraction in the sink (Omega)")
+            .item("sink_rate",        "10.0", "rate(s) of mass subtraction in the sink (Omega)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
             .item("gamma_law_index",     1.666666666666666, "adiabatic index")
@@ -358,15 +365,19 @@ impl FromStr for BinaryWithThermodynamics {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sr1, sr2) =
+        let (sradius1, sradius2) =
+            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+
+        let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             alpha: form.get("alpha").into(),
-            sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sr1.unwrap(),
-            sink_rate2: sr2.or(sr1).unwrap(),
+            sink_radius1: sradius1.unwrap(),
+            sink_radius2: sradius2.or(sradius1).unwrap(),
+            sink_rate1: srate1.unwrap(),
+            sink_rate2: srate2.or(srate1).unwrap(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             gamma_law_index: form.get("gamma_law_index").into(),
             cooling_coefficient: form.get("cooling_coefficient").into(),
@@ -430,7 +441,7 @@ impl Setup for BinaryWithThermodynamics {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if !self.test_model {
             let r = (x * x + y * y).sqrt();
-            let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
+            let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt();
             let phi_hat_x = -y / r.max(1e-12);
             let phi_hat_y = x / r.max(1e-12);
             let d = self.initial_density
@@ -478,7 +489,7 @@ impl Setup for BinaryWithThermodynamics {
                 vy: mass1.velocity_y(),
                 mass: mass1.mass(),
                 rate: self.sink_rate1,
-                radius: self.sink_radius,
+                radius: self.sink_radius1,
                 model: self.sink_model,
             };
             let mass2 = PointMass {
@@ -488,7 +499,7 @@ impl Setup for BinaryWithThermodynamics {
                 vy: mass2.velocity_y(),
                 mass: mass2.mass(),
                 rate: self.sink_rate2,
-                radius: self.sink_radius,
+                radius: self.sink_radius2,
                 model: self.sink_model,
             };
             PointMassList::from_slice(&[mass1, mass2])
@@ -500,7 +511,7 @@ impl Setup for BinaryWithThermodynamics {
                 vy: 0.0,
                 mass: 1.0,
                 rate: self.sink_rate1,
-                radius: self.sink_radius,
+                radius: self.sink_radius1,
                 model: self.sink_model,
             };
             PointMassList::from_slice(&[mass1])
