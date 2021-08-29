@@ -260,6 +260,10 @@ pub trait Setup: Send + Sync {
         None
     }
 
+    fn constant_softening(&self) -> Option<bool> {
+        None
+    }
+
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
         match mesh {
             Mesh::Structured(_) => {

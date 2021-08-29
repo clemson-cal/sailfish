@@ -26,6 +26,7 @@ extern "C" {
         mach_ceiling: f64,
         density_floor: f64,
         pressure_floor: f64,
+        constant_softening: bool,
         mode: ExecutionMode,
     );
 
@@ -36,6 +37,7 @@ extern "C" {
         mass_list: PointMassList,
         mass: PointMass,
         mode: ExecutionMode,
+        constant_softening: bool,
     );
 
     pub fn euler2d_wavespeed(
