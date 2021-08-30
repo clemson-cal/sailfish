@@ -1,6 +1,5 @@
 use crate::error::Error;
-use crate::Setup;
-use crate::{BoundaryCondition, Coordinates, ExecutionMode, Solve};
+use crate::{BoundaryCondition, Coordinates, ExecutionMode, Setup, Solve};
 use cfg_if::cfg_if;
 
 extern "C" {

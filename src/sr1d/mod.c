@@ -296,12 +296,13 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct BoundaryCondition bc,
     enum Coordinates coords,
     real a,
     real dt,
     int i)
 {
-    if (i == 0) {
+    if (bc.type == Inflow) {
         return;
     }
     int ni = face_positions.count - 1;
@@ -393,6 +394,7 @@ static void __global__ advance_rk_kernel(
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
+    struct BoundaryCondition bc,
     enum Coordinates coords,
     real a,
     real dt)
@@ -401,7 +403,7 @@ static void __global__ advance_rk_kernel(
 
     if (i < primitive_wr.count)
     {
-        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, coords, a, dt, i);
+        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt, i);
     }
 }
 
@@ -503,7 +505,7 @@ EXTERN_C void sr1d_advance_rk(
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, coords, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt, i);
             }
             break;
         }
@@ -511,7 +513,7 @@ EXTERN_C void sr1d_advance_rk(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, coords, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt, i);
             }
             #endif
             break;
@@ -521,7 +523,7 @@ EXTERN_C void sr1d_advance_rk(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, coords, a, dt);
+            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt);
             #endif
             break;
         }
