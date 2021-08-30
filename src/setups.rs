@@ -3,10 +3,7 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::{
-    BufferZone, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
-    StructuredMesh,
-};
+use crate::{BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel, StructuredMesh};
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
@@ -30,6 +27,7 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("pulse-collision", setup_builder!(PulseCollision)),
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
+        ("wind", setup_builder!(Wind)),
     ]
 }
 
@@ -292,8 +290,8 @@ impl Setup for Binary {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+    fn boundary_condition(&self) -> BoundaryCondition {
+        BoundaryCondition::Default
     }
 
     fn viscosity(&self) -> Option<f64> {
@@ -515,10 +513,10 @@ impl Setup for BinaryWithThermodynamics {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
+    fn boundary_condition(&self) -> BoundaryCondition {
         if !self.test_model {
             let onset_radius = self.domain_radius - 0.1;
-            BufferZone::Keplerian {
+            BoundaryCondition::KeplerianBuffer {
                 surface_density: self.initial_density * self.density_scaling(onset_radius),
                 surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
                 central_mass: 1.0,
@@ -527,7 +525,7 @@ impl Setup for BinaryWithThermodynamics {
                 onset_width: 0.1,
             }
         } else {
-            BufferZone::Keplerian {
+            BoundaryCondition::KeplerianBuffer {
                 // don't change this
                 surface_density: 1.0,
                 surface_pressure: 1.0,
@@ -648,8 +646,8 @@ impl Setup for Sedov {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+    fn boundary_condition(&self) -> BoundaryCondition {
+        BoundaryCondition::Default
     }
 
     fn viscosity(&self) -> Option<f64> {
@@ -817,15 +815,63 @@ impl Setup for FastShell {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        let num_decades = 2;
-        let zones_per_decade = resolution;
-        let r_inner = 1.0;
+        Mesh::logarithmic_radial(2, resolution)
+    }
 
-        let faces = (0..(zones_per_decade * num_decades + 1) as u32)
-            .map(|i| r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64))
-            .collect();
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::SphericalPolar
+    }
 
-        Mesh::FacePositions1D(faces)
+    fn end_time(&self) -> Option<f64> {
+        Some(1.0)
+    }
+}
+
+/// A spherical wind setup.
+pub struct Wind;
+
+impl FromStr for Wind {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self)
+        } else {
+            Err(InvalidSetup("setup does not take any parameters".into()))
+        }
+    }
+}
+
+impl Setup for Wind {
+    fn num_primitives(&self) -> usize {
+        3
+    }
+
+    fn solver_name(&self) -> String {
+        "sr1d".to_owned()
+    }
+
+    fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
+        let rho = r.powi(-2);
+        let vel = 1.0;
+        let pre = 1e-6 * rho;
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = pre;
+    }
+
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 4.0 / 3.0,
+        }
+    }
+
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::logarithmic_radial(2, resolution)
+    }
+
+    fn boundary_condition(&self) -> BoundaryCondition {
+        BoundaryCondition::Inflow
     }
 
     fn coordinate_system(&self) -> Coordinates {

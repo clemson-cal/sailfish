@@ -3,6 +3,7 @@ pub mod error;
 pub mod euler1d;
 pub mod euler2d;
 pub mod iso2d;
+pub mod sr1d;
 pub mod lookup_table;
 pub mod mesh;
 pub mod parse;
@@ -162,9 +163,10 @@ impl Default for PointMassList {
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub enum BufferZone {
-    NoBuffer,
-    Keplerian {
+pub enum BoundaryCondition {
+    Default,
+    Inflow,
+    KeplerianBuffer {
         surface_density: f64,
         surface_pressure: f64,
         central_mass: f64,

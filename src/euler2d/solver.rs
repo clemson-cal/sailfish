@@ -82,7 +82,7 @@ impl Solver {
                 self.primitive1.as_ptr(),
                 self.primitive2.as_mut_ptr(),
                 self.setup.equation_of_state(),
-                self.setup.buffer_zone(),
+                self.setup.boundary_condition(),
                 self.setup.masses(self.time),
                 self.setup.viscosity().unwrap_or(0.0),
                 a,

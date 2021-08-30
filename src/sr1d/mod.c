@@ -22,7 +22,7 @@
 // ============================================================================
 #define NCONS 3
 #define PLM_THETA 2.0
-#define ADIABATIC_GAMMA (5.0 / 3.0)
+#define ADIABATIC_GAMMA (4.0 / 3.0)
 
 
 // ============================ MATH ==========================================
@@ -64,60 +64,116 @@ static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real 
 
 // ============================ HYDRO =========================================
 // ============================================================================
+static __host__ __device__ real primitive_to_gamma_beta_squared(const real *prim)
+{
+    const real u1 = prim[1];
+    return u1 * u1;
+}
+
+static __host__ __device__ real primitive_to_lorentz_factor(const real *prim)
+{
+    return sqrt(1.0 + primitive_to_gamma_beta_squared(prim));
+}
+
+static __host__ __device__ real primitive_to_gamma_beta_component(const real *prim)
+{
+    return prim[1];
+}
+
+static __host__ __device__ real primitive_to_beta_component(const real *prim)
+{
+    const real w = primitive_to_lorentz_factor(prim);
+    return prim[1] / w;
+}
+
+static __host__ __device__ real primitive_to_enthalpy_density(const real* prim)
+{
+    const real rho = prim[0];
+    const real pre = prim[2];
+    return rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
+}
+
 static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
-    const real rho = cons[0];
-    const real px = cons[1];
-    const real energy = cons[2];
+    const real newton_iter_max = 50;
+    const real error_tolerance = 1e-12 * cons[0];
+    const real gm              = ADIABATIC_GAMMA;
+    const real m               = cons[0];
+    const real tau             = cons[2];
+    const real ss              = cons[1] * cons[1];
+    int iteration              = 0;
+    real p                     = prim[2];
+    real w0;
 
-    const real vx = px / rho;
-    const real kinetic_energy = 0.5 * rho * vx * vx;
-    const real thermal_energy = energy - kinetic_energy;
-    const real pressure = thermal_energy * (ADIABATIC_GAMMA - 1.0);
+    while (1) {
+        const real et = tau + p + m;
+        const real b2 = min2(ss / et / et, 1.0 - 1e-10);
+        const real w2 = 1.0 / (1.0 - b2);
+        const real w  = sqrt(w2);
+        const real e  = (tau + m * (1.0 - w) + p * (1.0 - w2)) / (m * w);
+        const real d  = m / w;
+        const real h  = 1.0 + e + p / d;
+        const real a2 = gm * p / (d * h);
+        const real f  = d * e * (gm - 1.0) - p;
+        const real g  = b2 * a2 - 1.0;
 
-    prim[0] = rho;
-    prim[1] = vx;
-    prim[2] = pressure;
+        p -= f / g;
+
+        if (fabs(f) < error_tolerance || iteration == newton_iter_max) {
+            w0 = w;
+            break;
+        }
+        iteration += 1;
+    }
+    prim[0] = m / w0;
+    prim[1] = w0 * cons[1] / (tau + m + p);
+    prim[2] = p;
 }
 
 static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons)
 {
     const real rho = prim[0];
-    const real vx = prim[1];
-    const real pressure = prim[2];
+    const real u1 = prim[1];
+    const real pre = prim[2];
 
-    const real px = vx * rho;
-    const real kinetic_energy = 0.5 * rho * vx * vx;
-    const real thermal_energy = pressure / (ADIABATIC_GAMMA - 1.0);
+    const real w = primitive_to_lorentz_factor(prim);
+    const real h = primitive_to_enthalpy_density(prim) / rho;
+    const real m = rho * w;
 
-    cons[0] = rho;
-    cons[1] = px;
-    cons[2] = kinetic_energy + thermal_energy;
+    cons[0] = m;
+    cons[1] = m * h * u1;
+    cons[2] = m * (h * w - 1.0) - pre;
 }
 
 static __host__ __device__ void primitive_to_flux(const real *prim, const real *cons, real *flux)
 {
-    const real vn = prim[1];
-    const real pressure = prim[2];
+    const real vn = primitive_to_beta_component(prim);
+    const real pre = prim[2];
 
     flux[0] = vn * cons[0];
-    flux[1] = vn * cons[1] + pressure;
-    flux[2] = vn * cons[2] + pressure * vn;
+    flux[1] = vn * cons[1] + pre;
+    flux[2] = vn * cons[2] + pre * vn;
 }
 
 static __host__ __device__ real primitive_to_sound_speed_squared(const real *prim)
 {
-    const real rho = prim[0];
-    const real pressure = prim[2];
-    return ADIABATIC_GAMMA * pressure / rho;
+    const real pre = prim[2];
+    const real rho_h = primitive_to_enthalpy_density(prim);
+    return ADIABATIC_GAMMA * pre / rho_h;
 }
 
 static __host__ __device__ void primitive_to_outer_wavespeeds(const real *prim, real *wavespeeds)
 {
-    const real cs = sqrt(primitive_to_sound_speed_squared(prim));
-    const real vn = prim[1];
-    wavespeeds[0] = vn - cs;
-    wavespeeds[1] = vn + cs;
+    const real a2 = primitive_to_sound_speed_squared(prim);
+    const real un = primitive_to_gamma_beta_component(prim);
+    const real uu = primitive_to_gamma_beta_squared(prim);
+    const real vv = uu / (1.0 + uu);
+    const real v2 = un * un / (1.0 + uu);
+    const real vn = sqrt(v2);
+    const real k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
+
+    wavespeeds[0] = (vn * (1.0 - a2) - k0) / (1.0 - vv * a2);
+    wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
 }
 
 static __host__ __device__ real primitive_to_max_wavespeed(const real *prim)
@@ -378,7 +434,7 @@ static void __global__ wavespeed_kernel(
  * @param primitive_ptr[out] [0] [ni] [3]
  * @param mode               The execution mode
  */
-EXTERN_C void euler1d_primitive_to_conserved(
+EXTERN_C void sr1d_primitive_to_conserved(
     int num_zones,
     real *primitive_ptr,
     real *conserved_ptr,
@@ -429,7 +485,7 @@ EXTERN_C void euler1d_primitive_to_conserved(
  * @param coords                 The coordinate system
  * @param mode                   The execution mode
  */
-EXTERN_C void euler1d_advance_rk(
+EXTERN_C void sr1d_advance_rk(
     int num_zones,
     real *face_positions_ptr,
     real *conserved_rk_ptr,
@@ -481,7 +537,7 @@ EXTERN_C void euler1d_advance_rk(
  * @param wavespeed_ptr[out]  [num_zones] [1]
  * @param mode                The execution mode
  */
-EXTERN_C void euler1d_wavespeed(
+EXTERN_C void sr1d_wavespeed(
     int num_zones,
     real *primitive_ptr,
     real *wavespeed_ptr,
@@ -525,7 +581,7 @@ EXTERN_C void euler1d_wavespeed(
  * @param primitive_ptr[in]   [num_zones] [3]
  * @param mode                The execution mode
  */
-EXTERN_C real euler1d_max_wavespeed(
+EXTERN_C real sr1d_max_wavespeed(
     int num_zones,
     real *primitive_ptr,
     enum ExecutionMode mode)
@@ -553,7 +609,7 @@ EXTERN_C real euler1d_max_wavespeed(
             break;
         }
 
-        case GPU: break; // Not implemented, use euler1d_wavespeed
+        case GPU: break; // Not implemented, use sr1d_wavespeed
                          // followed by a GPU reduction.
     }
     return a_max;
