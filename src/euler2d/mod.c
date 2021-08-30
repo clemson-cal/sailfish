@@ -1,5 +1,4 @@
 #include <math.h>
-#include <stdbool.h>
 #include "../sailfish.h"
 
 
@@ -89,7 +88,7 @@ static __host__ __device__ void point_mass_source_term(
     real *prim,
     real h,
     real *delta_cons,
-    bool constant_softening)
+    int constant_softening)
 {
     real x0 = mass->x;
     real y0 = mass->y;
@@ -185,7 +184,7 @@ static __host__ __device__ void point_masses_source_term(
     real *prim,
     real h,
     real *cons,
-    bool constant_softening)
+    int constant_softening)
 {
     for (int p = 0; p < mass_list->count; ++p)
     {
@@ -478,7 +477,7 @@ static __host__ __device__ void advance_rk_zone(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
-    bool constant_softening,
+    int constant_softening,
     int i,
     int j)
 {
@@ -657,7 +656,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
-    bool constant_softening,
+    int constant_softening,
     int i,
     int j)
 {
@@ -750,7 +749,7 @@ static __host__ __device__ void point_mass_source_term_zone(
     struct Patch cons_rate,
     struct PointMassList mass_list,
     struct PointMass mass,
-    bool constant_softening,
+    int constant_softening,
     int i,
     int j)
 {
@@ -810,7 +809,7 @@ static void __global__ advance_rk_kernel(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
-    bool constant_softening)
+    int constant_softening)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -855,7 +854,7 @@ static void __global__ advance_rk_kernel_inviscid(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
-    bool constant_softening)
+    int constant_softening)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -890,7 +889,7 @@ static void __global__ point_mass_source_term_kernel(
     struct Patch cons_rate,
     struct PointMassList mass_list,
     struct PointMass mass,
-    bool constant_softening)
+    int constant_softening)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -1006,7 +1005,7 @@ EXTERN_C void euler2d_advance_rk(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
-    bool constant_softening,
+    int constant_softening,
     enum ExecutionMode mode)
 {
     struct Patch conserved_rk = patch(mesh, NCONS, 0, conserved_rk_ptr);
@@ -1176,7 +1175,7 @@ EXTERN_C void euler2d_point_mass_source_term(
     struct PointMassList mass_list,
     struct PointMass mass,
     enum ExecutionMode mode,
-    bool constant_softening)
+    int constant_softening)
 {
     struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
     struct Patch cons_rate = patch(mesh, NCONS, 0, cons_rate_ptr);

@@ -92,7 +92,7 @@ impl Solver {
                 self.setup.mach_ceiling().unwrap_or(1e5),
                 self.setup.density_floor().unwrap_or(0.0),
                 self.setup.pressure_floor().unwrap_or(0.0),
-                self.setup.constant_softening().unwrap_or(false),
+                self.setup.constant_softening().unwrap_or(false) as i32,
                 self.mode,
             );
         });
@@ -164,7 +164,7 @@ impl PatchBasedSolve for Solver {
                     mass_list,
                     mass,
                     self.mode,
-                    self.setup.constant_softening().unwrap_or(false),
+                    self.setup.constant_softening().unwrap_or(false) as i32,
                 )
             });
             let mut udot = cons_rate
