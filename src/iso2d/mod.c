@@ -850,8 +850,7 @@ EXTERN_C void iso2d_primitive_to_conserved(
  * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [3]
  * @param eos                   The EOS
  * @param buffer                The buffer region
- * @param masses[in]            A pointer a list of point mass objects
- * @param num_masses            The number of point masses
+ * @param mass_list             A list of point mass objects
  * @param nu                    The viscosity coefficient
  * @param a                     The RK averaging parameter
  * @param dt                    The time step
@@ -1047,8 +1046,7 @@ EXTERN_C void iso2d_point_mass_source_term(
  * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [3]
  * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
  * @param eos                 The EOS
- * @param masses[in]          A pointer a list of point mass objects
- * @param num_masses          The number of point masses
+ * @param mass_list           A list of point mass objects
  * @param mode                The execution mode
  */
 EXTERN_C void iso2d_wavespeed(

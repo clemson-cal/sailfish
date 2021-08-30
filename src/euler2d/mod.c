@@ -102,11 +102,7 @@ static __host__ __device__ void point_mass_source_term(
     real dx = x1 - x0;
     real dy = y1 - y0;
     real r2 = dx * dx + dy * dy;
-    real softening_length = rs;
-    if (!constant_softening)
-    {
-        softening_length = 0.5 * h;
-    }
+    real softening_length = constant_softening ? rs : 0.5 * h;
     real r2_soft = r2 + pow(softening_length, 2.0);
     real dr = sqrt(r2);
     real mag = sigma * mp * pow(r2_soft, -1.5);
@@ -976,9 +972,8 @@ EXTERN_C void euler2d_primitive_to_conserved(
  * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
  * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [4]
  * @param eos                   The EOS
- * @param bc                The bc region
- * @param masses[in]            A pointer a list of point mass objects
- * @param num_masses            The number of point masses
+ * @param bc                    The boundary condition type
+ * @param mass_list             A list of point mass objects
  * @param alpha                 The alpha-viscosity parameter
  * @param a                     The RK averaging parameter
  * @param dt                    The time step
@@ -987,6 +982,7 @@ EXTERN_C void euler2d_primitive_to_conserved(
  * @param mach_ceiling          Safety parameters
  * @param density_floor         Safety parameters
  * @param pressure_floor        Safety parameters
+ * @param constant_softening    Ignore local disk height (use softening radius only)
  * @param mode                  The execution mode
  */
 EXTERN_C void euler2d_advance_rk(
@@ -1165,8 +1161,10 @@ EXTERN_C void euler2d_advance_rk(
  * @param mesh                The mesh [ni,     nj]
  * @param primitive_ptr[in]   [-2, -2] [ni + 4, nj + 4] [4]
  * @param cons_rate_ptr[out]  [ 0,  0] [ni,     nj]     [1]
+ * @param mass_list           A list of point mass objects
  * @param mass                A point mass
  * @param mode                The execution mode
+ * @param constant_softening  Ignore local disk height (use softening radius only)
  */
 EXTERN_C void euler2d_point_mass_source_term(
     struct Mesh mesh,
@@ -1211,9 +1209,9 @@ EXTERN_C void euler2d_point_mass_source_term(
 
 /**
  * Fill a buffer with the maximum wavespeed in each zone.
- * @param  mesh               The mesh [ni,     nj]
- * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
- * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
+ * @param mesh                The mesh [ni,     nj]
+ * @param primitive_ptr[in]   [-2, -2] [ni + 4, nj + 4] [4]
+ * @param wavespeed_ptr[out]  [ 0,  0] [ni,     nj]     [1]
  * @param eos                 The EOS
  * @param mode                The execution mode
  */
