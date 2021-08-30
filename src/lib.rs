@@ -3,6 +3,7 @@ pub mod error;
 pub mod euler1d;
 pub mod euler2d;
 pub mod iso2d;
+pub mod sr1d;
 pub mod lookup_table;
 pub mod mesh;
 pub mod parse;
