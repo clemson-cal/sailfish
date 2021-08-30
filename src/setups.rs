@@ -329,6 +329,7 @@ pub struct BinaryWithThermodynamics {
     pub mach_ceiling: f64,
     pub test_model: bool,
     pub one_body: bool,
+    pub constant_softening: bool,
     form: kind_config::Form,
 }
 
@@ -355,6 +356,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
             .item("test_model",        false, "use test model")
             .item("one_body",          false, "use one point mass")
+            .item("constant_softening",false, "use constant gravitational softening = sink_radius")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -378,6 +380,7 @@ impl FromStr for BinaryWithThermodynamics {
             mach_ceiling: form.get("mach_ceiling").into(),
             test_model: form.get("test_model").into(),
             one_body: form.get("one_body").into(),
+            constant_softening: form.get("constant_softening").into(),
             form,
         })
     }
@@ -558,6 +561,10 @@ impl Setup for BinaryWithThermodynamics {
 
     fn pressure_floor(&self) -> Option<f64> {
         Some(self.pressure_floor)
+    }
+
+    fn constant_softening(&self) -> Option<bool> {
+        Some(self.constant_softening)
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
