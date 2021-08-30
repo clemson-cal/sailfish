@@ -64,7 +64,7 @@ impl CommandLine {
             match state {
                 State::Ready => match arg.as_str() {
                     "--version" => {
-                        return Err(PrintUserInformation("sailfish 0.3.0\n".to_string()));
+                        return Err(PrintUserInformation(crate::sailfish_version() + "\n"));
                     }
 
                     #[rustfmt::skip]

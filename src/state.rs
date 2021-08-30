@@ -70,6 +70,9 @@ pub struct State {
 
     #[serde(default)]
     pub time_series_data: Vec<Vec<f64>>,
+
+    #[serde(default)]
+    pub version: String,
 }
 
 impl State {
@@ -93,6 +96,7 @@ impl State {
         state.parameters += new_parameters;
         state.restart_file = Some(filename.to_string());
         state.command_line.update(&command_line)?;
+        state.version = crate::sailfish_version();
 
         Ok(state)
     }

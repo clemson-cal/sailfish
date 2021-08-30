@@ -53,7 +53,7 @@ extern "C" void gpu_memcpy_peer(void *dst, int dst_device, const void *src, int 
     cudaMemcpyPeer(dst, dst_device, src, src_device, size);
 #else
     hipMemcpyPeer(dst, dst_device, src, src_device, size);
-#endif    
+#endif
 }
 
 extern "C" void gpu_device_synchronize()

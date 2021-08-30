@@ -23,6 +23,12 @@ use cfg_if::cfg_if;
 use std::ops::Range;
 use std::str::FromStr;
 
+/// Returns the current version number (should be consistent with Cargo
+/// meta-data).
+pub fn sailfish_version() -> String {
+    "sailfish version 0.3.1".to_owned()
+}
+
 /// Execution modes. These modes are referenced by Rust driver code, and by
 /// solver code written in C.
 #[repr(C)]

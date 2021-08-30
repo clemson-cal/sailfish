@@ -91,6 +91,7 @@ fn new_state(
         setup_name: setup_name.to_string(),
         parameters: parameters.to_string(),
         masses: setup.masses(setup.initial_time()).to_vec(),
+        version: sailfish::sailfish_version(),
     };
     Ok(state)
 }
