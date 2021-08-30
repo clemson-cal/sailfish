@@ -182,26 +182,26 @@ static __host__ __device__ real sound_speed_squared(
 }
 
 static __host__ __device__ void buffer_source_term(
-    struct BufferZone *buffer,
+    struct BoundaryCondition *bc,
     real xc,
     real yc,
     real dt,
     real *cons)
 {
-    switch (buffer->type)
+    switch (bc->type)
     {
-        case None:
-        {
+        case Default:
+        case Inflow:
             break;
-        }
-        case Keplerian:
+
+        case KeplerianBuffer:
         {
             real rc = sqrt(xc * xc + yc * yc);
-            real surface_density = buffer->keplerian.surface_density;
-            real central_mass = buffer->keplerian.central_mass;
-            real driving_rate = buffer->keplerian.driving_rate;
-            real outer_radius = buffer->keplerian.outer_radius;
-            real onset_width = buffer->keplerian.onset_width;
+            real surface_density = bc->keplerian_buffer.surface_density;
+            real central_mass = bc->keplerian_buffer.central_mass;
+            real driving_rate = bc->keplerian_buffer.driving_rate;
+            real outer_radius = bc->keplerian_buffer.outer_radius;
+            real onset_width = bc->keplerian_buffer.onset_width;
             real onset_radius = outer_radius - onset_width;
 
             if (rc > onset_radius)
@@ -393,7 +393,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition buffer,
     struct PointMassList mass_list,
     real nu,
     real a,
@@ -545,7 +545,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition buffer,
     struct PointMassList mass_list,
     real a,
     real dt,
@@ -695,7 +695,7 @@ static void __global__ advance_rk_kernel(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition buffer,
     struct PointMassList mass_list,
     real nu,
     real a,
@@ -730,7 +730,7 @@ static void __global__ advance_rk_kernel_inviscid(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition buffer,
     struct PointMassList mass_list,
     real a,
     real dt,
@@ -863,7 +863,7 @@ EXTERN_C void iso2d_advance_rk(
     real *primitive_rd_ptr,
     real *primitive_wr_ptr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition buffer,
     struct PointMassList mass_list,
     real nu,
     real a,

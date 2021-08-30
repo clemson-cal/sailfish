@@ -3,10 +3,7 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::{
-    BufferZone, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
-    StructuredMesh,
-};
+use crate::{BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel, StructuredMesh};
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
@@ -293,8 +290,8 @@ impl Setup for Binary {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+    fn buffer_zone(&self) -> BoundaryCondition {
+        BoundaryCondition::Default
     }
 
     fn viscosity(&self) -> Option<f64> {
@@ -513,10 +510,10 @@ impl Setup for BinaryWithThermodynamics {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
+    fn buffer_zone(&self) -> BoundaryCondition {
         if !self.test_model {
             let onset_radius = self.domain_radius - 0.1;
-            BufferZone::Keplerian {
+            BoundaryCondition::KeplerianBuffer {
                 surface_density: self.initial_density * self.density_scaling(onset_radius),
                 surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
                 central_mass: 1.0,
@@ -525,7 +522,7 @@ impl Setup for BinaryWithThermodynamics {
                 onset_width: 0.1,
             }
         } else {
-            BufferZone::Keplerian {
+            BoundaryCondition::KeplerianBuffer {
                 // don't change this
                 surface_density: 1.0,
                 surface_pressure: 1.0,
@@ -642,8 +639,8 @@ impl Setup for Sedov {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+    fn buffer_zone(&self) -> BoundaryCondition {
+        BoundaryCondition::Default
     }
 
     fn viscosity(&self) -> Option<f64> {

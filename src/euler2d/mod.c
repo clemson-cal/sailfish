@@ -203,27 +203,27 @@ static __host__ __device__ real sound_speed_squared(
 }
 
 static __host__ __device__ void buffer_source_term(
-    struct BufferZone *buffer,
+    struct BoundaryCondition *bc,
     real xc,
     real yc,
     real dt,
     real *cons)
 {
-    switch (buffer->type)
+    switch (bc->type)
     {
-        case None:
-        {
+        case Default:
+        case Inflow:
             break;
-        }
-        case Keplerian:
+
+        case KeplerianBuffer:
         {
             real rc = sqrt(xc * xc + yc * yc);
-            real surface_density = buffer->keplerian.surface_density;
-            real surface_pressure = buffer->keplerian.surface_pressure;
-            real central_mass = buffer->keplerian.central_mass;
-            real driving_rate = buffer->keplerian.driving_rate;
-            real outer_radius = buffer->keplerian.outer_radius;
-            real onset_width = buffer->keplerian.onset_width;
+            real surface_density = bc->keplerian_buffer.surface_density;
+            real surface_pressure = bc->keplerian_buffer.surface_pressure;
+            real central_mass = bc->keplerian_buffer.central_mass;
+            real driving_rate = bc->keplerian_buffer.driving_rate;
+            real outer_radius = bc->keplerian_buffer.outer_radius;
+            real onset_width = bc->keplerian_buffer.onset_width;
             real onset_radius = outer_radius - onset_width;
 
             if (rc > onset_radius)
@@ -455,7 +455,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real alpha,
     real a,
@@ -615,7 +615,7 @@ static __host__ __device__ void advance_rk_zone(
     frj[3] -= 0.5 * (nucc * pcc[0] * scc[3] * pcc[2] + nurj * prj[0] * srj[3] * prj[2]);
 
     primitive_to_conserved(pcc, ucc);
-    buffer_source_term(&buffer, xc, yc, dt, ucc);
+    buffer_source_term(&bc, xc, yc, dt, ucc);
     point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
@@ -634,7 +634,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real a,
     real dt,
@@ -716,7 +716,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
 
     real h = disk_height(&mass_list, xc, yc, pcc);
     primitive_to_conserved(pcc, ucc);
-    buffer_source_term(&buffer, xc, yc, dt, ucc);
+    buffer_source_term(&bc, xc, yc, dt, ucc);
     point_masses_source_term(&mass_list, xc, yc, dt, pcc, h, ucc);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
@@ -784,7 +784,7 @@ static void __global__ advance_rk_kernel(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real alpha,
     real a,
@@ -806,7 +806,7 @@ static void __global__ advance_rk_kernel(
             primitive_rd,
             primitive_wr,
             eos,
-            buffer,
+            bc,
             mass_list,
             alpha,
             a,
@@ -828,7 +828,7 @@ static void __global__ advance_rk_kernel_inviscid(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real a,
     real dt,
@@ -849,7 +849,7 @@ static void __global__ advance_rk_kernel_inviscid(
             primitive_rd,
             primitive_wr,
             eos,
-            buffer,
+            bc,
             mass_list,
             a,
             dt,
@@ -956,7 +956,7 @@ EXTERN_C void euler2d_primitive_to_conserved(
  * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
  * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [4]
  * @param eos                   The EOS
- * @param buffer                The buffer region
+ * @param bc                The bc region
  * @param masses[in]            A pointer a list of point mass objects
  * @param num_masses            The number of point masses
  * @param alpha                 The alpha-viscosity parameter
@@ -975,7 +975,7 @@ EXTERN_C void euler2d_advance_rk(
     real *primitive_rd_ptr,
     real *primitive_wr_ptr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real alpha,
     real a,
@@ -1000,7 +1000,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         a,
                         dt,
@@ -1019,7 +1019,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         alpha,
                         a,
@@ -1045,7 +1045,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         a,
                         dt,
@@ -1064,7 +1064,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         alpha,
                         a,
@@ -1094,7 +1094,7 @@ EXTERN_C void euler2d_advance_rk(
                     primitive_rd,
                     primitive_wr,
                     eos,
-                    buffer,
+                    bc,
                     mass_list,
                     a,
                     dt,
@@ -1111,7 +1111,7 @@ EXTERN_C void euler2d_advance_rk(
                     primitive_rd,
                     primitive_wr,
                     eos,
-                    buffer,
+                    bc,
                     mass_list,
                     alpha,
                     a,

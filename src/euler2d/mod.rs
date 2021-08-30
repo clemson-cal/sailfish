@@ -1,4 +1,4 @@
-use crate::{BufferZone, EquationOfState, ExecutionMode, PointMass, PointMassList, StructuredMesh};
+use crate::{BoundaryCondition, EquationOfState, ExecutionMode, PointMass, PointMassList, StructuredMesh};
 
 pub mod solver;
 
@@ -16,7 +16,7 @@ extern "C" {
         primitive_rd_ptr: *const f64,
         primitive_wr_ptr: *mut f64,
         eos: EquationOfState,
-        buffer: BufferZone,
+        buffer: BoundaryCondition,
         mass_list: PointMassList,
         alpha: f64,
         a: f64,

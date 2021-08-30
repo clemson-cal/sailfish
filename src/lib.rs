@@ -163,9 +163,10 @@ impl Default for PointMassList {
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub enum BufferZone {
-    NoBuffer,
-    Keplerian {
+pub enum BoundaryCondition {
+    Default,
+    Inflow,
+    KeplerianBuffer {
         surface_density: f64,
         surface_pressure: f64,
         central_mass: f64,

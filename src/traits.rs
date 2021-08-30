@@ -1,6 +1,6 @@
 use crate::{
-    BufferZone, Coordinates, Device, EquationOfState, ExecutionMode, IndexSpace, Mesh, Patch,
-    PointMassList, StructuredMesh,
+    BoundaryCondition, Coordinates, Device, EquationOfState, ExecutionMode, IndexSpace, Mesh,
+    Patch, PointMassList, StructuredMesh,
 };
 
 use gridiron::adjacency_list::AdjacencyList;
@@ -54,7 +54,7 @@ pub trait Solve {
 }
 
 /// A trait to build patch-based solver instances.
-/// 
+///
 /// With domain-decomposed grids, the driver needs to construct one solver
 /// instance for each grid patch. So, rather than supplying the driver with
 /// the solver instance(s), the top-level driver invocation provides a sovler
@@ -78,7 +78,7 @@ pub trait PatchBasedBuild {
 }
 
 /// A trait for 2D solvers which operate on grid patches.
-/// 
+///
 /// These solvers implement message passing and task-based parallelism via the
 /// `Automaton` trait.
 pub trait PatchBasedSolve:
@@ -126,25 +126,24 @@ pub trait PatchBasedSolve:
 }
 
 /// A trait describing a simulation model setup.
-/// 
+///
 /// This trait is used by the driver to define initial and boundary
 /// conditions, select a hydrodynamics solver and parameters, and describe
 /// physics conditions such as gravity and thermodynamics. Basic setups only
 /// need to implement a subset of the possible methods; most of the methods
 /// below have stub default implementations.
 pub trait Setup: Send + Sync {
-
     /// Invoked by the solver to determine an equation of state (EOS), if that
     /// solver supports different types.
-    /// 
+    ///
     /// Not all solvers support all EOS's, and the solver is not expected to
     /// produce an error if an incompatible EOS is returned from this method.
     fn equation_of_state(&self) -> EquationOfState;
 
     /// Invoked by the driver to build a mesh on which to run this problem.
-    /// 
+    ///
     /// The mesh type must be compatible with the requested solver.
-    /// 
+    ///
     /// The resolution parameter will be collected from the command line or
     /// restart file and provided to this method. The problem setup is then
     /// free to interpret the resolution parameter as it sees fit to generate
@@ -155,7 +154,7 @@ pub trait Setup: Send + Sync {
     fn mesh(&self, resolution: u32) -> Mesh;
 
     /// Invoked by the solver to determine the coordinate system.
-    /// 
+    ///
     /// Not all solvers support all coordinate systemsm and the solver is not
     /// expected to produce an error if an imcompatible coordinate system is
     /// returned from this method.
@@ -171,14 +170,14 @@ pub trait Setup: Send + Sync {
 
     /// Required method, invoked by the driver and possibly the solver, to
     /// specify initial and boundary conditions.
-    /// 
+    ///
     /// Note: This method might be changed to `primitive_at` or something
     /// similar, and be given a time argument to facilitate a time-dependent
     /// boundary condition.
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]);
 
     /// The time the simulation should start counting from.
-    /// 
+    ///
     /// Usually this will be `t=0`, however it sometimes makes sense to start
     /// from `t=1` or something else, especially with explosion problems or
     /// when log-spaced checkpoint outputs are desired.
@@ -194,7 +193,7 @@ pub trait Setup: Send + Sync {
 
     /// Invoked by the driver to convert from "simulation time" to "user
     /// time".
-    /// 
+    ///
     /// Simulation time is the time used by the physics solvers. Messages
     /// written to `stdout` by the driver report time `t` and timestep size
     /// `dt` in user time. The simulation start time, end time, as well as
@@ -217,10 +216,10 @@ pub trait Setup: Send + Sync {
 
     /// Invoked by solver modules which support a gravitational field sourced
     /// by point-like test masses.
-    /// 
+    ///
     /// The time argument is in simulation time, not user time (see
     /// [`Setup::unit_time`]).
-    /// 
+    ///
     /// This method is also called in the [`crate::state`] module to enable
     /// writing the point mass locations to checkpoint files for diagnostic
     /// purposes.
@@ -229,8 +228,8 @@ pub trait Setup: Send + Sync {
     }
 
     /// Invoked by solver modules which support a wave-damping zone.
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+    fn buffer_zone(&self) -> BoundaryCondition {
+        BoundaryCondition::Default
     }
 
     /// Invoked by solver modules which support viscous stresses.
