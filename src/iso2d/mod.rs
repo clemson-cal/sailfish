@@ -18,7 +18,7 @@ extern "C" {
         primitive_rd_ptr: *const f64,
         primitive_wr_ptr: *mut f64,
         eos: EquationOfState,
-        buffer: BoundaryCondition,
+        boundary_condition: BoundaryCondition,
         mass_list: PointMassList,
         nu: f64,
         a: f64,

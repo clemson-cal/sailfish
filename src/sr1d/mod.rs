@@ -1,5 +1,5 @@
-use crate::Setup;
 use crate::error::Error;
+use crate::{BoundaryCondition, Setup};
 use crate::{Coordinates, ExecutionMode, Solve};
 use cfg_if::cfg_if;
 
@@ -19,6 +19,7 @@ extern "C" {
         primitive_wr_ptr: *mut f64,
         a: f64,
         dt: f64,
+        boundary_condition: BoundaryCondition,
         coords: Coordinates,
         mode: ExecutionMode,
     );
@@ -31,8 +32,7 @@ extern "C" {
         mode: ExecutionMode,
     );
 
-    fn sr1d_max_wavespeed(num_zones: i32, primitive_ptr: *const f64, mode: ExecutionMode)
-        -> f64;
+    fn sr1d_max_wavespeed(num_zones: i32, primitive_ptr: *const f64, mode: ExecutionMode) -> f64;
 }
 
 pub fn solver(
@@ -40,14 +40,20 @@ pub fn solver(
     device: Option<i32>,
     faces: &[f64],
     primitive: &[f64],
+    boundary_condition: BoundaryCondition,
     coords: Coordinates,
 ) -> Result<Box<dyn Solve>, Error> {
     match mode {
-        ExecutionMode::CPU => Ok(Box::new(cpu::Solver::new(faces, primitive, coords))),
+        ExecutionMode::CPU => Ok(Box::new(cpu::Solver::new(
+            faces,
+            primitive,
+            boundary_condition,
+            coords,
+        ))),
         ExecutionMode::OMP => {
             cfg_if! {
                 if #[cfg(feature = "omp")] {
-                    Ok(Box::new(omp::Solver::new(faces, primitive, coords)))
+                    Ok(Box::new(omp::Solver::new(faces, primitive, boundary_condition, coords)))
                 } else {
                     panic!()
                 }
@@ -56,7 +62,7 @@ pub fn solver(
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Ok(Box::new(gpu::Solver::new(device, faces, primitive, coords)?))
+                    Ok(Box::new(gpu::Solver::new(device, faces, primitive, boundary_condition, coords)?))
                 } else {
                     std::convert::identity(device); // black-box
                     panic!()
@@ -74,12 +80,18 @@ pub mod cpu {
         primitive1: Vec<f64>,
         primitive2: Vec<f64>,
         conserved0: Vec<f64>,
+        boundary_condition: BoundaryCondition,
         coords: Coordinates,
         pub(super) mode: ExecutionMode,
     }
 
     impl Solver {
-        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
+        pub fn new(
+            faces: &[f64],
+            primitive: &[f64],
+            boundary_condition: BoundaryCondition,
+            coords: Coordinates,
+        ) -> Self {
             let num_zones = faces.len() - 1;
             assert_eq!(primitive.len(), num_zones * 3);
             Self {
@@ -87,6 +99,7 @@ pub mod cpu {
                 primitive1: primitive.to_vec(),
                 primitive2: primitive.to_vec(),
                 conserved0: vec![0.0; num_zones * 3],
+                boundary_condition,
                 coords,
                 mode: ExecutionMode::CPU,
             }
@@ -111,13 +124,7 @@ pub mod cpu {
                 );
             }
         }
-        fn advance_rk(
-            &mut self,
-            _setup: &dyn Setup,
-            _time: f64,
-            a: f64,
-            dt: f64,
-        ) {
+        fn advance_rk(&mut self, _setup: &dyn Setup, _time: f64, a: f64, dt: f64) {
             unsafe {
                 sr1d_advance_rk(
                     self.num_zones() as i32,
@@ -127,6 +134,7 @@ pub mod cpu {
                     self.primitive2.as_mut_ptr(),
                     a,
                     dt,
+                    self.boundary_condition,
                     self.coords,
                     self.mode,
                 )
@@ -146,8 +154,13 @@ pub mod omp {
     pub struct Solver(cpu::Solver);
 
     impl Solver {
-        pub fn new(faces: &[f64], primitive: &[f64], coords: Coordinates) -> Self {
-            let mut solver = cpu::Solver::new(faces, primitive, coords);
+        pub fn new(
+            faces: &[f64],
+            primitive: &[f64],
+            boundary_condition: BoundaryCondition,
+            coords: Coordinates,
+        ) -> Self {
+            let mut solver = cpu::Solver::new(faces, primitive, boundary_condition, coords);
             solver.mode = ExecutionMode::OMP;
             Self(solver)
         }
@@ -160,13 +173,7 @@ pub mod omp {
         fn primitive_to_conserved(&mut self) {
             self.0.primitive_to_conserved()
         }
-        fn advance_rk(
-            &mut self,
-            setup: &dyn Setup,
-            time: f64,
-            a: f64,
-            dt: f64,
-        ) {
+        fn advance_rk(&mut self, setup: &dyn Setup, time: f64, a: f64, dt: f64) {
             self.0.advance_rk(setup, time, a, dt)
         }
         fn max_wavespeed(&self, time: f64, setup: &dyn Setup) -> f64 {
@@ -186,6 +193,7 @@ pub mod gpu {
         primitive2: DeviceBuffer<f64>,
         conserved0: DeviceBuffer<f64>,
         wavespeeds: DeviceBuffer<f64>,
+        boundary_condition: BoundaryCondition,
         coords: Coordinates,
         device: Device,
     }
@@ -195,6 +203,7 @@ pub mod gpu {
             device: Option<i32>,
             faces: &[f64],
             primitive: &[f64],
+            boundary_condition: BoundaryCondition,
             coords: Coordinates,
         ) -> Result<Self, Error> {
             let num_zones = faces.len() - 1;
@@ -207,6 +216,7 @@ pub mod gpu {
                 primitive2: device.buffer_from(primitive),
                 conserved0: device.buffer_from(&vec![0.0; num_zones * 3]),
                 wavespeeds: device.buffer_from(&vec![0.0; num_zones]),
+                boundary_condition,
                 coords,
                 device,
             })
@@ -222,24 +232,16 @@ pub mod gpu {
             Vec::from(&self.primitive1)
         }
         fn primitive_to_conserved(&mut self) {
-            self.device.scope(|_| {
-                unsafe {
-                    sr1d_primitive_to_conserved(
-                        self.num_zones() as i32,
-                        self.primitive1.as_device_ptr(),
-                        self.conserved0.as_device_ptr() as *mut f64,
-                        ExecutionMode::GPU,
-                    );
-                }
+            self.device.scope(|_| unsafe {
+                sr1d_primitive_to_conserved(
+                    self.num_zones() as i32,
+                    self.primitive1.as_device_ptr(),
+                    self.conserved0.as_device_ptr() as *mut f64,
+                    ExecutionMode::GPU,
+                );
             })
         }
-        fn advance_rk(
-            &mut self,
-            _setup: &dyn Setup,
-            _time: f64,
-            a: f64,
-            dt: f64,
-        ) {
+        fn advance_rk(&mut self, _setup: &dyn Setup, _time: f64, a: f64, dt: f64) {
             self.device.scope(|_| {
                 unsafe {
                     sr1d_advance_rk(
@@ -250,6 +252,7 @@ pub mod gpu {
                         self.primitive2.as_device_ptr() as *mut f64,
                         a,
                         dt,
+                        self.boundary_condition,
                         self.coords,
                         ExecutionMode::GPU,
                     )

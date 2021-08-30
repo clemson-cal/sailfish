@@ -297,6 +297,7 @@ fn launch_single_patch(
                 cline.device,
                 faces,
                 &state.primitive,
+                setup.boundary_condition(),
                 setup.coordinate_system(),
             )?,
             "sr1d" => sr1d::solver(
@@ -304,6 +305,7 @@ fn launch_single_patch(
                 cline.device,
                 faces,
                 &state.primitive,
+                setup.boundary_condition(),
                 setup.coordinate_system(),
             )?,
             _ => panic!("unknown solver name"),

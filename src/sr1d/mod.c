@@ -479,6 +479,8 @@ EXTERN_C void sr1d_primitive_to_conserved(
  * @param primitive_wr_ptr[out]  [num_zones] [3]
  * @param a                      The RK averaging parameter
  * @param dt                     The time step
+ * @param bc                     The boundary conditions type
+ * @param coords                 The coordinate system
  * @param mode                   The execution mode
  */
 EXTERN_C void sr1d_advance_rk(
@@ -489,6 +491,7 @@ EXTERN_C void sr1d_advance_rk(
     real *primitive_wr_ptr,
     real a,
     real dt,
+    struct BoundaryCondition bc,
     enum Coordinates coords,
     enum ExecutionMode mode)
 {

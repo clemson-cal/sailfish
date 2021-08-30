@@ -393,7 +393,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BoundaryCondition buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real nu,
     real a,
@@ -527,7 +527,7 @@ static __host__ __device__ void advance_rk_zone(
     frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
 
     primitive_to_conserved(pcc, ucc);
-    buffer_source_term(&buffer, xc, yc, dt, ucc);
+    buffer_source_term(&bc, xc, yc, dt, ucc);
     point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -545,7 +545,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BoundaryCondition buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real a,
     real dt,
@@ -626,7 +626,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
     primitive_to_conserved(pcc, ucc);
-    buffer_source_term(&buffer, xc, yc, dt, ucc);
+    buffer_source_term(&bc, xc, yc, dt, ucc);
     point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)

@@ -228,7 +228,7 @@ pub trait Setup: Send + Sync {
     }
 
     /// Invoked by solver modules which support a wave-damping zone.
-    fn buffer_zone(&self) -> BoundaryCondition {
+    fn boundary_condition(&self) -> BoundaryCondition {
         BoundaryCondition::Default
     }
 

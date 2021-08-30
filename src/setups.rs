@@ -290,7 +290,7 @@ impl Setup for Binary {
         }
     }
 
-    fn buffer_zone(&self) -> BoundaryCondition {
+    fn boundary_condition(&self) -> BoundaryCondition {
         BoundaryCondition::Default
     }
 
@@ -510,7 +510,7 @@ impl Setup for BinaryWithThermodynamics {
         }
     }
 
-    fn buffer_zone(&self) -> BoundaryCondition {
+    fn boundary_condition(&self) -> BoundaryCondition {
         if !self.test_model {
             let onset_radius = self.domain_radius - 0.1;
             BoundaryCondition::KeplerianBuffer {
@@ -639,7 +639,7 @@ impl Setup for Sedov {
         }
     }
 
-    fn buffer_zone(&self) -> BoundaryCondition {
+    fn boundary_condition(&self) -> BoundaryCondition {
         BoundaryCondition::Default
     }
 
