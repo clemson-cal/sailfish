@@ -183,12 +183,12 @@ static __host__ __device__ void geometric_source_terms(enum Coordinates coords, 
             source[1] = p * (x1 * x1 - x0 * x0);
             source[2] = 0.0;
             break;
-	}
+        }
         default: {
             source[0] = 0.0;
             source[1] = 0.0;
             source[2] = 0.0;
-	}
+        }   
     }
 }
 
@@ -201,8 +201,6 @@ static __host__ __device__ void geometric_source_terms(enum Coordinates coords, 
 _Pragma("omp parallel for") \
     for (int i = p.start; i < p.start + p.count; ++i)
 #define GET(p, i) (p.data + p.jumps * ((i) - p.start))
-#define ELEMENTS(p) (p.count * p.count * p.num_fields)
-#define BYTES(p) (ELEMENTS(p) * sizeof(real))
 
 struct Patch
 {

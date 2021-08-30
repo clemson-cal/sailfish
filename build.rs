@@ -28,5 +28,7 @@ fn main() {
         .compile("euler1d_mod");
     plat.build_src("src/euler2d/mod", use_omp())
         .compile("euler2d_mod");
+    plat.build_src("src/sr1d/mod", use_omp())
+        .compile("sr1d_mod");
     plat.emit_link_flags();
 }
