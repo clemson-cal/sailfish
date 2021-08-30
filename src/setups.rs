@@ -863,6 +863,10 @@ impl Setup for Wind {
         Mesh::logarithmic_radial(2, resolution)
     }
 
+    fn boundary_condition(&self) -> BoundaryCondition {
+        BoundaryCondition::Inflow
+    }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::SphericalPolar
     }

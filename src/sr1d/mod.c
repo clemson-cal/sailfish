@@ -302,7 +302,7 @@ static __host__ __device__ void advance_rk_zone(
     real dt,
     int i)
 {
-    if (bc.type == Inflow) {
+    if (bc.type == Inflow && i == 0) {
         return;
     }
     int ni = face_positions.count - 1;
