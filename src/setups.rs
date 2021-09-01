@@ -163,6 +163,51 @@ impl Setup for Explosion {
     }
 }
 
+pub struct ExplosionDG;
+
+impl FromStr for ExplosionDG {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self)
+        } else {
+            Err(InvalidSetup("setup does not take any parameters".into()))
+        }
+    }
+}
+
+impl Setup for ExplosionDG {
+    fn num_primitives(&self) -> usize {
+        3
+    }
+    fn solver_name(&self) -> String {
+        "iso2d_dg".to_owned()
+    }
+    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
+        if (x * x + y * y).sqrt() < 0.25 {
+            primitive[0] = 1.0;
+        } else {
+            primitive[0] = 0.1;
+        }
+        primitive[1] = 0.0;
+        primitive[2] = 0.0;
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::Isothermal {
+            sound_speed_squared: 1.0,
+        }
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(0.2)
+    }
+}
+
 pub struct Binary {
     pub domain_radius: f64,
     pub nu: f64,
