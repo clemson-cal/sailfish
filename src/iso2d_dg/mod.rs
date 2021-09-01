@@ -3,6 +3,7 @@ use crate::{
 };
 
 pub mod solver;
+pub mod node;
 
 extern "C" {
     pub fn iso2d_primitive_to_conserved(
