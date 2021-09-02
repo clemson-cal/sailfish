@@ -17,6 +17,7 @@ const MAX_INTERIOR_NODES: usize = 25;
 const MAX_FACE_NODES: usize = 5;
 const MAX_POLYNOMIALS: usize = 15;
 
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct NodeData {
     /// normalized cell x coordinate [-1, 1]
@@ -69,6 +70,7 @@ impl Default for NodeData {
     }
 }
 
+#[repr(C)]
 #[derive(Clone, Copy)]
 pub struct Cell {
     pub interior_nodes: [NodeData; MAX_INTERIOR_NODES],
@@ -76,7 +78,7 @@ pub struct Cell {
     pub face_nodes_ri: [NodeData; MAX_FACE_NODES],
     pub face_nodes_lj: [NodeData; MAX_FACE_NODES],
     pub face_nodes_rj: [NodeData; MAX_FACE_NODES],
-    order: usize,
+    order: i32,
 }
 
 impl Cell {
@@ -103,6 +105,7 @@ impl Cell {
             }
         }
 
+        // BUG HERE!
         let mut q = 0;
         for n in 0..order {
             for m in 0..n + 1 {
@@ -126,19 +129,19 @@ impl Cell {
             face_nodes_ri,
             face_nodes_lj,
             face_nodes_rj,
-            order,
+            order: order as i32,
         }
+    }
+
+    pub fn order(&self) -> usize {
+        self.order as usize
     }
 
     pub fn quadrature_points(&self) -> impl Iterator<Item = [f64; 2]> + '_ {
         self.interior_nodes
             .iter()
-            .take(self.order * self.order)
+            .take(self.order() * self.order())
             .map(|node| [node.xsi_x, node.xsi_y])
-    }
-
-    pub fn num_quadrature_points(&self) -> usize {
-        self.order * self.order
     }
 }
 
