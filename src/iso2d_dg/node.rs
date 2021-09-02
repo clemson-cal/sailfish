@@ -76,6 +76,7 @@ pub struct Cell {
     pub face_nodes_ri: [NodeData; MAX_FACE_NODES],
     pub face_nodes_lj: [NodeData; MAX_FACE_NODES],
     pub face_nodes_rj: [NodeData; MAX_FACE_NODES],
+    order: usize,
 }
 
 impl Cell {
@@ -113,7 +114,7 @@ impl Cell {
                 }
                 for i in 0..num_faces {
                     face_nodes_lj[q] = NodeData::new(n, m, x[i], l, w[i] * l, order);
-                    face_nodes_rj[q] = NodeData::new(n, m, x[i], r, w[i] * r, order);                    
+                    face_nodes_rj[q] = NodeData::new(n, m, x[i], r, w[i] * r, order);
                 }
                 q += 1;
             }
@@ -125,7 +126,19 @@ impl Cell {
             face_nodes_ri,
             face_nodes_lj,
             face_nodes_rj,
+            order,
         }
+    }
+
+    pub fn quadrature_points(&self) -> impl Iterator<Item = [f64; 2]> + '_ {
+        self.interior_nodes
+            .iter()
+            .take(self.order * self.order)
+            .map(|node| [node.xsi_x, node.xsi_y])
+    }
+
+    pub fn num_quadrature_points(&self) -> usize {
+        self.order * self.order
     }
 }
 

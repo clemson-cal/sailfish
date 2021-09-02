@@ -239,6 +239,14 @@ impl StructuredMesh {
         [x, y]
     }
 
+    /// Returns the `[x, y]` coordinate in the mesh, as specified by the cell
+    /// index `(i, j)` and normalized subcell coordinates `xsi_x` and `xsi_y`
+    /// which take on values -1 and +1 at the lower and upper cell faces.
+    pub fn subcell_coordinates(&self, i: i64, j: i64, xsi_x: f64, xsi_y: f64) -> [f64; 2] {
+        let [x, y] = self.cell_coordinates(i, j);
+        [x + 0.5 * self.dx * xsi_x, y + 0.5 * self.dy * xsi_y]
+    }
+
     /// Returns the vertex `[x, y]` coordinate at a given index. Out-of-bounds
     /// indexes are allowed.
     pub fn vertex_coordinates(&self, i: i64, j: i64) -> [f64; 2] {

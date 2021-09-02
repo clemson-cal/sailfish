@@ -1,6 +1,6 @@
 use crate::{
-    BoundaryCondition, Coordinates, Device, EquationOfState, ExecutionMode, IndexSpace, Mesh,
-    Patch, PointMassList, StructuredMesh,
+    iso2d_dg::node::Cell, BoundaryCondition, Coordinates, Device, EquationOfState, ExecutionMode,
+    IndexSpace, Mesh, Patch, PointMassList, StructuredMesh,
 };
 
 use gridiron::adjacency_list::AdjacencyList;
@@ -288,6 +288,26 @@ pub trait Setup: Send + Sync {
                 Patch::from_slice_function(space, self.num_primitives(), |(i, j), prim| {
                     let [x, y] = mesh.cell_coordinates(i, j);
                     self.initial_primitive(x, y, prim)
+                })
+            }
+            _ => unimplemented!(),
+        }
+    }
+
+    /// Provided method to generate grid patches of primitive data from the
+    /// initial model, with the primitive variables sampled at sub-cell
+    /// quadrature points as specified by the `cell` variable.
+    fn initial_primitive_dg(&self, space: &IndexSpace, mesh: &Mesh, cell: &Cell) -> Patch {
+        match mesh {
+            Mesh::Structured(mesh) => {
+                let ni = cell.quadrature_points().count();
+                let nq = self.num_primitives();
+
+                Patch::from_slice_function(space, ni * nq, |(i, j), prim| {
+                    for (n, [a, b]) in cell.quadrature_points().enumerate() {
+                        let [x, y] = mesh.subcell_coordinates(i, j, a, b);
+                        self.initial_primitive(x, y, &mut prim[n * nq..(n + 1) * nq])
+                    }
                 })
             }
             _ => unimplemented!(),

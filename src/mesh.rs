@@ -32,6 +32,7 @@ impl Mesh {
             Self::FacePositions1D(faces) => faces.len() - 1,
         }
     }
+
     pub fn min_spacing(&self) -> f64 {
         match self {
             Self::Structured(mesh) => f64::min(mesh.dx, mesh.dy),
@@ -40,6 +41,7 @@ impl Mesh {
             }
         }
     }
+
     pub fn index_space(&self) -> IndexSpace {
         match self {
             Self::Structured(mesh) => IndexSpace::new(0..mesh.ni, 0..mesh.nj),
