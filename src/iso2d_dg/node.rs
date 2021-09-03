@@ -98,7 +98,13 @@ impl Cell {
             }
         }
 
+        /// nl and nr are unit normal vectors of the left and right faces dotted with the 
+        /// coordinate direction.
+        /// For face nodes, the Gaussian weight is multiplied by this quantity for computing sums
+        /// since neither is required independently 
         let [nl, nr] = [-1.0, 1.0];
+        /// xl and xr are the positions of the left and right zone faces in local zone coordinates
+        /// elsewhere referred to as xsi
         let [xl, xr] = [-1.0, 1.0];
 
         for j in 0..order {
@@ -132,25 +138,26 @@ impl Cell {
     }
 }
 
+/// Legendre polynomials scaled by sqrt(2n+1)
 fn pn(n: usize, x: f64) -> f64 {
     match n {
         0 => 1.0,
         1 => f64::sqrt(3.0) * x,
-        2 => f64::sqrt(5.0) * 0.5 * (3.0 * x * x - 1.0),
-        3 => f64::sqrt(7.0) * 0.5 * (5.0 * x * x * x - 3.0 * x),
-        4 => 3.0 / 8.0 * (35.0 * x * x * x * x - 30.0 * x * x + 3.0),
-        _ => panic!("unsupported order"),
+        2 => f64::sqrt(5.0) * 0.5   * (3.0 * x * x - 1.0),
+        3 => f64::sqrt(7.0) * 0.5   * (5.0 * x * x * x - 3.0 * x),
+        4 => f64::sqrt(9.0) * 0.125 * (35.0 * x * x * x * x - 30.0 * x * x + 3.0),
+        _ => panic!("unsupported pn order"),
     }
 }
 
 fn pn_prime(n: usize, x: f64) -> f64 {
     match n {
-        0 => 0.0, // 1.0,
+        0 => 0.0,
         1 => f64::sqrt(3.0),
-        2 => f64::sqrt(5.0) * 0.5 * (6.0 * x),
-        3 => f64::sqrt(7.0) * 0.5 * (15.0 * x * x - 3.0),
-        4 => 3.0 / 8.0 * (140.0 * x * x * x - 60.0 * x),
-        _ => panic!("unsupported order"),
+        2 => f64::sqrt(5.0) * 0.5   * (6.0 * x),
+        3 => f64::sqrt(7.0) * 0.5   * (15.0 * x * x - 3.0),
+        4 => f64::sqrt(9.0) * 0.125 * (140.0 * x * x * x - 60.0 * x),
+        _ => panic!("unsupported pn_prime order"),
     }
 }
 
