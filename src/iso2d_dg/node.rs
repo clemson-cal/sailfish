@@ -35,23 +35,21 @@ pub struct NodeData {
 }
 
 impl NodeData {
-    fn new(n: usize, m: usize, x: f64, y: f64, weight: f64, order: usize) -> Self {
+    fn new(order: usize, x: f64, y: f64, weight: f64) -> Self {
         let mut node = Self::default();
-        let num_polynomials = match order {
-            1 => 1,
-            2 => 3,
-            3 => 6,
-            4 => 10,
-            5 => 15,
-            _ => panic!("unsupported order"),
-        };
         node.xsi_x = x;
         node.xsi_y = y;
         node.weight = weight;
-        for p in 0..num_polynomials {
-            node.phi[p] = pn(n, x) * pn(m, y);
-            node.dphi_dx[p] = pn_prime(n, x) * pn(m, y);
-            node.dphi_dy[p] = pn(n, x) * pn_prime(m, y);
+        let mut p = 0;
+        for n in 0..order {
+            for m in 0..order {
+                if n + m < order {
+                    node.phi[p] = pn(n, x) * pn(m, y);
+                    node.dphi_dx[p] = pn_prime(n, x) * pn(m, y);
+                    node.dphi_dy[p] = pn(n, x) * pn_prime(m, y);
+                    p += 1;                    
+                }
+            }
         }
         node
     }
@@ -83,7 +81,6 @@ pub struct Cell {
 
 impl Cell {
     pub fn new(order: usize) -> Self {
-        let num_faces = order;
         let x = gaussian_quadrature_points(order);
         let w = gaussian_weight(order);
 
@@ -94,33 +91,23 @@ impl Cell {
         let mut face_nodes_rj = [NodeData::default(); MAX_FACE_NODES];
 
         let mut q = 0;
-        for i in 0..num_faces {
-            for j in 0..num_faces {
-                for n in 0..order {
-                    for m in 0..n + 1 {
-                        interior_nodes[q] = NodeData::new(n, m, x[i], x[j], w[i] * w[j], order);
-                    }
-                }
+        for i in 0..order {
+            for j in 0..order {
+                interior_nodes[q] = NodeData::new(order, x[i], x[j], w[i] * w[j]);
                 q += 1;
             }
         }
 
-        // BUG HERE!
-        let mut q = 0;
-        for n in 0..order {
-            for m in 0..n + 1 {
-                let l = -1.0;
-                let r = 1.0;
-                for j in 0..num_faces {
-                    face_nodes_li[q] = NodeData::new(n, m, l, x[j], l * w[j], order);
-                    face_nodes_ri[q] = NodeData::new(n, m, r, x[j], r * w[j], order);
-                }
-                for i in 0..num_faces {
-                    face_nodes_lj[q] = NodeData::new(n, m, x[i], l, w[i] * l, order);
-                    face_nodes_rj[q] = NodeData::new(n, m, x[i], r, w[i] * r, order);
-                }
-                q += 1;
-            }
+        let [nl, nr] = [-1.0, 1.0];
+        let [xl, xr] = [-1.0, 1.0];
+
+        for j in 0..order {
+            face_nodes_li[j] = NodeData::new(order, xl, x[j], nl * w[j]);
+            face_nodes_ri[j] = NodeData::new(order, xr, x[j], nr * w[j]);
+        }
+        for i in 0..order {
+            face_nodes_lj[i] = NodeData::new(order, x[i], xl, w[i] * nl);
+            face_nodes_rj[i] = NodeData::new(order, x[i], xr, w[i] * nr);
         }
 
         Self {
