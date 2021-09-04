@@ -1,8 +1,3 @@
-//! There are interior nodes and face nodes (interior quadrature points or face
-//! quadrature points).
-//!
-//! The face dimensionality is one smaller than the interior.
-//!
 //! `NI := NUM_INTERIOR_NODES`
 //! `NF := NUM_FACE_NODES`
 //! `NP := NUM_POLYNOMIALS`
@@ -47,7 +42,7 @@ impl NodeData {
                     node.phi[p] = pn(n, x) * pn(m, y);
                     node.dphi_dx[p] = pn_prime(n, x) * pn(m, y);
                     node.dphi_dy[p] = pn(n, x) * pn_prime(m, y);
-                    p += 1;                    
+                    p += 1;
                 }
             }
         }
@@ -98,13 +93,14 @@ impl Cell {
             }
         }
 
-        /// nl and nr are unit normal vectors of the left and right faces dotted with the 
-        /// coordinate direction.
-        /// For face nodes, the Gaussian weight is multiplied by this quantity for computing sums
-        /// since neither is required independently 
+        // nl and nr are unit normal vectors of the left and right faces,
+        // dotted with the coordinate direction. For face nodes, the Gaussian
+        // weight is multiplied by this quantity for computing sums since
+        // neither is required independently.
         let [nl, nr] = [-1.0, 1.0];
-        /// xl and xr are the positions of the left and right zone faces in local zone coordinates
-        /// elsewhere referred to as xsi
+
+        // xl and xr are the positions of the left and right zone faces in
+        // local zone coordinates, elsewhere referred to as xsi.
         let [xl, xr] = [-1.0, 1.0];
 
         for j in 0..order {
@@ -138,24 +134,27 @@ impl Cell {
     }
 }
 
-/// Legendre polynomials scaled by sqrt(2n+1)
+/// Returns the Legendre polynomials, for `n = 0` through 4, scaled by
+/// `sqrt(2n + 1)`.
 fn pn(n: usize, x: f64) -> f64 {
     match n {
         0 => 1.0,
         1 => f64::sqrt(3.0) * x,
-        2 => f64::sqrt(5.0) * 0.5   * (3.0 * x * x - 1.0),
-        3 => f64::sqrt(7.0) * 0.5   * (5.0 * x * x * x - 3.0 * x),
+        2 => f64::sqrt(5.0) * 0.500 * (3.0 * x * x - 1.0),
+        3 => f64::sqrt(7.0) * 0.500 * (5.0 * x * x * x - 3.0 * x),
         4 => f64::sqrt(9.0) * 0.125 * (35.0 * x * x * x * x - 30.0 * x * x + 3.0),
         _ => panic!("unsupported pn order"),
     }
 }
 
+/// Returns the derivative of Legendre polynomials, for `n = 0` through 4,
+/// scaled by `sqrt(2n + 1)`.
 fn pn_prime(n: usize, x: f64) -> f64 {
     match n {
         0 => 0.0,
         1 => f64::sqrt(3.0),
-        2 => f64::sqrt(5.0) * 0.5   * (6.0 * x),
-        3 => f64::sqrt(7.0) * 0.5   * (15.0 * x * x - 3.0),
+        2 => f64::sqrt(5.0) * 0.500 * (6.0 * x),
+        3 => f64::sqrt(7.0) * 0.500 * (15.0 * x * x - 3.0),
         4 => f64::sqrt(9.0) * 0.125 * (140.0 * x * x * x - 60.0 * x),
         _ => panic!("unsupported pn_prime order"),
     }
