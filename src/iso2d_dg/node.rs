@@ -1,13 +1,11 @@
-//! `NI := NUM_INTERIOR_NODES`
-//! `NF := NUM_FACE_NODES`
-//! `NP := NUM_POLYNOMIALS`
-//!
-//! `type Cell1 = Cell<1, 1, 1>;`
-//! `type Cell2 = Cell<4, 2, 3>;`
-//! `type Cell3 = Cell<9, 3, 6>;`
-//! `type Cell4 = Cell<16, 4, 10>;`
-//! `type Cell5 = Cell<25, 5, 15>;`
-
+// For reference --- num interior nodes, num face nodes, and num polynomials,
+// for DG orders 1 through 5:
+//
+// 1, 1, 1
+// 4, 2, 3
+// 9, 3, 6
+// 16, 4, 10
+// 25, 5, 15
 const MAX_INTERIOR_NODES: usize = 25;
 const MAX_FACE_NODES: usize = 5;
 const MAX_POLYNOMIALS: usize = 15;
