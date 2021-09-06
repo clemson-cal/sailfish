@@ -112,7 +112,7 @@ static __host__ __device__ void primitive_to_weights_zone(
     real *weights = GET(weights, i, j);
 
     // initialize to zero
-    
+
     for (int l = 0; l < NUM_POLYNOMIALS; ++l)
     {
         for (int q = 0; q < NCONS; ++q)
@@ -141,6 +141,9 @@ static __host__ __device__ void primitive_to_weights_zone(
         // convert to conserved variables at quadrature point
 
         primitive_to_conserved(prim, cons);
+
+        // Do Gaussian sum for each basis polynomial and for each conserved variable
+        // to project the conserved initial condition onto the basis polynomials
 
         for (int l = 0; l < NUM_POLYNOMIALS; ++l)
         {

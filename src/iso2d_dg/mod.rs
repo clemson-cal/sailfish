@@ -4,6 +4,13 @@ pub mod node;
 extern "C" {
     pub fn iso2d_dg_say_hello(order: i32) -> i32;
     pub fn iso2d_dg_get_order(cell: node::Cell) -> i32;
+
+    pub fn iso2d_dg_initial_primitive_to_weights(
+        cell: node::Cell
+        mesh: StructuredMesh,
+        weights_ptr: *mut f64,
+        mode: ExecutionMode,
+    );
 }
 
 #[cfg(test)]
