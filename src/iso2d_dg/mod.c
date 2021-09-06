@@ -95,8 +95,7 @@ static __host__ __device__ void primitive_to_conserved(const real *prim, real *c
 // ============================================================================
 static __host__ __device__ void primitive_to_weights_zone(
     struct Cell cell,
-    struct Patch primitive,
-    struct Patch conserved,
+    struct Patch weights,
     int i,
     int j,
     real x,
@@ -107,9 +106,20 @@ static __host__ __device__ void primitive_to_weights_zone(
     real prim[NCONS];
     real cons[NCONS];
 
-    // assume that "conserved" is now an array containing NCONS * NUM_POLYNOMIALS per zone
+    // assume that "weights" is now an array containing the NCONS * NUM_POLYNOMIALS 
+    // weights of conserved variables per zone
 
-    real *weights = GET(conserved, i, j);
+    real *weights = GET(weights, i, j);
+
+    // initialize to zero
+    
+    for (int l = 0; l < NUM_POLYNOMIALS; ++l)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            weights[q * NUM_POLYNOMIALS + l] = 0.0;
+        }
+    }
 
     // number of interior quadrature points in cell
 
@@ -124,11 +134,11 @@ static __host__ __device__ void primitive_to_weights_zone(
         real xq = x + cell.interior_nodes[qp].xsi_x * 0.5 * dx;
         real yq = y + cell.interior_nodes[qp].xsi_y * 0.5 * dy;
 
-        // get initial condition for primitives at quadrature point 
+        // get initial condition for primitive variables at quadrature point 
 
         initial_primitive(xq, yq, prim);
 
-        // convert to conserved at quadrature points
+        // convert to conserved variables at quadrature point
 
         primitive_to_conserved(prim, cons);
 
