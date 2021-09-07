@@ -1,18 +1,3 @@
-use std::env;
-use std::fs;
-
-fn is_program_in_path(program: &str) -> bool {
-    if let Ok(path) = env::var("PATH") {
-        for p in path.split(":") {
-            let p_str = format!("{}/{}", p, program);
-            if fs::metadata(p_str).is_ok() {
-                return true;
-            }
-        }
-    }
-    false
-}
-
 pub enum Platform {
     NoGpu,
     Cuda,
@@ -21,9 +6,11 @@ pub enum Platform {
 
 impl Platform {
     pub fn discover(gpu: bool) -> Self {
-        if gpu && is_program_in_path("nvcc") {
+        use which::which;
+
+        if gpu && which("nvcc").is_ok() {
             Platform::Cuda
-        } else if gpu && is_program_in_path("hipcc") {
+        } else if gpu && which("hipcc").is_ok() {
             Platform::Rocm
         } else {
             Platform::NoGpu
@@ -34,6 +21,9 @@ impl Platform {
         match self {
             Platform::NoGpu => {}
             Platform::Cuda => {
+                if let Ok(cuda_lib) = std::env::var("CUDA_LIB") {
+                    println!("cargo:rustc-link-search=native={}", cuda_lib)
+                }
                 println!("cargo:rustc-link-lib=dylib=cudart");
             }
             Platform::Rocm => {
