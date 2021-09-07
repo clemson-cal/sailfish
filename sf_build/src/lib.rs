@@ -16,12 +16,7 @@ use which::which;
 //}
 
 fn is_program_in_path(program: &str) -> bool {
-    let result = which(program);
-    if result.is_ok(){
-        return true;
-    } else {
-        return false;
-    }
+    which(program).is_ok()
 }
 
 pub enum Platform {
@@ -45,8 +40,9 @@ impl Platform {
         match self {
             Platform::NoGpu => {}
             Platform::Cuda => {
-                //The line below this one is temporarily hard-coded in
-                println!("cargo:rustc-link-search=native=C:/Program Files/NVIDIA GPU Computing Toolkit/CUDA/v11.3/lib/x64");
+                if let Ok(cuda_lib) = std::env::var("CUDA_LIB") {
+                    println!("cargo:rustc-link-search=native={}", cuda_lib)
+                }
                 println!("cargo:rustc-link-lib=dylib=cudart");
             }
             Platform::Rocm => {
