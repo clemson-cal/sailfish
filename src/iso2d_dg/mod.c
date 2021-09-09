@@ -128,9 +128,12 @@ static __host__ __device__ void primitive_to_weights_zone(
     real *p_cell = GET(primitive, i, j);
     real *w_cell = GET(weights, i, j);
 
-    for (int n = 0; n < n_poly * NCONS; ++n)
+    for (int q = 0; q < NCONS; ++q)
     {
-        w_cell[n] = 0.0;
+        for (int l = 0; l < n_poly; ++l)
+        {
+            w_cell[q * n_poly + l] = 0.0;
+        }
     }
 
     for (int qp = 0; qp < n_quad; ++qp)
@@ -149,6 +152,28 @@ static __host__ __device__ void primitive_to_weights_zone(
         }
     }
 }
+
+
+// ============================ KERNELS =======================================
+// ============================================================================
+#if defined(__NVCC__) || defined(__ROCM__)
+
+static void __global__ primitive_to_weights_kernel(
+    struct Mesh mesh,
+    struct Cell cell,
+    struct Patch primitive,
+    struct Patch weights)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        primitive_to_weights_zone(cell, primitive, weights, i, j);
+    }
+}
+
+#endif // defined(__NVCC__) || defined(__ROCM__)
 
 
 // ============================ PUBLIC API ====================================
@@ -177,9 +202,33 @@ EXTERN_C void iso2d_dg_primitive_to_weights(
     struct Patch primitive = patch(mesh, NCONS * n_quad, 0, primitive_ptr);
     struct Patch weights = patch(mesh, NCONS * n_poly, 0, weights_ptr);
 
-    FOR_EACH(weights)
-    {
-        primitive_to_weights_zone(cell, primitive, weights, i, j);
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(weights)
+            {
+                primitive_to_weights_zone(cell, primitive, weights, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(weights)
+            {
+                primitive_to_weights_zone(cell, primitive, weights, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #if defined(__NVCC__) || defined(__ROCM__)
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
+            primitive_to_weights_zone<<<bd, bs>>>(mesh, cell, primitive, weights);
+            #endif
+            break;
+        }
     }
 }
 
