@@ -225,7 +225,7 @@ EXTERN_C void iso2d_dg_primitive_to_weights(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
-            primitive_to_weights_zone<<<bd, bs>>>(mesh, cell, primitive, weights);
+            primitive_to_weights_kernel<<<bd, bs>>>(mesh, cell, primitive, weights);
             #endif
             break;
         }
