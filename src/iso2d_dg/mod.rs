@@ -1,3 +1,5 @@
+use crate::{ExecutionMode, StructuredMesh};
+
 pub mod solver;
 pub mod node;
 
@@ -5,9 +7,10 @@ extern "C" {
     pub fn iso2d_dg_say_hello(order: i32) -> i32;
     pub fn iso2d_dg_get_order(cell: node::Cell) -> i32;
 
-    pub fn iso2d_dg_initial_primitive_to_weights(
-        cell: node::Cell
+    pub fn iso2d_dg_primitive_to_weights(
+        cell: node::Cell,
         mesh: StructuredMesh,
+        primitive_ptr: *const f64,
         weights_ptr: *mut f64,
         mode: ExecutionMode,
     );

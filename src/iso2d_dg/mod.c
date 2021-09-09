@@ -20,6 +20,7 @@
 #define MAX_INTERIOR_NODES 25
 #define MAX_FACE_NODES 5
 #define MAX_POLYNOMIALS 15
+#define NCONS 3
 
 
 struct NodeData {
@@ -40,6 +41,26 @@ struct Cell {
     struct NodeData face_nodes_rj[MAX_FACE_NODES];
     int order;
 };
+
+
+static int num_polynomials(struct Cell cell)
+{
+    switch (cell.order)
+    {
+        case 1: return 1;
+        case 2: return 3;
+        case 3: return 6;
+        case 4: return 10;
+        case 5: return 15;
+        default: return 0;
+    }
+}
+
+static int num_quadrature_points(struct Cell cell)
+{
+    return cell.order * cell.order;
+}
+
 
 // ============================ PATCH =========================================
 // ============================================================================
@@ -91,102 +112,77 @@ static __host__ __device__ void primitive_to_conserved(const real *prim, real *c
     cons[2] = py;
 }
 
+
 // ============================ SCHEME ========================================
 // ============================================================================
 static __host__ __device__ void primitive_to_weights_zone(
     struct Cell cell,
+    struct Patch primitive,
     struct Patch weights,
     int i,
-    int j,
-    real x,
-    real y,
-    real dx,
-    real dy)
+    int j)
 {
-    real prim[NCONS];
-    real cons[NCONS];
+    int n_quad = num_quadrature_points(cell);
+    int n_poly = num_polynomials(cell);
 
-    // assume that "weights" is now an array containing the NCONS * NUM_POLYNOMIALS 
-    // weights of conserved variables per zone
+    real *p_cell = GET(primitive, i, j);
+    real *w_cell = GET(weights, i, j);
 
-    real *weights = GET(weights, i, j);
-
-    // initialize to zero
-
-    for (int l = 0; l < NUM_POLYNOMIALS; ++l)
+    for (int n = 0; n < n_poly * NCONS; ++n)
     {
-        for (int q = 0; q < NCONS; ++q)
-        {
-            weights[q * NUM_POLYNOMIALS + l] = 0.0;
-        }
+        w_cell[n] = 0.0;
     }
 
-    // number of interior quadrature points in cell
-
-    int nq = cell.order * cell.order;
-
-    // loop over cell's interior quadrature points
-
-    for (qp = 0; qp < nq; ++qp)
+    for (int qp = 0; qp < n_quad; ++qp)
     {
-        // global position of quadrature point 
+        real u[NCONS];
+        real *p = &p_cell[qp * NCONS];
+        primitive_to_conserved(p, u);
+        struct NodeData node = cell.interior_nodes[qp];
 
-        real xq = x + cell.interior_nodes[qp].xsi_x * 0.5 * dx;
-        real yq = y + cell.interior_nodes[qp].xsi_y * 0.5 * dy;
-
-        // get initial condition for primitive variables at quadrature point 
-
-        initial_primitive(xq, yq, prim);
-
-        // convert to conserved variables at quadrature point
-
-        primitive_to_conserved(prim, cons);
-
-        // Do Gaussian sum for each basis polynomial and for each conserved variable
-        // to project the conserved initial condition onto the basis polynomials
-
-        for (int l = 0; l < NUM_POLYNOMIALS; ++l)
+        for (int q = 0; q < NCONS; ++q)
         {
-            for (int q = 0; q < NCONS; ++q)
+            for (int l = 0; l < n_poly; ++l)
             {
-                weights[q * NUM_POLYNOMIALS + l] += 
-                0.25 * cons[q] * cell.interior_nodes[qp].phi[l] * cell.interior_nodes[qp].weight;
+                w_cell[q * n_poly + l] += 0.25 * u[q] * node.phi[l] * node.weight;
             }
         }
     }
 }
+
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
 
 /**
- * Converts an array of primitive data to an array of conserved weights data. 
- * The primitive data 
- * array index space must follow the descriptions below.
+ * Converts an array of primitive data to an array of conserved weights data.
+ * The primitive data array index space must follow the descriptions below.
+ *
+ * @param cell               The cell [order]
  * @param mesh               The mesh [ni,     nj]
- * @param primitive_ptr[in]  [-1, -1] [ni + 2, nj + 2] [3]
- * @param conserved_ptr[out] [ 0,  0] [ni,     nj]     [3]
+ * @param primitive_ptr[in]  [ 0,  0] [ni,     nj]     [3] [n_poly(order)]
+ * @param weights[out]       [-1, -1] [ni + 2, nj + 2] [3] [n_poly(order)]
  * @param mode               The execution mode
  */
-EXTERN_C int iso2d_dg_initial_primitive_to_weights(
-    struct Cell cell
+EXTERN_C void iso2d_dg_primitive_to_weights(
+    struct Cell cell,
     struct Mesh mesh,
     real *primitive_ptr,
     real *weights_ptr,
-    enum ExecutionMode mode
-    )
+    enum ExecutionMode mode)
 {
-    struct Patch weights   = patch(mesh, NCONS * NUM_POLYNOMIALS, 0, weights_ptr);
-        
-    FOR_EACH(weights) {
-                real dx = mesh.dx;
-                real dy = mesh.dy;
-                real x = mesh.x0 + (i + 0.5) * dx;
-                real y = mesh.y0 + (j + 0.5) * dy;
-                primitive_to_weights_zone(cell, weights, i, j, x, y, dx, dy);
-            }
-    return;
+    int n_quad = num_quadrature_points(cell);
+    int n_poly = num_polynomials(cell);
+
+    struct Patch primitive = patch(mesh, NCONS * n_quad, 0, primitive_ptr);
+    struct Patch weights = patch(mesh, NCONS * n_poly, 0, weights_ptr);
+
+    FOR_EACH(weights)
+    {
+        primitive_to_weights_zone(cell, primitive, weights, i, j);
+    }
 }
+
 
 /**
  * Template for a public API function to be exposed to Rust code via FFI.
