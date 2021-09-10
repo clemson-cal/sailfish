@@ -11,7 +11,7 @@ use gridiron::rect_map::{Rectangle, RectangleMap};
 
 use sailfish::error::{self, Error::*};
 use sailfish::setups;
-use sailfish::{euler1d, euler2d, iso2d, sr1d};
+use sailfish::{euler1d, euler2d, euler_rz, iso2d, sr1d};
 use sailfish::{
     CommandLine, ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve, Recurrence,
     RecurringTask, Setup, State,
@@ -290,7 +290,7 @@ fn launch_single_patch(
         cline.output_directory(&state.restart_file),
     );
     let mut solver = match &state.mesh {
-        Mesh::FacePositions1D(faces) => 
+        Mesh::FacePositions1D(faces) =>
         match setup.solver_name().as_str() {
             "euler1d" => euler1d::solver(
                 cline.execution_mode(),
@@ -368,6 +368,7 @@ fn run() -> Result<(), error::Error> {
         "iso2d" => launch_patch_based(state, setup, cline, iso2d::solver::Builder),
         "euler1d" => launch_single_patch(state, setup, cline),
         "euler2d" => launch_patch_based(state, setup, cline, euler2d::solver::Builder),
+        "euler_rz" => launch_patch_based(state, setup, cline, euler_rz::solver::Builder),
         "sr1d" => launch_single_patch(state, setup, cline),
         _ => panic!("unknown solver name"),
     }
