@@ -22,6 +22,7 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
     vec![
         ("binary", setup_builder!(Binary)),
         ("binary-therm", setup_builder!(BinaryWithThermodynamics)),
+        ("envelope-shock", setup_builder!(EnvelopeShock)),
         ("explosion", setup_builder!(Explosion)),
         ("fast-shell", setup_builder!(FastShell)),
         ("pulse-collision", setup_builder!(PulseCollision)),
@@ -883,6 +884,72 @@ impl Setup for Wind {
 
     fn boundary_condition(&self) -> BoundaryCondition {
         BoundaryCondition::Inflow
+    }
+
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::SphericalPolar
+    }
+
+    fn end_time(&self) -> Option<f64> {
+        Some(1.0)
+    }
+}
+
+pub struct EnvelopeShock;
+
+impl FromStr for EnvelopeShock {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self)
+        } else {
+            Err(InvalidSetup("setup does not take any parameters".into()))
+        }
+    }
+}
+
+impl Setup for EnvelopeShock {
+    fn num_primitives(&self) -> usize {
+        3
+    }
+
+    fn solver_name(&self) -> String {
+        "sr1d".to_owned()
+    }
+
+    fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
+        let r_shell: f64 = 10.0;
+        let dr = 1.0;
+        let rho_0 = 0.01;
+        let rho_1 = 1.0;
+        let u_max = 10.0;
+
+        let prof = |r: f64| {
+            if r > r_shell {
+                0.0
+            } else {
+                f64::exp((r - r_shell) / dr)
+            }
+        };
+
+        let rho_ambient = rho_0 * (r / r_shell).powi(-2);
+        let rho = rho_1 * prof(r) + rho_ambient;
+        let u = u_max * prof(r);
+        let p = 1e-3 * rho_ambient;
+
+        primitive[0] = rho;
+        primitive[1] = u;
+        primitive[2] = p;
+    }
+
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 4.0 / 3.0,
+        }
+    }
+
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::logarithmic_radial(2, resolution)
     }
 
     fn coordinate_system(&self) -> Coordinates {
