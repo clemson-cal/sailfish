@@ -178,10 +178,9 @@ static __host__ __device__ void primitive_to_outer_wavespeeds(const real *prim, 
 
 static __host__ __device__ real primitive_to_max_wavespeed(const real *prim)
 {
-    real cs = sqrt(primitive_to_sound_speed_squared(prim));
-    real vx = prim[1];
-    real ax = max2(fabs(vx - cs), fabs(vx + cs));
-    return ax;
+    real wavespeeds[2];
+    primitive_to_outer_wavespeeds(prim, wavespeeds);
+    return max2(fabs(wavespeeds[0]), fabs(wavespeeds[1]));
 }
 
 static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux)
