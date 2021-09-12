@@ -107,7 +107,7 @@ dependencies = [
 [[package]]
 name = "kepler-two-body"
 version = "0.1.0"
-source = "git+https://github.com/clemson-cal/kepler-two-body#2d8a0f5374052ab7f4f60c5bbbc37c4e5283b4a4"
+source = "git+https://github.com/clemson-cal/kepler-two-body#9011d3d30b40f1d1fe8c5b4592d9fd2e13f46dbd"
 
 [[package]]
 name = "kind-config"
