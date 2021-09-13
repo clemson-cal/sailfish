@@ -3,7 +3,11 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::{BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel, StructuredMesh};
+use crate::{
+    BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
+    StructuredMesh,
+};
+use std::f64::consts::PI;
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
@@ -193,8 +197,8 @@ impl FromStr for Binary {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sradius1, sradius2) =
-            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+        let (sradius1, sradius2) = crate::parse::parse_pair(form.get("sink_radius").into(), ',')
+            .map_err(ParseFloatError)?;
 
         let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
@@ -227,7 +231,10 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
-        println!("sink radii are [{}, {}]", self.sink_radius1, self.sink_radius2);
+        println!(
+            "sink radii are [{}, {}]",
+            self.sink_radius1, self.sink_radius2
+        );
         println!("sink rates are [{}, {}]", self.sink_rate1, self.sink_rate2);
     }
 
@@ -250,7 +257,7 @@ impl Setup for Binary {
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
-        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt();//use primary sink radius for both masses
+        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt(); //use primary sink radius for both masses
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
         let d = 1.0;
@@ -366,8 +373,8 @@ impl FromStr for BinaryWithThermodynamics {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sradius1, sradius2) =
-            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+        let (sradius1, sradius2) = crate::parse::parse_pair(form.get("sink_radius").into(), ',')
+            .map_err(ParseFloatError)?;
 
         let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
@@ -895,6 +902,7 @@ impl Setup for Wind {
     }
 }
 
+/// A relativistic shell is launched into a homologous, relativistic envelope.
 pub struct EnvelopeShock;
 
 impl FromStr for EnvelopeShock {
@@ -917,28 +925,36 @@ impl Setup for EnvelopeShock {
         "sr1d".to_owned()
     }
 
-    fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
-        let r_shell: f64 = 10.0;
-        let dr = 1.0;
-        let rho_0 = 0.01;
-        let rho_1 = 1.0;
-        let u_max = 10.0;
+    fn initial_primitive(&self, r: f64, _q: f64, primitive: &mut [f64]) {
+        let w_shell = 1.0;
+        let r_shell = 100.0;
+        let d_shell = 0.0;
+        let u_shell = 30.0;
 
         let prof = |r: f64| {
             if r > r_shell {
                 0.0
             } else {
-                f64::exp((r - r_shell) / dr)
+                f64::exp((r - r_shell) / w_shell)
             }
         };
 
-        let rho_ambient = rho_0 * (r / r_shell).powi(-2);
-        let rho = rho_1 * prof(r) + rho_ambient;
-        let u = u_max * prof(r);
-        let p = 1e-3 * rho_ambient;
+        let ambient = RelativisticEnvelope {
+            envelope_m1: 1.0,
+            envelope_fastest_beta: 0.99,
+            envelope_slowest_beta: 0.00,
+            envelope_psi: 0.25,
+            wind_mdot: 100.0,
+        };
 
-        primitive[0] = rho;
-        primitive[1] = u;
+        let t = self.initial_time();
+        let mdot = ambient.mass_rate_per_steradian(r, t);
+        let u_ambient = ambient.gamma_beta(r, t);
+        let d_ambient = mdot / (u_ambient * r * r);
+        let p = 1e-6 * d_ambient;
+
+        primitive[0] = d_ambient + d_shell * prof(r);
+        primitive[1] = u_ambient + u_shell * prof(r);
         primitive[2] = p;
     }
 
@@ -949,14 +965,81 @@ impl Setup for EnvelopeShock {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(2, resolution)
+        Mesh::logarithmic_radial(3, resolution)
     }
 
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::SphericalPolar
     }
 
-    fn end_time(&self) -> Option<f64> {
-        Some(1.0)
+    fn initial_time(&self) -> f64 {
+        500.0
+    }
+}
+
+pub struct RelativisticEnvelope {
+    /// Mass coordinate of the u=1 shell
+    pub envelope_m1: f64,
+
+    /// Beta (v/c) of the slowest envelope shell
+    pub envelope_slowest_beta: f64,
+
+    /// Beta (v/c) of the outer shell
+    pub envelope_fastest_beta: f64,
+
+    /// Index psi in u(m) ~ m^-psi
+    pub envelope_psi: f64,
+
+    /// The mass loss rate for the wind
+    pub wind_mdot: f64,
+}
+
+pub enum RelativisticEnvelopeZone {
+    Envelope,
+    Wind,
+}
+
+impl RelativisticEnvelope {
+    pub fn envelop_slowest_u(&self) -> f64 {
+        let b = self.envelope_slowest_beta;
+        b / (1.0 - b * b).sqrt()
+    }
+
+    pub fn zone(&self, r: f64, t: f64) -> RelativisticEnvelopeZone {
+        let v_min = self.envelope_slowest_beta;
+        let r_wind_envelop_interface = v_min * t;
+
+        if r > r_wind_envelop_interface {
+            RelativisticEnvelopeZone::Envelope
+        } else {
+            RelativisticEnvelopeZone::Wind
+        }
+    }
+
+    pub fn gamma_beta(&self, r: f64, t: f64) -> f64 {
+        match self.zone(r, t) {
+            RelativisticEnvelopeZone::Wind => self.envelop_slowest_u(),
+            RelativisticEnvelopeZone::Envelope => {
+                let b = f64::min(r / t, self.envelope_fastest_beta);
+                let u = b / f64::sqrt(1.0 - b * b);
+                u
+            }
+        }
+    }
+
+    pub fn mass_rate_per_steradian(&self, r: f64, t: f64) -> f64 {
+        match self.zone(r, t) {
+            RelativisticEnvelopeZone::Wind => self.wind_mass_rate_per_steradian(),
+            RelativisticEnvelopeZone::Envelope => {
+                let y = self.envelope_psi;
+                let s = f64::min(r / t, self.envelope_fastest_beta);
+                let f = f64::powf(s, -1.0 / y) * f64::powf(1.0 - s * s, 0.5 / y - 1.0);
+                self.envelope_m1 / (4.0 * PI * y * t) * f
+            }
+        }
+    }
+
+    pub fn wind_mass_rate_per_steradian(&self) -> f64 {
+        self.wind_mdot
     }
 }
