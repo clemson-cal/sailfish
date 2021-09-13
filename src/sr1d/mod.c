@@ -1,5 +1,7 @@
 #include <math.h>
 #include <stddef.h>
+#include <stdio.h>
+#include <stdlib.h>
 #include "../sailfish.h"
 
 
@@ -21,7 +23,7 @@
 // ============================ PHYSICS =======================================
 // ============================================================================
 #define NCONS 3
-#define PLM_THETA 1.5
+#define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
 
 
@@ -352,6 +354,23 @@ static __host__ __device__ void advance_rk_zone(
     primitive_to_conserved(pcc, ucc);
     geometric_source_terms(coords, xl, xr, pcc, sources);
 
+    // real tau_heat = 100.0;
+    // real mach_ceiling = 1000.0;
+
+    // real u = pcc[1];
+    // real e = pcc[2] / pcc[0] * 3.0;
+    // real G = sqrt(1.0 + u * u);
+    // real emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
+
+    // if (e < emin) {
+    //     real edot = -(e - emin) / tau_heat * (e < emin);
+    //     sources[0] += dv * 0.0;
+    //     sources[1] += dv * pcc[0] * edot * 4.0 / 3.0 * G * u;
+    //     sources[2] += dv * pcc[0] * edot * (1.0 + 4.0 / 3.0 * (G - 1.0));
+    //     // printf("emin=%4.3e e=%4.3e\n", emin, e);
+    //     // printf("adding fake heat tau=%f -> %f at r=%e\n", ucc[2], ucc[2] + sources[2], xl);
+    // }
+
     for (int q = 0; q < NCONS; ++q)
     {
         ucc[q] += (fli[q] * dal - fri[q] * dar + sources[q]) / dv * dt;
@@ -359,6 +378,20 @@ static __host__ __device__ void advance_rk_zone(
     }
     real *pout = GET(primitive_wr, i);
     conserved_to_primitive(ucc, pout);
+
+    real mach_ceiling = 1000.0;
+    real u = pcc[1];
+    real e = pcc[2] / pcc[0] * 3.0;
+    real emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
+
+    if (e < emin) {
+        pout[2] = pout[0] * emin * (ADIABATIC_GAMMA - 1.0);
+    }
+
+    if (pout[2] < 0.0 || pout[2] != pout[2]) {
+        printf("[FATAL] sr1d got negative pressure p=%e at r=%e\n", pout[2], xl);
+        exit(1);
+    }
 }
 
 static __host__ __device__ void wavespeed_zone(
