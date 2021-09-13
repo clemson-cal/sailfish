@@ -359,10 +359,7 @@ static void __global__ wavespeed_kernel(
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < mesh.ni && j < mesh.nj)
-    {
-        wavespeed_zone(primitive, wavespeed, i, j);
-    }
+    wavespeed_zone(primitive, wavespeed, i, j);
 }
 
 #endif
