@@ -1,4 +1,4 @@
-use crate::{ExecutionMode, StructuredMesh};
+use crate::{EquationOfState, ExecutionMode, StructuredMesh};
 
 pub mod solver;
 pub mod node;
