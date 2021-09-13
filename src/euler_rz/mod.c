@@ -450,13 +450,13 @@ EXTERN_C void euler_rz_advance_rk(
                     a,
                     dt,
                     i, j
-                    );
+                );
             }
             break;
         }
 
         case OMP: {
-        #ifdef _OPENMP
+            #ifdef _OPENMP
             FOR_EACH_OMP(conserved_rk) {
                 advance_rk_zone(
                     mesh,
@@ -466,10 +466,10 @@ EXTERN_C void euler_rz_advance_rk(
                     a,
                     dt,
                     i, j
-                    );
+                );
             }
-            break;
             #endif
+            break;
         }
 
         case GPU: {
@@ -483,7 +483,7 @@ EXTERN_C void euler_rz_advance_rk(
                 primitive_wr,
                 a,
                 dt
-                );
+            );
             #endif
             break;
         }
