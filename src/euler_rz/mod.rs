@@ -1,6 +1,4 @@
-use crate::{
-    BoundaryCondition, EquationOfState, ExecutionMode, PointMass, PointMassList, StructuredMesh,
-};
+use crate::{ExecutionMode, StructuredMesh};
 
 pub mod solver;
 
@@ -17,21 +15,8 @@ extern "C" {
         conserved_rk_ptr: *const f64,
         primitive_rd_ptr: *const f64,
         primitive_wr_ptr: *mut f64,
-        eos: EquationOfState,
-        boundary_condition: BoundaryCondition,
-        mass_list: PointMassList,
-        nu: f64,
         a: f64,
         dt: f64,
-        velocity_ceiling: f64,
-        mode: ExecutionMode,
-    );
-
-    pub fn euler_rz_point_mass_source_term(
-        mesh: StructuredMesh,
-        primitive_ptr: *const f64,
-        cons_rate_ptr: *const f64,
-        mass: PointMass,
         mode: ExecutionMode,
     );
 
@@ -39,11 +24,12 @@ extern "C" {
         mesh: StructuredMesh,
         primitive_ptr: *const f64,
         wavespeed_ptr: *mut f64,
-        eos: EquationOfState,
-        mass_list: PointMassList,
         mode: ExecutionMode,
     );
 
-    pub fn euler_rz_maximum(data: *const f64, size: std::os::raw::c_ulong, mode: ExecutionMode)
-        -> f64;
+    pub fn euler_rz_maximum(
+        data: *const f64,
+        size: std::os::raw::c_ulong,
+        mode: ExecutionMode,
+    ) -> f64;
 }
