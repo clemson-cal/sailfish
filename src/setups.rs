@@ -834,7 +834,7 @@ impl Setup for FastShell {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(2, resolution)
+        Mesh::logarithmic_radial(1.0, 2, resolution)
     }
 
     fn coordinate_system(&self) -> Coordinates {
@@ -886,7 +886,7 @@ impl Setup for Wind {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(2, resolution)
+        Mesh::logarithmic_radial(1.0, 2, resolution)
     }
 
     fn boundary_condition(&self) -> BoundaryCondition {
@@ -903,15 +903,39 @@ impl Setup for Wind {
 }
 
 /// A relativistic shell is launched into a homologous, relativistic envelope.
-pub struct EnvelopeShock;
+pub struct EnvelopeShock {
+    u_shell: f64,
+    r_inner: f64,
+    num_decades: i64,
+}
 
 impl FromStr for EnvelopeShock {
     type Err = error::Error;
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
-        if parameters.is_empty() {
-            Ok(Self)
+        #[rustfmt::skip]
+        let form = kind_config::Form::new()
+            .item("u_shell",       30.0, "gamma-beta of the launched shell")
+            .item("r_inner",       1.0,  "inner boundary radius")
+            .item("num_decades",   3,    "number of radial decades")
+            .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        let setup = Self {
+            r_inner: form.get("r_inner").into(),
+            num_decades: form.get("num_decades").into(),
+            u_shell: form.get("u_shell").into(),
+        };
+
+        if false {
+            panic!()
+        } else if setup.u_shell < 0.0 {
+            Err(InvalidSetup(format!("u_shell must be >=0.0")))
+        } else if setup.r_inner <= 0.0 {
+            Err(InvalidSetup(format!("r_inner must be >0.0")))
+        } else if setup.num_decades < 1 {
+            Err(InvalidSetup(format!("num_decades must be >0")))
         } else {
-            Err(InvalidSetup("setup does not take any parameters".into()))
+            Ok(setup)
         }
     }
 }
@@ -965,7 +989,7 @@ impl Setup for EnvelopeShock {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(3, resolution)
+        Mesh::logarithmic_radial(self.r_inner, self.num_decades as u32, resolution)
     }
 
     fn coordinate_system(&self) -> Coordinates {
