@@ -57,7 +57,7 @@ pub trait Solve {
 ///
 /// With domain-decomposed grids, the driver needs to construct one solver
 /// instance for each grid patch. So, rather than supplying the driver with
-/// the solver instance(s), the top-level driver invocation provides a sovler
+/// the solver instance(s), the top-level driver invocation provides a solver
 /// builder, which the driver then uses to build as many solvers as there are
 /// patches.
 pub trait PatchBasedBuild {
