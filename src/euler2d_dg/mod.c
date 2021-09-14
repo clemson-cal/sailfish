@@ -19,7 +19,9 @@
 #define MAX_INTERIOR_NODES 25
 #define MAX_FACE_NODES 5
 #define MAX_POLYNOMIALS 15
-#define NCONS 3
+
+#define ADIABATIC_GAMMA (5.0 / 3.0)
+#define NCONS 4
 
 // ============================ MATH ==========================================
 // ============================================================================
@@ -69,48 +71,44 @@ static int num_quadrature_points(struct Cell cell)
     return cell.order * cell.order;
 }
 
-// ============================ EOS ===========================================
-// ============================================================================
-static __host__ __device__ real sound_speed_squared(
-    struct EquationOfState *eos)
-{
-    switch (eos->type)
-    {
-        case Isothermal:
-            return eos->isothermal.sound_speed_squared;
-        case LocallyIsothermal:
-            return 1.0; // WARNING
-        default:
-            return 1.0; // WARNING
-    }
-}
-
 // ============================ HYDRO =========================================
 // ============================================================================
-static __host__ __device__ void primitive_to_conserved(const real *prim, real *cons)
-{
-    real rho = prim[0];
-    real vx = prim[1];
-    real vy = prim[2];
-    real px = vx * rho;
-    real py = vy * rho;
-
-    cons[0] = rho;
-    cons[1] = px;
-    cons[2] = py;
-}
 
 static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
-    real rho = cons[0];
-    real px = cons[1];
-    real py = cons[2];
-    real vx = px / rho;
-    real vy = py / rho;
+    const real rho    = cons[0];
+    const real px     = cons[1];
+    const real py     = cons[2];
+    const real energy = cons[3];
+
+    const real vx = px / rho;
+    const real vy = py / rho;
+    const real kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
+    const real thermal_energy = energy - kinetic_energy;
+    const real pressure = thermal_energy * (ADIABATIC_GAMMA - 1.0);
 
     prim[0] = rho;
     prim[1] = vx;
     prim[2] = vy;
+    prim[3] = pressure;
+}
+
+static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons)
+{
+    const real rho      = prim[0];
+    const real vx       = prim[1];
+    const real vy       = prim[2];
+    const real pressure = prim[3];
+
+    const real px = vx * rho;
+    const real py = vy * rho;
+    const real kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
+    const real thermal_energy = pressure / (ADIABATIC_GAMMA - 1.0);
+
+    cons[0] = rho;
+    cons[1] = px;
+    cons[2] = py;
+    cons[3] = kinetic_energy + thermal_energy;
 }
 
 static __host__ __device__ real primitive_to_velocity(const real *prim, int direction)
@@ -127,65 +125,121 @@ static __host__ __device__ void primitive_to_flux(
     const real *prim,
     const real *cons,
     real *flux,
-    real cs2,
     int direction)
 {
     real vn = primitive_to_velocity(prim, direction);
-    real rho = prim[0];
-    real pressure = rho * cs2;
+    real rho      = prim[0];
+    real pressure = prim[3];
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pressure * (direction == 0);
     flux[2] = vn * cons[2] + pressure * (direction == 1);
+    flux[3] = vn * cons[3] + pressure * vn;
+}
+
+static __host__ __device__ real primitive_to_sound_speed_squared(const real *prim)
+{
+    const real rho = prim[0];
+    const real pressure = prim[3];
+    return ADIABATIC_GAMMA * pressure / rho;
 }
 
 static __host__ __device__ void primitive_to_outer_wavespeeds(
     const real *prim,
-    real *wavespeeds,
-    real cs2,
-    int direction)
+    real *wavespeeds)
 {
-    real cs = sqrt(cs2);
+    const real cs = sqrt(primitive_to_sound_speed_squared(prim));
     real vn = primitive_to_velocity(prim, direction);
     wavespeeds[0] = vn - cs;
     wavespeeds[1] = vn + cs;
 }
 
-/*
-static __host__ __device__ real primitive_max_wavespeed(const real *prim, real cs2)
+static __host__ __device__ real primitive_max_wavespeed(const real *prim)
 {
-    real cs = sqrt(cs2);
+    real cs = sqrt(primitive_to_sound_speed_squared(prim));
     real vx = prim[1];
     real vy = prim[2];
     real ax = max2(fabs(vx - cs), fabs(vx + cs));
     real ay = max2(fabs(vy - cs), fabs(vy + cs));
     return max2(ax, ay);
 }
-*/
 
-static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, real cs2, int direction)
+static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, int direction)
 {
-    real ul[NCONS];
-    real ur[NCONS];
-    real fl[NCONS];
-    real fr[NCONS];
+    real ul[4];
+    real ur[4];
+    real fl[4];
+    real fr[4];
     real al[2];
     real ar[2];
 
     primitive_to_conserved(pl, ul);
     primitive_to_conserved(pr, ur);
-    primitive_to_flux(pl, ul, fl, cs2, direction);
-    primitive_to_flux(pr, ur, fr, cs2, direction);
-    primitive_to_outer_wavespeeds(pl, al, cs2, direction);
-    primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
+    primitive_to_flux_vector(pl, ul, fl, direction);
+    primitive_to_flux_vector(pr, ur, fr, direction);
+    primitive_to_outer_wavespeeds(pl, al, direction);
+    primitive_to_outer_wavespeeds(pr, ar, direction);
 
-    const real am = min3(0.0, al[0], ar[0]);
-    const real ap = max3(0.0, al[1], ar[1]);
+    const real am = min2(0.0, min2(al[0], ar[0]));
+    const real ap = max2(0.0, max2(al[1], ar[1]));
 
     for (int q = 0; q < NCONS; ++q)
     {
         flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
     }
+}
+
+static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, real *flux, int direction)
+{
+    enum { d, px, py, e }; // Conserved
+    enum { rho, vx, vy, p }; // Primitive
+
+    real ul[NCONS];
+    real ur[NCONS];
+    real ulstar[NCONS];
+    real urstar[NCONS];
+    real fl[NCONS];
+    real fr[NCONS];
+    real al[2];
+    real ar[2];
+
+    const real vnl = primitive_to_velocity_component(pl, direction);
+    const real vnr = primitive_to_velocity_component(pr, direction);
+
+    primitive_to_conserved(pl, ul);
+    primitive_to_conserved(pr, ur);
+    primitive_to_flux_vector(pl, ul, fl, direction);
+    primitive_to_flux_vector(pr, ur, fr, direction);
+    primitive_to_outer_wavespeeds(pl, al, direction);
+    primitive_to_outer_wavespeeds(pr, ar, direction);
+
+    const real am = min3(0.0, al[0], ar[0]);
+    const real ap = max3(0.0, al[1], ar[1]);
+
+    real lc = (
+        + (pr[p] - pr[rho] * vnr * (ap - vnr))
+        - (pl[p] - pl[rho] * vnl * (am - vnl))) / (pl[rho] * (am - vnl) - pr[rho] * (ap - vnr));
+
+    real ffl = pl[rho] * (am - vnl) / (am - lc);
+    real ffr = pr[rho] * (ap - vnr) / (ap - lc);
+    
+    ulstar[d] = ffl;
+    ulstar[e] = ffl * (ul[e] / pl[rho] + (lc - vnl) * (lc + pl[p] / (pl[rho] * (am - vnl))));
+    ulstar[px] = ffl * ((lc - vnl) * (direction==0) + pl[vx]);
+    ulstar[py] = ffl * ((lc - vnl) * (direction==1) + pl[vy]);
+
+    urstar[d] = ffr;
+    urstar[e] = ffr * (ur[e] / pr[rho] + (lc - vnl) * (lc + pr[p] / (pr[rho] * (ap - vnl))));
+    urstar[px] = ffr * ((lc - vnl) * (direction==0) + pl[vx]);
+    urstar[py] = ffr * ((lc - vnl) * (direction==1) + pl[vy]);
+
+    const real s = 0.0; //stationary face s = x / t
+
+    if      ( s <= am )       for (int i=0; i<NCONS; ++i) flux[i] = fl[i];
+    else if ( am<s && s<=lc ) for (int i=0; i<NCONS; ++i) flux[i] = fl[i] + am * (ulstar[i] - ul[i]);
+    else if ( lc<s && s<=ap ) for (int i=0; i<NCONS; ++i) flux[i] = fr[i] + ap * (urstar[i] - ur[i]);
+    else if ( ap<s          ) for (int i=0; i<NCONS; ++i) flux[i] = fr[i];
+
 }
 
 // ============================ PATCH =========================================
@@ -354,15 +408,10 @@ static __host__ __device__ void advance_rk_zone_dg(
         conserved_to_primitive(urjm, prjm);
         conserved_to_primitive(urjp, prjp);
 
-        real cs2li = sound_speed_squared(&eos);
-        real cs2ri = sound_speed_squared(&eos);
-        real cs2lj = sound_speed_squared(&eos);
-        real cs2rj = sound_speed_squared(&eos);
-
-        riemann_hlle(plim, plip, fli, cs2li, 0);
-        riemann_hlle(prim, prip, fri, cs2ri, 0);
-        riemann_hlle(pljm, pljp, flj, cs2lj, 1);
-        riemann_hlle(prjm, prjp, frj, cs2rj, 1);
+        riemann_hllc(plim, plip, fli, 0);
+        riemann_hllc(prim, prip, fri, 0);
+        riemann_hllc(pljm, pljp, flj, 1);
+        riemann_hllc(prjm, prjp, frj, 1);
         
         for (int q = 0; q < NCONS; ++q)
         {
@@ -399,10 +448,8 @@ static __host__ __device__ void advance_rk_zone_dg(
 
         conserved_to_primitive(cons, primitive);
 
-        real cs2 = sound_speed_squared(&eos);
-
-        primitive_to_flux(primitive, cons, flux_x, cs2, 0);
-        primitive_to_flux(primitive, cons, flux_y, cs2, 1);
+        primitive_to_flux(primitive, cons, flux_x, 0);
+        primitive_to_flux(primitive, cons, flux_y, 1);
 
         for (int q = 0; q < NCONS; ++q)
         {
