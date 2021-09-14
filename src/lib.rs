@@ -211,6 +211,18 @@ impl StructuredMesh {
         }
     }
 
+    /// Creates a square mesh with a left side aligned with x = 0
+    pub fn left_aligned_square(domain_radius: f64, resolution: u32) -> Self {
+        Self {
+            x0: 0.0,
+            y0: -domain_radius,
+            ni: resolution as i64,
+            nj: resolution as i64,
+            dx: domain_radius / resolution as f64,
+            dy: 2.0 * domain_radius / resolution as f64,
+        }
+    }
+
     /// Returns the number of zones on the i-axis as a `u32`.
     pub fn ni(&self) -> u32 {
         self.ni as u32

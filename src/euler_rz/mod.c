@@ -142,6 +142,11 @@ static __host__ __device__ real primitive_max_wavespeed(const real *prim)
     return max2(ax, ay);
 }
 
+static __host__ __device__ void geometrical_source_terms(const real *prim, real *cons, real xc, real dt)
+{
+    cons[1] += dt * prim[3] / xc;
+}
+
 static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, int direction)
 {
     real ul[NCONS];
@@ -228,6 +233,9 @@ static __host__ __device__ void advance_rk_zone(
 {
     real dx = mesh.dx;
     real dy = mesh.dy;
+    real xl = mesh.x0 + (i + 0.0) * dx;
+    real xc = mesh.x0 + (i + 0.5) * dx;
+    real xr = mesh.x0 + (i + 1.0) * dx;
 
     real *un = GET(conserved_rk, i, j);
     real *pcc = GET(primitive_rd, i, j);
@@ -288,10 +296,11 @@ static __host__ __device__ void advance_rk_zone(
     riemann_hlle(prjm, prjp, frj, 1);
 
     primitive_to_conserved(pcc, ucc);
+    geometrical_source_terms(pcc, ucc, xc, dt);
 
     for (int q = 0; q < NCONS; ++q)
     {
-        ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        ucc[q] -= ((xr * fri[q] - xl * fli[q]) / xc / dx + (frj[q] - flj[q]) / dy) * dt;
         ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i, j);
