@@ -146,7 +146,8 @@ static __host__ __device__ real primitive_to_sound_speed_squared(const real *pri
 
 static __host__ __device__ void primitive_to_outer_wavespeeds(
     const real *prim,
-    real *wavespeeds)
+    real *wavespeeds,
+    int direction)
 {
     const real cs = sqrt(primitive_to_sound_speed_squared(prim));
     real vn = primitive_to_velocity(prim, direction);
