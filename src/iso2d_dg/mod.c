@@ -573,7 +573,7 @@ EXTERN_C void iso2d_advance_rk_dg(
             #ifdef _OPENMP
             FOR_EACH_OMP(weights_rd) {
                 advance_rk_zone_dg(
-                    cell
+                    cell,
                     mesh,
                     weights_rd,
                     weights_wr,
