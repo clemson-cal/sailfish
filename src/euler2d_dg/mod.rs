@@ -5,7 +5,7 @@ pub mod node;
 
 extern "C" {
 
-    pub fn iso2d_dg_primitive_to_weights(
+    pub fn euler2d_dg_primitive_to_weights(
         cell: node::Cell,
         mesh: StructuredMesh,
         weights_ptr: *const f64,
@@ -13,7 +13,7 @@ extern "C" {
         mode: ExecutionMode,
     );
 
-    pub fn iso2d_dg_advance_rk(
+    pub fn euler2d_dg_advance_rk(
         cell: node::Cell,
         mesh: StructuredMesh,
         weights_rd_ptr: *const f64,
