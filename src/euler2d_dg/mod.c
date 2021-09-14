@@ -492,7 +492,7 @@ static void __global__ primitive_to_weights_kernel(
     }
 }
 
-static void __global__ advance_rk_kernel_dg(
+static void __global__ advance_rk_dg_kernel(
     struct Cell cell,
     struct Mesh mesh,
     struct Patch weights_rd,
@@ -534,7 +534,7 @@ static void __global__ advance_rk_kernel_dg(
  * @param weights[out]       [-1, -1] [ni + 2, nj + 2] [3] [n_poly(order)]
  * @param mode               The execution mode
  */
-EXTERN_C void iso2d_dg_primitive_to_weights(
+EXTERN_C void euler2d_dg_primitive_to_weights(
     struct Cell cell,
     struct Mesh mesh,
     real *primitive_ptr,
@@ -587,7 +587,7 @@ EXTERN_C void iso2d_dg_primitive_to_weights(
  * @param dt                    The time step
  * @param mode                  The execution mode
  */
-EXTERN_C void iso2d_advance_rk_dg(
+EXTERN_C void euler2d_advance_rk_dg(
     struct Cell cell,
     struct Mesh mesh,
     real *weights_rd_ptr,
@@ -638,7 +638,7 @@ EXTERN_C void iso2d_advance_rk_dg(
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
  
-            advance_rk_kernel_dg<<<bd, bs>>>(
+            advance_rk_dg_kernel<<<bd, bs>>>(
                 cell,
                 mesh,
                 weights_rd,
@@ -661,7 +661,6 @@ EXTERN_C int iso2d_dg_say_hello(int order)
 {
     return order;
 }
-
 
 /**
  * Template for a public API function to be exposed to Rust code via FFI.
