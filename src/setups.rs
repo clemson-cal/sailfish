@@ -213,7 +213,7 @@ impl Setup for Kilonova {
     }
 
     fn end_time(&self) -> Option<f64> {
-        Some(0.05)
+        Some(0.1)
     }
 }
 

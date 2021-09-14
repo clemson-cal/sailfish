@@ -15,6 +15,6 @@ for filename in sys.argv[1:]:
         j1 = patch['rect'][1]['end']
         local_prim = np.array(np.frombuffer(patch['data'])).reshape([i1 - i0, j1 - j0, 4])
         prim[i0:i1, j0:j1] = local_prim
-    plt.imshow(prim[:,:,3].T, origin='lower')
+    plt.imshow(prim[:,:,0].T, origin='lower')
 
 plt.show()
