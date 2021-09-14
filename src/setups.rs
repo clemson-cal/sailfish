@@ -27,6 +27,8 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("pulse-collision", setup_builder!(PulseCollision)),
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
+        ("shocktubeDG", setup_builder!(ShocktubeDG)),
+        ("vortexDG", setup_builder!(VortexDG)),
         ("wind", setup_builder!(Wind)),
     ]
 }
@@ -111,7 +113,55 @@ impl Setup for Shocktube {
         Some(0.15)
     }
 }
+pub struct ShocktubeDG;
 
+impl FromStr for ShocktubeDG {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self)
+        } else {
+            Err(InvalidSetup("setup does not take any parameters".into()))
+        }
+    }
+}
+
+impl Setup for ShocktubeDG {
+    fn num_primitives(&self) -> usize {
+        4
+    }
+
+    fn solver_name(&self) -> String {
+        "euler2d_dg".to_owned()
+    }
+
+    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
+        if x < 0.5 {
+            primitive[0] = 1.0;
+            primitive[3] = 1.0;
+        } else {
+            primitive[0] = 0.1;
+            primitive[3] = 0.125;
+        }
+        primitive[1] = 0.0;
+        primitive[2] = 0.0;
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 5.0 / 3.0,
+        }
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+
+    fn end_time(&self) -> Option<f64> {
+        Some(0.15)
+    }
+}
 /// A cylindrical explosion in 2D planar geometry; isothermal hydro.
 ///
 /// This problem is useful for testing bare-bones setups with minimal physics.
@@ -178,10 +228,10 @@ impl FromStr for ExplosionDG {
 
 impl Setup for ExplosionDG {
     fn num_primitives(&self) -> usize {
-        3
+        4
     }
     fn solver_name(&self) -> String {
-        "iso2d_dg".to_owned()
+        "euler2d_dg".to_owned()
     }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
@@ -193,8 +243,8 @@ impl Setup for ExplosionDG {
         primitive[2] = 0.0;
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::Isothermal {
-            sound_speed_squared: 1.0,
+        EquationOfState::GammaLaw {
+            gamma_law_index: self.gamma_law_index,
         }
     }
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -229,18 +279,24 @@ impl Setup for VortexDG {
         "euler2d_dg".to_owned()
     }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-        if (x * x + y * y).sqrt() < 0.25 {
-            primitive[0] = 1.0;
-        } else {
-            primitive[0] = 0.1;
-        }
-        primitive[1] = 0.0;
-        primitive[2] = 0.0;
-        primitive[3] = 0.0;
+
+        // Schaal+(2015) Isentropic Vortex Sec. 5.1
+        let r = (x * x + y * y).sqrt();
+        let beta = 5.0;
+        let g = 7.0/5.0;
+        let real vb = 0.0;
+        let rho = (1.0 - (g - 1.0) * beta * beta / (8.0 * g * 3.14159 * 3.14159 * PI) * (1.0-r2).exp()).pow(1.0/(g-1.0));
+        let pressure = rho.pow(g);
+        let vx = -(yq - ymid) * beta / (2.0 * 3.14159) * ((1.0-r2)/2.0).exp();
+        let vy =  (xq - xmid) * beta / (2.0 * 3.14159) * ((1.0-r2)/2.0).exp();  
+        prim[0] = rho;
+        prim[1] = vx + vb;
+        prim[2] = vy + vb;
+        prim[3] = pressure;
     }
     fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::Isothermal {
-            sound_speed_squared: 1.0,
+        EquationOfState::GammaLaw {
+            gamma_law_index: self.gamma_law_index,
         }
     }
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -671,7 +727,7 @@ impl Setup for BinaryWithThermodynamics {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
             resolution,
-        ))
+        )
     }
 
     fn coordinate_system(&self) -> Coordinates {
