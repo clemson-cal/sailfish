@@ -37,7 +37,7 @@ struct NodeData {
     real phi[MAX_POLYNOMIALS];
     real dphi_dx[MAX_POLYNOMIALS];
     real dphi_dy[MAX_POLYNOMIALS];
-    real weight; 
+    real weight;
 };
 
 
@@ -314,7 +314,7 @@ static __host__ __device__ void advance_rk_zone_dg(
     {
         for (int l = 0; l < n_poly; ++l)
         {
-            dwij[q * n_poly + l] = 0.0;  
+            dwij[q * n_poly + l] = 0.0;
         }
     }
 
@@ -334,14 +334,14 @@ static __host__ __device__ void advance_rk_zone_dg(
 
             for (int l = 0; l < n_poly; ++l)
             {
-                ulim[q] += wli[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i-1 
+                ulim[q] += wli[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i - 1
                 ulip[q] += wij[q * n_poly + l] * cell.face_nodes_li[qp].phi[l]; // left face of zone i
-                urim[q] += wij[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i  
+                urim[q] += wij[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i
                 urip[q] += wri[q * n_poly + l] * cell.face_nodes_li[qp].phi[l]; // left face of zone i + 1
-                uljm[q] += wlj[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j-1 
+                uljm[q] += wlj[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j - 1
                 uljp[q] += wij[q * n_poly + l] * cell.face_nodes_lj[qp].phi[l]; // bottom face of zone j
-                urjm[q] += wij[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j  
-                urjp[q] += wrj[q * n_poly + l] * cell.face_nodes_lj[qp].phi[l]; // bottom face of zone j + 1                       
+                urjm[q] += wij[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j
+                urjp[q] += wrj[q * n_poly + l] * cell.face_nodes_lj[qp].phi[l]; // bottom face of zone j + 1
             }
         }
 
@@ -363,7 +363,7 @@ static __host__ __device__ void advance_rk_zone_dg(
         riemann_hlle(prim, prip, fri, cs2ri, 0);
         riemann_hlle(pljm, pljp, flj, cs2lj, 1);
         riemann_hlle(prjm, prjp, frj, cs2rj, 1);
-        
+
         for (int q = 0; q < NCONS; ++q)
         {
             for (int l = 0; l < n_poly; ++l)
@@ -371,7 +371,7 @@ static __host__ __device__ void advance_rk_zone_dg(
                 dwij[q * n_poly + l] -= fli[q] * cell.face_nodes_li[qp].phi[l] * cell.face_nodes_li[qp].weight;
                 dwij[q * n_poly + l] -= fri[q] * cell.face_nodes_ri[qp].phi[l] * cell.face_nodes_ri[qp].weight;
                 dwij[q * n_poly + l] -= flj[q] * cell.face_nodes_lj[qp].phi[l] * cell.face_nodes_lj[qp].weight;
-                dwij[q * n_poly + l] -= frj[q] * cell.face_nodes_rj[qp].phi[l] * cell.face_nodes_rj[qp].weight;  
+                dwij[q * n_poly + l] -= frj[q] * cell.face_nodes_rj[qp].phi[l] * cell.face_nodes_rj[qp].weight;
             }
         }
     }
@@ -409,7 +409,7 @@ static __host__ __device__ void advance_rk_zone_dg(
             for (int l = 0; l < n_poly; ++l)
             {
                 dwij[q * n_poly + l] += flux_x[q] * node.dphi_dx[l] * node.weight;
-                dwij[q * n_poly + l] += flux_y[q] * node.dphi_dy[l] * node.weight; 
+                dwij[q * n_poly + l] += flux_y[q] * node.dphi_dy[l] * node.weight;
             }
         }
     }
@@ -420,7 +420,7 @@ static __host__ __device__ void advance_rk_zone_dg(
     {
         for (int l = 0; l < n_poly; ++l)
         {
-            wout[q * n_poly + l] = wij[q * n_poly + l] + 0.5 * dwij[q * n_poly + l] * dt / dx; //assumes dy=dx
+            wout[q * n_poly + l] = wij[q * n_poly + l] + 0.5 * dwij[q * n_poly + l] * dt / dx; // assumes dy = dx
         }
     }
 }
@@ -545,7 +545,7 @@ EXTERN_C void iso2d_advance_rk_dg(
     real *weights_rd_ptr,
     real *weights_wr_ptr,
     struct EquationOfState eos,
-    real dt, 
+    real dt,
     enum ExecutionMode mode)
 {
     int n_poly = num_polynomials(cell);
@@ -579,7 +579,8 @@ EXTERN_C void iso2d_advance_rk_dg(
                     weights_wr,
                     eos,
                     dt,
-                    i, j);
+                    i, j
+                );
             }
             #endif
             break;
@@ -589,7 +590,7 @@ EXTERN_C void iso2d_advance_rk_dg(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
- 
+
             advance_rk_kernel_dg<<<bd, bs>>>(
                 cell,
                 mesh,
@@ -597,7 +598,7 @@ EXTERN_C void iso2d_advance_rk_dg(
                 weights_wr,
                 eos,
                 dt,
-            );           
+            );
             #endif
             break;
         }
@@ -606,7 +607,7 @@ EXTERN_C void iso2d_advance_rk_dg(
 
 /**
  * Template for a public API function to be exposed to Rust code via FFI.
- * 
+ *
  * @param order          The DG order
  */
 EXTERN_C int iso2d_dg_say_hello(int order)
@@ -617,11 +618,10 @@ EXTERN_C int iso2d_dg_say_hello(int order)
 
 /**
  * Template for a public API function to be exposed to Rust code via FFI.
- * 
+ *
  * @param cell          The DG cell data
  */
 EXTERN_C int iso2d_dg_get_order(struct Cell cell)
 {
     return cell.order;
 }
-

@@ -39,7 +39,7 @@ struct NodeData {
     real phi[MAX_POLYNOMIALS];
     real dphi_dx[MAX_POLYNOMIALS];
     real dphi_dy[MAX_POLYNOMIALS];
-    real weight; 
+    real weight;
 };
 
 
@@ -223,24 +223,23 @@ static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, rea
 
     real ffl = pl[rho] * (am - vnl) / (am - lc);
     real ffr = pr[rho] * (ap - vnr) / (ap - lc);
-    
+
     ulstar[d] = ffl;
     ulstar[e] = ffl * (ul[e] / pl[rho] + (lc - vnl) * (lc + pl[p] / (pl[rho] * (am - vnl))));
-    ulstar[px] = ffl * ((lc - vnl) * (direction==0) + pl[vx]);
-    ulstar[py] = ffl * ((lc - vnl) * (direction==1) + pl[vy]);
+    ulstar[px] = ffl * ((lc - vnl) * (direction == 0) + pl[vx]);
+    ulstar[py] = ffl * ((lc - vnl) * (direction == 1) + pl[vy]);
 
     urstar[d] = ffr;
     urstar[e] = ffr * (ur[e] / pr[rho] + (lc - vnl) * (lc + pr[p] / (pr[rho] * (ap - vnl))));
-    urstar[px] = ffr * ((lc - vnl) * (direction==0) + pl[vx]);
-    urstar[py] = ffr * ((lc - vnl) * (direction==1) + pl[vy]);
+    urstar[px] = ffr * ((lc - vnl) * (direction == 0) + pl[vx]);
+    urstar[py] = ffr * ((lc - vnl) * (direction == 1) + pl[vy]);
 
-    const real s = 0.0; //stationary face s = x / t
+    const real s = 0.0; // stationary face s = x / t
 
-    if      ( s <= am )       for (int i=0; i<NCONS; ++i) flux[i] = fl[i];
-    else if ( am<s && s<=lc ) for (int i=0; i<NCONS; ++i) flux[i] = fl[i] + am * (ulstar[i] - ul[i]);
-    else if ( lc<s && s<=ap ) for (int i=0; i<NCONS; ++i) flux[i] = fr[i] + ap * (urstar[i] - ur[i]);
-    else if ( ap<s          ) for (int i=0; i<NCONS; ++i) flux[i] = fr[i];
-
+    if      (s  <= am)          for (int i = 0; i < NCONS; ++i) flux[i] = fl[i];
+    else if (am < s && s <= lc) for (int i = 0; i < NCONS; ++i) flux[i] = fl[i] + am * (ulstar[i] - ul[i]);
+    else if (lc < s && s <= ap) for (int i = 0; i < NCONS; ++i) flux[i] = fr[i] + ap * (urstar[i] - ur[i]);
+    else if (ap < s)            for (int i = 0; i < NCONS; ++i) flux[i] = fr[i];
 }
 
 // ============================ PATCH =========================================
@@ -369,7 +368,7 @@ static __host__ __device__ void advance_rk_zone_dg(
     {
         for (int l = 0; l < n_poly; ++l)
         {
-            dwij[q * n_poly + l] = 0.0;  
+            dwij[q * n_poly + l] = 0.0;
         }
     }
 
@@ -389,14 +388,14 @@ static __host__ __device__ void advance_rk_zone_dg(
 
             for (int l = 0; l < n_poly; ++l)
             {
-                ulim[q] += wli[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i-1 
+                ulim[q] += wli[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i - 1
                 ulip[q] += wij[q * n_poly + l] * cell.face_nodes_li[qp].phi[l]; // left face of zone i
-                urim[q] += wij[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i  
+                urim[q] += wij[q * n_poly + l] * cell.face_nodes_ri[qp].phi[l]; // right face of zone i
                 urip[q] += wri[q * n_poly + l] * cell.face_nodes_li[qp].phi[l]; // left face of zone i + 1
-                uljm[q] += wlj[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j-1 
+                uljm[q] += wlj[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j - 1
                 uljp[q] += wij[q * n_poly + l] * cell.face_nodes_lj[qp].phi[l]; // bottom face of zone j
-                urjm[q] += wij[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j  
-                urjp[q] += wrj[q * n_poly + l] * cell.face_nodes_lj[qp].phi[l]; // bottom face of zone j + 1                       
+                urjm[q] += wij[q * n_poly + l] * cell.face_nodes_rj[qp].phi[l]; // top face of zone j
+                urjp[q] += wrj[q * n_poly + l] * cell.face_nodes_lj[qp].phi[l]; // bottom face of zone j + 1
             }
         }
 
@@ -413,7 +412,7 @@ static __host__ __device__ void advance_rk_zone_dg(
         riemann_hllc(prim, prip, fri, 0);
         riemann_hllc(pljm, pljp, flj, 1);
         riemann_hllc(prjm, prjp, frj, 1);
-        
+
         for (int q = 0; q < NCONS; ++q)
         {
             for (int l = 0; l < n_poly; ++l)
@@ -421,7 +420,7 @@ static __host__ __device__ void advance_rk_zone_dg(
                 dwij[q * n_poly + l] -= fli[q] * cell.face_nodes_li[qp].phi[l] * cell.face_nodes_li[qp].weight;
                 dwij[q * n_poly + l] -= fri[q] * cell.face_nodes_ri[qp].phi[l] * cell.face_nodes_ri[qp].weight;
                 dwij[q * n_poly + l] -= flj[q] * cell.face_nodes_lj[qp].phi[l] * cell.face_nodes_lj[qp].weight;
-                dwij[q * n_poly + l] -= frj[q] * cell.face_nodes_rj[qp].phi[l] * cell.face_nodes_rj[qp].weight;  
+                dwij[q * n_poly + l] -= frj[q] * cell.face_nodes_rj[qp].phi[l] * cell.face_nodes_rj[qp].weight;
             }
         }
     }
@@ -457,7 +456,7 @@ static __host__ __device__ void advance_rk_zone_dg(
             for (int l = 0; l < n_poly; ++l)
             {
                 dwij[q * n_poly + l] += flux_x[q] * node.dphi_dx[l] * node.weight;
-                dwij[q * n_poly + l] += flux_y[q] * node.dphi_dy[l] * node.weight; 
+                dwij[q * n_poly + l] += flux_y[q] * node.dphi_dy[l] * node.weight;
             }
         }
     }
@@ -468,7 +467,7 @@ static __host__ __device__ void advance_rk_zone_dg(
     {
         for (int l = 0; l < n_poly; ++l)
         {
-            wout[q * n_poly + l] = wij[q * n_poly + l] + 0.5 * dwij[q * n_poly + l] * dt / dx; //assumes dy=dx
+            wout[q * n_poly + l] = wij[q * n_poly + l] + 0.5 * dwij[q * n_poly + l] * dt / dx; // assumes dy = dx
         }
     }
 }
@@ -517,9 +516,7 @@ static void __global__ advance_rk_dg_kernel(
         );
     }
 }
-
 #endif // defined(__NVCC__) || defined(__ROCM__)
-
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
@@ -593,7 +590,7 @@ EXTERN_C void euler2d_advance_rk_dg(
     real *weights_rd_ptr,
     real *weights_wr_ptr,
     struct EquationOfState eos,
-    real dt, 
+    real dt,
     enum ExecutionMode mode)
 {
     int n_poly = num_polynomials(cell);
@@ -627,7 +624,8 @@ EXTERN_C void euler2d_advance_rk_dg(
                     weights_wr,
                     eos,
                     dt,
-                    i, j);
+                    i, j
+                );
             }
             #endif
             break;
@@ -637,7 +635,7 @@ EXTERN_C void euler2d_advance_rk_dg(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
- 
+
             advance_rk_dg_kernel<<<bd, bs>>>(
                 cell,
                 mesh,
@@ -645,7 +643,7 @@ EXTERN_C void euler2d_advance_rk_dg(
                 weights_wr,
                 eos,
                 dt,
-            );           
+            );
             #endif
             break;
         }
@@ -654,7 +652,7 @@ EXTERN_C void euler2d_advance_rk_dg(
 
 /**
  * Template for a public API function to be exposed to Rust code via FFI.
- * 
+ *
  * @param order          The DG order
  */
 EXTERN_C int iso2d_dg_say_hello(int order)
@@ -664,7 +662,7 @@ EXTERN_C int iso2d_dg_say_hello(int order)
 
 /**
  * Template for a public API function to be exposed to Rust code via FFI.
- * 
+ *
  * @param cell          The DG cell data
  */
 EXTERN_C int iso2d_dg_get_order(struct Cell cell)
