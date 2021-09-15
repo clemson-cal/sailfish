@@ -1,11 +1,11 @@
 use crate::{EquationOfState, ExecutionMode, StructuredMesh};
+use crate::node_2d;
 
 pub mod solver;
-pub mod node;
 
 extern "C" {
     fn euler2d_dg_primitive_to_weights(
-        cell: node::Cell,
+        cell: node_2d::Cell,
         mesh: StructuredMesh,
         primitive_ptr: *const f64,
         weights_ptr: *mut f64,
@@ -13,7 +13,7 @@ extern "C" {
     );
 
     fn euler2d_dg_advance_rk(
-        cell: node::Cell,
+        cell: node_2d::Cell,
         mesh: StructuredMesh,
         weights_rd_ptr: *const f64,
         weights_wr_ptr: *mut f64,

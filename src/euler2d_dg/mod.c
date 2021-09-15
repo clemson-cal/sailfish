@@ -1,3 +1,4 @@
+#define DG_SOLVER
 #include <stdio.h>
 #include <math.h>
 #include "../sailfish.h"
@@ -16,10 +17,6 @@
 #define EXTERN_C extern "C"
 #endif
 
-#define MAX_INTERIOR_NODES 25
-#define MAX_FACE_NODES 5
-#define MAX_POLYNOMIALS 15
-
 #define ADIABATIC_GAMMA (5.0 / 3.0)
 #define NCONS 4
 
@@ -32,44 +29,6 @@
 #define max3(a, b, c) max2(a, max2(b, c))
 #define sign(x) copysign(1.0, x)
 #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
-
-struct NodeData {
-    real xsi_x;
-    real xsi_y;
-    real phi[MAX_POLYNOMIALS];
-    real dphi_dx[MAX_POLYNOMIALS];
-    real dphi_dy[MAX_POLYNOMIALS];
-    real weight;
-};
-
-
-struct Cell {
-    struct NodeData interior_nodes[MAX_INTERIOR_NODES];
-    struct NodeData face_nodes_li[MAX_FACE_NODES];
-    struct NodeData face_nodes_ri[MAX_FACE_NODES];
-    struct NodeData face_nodes_lj[MAX_FACE_NODES];
-    struct NodeData face_nodes_rj[MAX_FACE_NODES];
-    int order;
-};
-
-
-static int num_polynomials(struct Cell cell)
-{
-    switch (cell.order)
-    {
-        case 1: return 1;
-        case 2: return 3;
-        case 3: return 6;
-        case 4: return 10;
-        case 5: return 15;
-        default: return 0;
-    }
-}
-
-static int num_quadrature_points(struct Cell cell)
-{
-    return cell.order * cell.order;
-}
 
 // ============================ HYDRO =========================================
 // ============================================================================
@@ -526,7 +485,7 @@ static void __global__ advance_rk_dg_kernel(
  *
  * @param cell               The cell [order]
  * @param mesh               The mesh [ni,     nj]
- * @param primitive_ptr[in]  [ 0,  0] [ni,     nj]     [4] [n_poly(order)]
+ * @param primitive_ptr[in]  [ 0,  0] [ni,     nj]     [4] [n_quad]
  * @param weights[out]       [-1, -1] [ni + 2, nj + 2] [4] [n_poly(order)]
  * @param mode               The execution mode
  */

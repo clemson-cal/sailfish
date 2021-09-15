@@ -185,6 +185,9 @@ impl PatchBasedBuild for Builder {
         device: Option<Device>,
         setup: Arc<dyn Setup>,
     ) -> Self::Solver {
+        let cell = setup.dg_cell().expect("setup must provide a cell");
+        let num_fields = 4 * cell.quadrature_points().count();
+
         assert! {
             (device.is_none() && std::matches!(mode, ExecutionMode::CPU | ExecutionMode::OMP)) ||
             (device.is_some() && std::matches!(mode, ExecutionMode::GPU)),
@@ -192,8 +195,9 @@ impl PatchBasedBuild for Builder {
         };
         assert_eq! {
             setup.num_primitives(),
-            3,
-            "this solver is hard-coded for 3 primitive variable fields"
+            num_fields,
+            "this solver requires 4 primitive variable fields, by {} quadrature points",
+            cell.quadrature_points().count(),
         };
 
         let rect = primitive.rect();

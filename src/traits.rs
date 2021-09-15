@@ -1,6 +1,6 @@
 use crate::{
-    BoundaryCondition, Coordinates, Device, EquationOfState, ExecutionMode, IndexSpace, Mesh,
-    Patch, PointMassList, StructuredMesh,
+    node_2d, BoundaryCondition, Coordinates, Device, EquationOfState, ExecutionMode, IndexSpace,
+    Mesh, Patch, PointMassList, StructuredMesh,
 };
 
 use gridiron::adjacency_list::AdjacencyList;
@@ -263,6 +263,10 @@ pub trait Setup: Send + Sync {
         None
     }
 
+    fn dg_cell(&self) -> Option<node_2d::Cell> {
+        None
+    }
+
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
         match mesh {
             Mesh::Structured(_) => {
@@ -283,6 +287,14 @@ pub trait Setup: Send + Sync {
     /// Provided method to generate grid patches of primitive data from the
     /// initial model.
     fn initial_primitive_patch(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
+        if let Some(cell) = self.dg_cell() {
+            self.initial_primitive_patch_dg(space, mesh, &cell)
+        } else {
+            self.initial_primitive_patch_conventional(space, mesh)
+        }
+    }
+
+    fn initial_primitive_patch_conventional(&self, space: &IndexSpace, mesh: &Mesh) -> Patch {
         match mesh {
             Mesh::Structured(mesh) => {
                 Patch::from_slice_function(space, self.num_primitives(), |(i, j), prim| {
@@ -297,7 +309,7 @@ pub trait Setup: Send + Sync {
     /// Provided method to generate grid patches of primitive data from the
     /// initial model, with the primitive variables sampled at sub-cell
     /// quadrature points as specified by the `cell` variable.
-    fn initial_primitive_dg(&self, space: &IndexSpace, mesh: &Mesh, cell: &crate::euler2d_dg::node::Cell) -> Patch {
+    fn initial_primitive_patch_dg(&self, space: &IndexSpace, mesh: &Mesh, cell: &node_2d::Cell) -> Patch {
         match mesh {
             Mesh::Structured(mesh) => {
                 let ni = cell.quadrature_points().count();

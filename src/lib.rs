@@ -7,6 +7,7 @@ pub mod iso2d;
 pub mod sr1d;
 pub mod lookup_table;
 pub mod mesh;
+pub mod node_2d;
 pub mod parse;
 pub mod patch;
 pub mod setups;
