@@ -497,8 +497,7 @@ static void __global__ advance_rk_dg_kernel(
     struct Patch weights_rd,
     struct Patch weights_wr,
     struct EquationOfState eos,
-    real dt
-    )
+    real dt)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -527,8 +526,8 @@ static void __global__ advance_rk_dg_kernel(
  *
  * @param cell               The cell [order]
  * @param mesh               The mesh [ni,     nj]
- * @param primitive_ptr[in]  [ 0,  0] [ni,     nj]     [3] [n_poly(order)]
- * @param weights[out]       [-1, -1] [ni + 2, nj + 2] [3] [n_poly(order)]
+ * @param primitive_ptr[in]  [ 0,  0] [ni,     nj]     [4] [n_poly(order)]
+ * @param weights[out]       [-1, -1] [ni + 2, nj + 2] [4] [n_poly(order)]
  * @param mode               The execution mode
  */
 EXTERN_C void euler2d_dg_primitive_to_weights(
@@ -578,8 +577,8 @@ EXTERN_C void euler2d_dg_primitive_to_weights(
  * Updates an array of DG weights data by advancing it a single Runge-Kutta
  * step.
  * @param mesh                  The mesh [ni,     nj]
- * @param weights_rd_ptr[in]  [-1, -1] [ni + 2, nj + 2] [3]
- * @param weights_wr_ptr[out] [-1, -1] [ni + 2, nj + 2] [3]
+ * @param weights_rd_ptr[in]    [-1, -1] [ni + 2, nj + 2] [4]
+ * @param weights_wr_ptr[out]   [-1, -1] [ni + 2, nj + 2] [4]
  * @param eos                   The EOS
  * @param dt                    The time step
  * @param mode                  The execution mode
@@ -649,24 +648,3 @@ EXTERN_C void euler2d_advance_rk_dg(
         }
     }
 }
-
-/**
- * Template for a public API function to be exposed to Rust code via FFI.
- *
- * @param order          The DG order
- */
-EXTERN_C int iso2d_dg_say_hello(int order)
-{
-    return order;
-}
-
-/**
- * Template for a public API function to be exposed to Rust code via FFI.
- *
- * @param cell          The DG cell data
- */
-EXTERN_C int iso2d_dg_get_order(struct Cell cell)
-{
-    return cell.order;
-}
-

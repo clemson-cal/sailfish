@@ -1,17 +1,17 @@
-use crate::iso2d;
 use crate::mesh;
 use crate::patch::Patch;
 use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh};
-use cfg_if::cfg_if;
+// use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{Automaton, Status};
 use gridiron::index_space::{Axis, IndexSpace};
 use gridiron::rect_map::Rectangle;
 use std::mem::swap;
-use std::ops::DerefMut;
-use std::os::raw::c_ulong;
-use std::sync::{Arc, Mutex};
+// use std::ops::DerefMut;
+// use std::os::raw::c_ulong;
+// use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 
 enum SolverState {
     NotReady,
@@ -26,29 +26,29 @@ pub struct Solver {
     rk_order: usize,
     primitive1: Patch,
     primitive2: Patch,
-    conserved0: Patch,
-    source_buf: Arc<Mutex<Patch>>,
-    wavespeeds: Arc<Mutex<Patch>>,
+    // conserved0: Patch,
+    // source_buf: Arc<Mutex<Patch>>,
+    // wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
     incoming_count: usize,
     received_count: usize,
     outgoing_edges: Vec<Rectangle<i64>>,
-    mesh: StructuredMesh,
-    mode: ExecutionMode,
+    // mesh: StructuredMesh,
+    // mode: ExecutionMode,
     device: Option<Device>,
-    setup: Arc<dyn Setup>,
+    // setup: Arc<dyn Setup>,
 }
 
 impl Solver {
     pub fn new_timestep(&mut self) {
-        gpu_core::scope(self.device, || unsafe {
-            iso2d::iso2d_primitive_to_conserved(
-                self.mesh,
-                self.primitive1.as_ptr(),
-                self.conserved0.as_mut_ptr(),
-                self.mode,
-            );
-        });
+        // gpu_core::scope(self.device, || unsafe {
+        //     iso2d::iso2d_primitive_to_conserved(
+        //         self.mesh,
+        //         self.primitive1.as_ptr(),
+        //         self.conserved0.as_mut_ptr(),
+        //         self.mode,
+        //     );
+        // });
         self.time0 = self.time;
         self.state = SolverState::RungeKuttaStage(0);
     }
@@ -75,22 +75,22 @@ impl Solver {
             _ => panic!(),
         };
 
-        gpu_core::scope(self.device, || unsafe {
-            iso2d::iso2d_advance_rk(
-                self.mesh,
-                self.conserved0.as_ptr(),
-                self.primitive1.as_ptr(),
-                self.primitive2.as_mut_ptr(),
-                self.setup.equation_of_state(),
-                self.setup.boundary_condition(),
-                self.setup.masses(self.time),
-                self.setup.viscosity().unwrap_or(0.0),
-                a,
-                dt,
-                self.setup.velocity_ceiling().unwrap_or(f64::MAX),
-                self.mode,
-            );
-        });
+        // gpu_core::scope(self.device, || unsafe {
+        //     iso2d::iso2d_advance_rk(
+        //         self.mesh,
+        //         self.conserved0.as_ptr(),
+        //         self.primitive1.as_ptr(),
+        //         self.primitive2.as_mut_ptr(),
+        //         self.setup.equation_of_state(),
+        //         self.setup.boundary_condition(),
+        //         self.setup.masses(self.time),
+        //         self.setup.viscosity().unwrap_or(0.0),
+        //         a,
+        //         dt,
+        //         self.setup.velocity_ceiling().unwrap_or(f64::MAX),
+        //         self.mode,
+        //     );
+        // });
         swap(&mut self.primitive1, &mut self.primitive2);
 
         self.time = self.time0 * a + (self.time + dt) * (1.0 - a);
@@ -108,72 +108,11 @@ impl PatchBasedSolve for Solver {
     }
 
     fn max_wavespeed(&self) -> f64 {
-        let setup = &self.setup;
-        let eos = setup.equation_of_state();
-        let mut lock = self.wavespeeds.lock().unwrap();
-        let wavespeeds = lock.deref_mut();
-
-        gpu_core::scope(self.device, || unsafe {
-            iso2d::iso2d_wavespeed(
-                self.mesh,
-                self.primitive1.as_ptr(),
-                wavespeeds.as_mut_ptr(),
-                eos,
-                self.setup.masses(self.time),
-                self.mode,
-            )
-        });
-
-        match self.mode {
-            ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
-                iso2d::iso2d_maximum(
-                    wavespeeds.as_ptr(),
-                    wavespeeds.as_slice().unwrap().len() as c_ulong,
-                    self.mode,
-                )
-            },
-            ExecutionMode::GPU => {
-                cfg_if! {
-                    if #[cfg(feature = "gpu")] {
-                        use gpu_core::Reduce;
-                        wavespeeds.as_device_buffer().unwrap().maximum().unwrap()
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
-        }
+        todo!("need to compute wavespeeds")
     }
 
     fn reductions(&self) -> Vec<f64> {
-        let mut lock = self.source_buf.lock().unwrap();
-        let cons_rate = lock.deref_mut();
-        let mut result = vec![];
-
-        for mass in self.setup.masses(self.time).to_vec() {
-            gpu_core::scope(self.device, || unsafe {
-                iso2d::iso2d_point_mass_source_term(
-                    self.mesh,
-                    self.primitive1.as_ptr(),
-                    cons_rate.as_ptr(),
-                    mass,
-                    self.mode,
-                )
-            });
-            let mut udot = cons_rate
-                .to_host()
-                .as_slice()
-                .unwrap()
-                .chunks_exact(3)
-                .fold([0.0, 0.0, 0.0], |a: [f64; 3], b: &[f64]| {
-                    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
-                });
-            for ud in &mut udot {
-                *ud *= self.mesh.dx * self.mesh.dy;
-            }
-            result.extend(udot)
-        }
-        result
+        vec![]
     }
 
     fn set_timestep(&mut self, dt: f64) {
@@ -271,9 +210,9 @@ impl PatchBasedBuild for Builder {
         ];
 
         let primitive1 = Patch::zeros(3, &local_space.extend_all(2)).on(device);
-        let conserved0 = Patch::zeros(3, &local_space).on(device);
-        let source_buf = Patch::zeros(3, &local_space).on(device);
-        let wavespeeds = Patch::zeros(1, &local_space).on(device);
+        // let conserved0 = Patch::zeros(3, &local_space).on(device);
+        // let source_buf = Patch::zeros(3, &locaal_space).on(device);
+        // let wavespeeds = Patch::zeros(1, &local_space).on(device);
 
         let mut primitive1 = primitive1;
         primitive.copy_into(&mut primitive1);
@@ -294,17 +233,17 @@ impl PatchBasedBuild for Builder {
             rk_order,
             primitive2: primitive1.clone(),
             primitive1,
-            conserved0,
-            source_buf: Arc::new(Mutex::new(source_buf)),
-            wavespeeds: Arc::new(Mutex::new(wavespeeds)),
+            // conserved0,
+            // source_buf: Arc::new(Mutex::new(source_buf)),
+            // wavespeeds: Arc::new(Mutex::new(wavespeeds)),
             outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
             incoming_count: edge_list.incoming_edges(&rect).count(),
             received_count: 0,
             index_space: local_space,
-            mode,
+            // mode,
             device,
-            mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
-            setup,
+            // mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
+            // setup,
         }
     }
 }

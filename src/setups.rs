@@ -3,9 +3,13 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::{BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel, StructuredMesh};
+use crate::{
+    BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
+    StructuredMesh,
+};
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
+use std::f64::consts::PI;
 use std::fmt::Write;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -213,13 +217,17 @@ impl Setup for Explosion {
     }
 }
 
-pub struct ExplosionDG;
+pub struct ExplosionDG {
+    gamma_law_index: f64,
+}
 
 impl FromStr for ExplosionDG {
     type Err = error::Error;
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         if parameters.is_empty() {
-            Ok(Self)
+            Ok(Self {
+                gamma_law_index: 5.0 / 3.0,
+            })
         } else {
             Err(InvalidSetup("setup does not take any parameters".into()))
         }
@@ -258,13 +266,17 @@ impl Setup for ExplosionDG {
     }
 }
 
-pub struct VortexDG;
+pub struct VortexDG {
+    gamma_law_index: f64,
+}
 
 impl FromStr for VortexDG {
     type Err = error::Error;
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         if parameters.is_empty() {
-            Ok(Self)
+            Ok(Self {
+                gamma_law_index: 5.0 / 3.0,
+            })
         } else {
             Err(InvalidSetup("setup does not take any parameters".into()))
         }
@@ -279,20 +291,20 @@ impl Setup for VortexDG {
         "euler2d_dg".to_owned()
     }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-
         // Schaal+(2015) Isentropic Vortex Sec. 5.1
-        let r = (x * x + y * y).sqrt();
+        let r2 = x * x + y * y;
         let beta = 5.0;
-        let g = 7.0/5.0;
-        let real vb = 0.0;
-        let rho = (1.0 - (g - 1.0) * beta * beta / (8.0 * g * 3.14159 * 3.14159 * PI) * (1.0-r2).exp()).pow(1.0/(g-1.0));
-        let pressure = rho.pow(g);
-        let vx = -(yq - ymid) * beta / (2.0 * 3.14159) * ((1.0-r2)/2.0).exp();
-        let vy =  (xq - xmid) * beta / (2.0 * 3.14159) * ((1.0-r2)/2.0).exp();  
-        prim[0] = rho;
-        prim[1] = vx + vb;
-        prim[2] = vy + vb;
-        prim[3] = pressure;
+        let g = self.gamma_law_index;
+        let vb = 0.0;
+        let rho = (1.0 - (g - 1.0) * beta * beta / (8.0 * g * PI * PI) * (1.0 - r2).exp())
+            .powf(1.0 / (g - 1.0));
+        let pressure = rho.powf(g);
+        let vx = y * beta / (2.0 * PI) * ((1.0 - r2) / 2.0).exp() * -1.0;
+        let vy = x * beta / (2.0 * PI) * ((1.0 - r2) / 2.0).exp();
+        primitive[0] = rho;
+        primitive[1] = vx + vb;
+        primitive[2] = vy + vb;
+        primitive[3] = pressure;
     }
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
@@ -339,8 +351,8 @@ impl FromStr for Binary {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sradius1, sradius2) =
-            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+        let (sradius1, sradius2) = crate::parse::parse_pair(form.get("sink_radius").into(), ',')
+            .map_err(ParseFloatError)?;
 
         let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
@@ -373,7 +385,10 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
-        println!("sink radii are [{}, {}]", self.sink_radius1, self.sink_radius2);
+        println!(
+            "sink radii are [{}, {}]",
+            self.sink_radius1, self.sink_radius2
+        );
         println!("sink rates are [{}, {}]", self.sink_rate1, self.sink_rate2);
     }
 
@@ -396,7 +411,7 @@ impl Setup for Binary {
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
-        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt();//use primary sink radius for both masses
+        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt(); //use primary sink radius for both masses
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
         let d = 1.0;
@@ -512,8 +527,8 @@ impl FromStr for BinaryWithThermodynamics {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sradius1, sradius2) =
-            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+        let (sradius1, sradius2) = crate::parse::parse_pair(form.get("sink_radius").into(), ',')
+            .map_err(ParseFloatError)?;
 
         let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
@@ -727,7 +742,7 @@ impl Setup for BinaryWithThermodynamics {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
             resolution,
-        )
+        ))
     }
 
     fn coordinate_system(&self) -> Coordinates {
