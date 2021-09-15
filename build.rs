@@ -24,8 +24,6 @@ fn main() {
     let plat = sf_build::Platform::discover(use_gpu());
     plat.build_src("src/iso2d/mod", use_omp())
         .compile("iso2d_mod");
-    plat.build_src("src/iso2d_dg/mod", use_omp())
-        .compile("iso2d_dg_mod");    
     plat.build_src("src/euler1d/mod", use_omp())
         .compile("euler1d_mod");
     plat.build_src("src/euler2d/mod", use_omp())

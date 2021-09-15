@@ -11,7 +11,7 @@ use gridiron::rect_map::{Rectangle, RectangleMap};
 
 use sailfish::error::{self, Error::*};
 use sailfish::setups;
-use sailfish::{euler1d, euler2d, euler2d_dg, iso2d, iso2d_dg, sr1d};
+use sailfish::{euler1d, euler2d, euler2d_dg, iso2d, sr1d};
 use sailfish::{
     CommandLine, ExecutionMode, Mesh, Patch, PatchBasedBuild, PatchBasedSolve, Recurrence,
     RecurringTask, Setup, State,
@@ -366,7 +366,6 @@ fn run() -> Result<(), error::Error> {
 
     match setup.solver_name().as_str() {
         "iso2d" => launch_patch_based(state, setup, cline, iso2d::solver::Builder),
-        "iso2d_dg" => launch_patch_based(state, setup, cline, iso2d_dg::solver::Builder),
         "euler1d" => launch_single_patch(state, setup, cline),
         "euler2d" => launch_patch_based(state, setup, cline, euler2d::solver::Builder),
         "euler2d_dg" => launch_patch_based(state, setup, cline, euler2d_dg::solver::Builder),

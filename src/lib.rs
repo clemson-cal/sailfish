@@ -4,7 +4,6 @@ pub mod euler1d;
 pub mod euler2d;
 pub mod euler2d_dg;
 pub mod iso2d;
-pub mod iso2d_dg;
 pub mod sr1d;
 pub mod lookup_table;
 pub mod mesh;
