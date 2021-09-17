@@ -1,4 +1,4 @@
-use crate::{BufferZone, EquationOfState, ExecutionMode, PointMass, PointMassList, StructuredMesh};
+use crate::{BoundaryCondition, EquationOfState, ExecutionMode, PointMass, PointMassList, StructuredMesh};
 
 pub mod solver;
 
@@ -16,7 +16,7 @@ extern "C" {
         primitive_rd_ptr: *const f64,
         primitive_wr_ptr: *mut f64,
         eos: EquationOfState,
-        buffer: BufferZone,
+        boundary_condition: BoundaryCondition,
         mass_list: PointMassList,
         alpha: f64,
         a: f64,
@@ -26,6 +26,7 @@ extern "C" {
         mach_ceiling: f64,
         density_floor: f64,
         pressure_floor: f64,
+        constant_softening: i32,
         mode: ExecutionMode,
     );
 
@@ -36,6 +37,7 @@ extern "C" {
         mass_list: PointMassList,
         mass: PointMass,
         mode: ExecutionMode,
+        constant_softening: i32,
     );
 
     pub fn euler2d_wavespeed(

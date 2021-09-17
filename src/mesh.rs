@@ -1,6 +1,6 @@
 //! Generalizes over mesh data structures used by different solvers.
 
-use crate::IndexSpace;
+use crate::{IndexSpace, StructuredMesh};
 
 /// Either a [`crate::StructuredMesh`] or a `Vec` of face positions in 1D.
 #[derive(Clone, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -11,6 +11,21 @@ pub enum Mesh {
 }
 
 impl Mesh {
+    /// Creates a square mesh that is centered on the origin, with the given
+    /// number of zones on each side.
+    pub fn centered_square(domain_radius: f64, resolution: u32) -> Self {
+        Self::Structured(StructuredMesh::centered_square(domain_radius, resolution))
+    }
+
+    /// Creates a `FacePositions1D` mesh with logarithmic zone spacing.
+    pub fn logarithmic_radial(num_decades: u32, zones_per_decade: u32) -> Self {
+        let r_inner = 1.0;
+        let faces = (0..(zones_per_decade * num_decades + 1) as u32)
+            .map(|i| r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64))
+            .collect();
+        Self::FacePositions1D(faces)
+    }
+
     pub fn num_total_zones(&self) -> usize {
         match self {
             Self::Structured(mesh) => mesh.num_total_zones(),

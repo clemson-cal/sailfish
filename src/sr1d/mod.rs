@@ -3,14 +3,14 @@ use crate::{BoundaryCondition, Coordinates, ExecutionMode, Setup, Solve};
 use cfg_if::cfg_if;
 
 extern "C" {
-    fn euler1d_primitive_to_conserved(
+    fn sr1d_primitive_to_conserved(
         num_zones: i32,
         primitive_ptr: *const f64,
         conserved_ptr: *mut f64,
         mode: ExecutionMode,
     );
 
-    fn euler1d_advance_rk(
+    fn sr1d_advance_rk(
         num_zones: i32,
         face_positions_ptr: *const f64,
         conserved_rk_ptr: *const f64,
@@ -24,15 +24,14 @@ extern "C" {
     );
 
     #[cfg(feature = "gpu")]
-    fn euler1d_wavespeed(
+    fn sr1d_wavespeed(
         num_zones: i32,
         primitive_ptr: *const f64,
         wavespeed_ptr: *mut f64,
         mode: ExecutionMode,
     );
 
-    fn euler1d_max_wavespeed(num_zones: i32, primitive_ptr: *const f64, mode: ExecutionMode)
-        -> f64;
+    fn sr1d_max_wavespeed(num_zones: i32, primitive_ptr: *const f64, mode: ExecutionMode) -> f64;
 }
 
 pub fn solver(
@@ -116,7 +115,7 @@ pub mod cpu {
         }
         fn primitive_to_conserved(&mut self) {
             unsafe {
-                euler1d_primitive_to_conserved(
+                sr1d_primitive_to_conserved(
                     self.num_zones() as i32,
                     self.primitive1.as_ptr(),
                     self.conserved0.as_mut_ptr(),
@@ -126,7 +125,7 @@ pub mod cpu {
         }
         fn advance_rk(&mut self, _setup: &dyn Setup, _time: f64, a: f64, dt: f64) {
             unsafe {
-                euler1d_advance_rk(
+                sr1d_advance_rk(
                     self.num_zones() as i32,
                     self.faces.as_ptr(),
                     self.conserved0.as_ptr(),
@@ -143,7 +142,7 @@ pub mod cpu {
         }
         fn max_wavespeed(&self, _time: f64, _setup: &dyn Setup) -> f64 {
             unsafe {
-                euler1d_max_wavespeed(self.num_zones() as i32, self.primitive1.as_ptr(), self.mode)
+                sr1d_max_wavespeed(self.num_zones() as i32, self.primitive1.as_ptr(), self.mode)
             }
         }
     }
@@ -185,7 +184,6 @@ pub mod omp {
 #[cfg(feature = "gpu")]
 pub mod gpu {
     use super::*;
-    use crate::BoundaryCondition;
     use gpu_core::{Device, DeviceBuffer};
 
     pub struct Solver {
@@ -234,7 +232,7 @@ pub mod gpu {
         }
         fn primitive_to_conserved(&mut self) {
             self.device.scope(|_| unsafe {
-                euler1d_primitive_to_conserved(
+                sr1d_primitive_to_conserved(
                     self.num_zones() as i32,
                     self.primitive1.as_device_ptr(),
                     self.conserved0.as_device_ptr() as *mut f64,
@@ -245,7 +243,7 @@ pub mod gpu {
         fn advance_rk(&mut self, _setup: &dyn Setup, _time: f64, a: f64, dt: f64) {
             self.device.scope(|_| {
                 unsafe {
-                    euler1d_advance_rk(
+                    sr1d_advance_rk(
                         self.num_zones() as i32,
                         self.faces.as_device_ptr(),
                         self.conserved0.as_device_ptr(),
@@ -265,7 +263,7 @@ pub mod gpu {
             use gpu_core::Reduce;
             self.device.scope(|_| {
                 unsafe {
-                    euler1d_wavespeed(
+                    sr1d_wavespeed(
                         self.num_zones() as i32,
                         self.primitive1.as_device_ptr(),
                         self.wavespeeds.as_device_ptr() as *mut f64,

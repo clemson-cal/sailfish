@@ -3,10 +3,7 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::{
-    BufferZone, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
-    StructuredMesh,
-};
+use crate::{BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel, StructuredMesh};
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
@@ -30,6 +27,7 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("pulse-collision", setup_builder!(PulseCollision)),
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
+        ("wind", setup_builder!(Wind)),
     ]
 }
 
@@ -169,7 +167,8 @@ pub struct Binary {
     pub domain_radius: f64,
     pub nu: f64,
     pub mach_number: f64,
-    pub sink_radius: f64,
+    pub sink_radius1: f64,
+    pub sink_radius2: f64,
     pub sink_rate1: f64,
     pub sink_rate2: f64,
     pub sink_model: SinkModel,
@@ -185,24 +184,28 @@ impl FromStr for Binary {
             .item("domain_radius", 12.0, "half-size of the simulation domain (a)")
             .item("nu",            1e-3, "kinematic viscosity coefficient (Omega a^2)")
             .item("mach_number",   10.0, "mach number for locally isothermal EOS")
-            .item("sink_radius",   0.05, "sink kernel radius (a)")
+            .item("sink_radius", "0.05", "sink kernel radii (a)")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
-            .item("sink_rate",   "10.0", "rate of mass subtraction in the sink (Omega)")
+            .item("sink_rate",   "10.0", "rate(s) of mass subtraction in the sink (Omega)")
             .item("q",              1.0, "system mass ratio: [0-1]")
             .item("e",              0.0, "orbital eccentricity: [0-1]")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sr1, sr2) =
+        let (sradius1, sradius2) =
+            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+
+        let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             nu: form.get("nu").into(),
             mach_number: form.get("mach_number").into(),
-            sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sr1.unwrap(),
-            sink_rate2: sr2.or(sr1).unwrap(),
+            sink_radius1: sradius1.unwrap(),
+            sink_radius2: sradius2.or(sradius1).unwrap(),
+            sink_rate1: srate1.unwrap(),
+            sink_rate2: srate2.or(srate1).unwrap(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             form,
         })
@@ -223,6 +226,7 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
+        println!("sink radii are [{}, {}]", self.sink_radius1, self.sink_radius2);
         println!("sink rates are [{}, {}]", self.sink_rate1, self.sink_rate2);
     }
 
@@ -245,7 +249,7 @@ impl Setup for Binary {
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
-        let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
+        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt();//use primary sink radius for both masses
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
         let d = 1.0;
@@ -270,7 +274,7 @@ impl Setup for Binary {
             vy: mass1.velocity_y(),
             mass: mass1.mass(),
             rate: self.sink_rate1,
-            radius: self.sink_radius,
+            radius: self.sink_radius1,
             model: self.sink_model,
         };
         let mass2 = PointMass {
@@ -280,7 +284,7 @@ impl Setup for Binary {
             vy: mass2.velocity_y(),
             mass: mass2.mass(),
             rate: self.sink_rate2,
-            radius: self.sink_radius,
+            radius: self.sink_radius2,
             model: self.sink_model,
         };
         PointMassList::from_slice(&[mass1, mass2])
@@ -292,8 +296,8 @@ impl Setup for Binary {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+    fn boundary_condition(&self) -> BoundaryCondition {
+        BoundaryCondition::Default
     }
 
     fn viscosity(&self) -> Option<f64> {
@@ -315,7 +319,8 @@ impl Setup for Binary {
 pub struct BinaryWithThermodynamics {
     pub domain_radius: f64,
     pub alpha: f64,
-    pub sink_radius: f64,
+    pub sink_radius1: f64,
+    pub sink_radius2: f64,
     pub sink_rate1: f64,
     pub sink_rate2: f64,
     pub sink_model: SinkModel,
@@ -329,6 +334,7 @@ pub struct BinaryWithThermodynamics {
     pub mach_ceiling: f64,
     pub test_model: bool,
     pub one_body: bool,
+    pub constant_softening: bool,
     form: kind_config::Form,
 }
 
@@ -340,9 +346,9 @@ impl FromStr for BinaryWithThermodynamics {
         let form = kind_config::Form::new()
             .item("domain_radius",      12.0, "half-size of the simulation domain (a)")
             .item("alpha",               0.1, "alpha-viscosity coefficient (dimensionless)")
-            .item("sink_radius",        0.05, "sink kernel radius (a)")
+            .item("sink_radius",      "0.05", "sink kernel radii (a)")
             .item("sink_model",         "af", "sink prescription: [none|af|tf|ff]")
-            .item("sink_rate",        "10.0", "rate of mass subtraction in the sink (Omega)")
+            .item("sink_rate",        "10.0", "rate(s) of mass subtraction in the sink (Omega)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
             .item("gamma_law_index",     1.666666666666666, "adiabatic index")
@@ -355,18 +361,23 @@ impl FromStr for BinaryWithThermodynamics {
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
             .item("test_model",        false, "use test model")
             .item("one_body",          false, "use one point mass")
+            .item("constant_softening",false, "use constant gravitational softening = sink_radius")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sr1, sr2) =
+        let (sradius1, sradius2) =
+            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+
+        let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
 
         Ok(Self {
             domain_radius: form.get("domain_radius").into(),
             alpha: form.get("alpha").into(),
-            sink_radius: form.get("sink_radius").into(),
-            sink_rate1: sr1.unwrap(),
-            sink_rate2: sr2.or(sr1).unwrap(),
+            sink_radius1: sradius1.unwrap(),
+            sink_radius2: sradius2.or(sradius1).unwrap(),
+            sink_rate1: srate1.unwrap(),
+            sink_rate2: srate2.or(srate1).unwrap(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             gamma_law_index: form.get("gamma_law_index").into(),
             cooling_coefficient: form.get("cooling_coefficient").into(),
@@ -378,6 +389,7 @@ impl FromStr for BinaryWithThermodynamics {
             mach_ceiling: form.get("mach_ceiling").into(),
             test_model: form.get("test_model").into(),
             one_body: form.get("one_body").into(),
+            constant_softening: form.get("constant_softening").into(),
             form,
         })
     }
@@ -429,7 +441,7 @@ impl Setup for BinaryWithThermodynamics {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if !self.test_model {
             let r = (x * x + y * y).sqrt();
-            let rs = (x * x + y * y + self.sink_radius.powf(2.0)).sqrt();
+            let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt();
             let phi_hat_x = -y / r.max(1e-12);
             let phi_hat_y = x / r.max(1e-12);
             let d = self.initial_density
@@ -477,7 +489,7 @@ impl Setup for BinaryWithThermodynamics {
                 vy: mass1.velocity_y(),
                 mass: mass1.mass(),
                 rate: self.sink_rate1,
-                radius: self.sink_radius,
+                radius: self.sink_radius1,
                 model: self.sink_model,
             };
             let mass2 = PointMass {
@@ -487,7 +499,7 @@ impl Setup for BinaryWithThermodynamics {
                 vy: mass2.velocity_y(),
                 mass: mass2.mass(),
                 rate: self.sink_rate2,
-                radius: self.sink_radius,
+                radius: self.sink_radius2,
                 model: self.sink_model,
             };
             PointMassList::from_slice(&[mass1, mass2])
@@ -499,7 +511,7 @@ impl Setup for BinaryWithThermodynamics {
                 vy: 0.0,
                 mass: 1.0,
                 rate: self.sink_rate1,
-                radius: self.sink_radius,
+                radius: self.sink_radius1,
                 model: self.sink_model,
             };
             PointMassList::from_slice(&[mass1])
@@ -512,10 +524,10 @@ impl Setup for BinaryWithThermodynamics {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
+    fn boundary_condition(&self) -> BoundaryCondition {
         if !self.test_model {
             let onset_radius = self.domain_radius - 0.1;
-            BufferZone::Keplerian {
+            BoundaryCondition::KeplerianBuffer {
                 surface_density: self.initial_density * self.density_scaling(onset_radius),
                 surface_pressure: self.initial_pressure * self.pressure_scaling(onset_radius),
                 central_mass: 1.0,
@@ -524,7 +536,7 @@ impl Setup for BinaryWithThermodynamics {
                 onset_width: 0.1,
             }
         } else {
-            BufferZone::Keplerian {
+            BoundaryCondition::KeplerianBuffer {
                 // don't change this
                 surface_density: 1.0,
                 surface_pressure: 1.0,
@@ -558,6 +570,10 @@ impl Setup for BinaryWithThermodynamics {
 
     fn pressure_floor(&self) -> Option<f64> {
         Some(self.pressure_floor)
+    }
+
+    fn constant_softening(&self) -> Option<bool> {
+        Some(self.constant_softening)
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
@@ -641,8 +657,8 @@ impl Setup for Sedov {
         }
     }
 
-    fn buffer_zone(&self) -> BufferZone {
-        BufferZone::NoBuffer
+    fn boundary_condition(&self) -> BoundaryCondition {
+        BoundaryCondition::Default
     }
 
     fn viscosity(&self) -> Option<f64> {
@@ -810,15 +826,63 @@ impl Setup for FastShell {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        let num_decades = 2;
-        let zones_per_decade = resolution;
-        let r_inner = 1.0;
+        Mesh::logarithmic_radial(2, resolution)
+    }
 
-        let faces = (0..(zones_per_decade * num_decades + 1) as u32)
-            .map(|i| r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64))
-            .collect();
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::SphericalPolar
+    }
 
-        Mesh::FacePositions1D(faces)
+    fn end_time(&self) -> Option<f64> {
+        Some(1.0)
+    }
+}
+
+/// A spherical wind setup.
+pub struct Wind;
+
+impl FromStr for Wind {
+    type Err = error::Error;
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        if parameters.is_empty() {
+            Ok(Self)
+        } else {
+            Err(InvalidSetup("setup does not take any parameters".into()))
+        }
+    }
+}
+
+impl Setup for Wind {
+    fn num_primitives(&self) -> usize {
+        3
+    }
+
+    fn solver_name(&self) -> String {
+        "sr1d".to_owned()
+    }
+
+    fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
+        let rho = r.powi(-2);
+        let vel = 1.0;
+        let pre = 1e-6 * rho;
+
+        primitive[0] = rho;
+        primitive[1] = vel;
+        primitive[2] = pre;
+    }
+
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: 4.0 / 3.0,
+        }
+    }
+
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::logarithmic_radial(2, resolution)
+    }
+
+    fn boundary_condition(&self) -> BoundaryCondition {
+        BoundaryCondition::Inflow
     }
 
     fn coordinate_system(&self) -> Coordinates {

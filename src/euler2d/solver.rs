@@ -82,7 +82,7 @@ impl Solver {
                 self.primitive1.as_ptr(),
                 self.primitive2.as_mut_ptr(),
                 self.setup.equation_of_state(),
-                self.setup.buffer_zone(),
+                self.setup.boundary_condition(),
                 self.setup.masses(self.time),
                 self.setup.viscosity().unwrap_or(0.0),
                 a,
@@ -92,6 +92,7 @@ impl Solver {
                 self.setup.mach_ceiling().unwrap_or(1e5),
                 self.setup.density_floor().unwrap_or(0.0),
                 self.setup.pressure_floor().unwrap_or(0.0),
+                self.setup.constant_softening().unwrap_or(false) as i32,
                 self.mode,
             );
         });
@@ -163,6 +164,7 @@ impl PatchBasedSolve for Solver {
                     mass_list,
                     mass,
                     self.mode,
+                    self.setup.constant_softening().unwrap_or(false) as i32,
                 )
             });
             let mut udot = cons_rate

@@ -62,23 +62,21 @@ struct EquationOfState
     };
 };
 
-enum BufferZoneType
+enum BoundaryConditionType
 {
-    None,
-    Keplerian,
+    Default,
+    Inflow,
+    KeplerianBuffer,
 };
 
-struct BufferZone
+struct BoundaryCondition
 {
-    enum BufferZoneType type;
+    enum BoundaryConditionType type;
 
     union
     {
-        /* struct
-        {
-
-        } none; */
-
+        // default;
+        // inflow;
         struct
         {
             real surface_density;
@@ -87,7 +85,7 @@ struct BufferZone
             real driving_rate;
             real outer_radius;
             real onset_width;
-        } keplerian;
+        } keplerian_buffer;
     };
 };
 

@@ -3,6 +3,7 @@ pub mod error;
 pub mod euler1d;
 pub mod euler2d;
 pub mod iso2d;
+pub mod sr1d;
 pub mod lookup_table;
 pub mod mesh;
 pub mod parse;
@@ -22,6 +23,12 @@ pub use mesh::Mesh;
 use cfg_if::cfg_if;
 use std::ops::Range;
 use std::str::FromStr;
+
+/// Returns the current version number (should be consistent with Cargo
+/// meta-data).
+pub fn sailfish_version() -> String {
+    "sailfish version 0.3.3".to_owned()
+}
 
 /// Execution modes. These modes are referenced by Rust driver code, and by
 /// solver code written in C.
@@ -156,9 +163,10 @@ impl Default for PointMassList {
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
-pub enum BufferZone {
-    NoBuffer,
-    Keplerian {
+pub enum BoundaryCondition {
+    Default,
+    Inflow,
+    KeplerianBuffer {
         surface_density: f64,
         surface_pressure: f64,
         central_mass: f64,

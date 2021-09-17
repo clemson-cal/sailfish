@@ -87,7 +87,8 @@ static __host__ __device__ void point_mass_source_term(
     real dt,
     real *prim,
     real h,
-    real *delta_cons)
+    real *delta_cons,
+    int constant_softening)
 {
     real x0 = mass->x;
     real y0 = mass->y;
@@ -101,7 +102,8 @@ static __host__ __device__ void point_mass_source_term(
     real dx = x1 - x0;
     real dy = y1 - y0;
     real r2 = dx * dx + dy * dy;
-    real r2_soft = r2 + pow(0.5 * h, 2.0);
+    real softening_length = constant_softening ? rs : 0.5 * h;
+    real r2_soft = r2 + pow(softening_length, 2.0);
     real dr = sqrt(r2);
     real mag = sigma * mp * pow(r2_soft, -1.5);
     real fx = -mag * dx;
@@ -114,12 +116,17 @@ static __host__ __device__ void point_mass_source_term(
     {
         sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
     }
-    if (dr < rs)
+    if (!constant_softening)
     {
-        r2_soft = r2 + pow(max2(rs, 0.5 * h), 2.0);
-        mag = sigma * mp * pow(r2_soft, -1.5);
-        fx = -mag * dx;
-        fy = -mag * dy;
+        if (dr < rs)
+        {
+            real transition = pow(1.0 - pow(dr / rs, 2.0), 2.0);
+            real mod_rs = transition * rs + (1.0 - transition) * 0.5 * h;
+            r2_soft = r2 + pow(mod_rs, 2.0);
+            mag = sigma * mp / pow(r2_soft, 1.5);
+            fx = -mag * dx;
+            fy = -mag * dy;
+        }
     }
     //if (dr < 1.0 * rs)
     //{
@@ -172,12 +179,13 @@ static __host__ __device__ void point_masses_source_term(
     real dt,
     real *prim,
     real h,
-    real *cons)
+    real *cons,
+    int constant_softening)
 {
     for (int p = 0; p < mass_list->count; ++p)
     {
         real delta_cons[NCONS];
-        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, h, delta_cons);
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, h, delta_cons, constant_softening);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -203,27 +211,27 @@ static __host__ __device__ real sound_speed_squared(
 }
 
 static __host__ __device__ void buffer_source_term(
-    struct BufferZone *buffer,
+    struct BoundaryCondition *bc,
     real xc,
     real yc,
     real dt,
     real *cons)
 {
-    switch (buffer->type)
+    switch (bc->type)
     {
-        case None:
-        {
+        case Default:
+        case Inflow:
             break;
-        }
-        case Keplerian:
+
+        case KeplerianBuffer:
         {
             real rc = sqrt(xc * xc + yc * yc);
-            real surface_density = buffer->keplerian.surface_density;
-            real surface_pressure = buffer->keplerian.surface_pressure;
-            real central_mass = buffer->keplerian.central_mass;
-            real driving_rate = buffer->keplerian.driving_rate;
-            real outer_radius = buffer->keplerian.outer_radius;
-            real onset_width = buffer->keplerian.onset_width;
+            real surface_density = bc->keplerian_buffer.surface_density;
+            real surface_pressure = bc->keplerian_buffer.surface_pressure;
+            real central_mass = bc->keplerian_buffer.central_mass;
+            real driving_rate = bc->keplerian_buffer.driving_rate;
+            real outer_radius = bc->keplerian_buffer.outer_radius;
+            real onset_width = bc->keplerian_buffer.onset_width;
             real onset_radius = outer_radius - onset_width;
 
             if (rc > onset_radius)
@@ -455,7 +463,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real alpha,
     real a,
@@ -465,6 +473,7 @@ static __host__ __device__ void advance_rk_zone(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
+    int constant_softening,
     int i,
     int j)
 {
@@ -615,8 +624,8 @@ static __host__ __device__ void advance_rk_zone(
     frj[3] -= 0.5 * (nucc * pcc[0] * scc[3] * pcc[2] + nurj * prj[0] * srj[3] * prj[2]);
 
     primitive_to_conserved(pcc, ucc);
-    buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc);
+    buffer_source_term(&bc, xc, yc, dt, ucc);
+    point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc, constant_softening);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -634,7 +643,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real a,
     real dt,
@@ -643,6 +652,7 @@ static __host__ __device__ void advance_rk_zone_inviscid(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
+    int constant_softening,
     int i,
     int j)
 {
@@ -716,8 +726,8 @@ static __host__ __device__ void advance_rk_zone_inviscid(
 
     real h = disk_height(&mass_list, xc, yc, pcc);
     primitive_to_conserved(pcc, ucc);
-    buffer_source_term(&buffer, xc, yc, dt, ucc);
-    point_masses_source_term(&mass_list, xc, yc, dt, pcc, h, ucc);
+    buffer_source_term(&bc, xc, yc, dt, ucc);
+    point_masses_source_term(&mass_list, xc, yc, dt, pcc, h, ucc, constant_softening);
     cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -735,6 +745,7 @@ static __host__ __device__ void point_mass_source_term_zone(
     struct Patch cons_rate,
     struct PointMassList mass_list,
     struct PointMass mass,
+    int constant_softening,
     int i,
     int j)
 {
@@ -743,7 +754,7 @@ static __host__ __device__ void point_mass_source_term_zone(
     real x = mesh.x0 + (i + 0.5) * mesh.dx;
     real y = mesh.y0 + (j + 0.5) * mesh.dy;
     real h = disk_height(&mass_list, x, y, pc);
-    point_mass_source_term(&mass, x, y, 1.0, pc, h, sc);
+    point_mass_source_term(&mass, x, y, 1.0, pc, h, sc, constant_softening);
 }
 
 static __host__ __device__ void wavespeed_zone(
@@ -784,7 +795,7 @@ static void __global__ advance_rk_kernel(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real alpha,
     real a,
@@ -793,7 +804,8 @@ static void __global__ advance_rk_kernel(
     real cooling_coefficient,
     real mach_ceiling,
     real density_floor,
-    real pressure_floor)
+    real pressure_floor,
+    int constant_softening)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -806,7 +818,7 @@ static void __global__ advance_rk_kernel(
             primitive_rd,
             primitive_wr,
             eos,
-            buffer,
+            bc,
             mass_list,
             alpha,
             a,
@@ -816,6 +828,7 @@ static void __global__ advance_rk_kernel(
             mach_ceiling,
             density_floor,
             pressure_floor,
+            constant_softening,
             i,
             j
         );
@@ -828,7 +841,7 @@ static void __global__ advance_rk_kernel_inviscid(
     struct Patch primitive_rd,
     struct Patch primitive_wr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real a,
     real dt,
@@ -836,7 +849,8 @@ static void __global__ advance_rk_kernel_inviscid(
     real cooling_coefficient,
     real mach_ceiling,
     real density_floor,
-    real pressure_floor)
+    real pressure_floor,
+    int constant_softening)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -849,7 +863,7 @@ static void __global__ advance_rk_kernel_inviscid(
             primitive_rd,
             primitive_wr,
             eos,
-            buffer,
+            bc,
             mass_list,
             a,
             dt,
@@ -858,6 +872,7 @@ static void __global__ advance_rk_kernel_inviscid(
             mach_ceiling,
             density_floor,
             pressure_floor,
+            constant_softening,
             i,
             j
         );
@@ -869,14 +884,15 @@ static void __global__ point_mass_source_term_kernel(
     struct Patch primitive,
     struct Patch cons_rate,
     struct PointMassList mass_list,
-    struct PointMass mass)
+    struct PointMass mass,
+    int constant_softening)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (i < mesh.ni && j < mesh.nj)
     {
-        point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, i, j);
+        point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, constant_softening, i, j);
     }
 }
 
@@ -956,9 +972,8 @@ EXTERN_C void euler2d_primitive_to_conserved(
  * @param primitive_rd_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
  * @param primitive_wr_ptr[out] [-2, -2] [ni + 4, nj + 4] [4]
  * @param eos                   The EOS
- * @param buffer                The buffer region
- * @param masses[in]            A pointer a list of point mass objects
- * @param num_masses            The number of point masses
+ * @param bc                    The boundary condition type
+ * @param mass_list             A list of point mass objects
  * @param alpha                 The alpha-viscosity parameter
  * @param a                     The RK averaging parameter
  * @param dt                    The time step
@@ -967,6 +982,7 @@ EXTERN_C void euler2d_primitive_to_conserved(
  * @param mach_ceiling          Safety parameters
  * @param density_floor         Safety parameters
  * @param pressure_floor        Safety parameters
+ * @param constant_softening    Ignore local disk height (use softening radius only)
  * @param mode                  The execution mode
  */
 EXTERN_C void euler2d_advance_rk(
@@ -975,7 +991,7 @@ EXTERN_C void euler2d_advance_rk(
     real *primitive_rd_ptr,
     real *primitive_wr_ptr,
     struct EquationOfState eos,
-    struct BufferZone buffer,
+    struct BoundaryCondition bc,
     struct PointMassList mass_list,
     real alpha,
     real a,
@@ -985,6 +1001,7 @@ EXTERN_C void euler2d_advance_rk(
     real mach_ceiling,
     real density_floor,
     real pressure_floor,
+    int constant_softening,
     enum ExecutionMode mode)
 {
     struct Patch conserved_rk = patch(mesh, NCONS, 0, conserved_rk_ptr);
@@ -1000,7 +1017,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         a,
                         dt,
@@ -1009,6 +1026,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
+                        constant_softening,
                         i, j
                     );
                 }
@@ -1019,7 +1037,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         alpha,
                         a,
@@ -1029,6 +1047,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
+                        constant_softening,
                         i, j
                     );
                 }
@@ -1045,7 +1064,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         a,
                         dt,
@@ -1054,6 +1073,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
+                        constant_softening,
                         i, j
                     );
                 }
@@ -1064,7 +1084,7 @@ EXTERN_C void euler2d_advance_rk(
                         primitive_rd,
                         primitive_wr,
                         eos,
-                        buffer,
+                        bc,
                         mass_list,
                         alpha,
                         a,
@@ -1074,6 +1094,7 @@ EXTERN_C void euler2d_advance_rk(
                         mach_ceiling,
                         density_floor,
                         pressure_floor,
+                        constant_softening,
                         i, j
                     );
                 }
@@ -1094,7 +1115,7 @@ EXTERN_C void euler2d_advance_rk(
                     primitive_rd,
                     primitive_wr,
                     eos,
-                    buffer,
+                    bc,
                     mass_list,
                     a,
                     dt,
@@ -1102,7 +1123,8 @@ EXTERN_C void euler2d_advance_rk(
                     cooling_coefficient,
                     mach_ceiling,
                     density_floor,
-                    pressure_floor
+                    pressure_floor,
+                    constant_softening
                 );
             } else {
                 advance_rk_kernel<<<bd, bs>>>(
@@ -1111,7 +1133,7 @@ EXTERN_C void euler2d_advance_rk(
                     primitive_rd,
                     primitive_wr,
                     eos,
-                    buffer,
+                    bc,
                     mass_list,
                     alpha,
                     a,
@@ -1120,7 +1142,8 @@ EXTERN_C void euler2d_advance_rk(
                     cooling_coefficient,
                     mach_ceiling,
                     density_floor,
-                    pressure_floor
+                    pressure_floor,
+                    constant_softening
                 );
             }
             #endif
@@ -1138,8 +1161,10 @@ EXTERN_C void euler2d_advance_rk(
  * @param mesh                The mesh [ni,     nj]
  * @param primitive_ptr[in]   [-2, -2] [ni + 4, nj + 4] [4]
  * @param cons_rate_ptr[out]  [ 0,  0] [ni,     nj]     [1]
+ * @param mass_list           A list of point mass objects
  * @param mass                A point mass
  * @param mode                The execution mode
+ * @param constant_softening  Ignore local disk height (use softening radius only)
  */
 EXTERN_C void euler2d_point_mass_source_term(
     struct Mesh mesh,
@@ -1147,7 +1172,8 @@ EXTERN_C void euler2d_point_mass_source_term(
     real *cons_rate_ptr,
     struct PointMassList mass_list,
     struct PointMass mass,
-    enum ExecutionMode mode)
+    enum ExecutionMode mode,
+    int constant_softening)
 {
     struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
     struct Patch cons_rate = patch(mesh, NCONS, 0, cons_rate_ptr);
@@ -1155,7 +1181,7 @@ EXTERN_C void euler2d_point_mass_source_term(
     switch (mode) {
         case CPU: {
             FOR_EACH(cons_rate) {
-                point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, i, j);
+                point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, constant_softening, i, j);
             }
             break;
         }
@@ -1163,7 +1189,7 @@ EXTERN_C void euler2d_point_mass_source_term(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(cons_rate) {
-                point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, i, j);
+                point_mass_source_term_zone(mesh, primitive, cons_rate, mass_list, mass, constant_softening, i, j);
             }
             #endif
             break;
@@ -1173,7 +1199,7 @@ EXTERN_C void euler2d_point_mass_source_term(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
-            point_mass_source_term_kernel<<<bd, bs>>>(mesh, primitive, cons_rate, mass_list, mass);
+            point_mass_source_term_kernel<<<bd, bs>>>(mesh, primitive, cons_rate, mass_list, mass, constant_softening);
             #endif
             break;
         }
@@ -1183,9 +1209,9 @@ EXTERN_C void euler2d_point_mass_source_term(
 
 /**
  * Fill a buffer with the maximum wavespeed in each zone.
- * @param  mesh               The mesh [ni,     nj]
- * @param  primitive_ptr[in]  [-2, -2] [ni + 4, nj + 4] [4]
- * @param  wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
+ * @param mesh                The mesh [ni,     nj]
+ * @param primitive_ptr[in]   [-2, -2] [ni + 4, nj + 4] [4]
+ * @param wavespeed_ptr[out]  [ 0,  0] [ni,     nj]     [1]
  * @param eos                 The EOS
  * @param mode                The execution mode
  */
