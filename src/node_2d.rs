@@ -124,11 +124,54 @@ impl Cell {
         self.order as usize
     }
 
-    pub fn quadrature_points(&self) -> impl Iterator<Item = [f64; 2]> + '_ {
+    pub fn interior_nodes(&self) -> impl Iterator<Item = &NodeData> + '_ {
         self.interior_nodes
             .iter()
-            .take(self.order() * self.order())
-            .map(|node| [node.xsi_x, node.xsi_y])
+            .take(self.num_quadrature_points())
+    }
+
+    pub fn quadrature_points(&self) -> impl Iterator<Item = [f64; 2]> + '_ {
+        self.interior_nodes().map(|node| [node.xsi_x, node.xsi_y])
+    }
+
+    pub fn num_quadrature_points(&self) -> usize {
+        self.order() * self.order()
+    }
+
+    pub fn num_polynomials(&self) -> usize {
+        match self.order {
+            1 => 1,
+            2 => 3,
+            3 => 6,
+            4 => 10,
+            5 => 15,
+            _ => panic!(),
+        }
+    }
+
+    /// Converts a multi-component scalar field `y`, tabulated at the
+    /// quadrature points of this cell, to a component-wise weights
+    /// representation. The size of the input slice `y` is the number of
+    /// quadrature points in this cell, times the number of fields
+    /// `num_fields`. The size of the output slice `weights` is the number of
+    /// polynomial basis functions for this cell, times `num_fields`.
+    pub fn to_weights(&self, y: &[f64], weights: &mut [f64], num_fields: usize) {
+        let np = self.num_polynomials();
+
+        assert_eq!(y.len(), num_fields * self.num_quadrature_points());
+        assert_eq!(weights.len(), num_fields * np);
+
+        for w in weights.iter_mut() {
+            *w = 0.0;
+        }
+
+        for (node, yp) in self.interior_nodes().zip(y.chunks_exact(num_fields)) {
+            for q in 0..num_fields {
+                for l in 0..self.num_polynomials() {
+                    weights[q * np + l] = 0.25 * yp[q] * node.phi[l] * node.weight;
+                }
+            }
+        }
     }
 }
 

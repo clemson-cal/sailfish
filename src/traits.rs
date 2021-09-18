@@ -316,7 +316,7 @@ pub trait Setup: Send + Sync {
     fn initial_primitive_patch_dg(&self, space: &IndexSpace, mesh: &Mesh, cell: &node_2d::Cell) -> Patch {
         match mesh {
             Mesh::Structured(mesh) => {
-                let ni = cell.quadrature_points().count();
+                let ni = cell.num_quadrature_points();
                 let nq = self.num_primitives();
 
                 Patch::from_slice_function(space, ni * nq, |(i, j), prim| {
