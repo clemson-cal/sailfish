@@ -266,6 +266,25 @@ impl Setup for ExplosionDG {
     fn end_time(&self) -> Option<f64> {
         Some(0.2)
     }
+    fn dg_cell(&self) -> Option<crate::node_2d::Cell> {
+        Some(crate::node_2d::Cell::new(3))
+    }
+    fn primitive_to_conserved(&self, prim: &[f64], cons: &mut [f64]) {
+        let rho = prim[0];
+        let vx = prim[1];
+        let vy = prim[2];
+        let pre = prim[3];
+
+        let px = vx * rho;
+        let py = vy * rho;
+        let kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
+        let thermal_energy = pre / (self.gamma_law_index - 1.0);
+
+        cons[0] = rho;
+        cons[1] = px;
+        cons[2] = py;
+        cons[3] = kinetic_energy + thermal_energy;
+    }
 }
 
 pub struct VortexDG {

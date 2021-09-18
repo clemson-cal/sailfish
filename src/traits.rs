@@ -267,6 +267,10 @@ pub trait Setup: Send + Sync {
         None
     }
 
+    fn primitive_to_conserved(&self, _prim: &[f64], _cons: &mut [f64]) {
+        unimplemented!("Setup::primitive_to_conserved must be implemented if dg_cell returns Some")
+    }
+
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
         match mesh {
             Mesh::Structured(_) => {
