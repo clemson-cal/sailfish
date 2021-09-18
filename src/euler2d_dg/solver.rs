@@ -100,8 +100,7 @@ impl Solver {
 
 impl PatchBasedSolve for Solver {
     fn primitive(&self) -> Patch {
-        todo!("return weights")
-        // self.primitive1.extract(&self.index_space)
+        self.weights_rd.extract(&self.index_space)
     }
 
     fn max_wavespeed(&self) -> f64 {

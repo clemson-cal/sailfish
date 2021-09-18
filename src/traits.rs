@@ -310,20 +310,34 @@ pub trait Setup: Send + Sync {
         }
     }
 
-    /// Provided method to generate grid patches of primitive data from the
-    /// initial model, with the primitive variables sampled at sub-cell
-    /// quadrature points as specified by the `cell` variable.
-    fn initial_primitive_patch_dg(&self, space: &IndexSpace, mesh: &Mesh, cell: &node_2d::Cell) -> Patch {
+    /// Provided method to generate grid patches of weight data from the
+    /// initial model. The primitive variables are given by the
+    /// `initial_primitive` function, called at sub-cell quadrature points
+    /// specified by the `cell` variable. Those primitive variables are then
+    /// converted to converved variables using `Setup::primitive_to_conserved`
+    /// (which must be implemented by the setup). Finally the conserved
+    /// variables are converted into cell weights. The grid patch returned has
+    /// the number of fields equal to `cell.num_polynomials()`, times
+    /// `self.num_primitives()`.
+    fn initial_primitive_patch_dg(
+        &self,
+        space: &IndexSpace,
+        mesh: &Mesh,
+        cell: &node_2d::Cell,
+    ) -> Patch {
         match mesh {
             Mesh::Structured(mesh) => {
-                let ni = cell.num_quadrature_points();
+                let np = cell.num_polynomials();
                 let nq = self.num_primitives();
 
-                Patch::from_slice_function(space, ni * nq, |(i, j), prim| {
-                    for (n, [a, b]) in cell.quadrature_points().enumerate() {
+                Patch::from_slice_function(space, np * nq, |(i, j), w| {
+                    let mut prim = vec![0.0; nq * cell.num_quadrature_points()];
+
+                    for ([a, b], p) in cell.quadrature_points().zip(prim.chunks_mut(nq)) {
                         let [x, y] = mesh.subcell_coordinates(i, j, a, b);
-                        self.initial_primitive(x, y, &mut prim[n * nq..(n + 1) * nq])
+                        self.initial_primitive(x, y, p)
                     }
+                    cell.to_weights(&prim, w, nq)
                 })
             }
             _ => unimplemented!(),

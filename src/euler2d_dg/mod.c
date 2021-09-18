@@ -236,43 +236,43 @@ static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real 
 
 // ============================ SCHEME ========================================
 // ============================================================================
-static __host__ __device__ void primitive_to_weights_zone(
-    struct Cell cell,
-    struct Patch primitive,
-    struct Patch weights,
-    int i,
-    int j)
-{
-    int n_quad = num_quadrature_points(cell);
-    int n_poly = num_polynomials(cell);
+// static __host__ __device__ void primitive_to_weights_zone(
+//     struct Cell cell,
+//     struct Patch primitive,
+//     struct Patch weights,
+//     int i,
+//     int j)
+// {
+//     int n_quad = num_quadrature_points(cell);
+//     int n_poly = num_polynomials(cell);
 
-    real *p_cell = GET(primitive, i, j);
-    real *w_cell = GET(weights, i, j);
+//     real *p_cell = GET(primitive, i, j);
+//     real *w_cell = GET(weights, i, j);
 
-    for (int q = 0; q < NCONS; ++q)
-    {
-        for (int l = 0; l < n_poly; ++l)
-        {
-            w_cell[q * n_poly + l] = 0.0;
-        }
-    }
+//     for (int q = 0; q < NCONS; ++q)
+//     {
+//         for (int l = 0; l < n_poly; ++l)
+//         {
+//             w_cell[q * n_poly + l] = 0.0;
+//         }
+//     }
 
-    for (int qp = 0; qp < n_quad; ++qp)
-    {
-        real u[NCONS];
-        real *p = &p_cell[qp * NCONS];
-        primitive_to_conserved(p, u);
-        struct NodeData node = cell.interior_nodes[qp];
+//     for (int qp = 0; qp < n_quad; ++qp)
+//     {
+//         real u[NCONS];
+//         real *p = &p_cell[qp * NCONS];
+//         primitive_to_conserved(p, u);
+//         struct NodeData node = cell.interior_nodes[qp];
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            for (int l = 0; l < n_poly; ++l)
-            {
-                w_cell[q * n_poly + l] += 0.25 * u[q] * node.phi[l] * node.weight;
-            }
-        }
-    }
-}
+//         for (int q = 0; q < NCONS; ++q)
+//         {
+//             for (int l = 0; l < n_poly; ++l)
+//             {
+//                 w_cell[q * n_poly + l] += 0.25 * u[q] * node.phi[l] * node.weight;
+//             }
+//         }
+//     }
+// }
 
 static __host__ __device__ void advance_rk_zone_dg(
     struct Cell cell,
@@ -460,20 +460,20 @@ static __host__ __device__ void wavespeed_zone(
 // ============================================================================
 #if defined(__NVCC__) || defined(__ROCM__)
 
-static void __global__ primitive_to_weights_kernel(
-    struct Mesh mesh,
-    struct Cell cell,
-    struct Patch primitive,
-    struct Patch weights)
-{
-    int i = threadIdx.y + blockIdx.y * blockDim.y;
-    int j = threadIdx.x + blockIdx.x * blockDim.x;
+// static void __global__ primitive_to_weights_kernel(
+//     struct Mesh mesh,
+//     struct Cell cell,
+//     struct Patch primitive,
+//     struct Patch weights)
+// {
+//     int i = threadIdx.y + blockIdx.y * blockDim.y;
+//     int j = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < mesh.ni && j < mesh.nj)
-    {
-        primitive_to_weights_zone(cell, primitive, weights, i, j);
-    }
-}
+//     if (i < mesh.ni && j < mesh.nj)
+//     {
+//         primitive_to_weights_zone(cell, primitive, weights, i, j);
+//     }
+// }
 
 static void __global__ advance_rk_dg_kernel(
     struct Cell cell,
@@ -511,6 +511,7 @@ static void __global__ wavespeed_kernel(
         wavespeed_zone(cell, weights, wavespeed, i, j);
     }
 }
+
 #endif // defined(__NVCC__) || defined(__ROCM__)
 
 // ============================ PUBLIC API ====================================
@@ -526,48 +527,48 @@ static void __global__ wavespeed_kernel(
  * @param weights[out]       [-1, -1] [ni + 2, nj + 2] [4] [n_poly(order)]
  * @param mode               The execution mode
  */
-EXTERN_C void euler2d_dg_primitive_to_weights(
-    struct Cell cell,
-    struct Mesh mesh,
-    real *primitive_ptr,
-    real *weights_ptr,
-    enum ExecutionMode mode)
-{
-    int n_quad = num_quadrature_points(cell);
-    int n_poly = num_polynomials(cell);
+// EXTERN_C void euler2d_dg_primitive_to_weights(
+//     struct Cell cell,
+//     struct Mesh mesh,
+//     real *primitive_ptr,
+//     real *weights_ptr,
+//     enum ExecutionMode mode)
+// {
+//     int n_quad = num_quadrature_points(cell);
+//     int n_poly = num_polynomials(cell);
 
-    struct Patch primitive = patch(mesh, NCONS * n_quad, 0, primitive_ptr);
-    struct Patch weights = patch(mesh, NCONS * n_poly, 0, weights_ptr);
+//     struct Patch primitive = patch(mesh, NCONS * n_quad, 0, primitive_ptr);
+//     struct Patch weights = patch(mesh, NCONS * n_poly, 0, weights_ptr);
 
-    switch (mode) {
-        case CPU: {
-            FOR_EACH(weights)
-            {
-                primitive_to_weights_zone(cell, primitive, weights, i, j);
-            }
-            break;
-        }
+//     switch (mode) {
+//         case CPU: {
+//             FOR_EACH(weights)
+//             {
+//                 primitive_to_weights_zone(cell, primitive, weights, i, j);
+//             }
+//             break;
+//         }
 
-        case OMP: {
-            #ifdef _OPENMP
-            FOR_EACH_OMP(weights)
-            {
-                primitive_to_weights_zone(cell, primitive, weights, i, j);
-            }
-            #endif
-            break;
-        }
+//         case OMP: {
+//             #ifdef _OPENMP
+//             FOR_EACH_OMP(weights)
+//             {
+//                 primitive_to_weights_zone(cell, primitive, weights, i, j);
+//             }
+//             #endif
+//             break;
+//         }
 
-        case GPU: {
-            #if defined(__NVCC__) || defined(__ROCM__)
-            dim3 bs = dim3(16, 16);
-            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
-            primitive_to_weights_kernel<<<bd, bs>>>(mesh, cell, primitive, weights);
-            #endif
-            break;
-        }
-    }
-}
+//         case GPU: {
+//             #if defined(__NVCC__) || defined(__ROCM__)
+//             dim3 bs = dim3(16, 16);
+//             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
+//             primitive_to_weights_kernel<<<bd, bs>>>(mesh, cell, primitive, weights);
+//             #endif
+//             break;
+//         }
+//     }
+// }
 
 
 /**
@@ -579,7 +580,7 @@ EXTERN_C void euler2d_dg_primitive_to_weights(
  * @param dt                    The time step
  * @param mode                  The execution mode
  */
-EXTERN_C void euler2d_advance_rk_dg(
+EXTERN_C void euler2d_dg_advance_rk(
     struct Cell cell,
     struct Mesh mesh,
     real *weights_rd_ptr,
