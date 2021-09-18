@@ -3,6 +3,7 @@ use crate::mesh;
 use crate::node_2d::Cell;
 use crate::patch::Patch;
 use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh};
+use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::Automaton;
@@ -10,6 +11,7 @@ use gridiron::index_space::{Axis, IndexSpace};
 use gridiron::rect_map::Rectangle;
 use std::mem::swap;
 use std::ops::DerefMut;
+use std::os::raw::c_ulong;
 use std::sync::{Arc, Mutex};
 
 enum SolverState {
@@ -103,7 +105,6 @@ impl PatchBasedSolve for Solver {
     }
 
     fn max_wavespeed(&self) -> f64 {
-        // let setup = &self.setup;
         let mut lock = self.wavespeeds.lock().unwrap();
         let wavespeeds = lock.deref_mut();
 
@@ -117,29 +118,25 @@ impl PatchBasedSolve for Solver {
             )
         });
 
-        1.0
-
-        // match self.mode {
-        //     ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
-        //         euler2d_dg::euler2d_maximum(
-        //             cell,
-        //             self.mesh,
-        //             wavespeeds.as_ptr(),
-        //             wavespeeds.as_slice().unwrap().len() as c_ulong,
-        //             self.mode,
-        //         )
-        //     },
-        //     ExecutionMode::GPU => {
-        //         cfg_if! {
-        //             if #[cfg(feature = "gpu")] {
-        //                 use gpu_core::Reduce;
-        //                 wavespeeds.as_device_buffer().unwrap().maximum().unwrap()
-        //             } else {
-        //                 unreachable!()
-        //             }
-        //         }
-        //     }
-        // }
+        match self.mode {
+            ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
+                euler2d_dg::euler2d_dg_maximum(
+                    wavespeeds.as_ptr(),
+                    wavespeeds.as_slice().unwrap().len() as c_ulong,
+                    self.mode,
+                )
+            },
+            ExecutionMode::GPU => {
+                cfg_if! {
+                    if #[cfg(feature = "gpu")] {
+                        use gpu_core::Reduce;
+                        wavespeeds.as_device_buffer().unwrap().maximum().unwrap()
+                    } else {
+                        unreachable!()
+                    }
+                }
+            }
+        }
     }
 
     fn reductions(&self) -> Vec<f64> {

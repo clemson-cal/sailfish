@@ -1,5 +1,5 @@
-use crate::{ExecutionMode, StructuredMesh};
 use crate::node_2d;
+use crate::{ExecutionMode, StructuredMesh};
 
 pub mod solver;
 
@@ -28,4 +28,10 @@ extern "C" {
         wavespeed_ptr: *mut f64,
         mode: ExecutionMode,
     );
+
+    fn euler2d_dg_maximum(
+        data: *const f64,
+        size: std::os::raw::c_ulong,
+        mode: ExecutionMode,
+    ) -> f64;
 }
