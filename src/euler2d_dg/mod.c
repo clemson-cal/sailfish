@@ -280,7 +280,6 @@ static __host__ __device__ void advance_rk_zone_dg(
     struct Mesh mesh,
     struct Patch weights_rd,
     struct Patch weights_wr,
-    struct EquationOfState eos,
     real dt,
     int i,
     int j)
@@ -431,6 +430,33 @@ static __host__ __device__ void advance_rk_zone_dg(
     }
 }
 
+static __host__ __device__ void wavespeed_zone(
+    struct Cell cell,
+    struct Patch weights,
+    struct Patch wavespeed,
+    int i,
+    int j)
+{
+    int n_poly = num_polynomials(cell);
+
+    real cons[NCONS];
+    real prim[NCONS];
+
+    real *wij = GET(weights, i, j);
+
+    // use zero weights
+    for (int q = 0; q < NCONS; ++q)
+    {
+        cons[q] = wij[q * n_poly + 0];
+    }
+
+    conserved_to_primitive(cons, prim);
+
+    real a = primitive_max_wavespeed(prim);
+    
+    GET(wavespeed, i, j)[0] = a;
+}
+
 // ============================ KERNELS =======================================
 // ============================================================================
 #if defined(__NVCC__) || defined(__ROCM__)
@@ -472,6 +498,20 @@ static void __global__ advance_rk_dg_kernel(
             dt,
             i, j
         );
+    }
+}
+
+static void __global__ wavespeed_kernel(
+    struct Cell cell,
+    struct Patch weights,
+    struct Patch wavespeed)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        wavespeed_zone(cell, weights, wavespeed, i, j);
     }
 }
 #endif // defined(__NVCC__) || defined(__ROCM__)
@@ -602,6 +642,56 @@ EXTERN_C void euler2d_advance_rk_dg(
                 eos,
                 dt,
             );
+            #endif
+            break;
+        }
+    }
+}
+ /**
+ * Converts an array of weights data to an array of wavespeed data.
+ * The data array index spaces must follow the descriptions below.
+ *
+ * @param cell               The cell [order]
+ * @param weights_ptr[in]    [-1, -1] [ni + 2, nj + 2] [4]
+ * @param wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
+ * @param mode               The execution mode
+ */
+EXTERN_C void euler2d_dg_wavespeed(
+    struct Cell cell,
+    real *weights_ptr,
+    real *wavespeed_ptr,
+    enum ExecutionMode mode)
+{
+    int n_quad = num_quadrature_points(cell);
+    int n_poly = num_polynomials(cell);
+
+    struct Patch weights   = patch(mesh, NCONS * n_poly, 1, weights_ptr);
+    struct Patch wavespeed = patch(mesh,       1,        0, wavespeed_ptr);
+
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(weights)
+            {
+                wavespeed_zone(cell, weights, wavespeed, i, j);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(weights)
+            {
+                wavespeed_zone(cell, weights, wavespeed, i, j);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #if defined(__NVCC__) || defined(__ROCM__)
+            dim3 bs = dim3(16, 16);
+            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
+            wavespeed_kernel<<<bd, bs>>>(cell, weights, wavespeed);
             #endif
             break;
         }

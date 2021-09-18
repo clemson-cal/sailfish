@@ -1,7 +1,9 @@
+use crate::euler2d_dg;
 use crate::mesh;
 use crate::patch::Patch;
 use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh};
-// use cfg_if::cfg_if;
+use crate::node_2d::Cell;
+use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
 use gridiron::automaton::{Automaton, Status};
@@ -9,9 +11,10 @@ use gridiron::index_space::{Axis, IndexSpace};
 use gridiron::rect_map::Rectangle;
 use std::mem::swap;
 // use std::ops::DerefMut;
-// use std::os::raw::c_ulong;
-// use std::sync::{Arc, Mutex};
-use std::sync::Arc;
+use std::os::raw::c_ulong;
+use std::sync::{Arc, Mutex};
+//use std::sync::Arc;
+
 
 enum SolverState {
     NotReady,
@@ -24,35 +27,37 @@ pub struct Solver {
     state: SolverState,
     dt: Option<f64>,
     rk_order: usize,
-    primitive1: Patch,
-    primitive2: Patch,
+    weights_rd: Patch,
+    weights_wr: Patch,
     // conserved0: Patch,
-    // source_buf: Arc<Mutex<Patch>>,
-    // wavespeeds: Arc<Mutex<Patch>>,
+    source_buf: Arc<Mutex<Patch>>,
+    wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
     incoming_count: usize,
     received_count: usize,
     outgoing_edges: Vec<Rectangle<i64>>,
-    // mesh: StructuredMesh,
-    // mode: ExecutionMode,
+    cell: Cell,
+    mesh: StructuredMesh,
+    mode: ExecutionMode,
     device: Option<Device>,
     // setup: Arc<dyn Setup>,
 }
 
 impl Solver {
-    pub fn new_timestep(&mut self) {
-        // gpu_core::scope(self.device, || unsafe {
-        //     iso2d::iso2d_primitive_to_conserved(
-        //         self.mesh,
-        //         self.primitive1.as_ptr(),
-        //         self.conserved0.as_mut_ptr(),
-        //         self.mode,
-        //     );
-        // });
+    
+/*    pub fn new_timestep(&mut self) {
+        gpu_core::scope(self.device, || unsafe {
+            euler2d_dg::euler2d_dg_primitive_to_conserved(
+                self.mesh,
+                self.weights_rd.as_ptr(),
+                self.weights_wr.as_mut_ptr(),
+                self.mode,
+            );
+        });
         self.time0 = self.time;
         self.state = SolverState::RungeKuttaStage(0);
     }
-
+*/
     pub fn advance_rk(&mut self, stage: usize) {
         let dt = self.dt.unwrap();
 
@@ -75,23 +80,17 @@ impl Solver {
             _ => panic!(),
         };
 
-        // gpu_core::scope(self.device, || unsafe {
-        //     iso2d::iso2d_advance_rk(
-        //         self.mesh,
-        //         self.conserved0.as_ptr(),
-        //         self.primitive1.as_ptr(),
-        //         self.primitive2.as_mut_ptr(),
-        //         self.setup.equation_of_state(),
-        //         self.setup.boundary_condition(),
-        //         self.setup.masses(self.time),
-        //         self.setup.viscosity().unwrap_or(0.0),
-        //         a,
-        //         dt,
-        //         self.setup.velocity_ceiling().unwrap_or(f64::MAX),
-        //         self.mode,
-        //     );
-        // });
-        swap(&mut self.primitive1, &mut self.primitive2);
+        gpu_core::scope(self.device, || unsafe {
+            euler2d_dg::euler2d_dg_advance_rk(
+                self.cell,
+                self.mesh,
+                self.weights_rd.as_ptr(),
+                self.weights_wr.as_mut_ptr(),
+                dt,                
+                self.mode,
+            );
+        });
+        swap(&mut self.weights_rd, &mut self.weights_wr);
 
         self.time = self.time0 * a + (self.time + dt) * (1.0 - a);
         self.state = if stage == self.rk_order - 1 {
@@ -103,12 +102,46 @@ impl Solver {
 }
 
 impl PatchBasedSolve for Solver {
+    
     fn primitive(&self) -> Patch {
         self.primitive1.extract(&self.index_space)
     }
 
     fn max_wavespeed(&self) -> f64 {
-        todo!("need to compute wavespeeds")
+        let setup = &self.setup;
+        let eos = setup.equation_of_state();
+        let mut lock = self.wavespeeds.lock().unwrap();
+        let wavespeeds = lock.deref_mut();
+
+        gpu_core::scope(self.device, || unsafe {
+            euler2d_dg::euler2d_dg_wavespeed(
+                self.mesh,
+                self.weights_rd.as_ptr(),
+                wavespeeds.as_mut_ptr(),
+                eos,
+                self.mode,
+            )
+        });
+
+        match self.mode {
+            ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
+                euler2d_dg::euler2d_dg_wavespeed(
+                    wavespeeds.as_ptr(),
+                    wavespeeds.as_slice().unwrap().len() as c_ulong,
+                    self.mode,
+                )
+            },
+            ExecutionMode::GPU => {
+                cfg_if! {
+                    if #[cfg(feature = "gpu")] {
+                        use gpu_core::Reduce;
+                        wavespeeds.as_device_buffer().unwrap().maximum().unwrap()
+                    } else {
+                        unreachable!()
+                    }
+                }
+            }
+        }
     }
 
     fn reductions(&self) -> Vec<f64> {

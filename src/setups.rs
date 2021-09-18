@@ -244,8 +244,10 @@ impl Setup for ExplosionDG {
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         if (x * x + y * y).sqrt() < 0.25 {
             primitive[0] = 1.0;
+            primitive[3] = 1.0;
         } else {
-            primitive[0] = 0.1;
+            primitive[0] = 0.125;
+            primitive[3] = 0.100;
         }
         primitive[1] = 0.0;
         primitive[2] = 0.0;

@@ -1,4 +1,4 @@
-use crate::{EquationOfState, ExecutionMode, StructuredMesh};
+use crate::{ExecutionMode, StructuredMesh};
 use crate::node_2d;
 
 pub mod solver;
@@ -17,8 +17,15 @@ extern "C" {
         mesh: StructuredMesh,
         weights_rd_ptr: *const f64,
         weights_wr_ptr: *mut f64,
-        eos: EquationOfState,
         dt: f64,
         mode: ExecutionMode,
     );
+
+    fn euler2d_dg_wavespeed(
+        cell: node_2d::Cell,
+        weights_ptr: *const f64,
+        wavespeed_ptr: *mut f64,
+        mode: ExecutionMode,
+    );
+
 }
