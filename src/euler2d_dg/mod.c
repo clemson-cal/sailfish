@@ -70,7 +70,7 @@ static __device__ __host__ void primitive_to_conserved(const real *prim, real *c
     cons[3] = kinetic_energy + thermal_energy;
 }
 
-static __host__ __device__ real primitive_to_velocity(const real *prim, int direction)
+static __host__ __device__ real primitive_to_velocity_component(const real *prim, int direction)
 {
     switch (direction)
     {
@@ -86,8 +86,7 @@ static __host__ __device__ void primitive_to_flux(
     real *flux,
     int direction)
 {
-    real vn = primitive_to_velocity(prim, direction);
-    real rho      = prim[0];
+    real vn = primitive_to_velocity_component(prim, direction);
     real pressure = prim[3];
 
     flux[0] = vn * cons[0];
@@ -109,7 +108,7 @@ static __host__ __device__ void primitive_to_outer_wavespeeds(
     int direction)
 {
     const real cs = sqrt(primitive_to_sound_speed_squared(prim));
-    real vn = primitive_to_velocity(prim, direction);
+    real vn = primitive_to_velocity_component(prim, direction);
     wavespeeds[0] = vn - cs;
     wavespeeds[1] = vn + cs;
 }
@@ -124,30 +123,30 @@ static __host__ __device__ real primitive_max_wavespeed(const real *prim)
     return max2(ax, ay);
 }
 
-static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, int direction)
-{
-    real ul[4];
-    real ur[4];
-    real fl[4];
-    real fr[4];
-    real al[2];
-    real ar[2];
+// static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, int direction)
+// {
+//     real ul[4];
+//     real ur[4];
+//     real fl[4];
+//     real fr[4];
+//     real al[2];
+//     real ar[2];
 
-    primitive_to_conserved(pl, ul);
-    primitive_to_conserved(pr, ur);
-    primitive_to_flux_vector(pl, ul, fl, direction);
-    primitive_to_flux_vector(pr, ur, fr, direction);
-    primitive_to_outer_wavespeeds(pl, al, direction);
-    primitive_to_outer_wavespeeds(pr, ar, direction);
+//     primitive_to_conserved(pl, ul);
+//     primitive_to_conserved(pr, ur);
+//     primitive_to_flux(pl, ul, fl, direction);
+//     primitive_to_flux(pr, ur, fr, direction);
+//     primitive_to_outer_wavespeeds(pl, al, direction);
+//     primitive_to_outer_wavespeeds(pr, ar, direction);
 
-    const real am = min2(0.0, min2(al[0], ar[0]));
-    const real ap = max2(0.0, max2(al[1], ar[1]));
+//     const real am = min2(0.0, min2(al[0], ar[0]));
+//     const real ap = max2(0.0, max2(al[1], ar[1]));
 
-    for (int q = 0; q < NCONS; ++q)
-    {
-        flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
-    }
-}
+//     for (int q = 0; q < NCONS; ++q)
+//     {
+//         flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+//     }
+// }
 
 static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, real *flux, int direction)
 {
@@ -168,8 +167,8 @@ static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, rea
 
     primitive_to_conserved(pl, ul);
     primitive_to_conserved(pr, ur);
-    primitive_to_flux_vector(pl, ul, fl, direction);
-    primitive_to_flux_vector(pr, ur, fr, direction);
+    primitive_to_flux(pl, ul, fl, direction);
+    primitive_to_flux(pr, ur, fr, direction);
     primitive_to_outer_wavespeeds(pl, al, direction);
     primitive_to_outer_wavespeeds(pr, ar, direction);
 
@@ -453,7 +452,7 @@ static __host__ __device__ void wavespeed_zone(
     conserved_to_primitive(cons, prim);
 
     real a = primitive_max_wavespeed(prim);
-    
+
     GET(wavespeed, i, j)[0] = a;
 }
 
@@ -481,7 +480,6 @@ static void __global__ advance_rk_dg_kernel(
     struct Mesh mesh,
     struct Patch weights_rd,
     struct Patch weights_wr,
-    struct EquationOfState eos,
     real dt)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
@@ -494,7 +492,6 @@ static void __global__ advance_rk_dg_kernel(
             mesh,
             weights_rd,
             weights_wr,
-            eos,
             dt,
             i, j
         );
@@ -572,13 +569,13 @@ EXTERN_C void euler2d_dg_primitive_to_weights(
     }
 }
 
+
 /**
  * Updates an array of DG weights data by advancing it a single Runge-Kutta
  * step.
  * @param mesh                  The mesh [ni,     nj]
  * @param weights_rd_ptr[in]    [-1, -1] [ni + 2, nj + 2] [4]
  * @param weights_wr_ptr[out]   [-1, -1] [ni + 2, nj + 2] [4]
- * @param eos                   The EOS
  * @param dt                    The time step
  * @param mode                  The execution mode
  */
@@ -587,7 +584,6 @@ EXTERN_C void euler2d_advance_rk_dg(
     struct Mesh mesh,
     real *weights_rd_ptr,
     real *weights_wr_ptr,
-    struct EquationOfState eos,
     real dt,
     enum ExecutionMode mode)
 {
@@ -604,7 +600,6 @@ EXTERN_C void euler2d_advance_rk_dg(
                     mesh,
                     weights_rd,
                     weights_wr,
-                    eos,
                     dt,
                     i, j
                 );
@@ -616,11 +611,10 @@ EXTERN_C void euler2d_advance_rk_dg(
             #ifdef _OPENMP
             FOR_EACH_OMP(weights_rd) {
                 advance_rk_zone_dg(
-                    cell
+                    cell,
                     mesh,
                     weights_rd,
                     weights_wr,
-                    eos,
                     dt,
                     i, j
                 );
@@ -639,7 +633,6 @@ EXTERN_C void euler2d_advance_rk_dg(
                 mesh,
                 weights_rd,
                 weights_wr,
-                eos,
                 dt,
             );
             #endif
@@ -647,26 +640,28 @@ EXTERN_C void euler2d_advance_rk_dg(
         }
     }
 }
- /**
- * Converts an array of weights data to an array of wavespeed data.
- * The data array index spaces must follow the descriptions below.
- *
- * @param cell               The cell [order]
- * @param weights_ptr[in]    [-1, -1] [ni + 2, nj + 2] [4]
- * @param wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
- * @param mode               The execution mode
- */
+
+
+/**
+* Converts an array of weights data to an array of wavespeed data.
+* The data array index spaces must follow the descriptions below.
+*
+* @param cell               The cell [order]
+* @param weights_ptr[in]    [-1, -1] [ni + 2, nj + 2] [4]
+* @param wavespeed_ptr[out] [ 0,  0] [ni,     nj]     [1]
+* @param mode               The execution mode
+*/
 EXTERN_C void euler2d_dg_wavespeed(
     struct Cell cell,
+    struct Mesh mesh,
     real *weights_ptr,
     real *wavespeed_ptr,
     enum ExecutionMode mode)
 {
-    int n_quad = num_quadrature_points(cell);
     int n_poly = num_polynomials(cell);
 
     struct Patch weights   = patch(mesh, NCONS * n_poly, 1, weights_ptr);
-    struct Patch wavespeed = patch(mesh,       1,        0, wavespeed_ptr);
+    struct Patch wavespeed = patch(mesh, 1, 0, wavespeed_ptr);
 
     switch (mode) {
         case CPU: {

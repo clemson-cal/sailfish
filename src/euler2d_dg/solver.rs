@@ -1,20 +1,16 @@
 use crate::euler2d_dg;
 use crate::mesh;
+use crate::node_2d::Cell;
 use crate::patch::Patch;
 use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMesh};
-use crate::node_2d::Cell;
-use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
-use gridiron::automaton::{Automaton, Status};
+use gridiron::automaton::Automaton;
 use gridiron::index_space::{Axis, IndexSpace};
 use gridiron::rect_map::Rectangle;
 use std::mem::swap;
-// use std::ops::DerefMut;
-use std::os::raw::c_ulong;
+use std::ops::DerefMut;
 use std::sync::{Arc, Mutex};
-//use std::sync::Arc;
-
 
 enum SolverState {
     NotReady,
@@ -30,12 +26,12 @@ pub struct Solver {
     weights_rd: Patch,
     weights_wr: Patch,
     // conserved0: Patch,
-    source_buf: Arc<Mutex<Patch>>,
+    // source_buf: Arc<Mutex<Patch>>,
     wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
-    incoming_count: usize,
-    received_count: usize,
-    outgoing_edges: Vec<Rectangle<i64>>,
+    // incoming_count: usize,
+    // received_count: usize,
+    // outgoing_edges: Vec<Rectangle<i64>>,
     cell: Cell,
     mesh: StructuredMesh,
     mode: ExecutionMode,
@@ -44,20 +40,19 @@ pub struct Solver {
 }
 
 impl Solver {
-    
-/*    pub fn new_timestep(&mut self) {
-        gpu_core::scope(self.device, || unsafe {
-            euler2d_dg::euler2d_dg_primitive_to_conserved(
-                self.mesh,
-                self.weights_rd.as_ptr(),
-                self.weights_wr.as_mut_ptr(),
-                self.mode,
-            );
-        });
-        self.time0 = self.time;
-        self.state = SolverState::RungeKuttaStage(0);
-    }
-*/
+    // pub fn new_timestep(&mut self) {
+    //     gpu_core::scope(self.device, || unsafe {
+    //         euler2d_dg::euler2d_dg_primitive_to_conserved(
+    //             self.mesh,
+    //             self.weights_rd.as_ptr(),
+    //             self.weights_wr.as_mut_ptr(),
+    //             self.mode,
+    //         );
+    //     });
+    //     self.time0 = self.time;
+    //     self.state = SolverState::RungeKuttaStage(0);
+    // }
+
     pub fn advance_rk(&mut self, stage: usize) {
         let dt = self.dt.unwrap();
 
@@ -86,7 +81,7 @@ impl Solver {
                 self.mesh,
                 self.weights_rd.as_ptr(),
                 self.weights_wr.as_mut_ptr(),
-                dt,                
+                dt,
                 self.mode,
             );
         });
@@ -102,46 +97,49 @@ impl Solver {
 }
 
 impl PatchBasedSolve for Solver {
-    
     fn primitive(&self) -> Patch {
-        self.primitive1.extract(&self.index_space)
+        todo!("return weights")
+        // self.primitive1.extract(&self.index_space)
     }
 
     fn max_wavespeed(&self) -> f64 {
-        let setup = &self.setup;
-        let eos = setup.equation_of_state();
+        // let setup = &self.setup;
         let mut lock = self.wavespeeds.lock().unwrap();
         let wavespeeds = lock.deref_mut();
 
         gpu_core::scope(self.device, || unsafe {
             euler2d_dg::euler2d_dg_wavespeed(
+                self.cell,
                 self.mesh,
                 self.weights_rd.as_ptr(),
                 wavespeeds.as_mut_ptr(),
-                eos,
                 self.mode,
             )
         });
 
-        match self.mode {
-            ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
-                euler2d_dg::euler2d_dg_wavespeed(
-                    wavespeeds.as_ptr(),
-                    wavespeeds.as_slice().unwrap().len() as c_ulong,
-                    self.mode,
-                )
-            },
-            ExecutionMode::GPU => {
-                cfg_if! {
-                    if #[cfg(feature = "gpu")] {
-                        use gpu_core::Reduce;
-                        wavespeeds.as_device_buffer().unwrap().maximum().unwrap()
-                    } else {
-                        unreachable!()
-                    }
-                }
-            }
-        }
+        1.0
+
+        // match self.mode {
+        //     ExecutionMode::CPU | ExecutionMode::OMP => unsafe {
+        //         euler2d_dg::euler2d_maximum(
+        //             cell,
+        //             self.mesh,
+        //             wavespeeds.as_ptr(),
+        //             wavespeeds.as_slice().unwrap().len() as c_ulong,
+        //             self.mode,
+        //         )
+        //     },
+        //     ExecutionMode::GPU => {
+        //         cfg_if! {
+        //             if #[cfg(feature = "gpu")] {
+        //                 use gpu_core::Reduce;
+        //                 wavespeeds.as_device_buffer().unwrap().maximum().unwrap()
+        //             } else {
+        //                 unreachable!()
+        //             }
+        //         }
+        //     }
+        // }
     }
 
     fn reductions(&self) -> Vec<f64> {
@@ -167,33 +165,37 @@ impl Automaton for Solver {
     }
 
     fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
-        self.outgoing_edges
-            .iter()
-            .map(IndexSpace::from)
-            .map(|neighbor_space| {
-                let overlap = neighbor_space
-                    .extend_all(2)
-                    .intersect(&self.index_space)
-                    .unwrap();
-                let guard_patch = self.primitive1.extract(&overlap);
-                (neighbor_space.to_rect(), guard_patch)
-            })
-            .collect()
+        todo!()
+        // self.outgoing_edges
+        //     .iter()
+        //     .map(IndexSpace::from)
+        //     .map(|neighbor_space| {
+        //         let overlap = neighbor_space
+        //             .extend_all(2)
+        //             .intersect(&self.index_space)
+        //             .unwrap();
+        //         let guard_patch = self.primitive1.extract(&overlap);
+        //         (neighbor_space.to_rect(), guard_patch)
+        //     })
+        //     .collect()
     }
 
     fn independent(&self) -> bool {
-        self.incoming_count == 0
+        // self.incoming_count == 0
+        todo!()
     }
 
-    fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
-        neighbor_patch.copy_into(&mut self.primitive1);
-        self.received_count = (self.received_count + 1) % self.incoming_count;
-        Status::eligible_if(self.received_count == 0)
+    fn receive(&mut self, _neighbor_patch: Self::Message) -> gridiron::automaton::Status {
+        todo!()
+        // neighbor_patch.copy_into(&mut self.primitive1);
+        // self.received_count = (self.received_count + 1) % self.incoming_count;
+        // Status::eligible_if(self.received_count == 0)
     }
 
     fn value(mut self) -> Self::Value {
         if let SolverState::NotReady = self.state {
-            self.new_timestep()
+            todo!()
+            // self.new_timestep()
         }
         if let SolverState::RungeKuttaStage(stage) = self.state {
             self.advance_rk(stage)
@@ -212,7 +214,7 @@ impl PatchBasedBuild for Builder {
         time: f64,
         primitive: Patch,
         global_structured_mesh: StructuredMesh,
-        edge_list: &AdjacencyList<Rectangle<i64>>,
+        _edge_list: &AdjacencyList<Rectangle<i64>>,
         rk_order: usize,
         mode: ExecutionMode,
         device: Option<Device>,
@@ -249,7 +251,7 @@ impl PatchBasedBuild for Builder {
         let primitive1 = Patch::zeros(3, &local_space.extend_all(2)).on(device);
         // let conserved0 = Patch::zeros(3, &local_space).on(device);
         // let source_buf = Patch::zeros(3, &locaal_space).on(device);
-        // let wavespeeds = Patch::zeros(1, &local_space).on(device);
+        let wavespeeds = Patch::zeros(1, &local_space).on(device);
 
         let mut primitive1 = primitive1;
         primitive.copy_into(&mut primitive1);
@@ -268,18 +270,19 @@ impl PatchBasedBuild for Builder {
             state: SolverState::NotReady,
             dt: None,
             rk_order,
-            primitive2: primitive1.clone(),
-            primitive1,
+            weights_rd: primitive1.clone(),
+            weights_wr: primitive1,
             // conserved0,
             // source_buf: Arc::new(Mutex::new(source_buf)),
-            // wavespeeds: Arc::new(Mutex::new(wavespeeds)),
-            outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
-            incoming_count: edge_list.incoming_edges(&rect).count(),
-            received_count: 0,
+            wavespeeds: Arc::new(Mutex::new(wavespeeds)),
+            // outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
+            // incoming_count: edge_list.incoming_edges(&rect).count(),
+            // received_count: 0,
             index_space: local_space,
-            // mode,
+            mode,
             device,
-            // mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
+            cell,
+            mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
             // setup,
         }
     }
