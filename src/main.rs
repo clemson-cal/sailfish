@@ -103,6 +103,8 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
 
         if name.ends_with(".sf") {
             State::from_checkpoint(name, &parameters, cline)?
+        } else if let Some(ref file) = sailfish::parse::last_in_dir_ending_with(name, ".sf") {
+            State::from_checkpoint(file, &parameters, cline)?
         } else {
             new_state(cline.clone(), name, &parameters)?
         }
@@ -290,8 +292,7 @@ fn launch_single_patch(
         cline.output_directory(&state.restart_file),
     );
     let mut solver = match &state.mesh {
-        Mesh::FacePositions1D(faces) => 
-        match setup.solver_name().as_str() {
+        Mesh::FacePositions1D(faces) => match setup.solver_name().as_str() {
             "euler1d" => euler1d::solver(
                 cline.execution_mode(),
                 cline.device,
@@ -309,7 +310,7 @@ fn launch_single_patch(
                 setup.coordinate_system(),
             )?,
             _ => panic!("unknown solver name"),
-        }
+        },
         _ => panic!("the single patch solver assumes you have a FacePositions mesh"),
     };
 
