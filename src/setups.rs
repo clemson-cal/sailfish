@@ -905,8 +905,10 @@ impl Setup for Wind {
 /// A relativistic shell is launched into a homologous, relativistic envelope.
 pub struct EnvelopeShock {
     u_shell: f64,
+    d_shell: f64,
     r_inner: f64,
     num_decades: i64,
+    form: kind_config::Form,
 }
 
 impl FromStr for EnvelopeShock {
@@ -915,21 +917,26 @@ impl FromStr for EnvelopeShock {
         #[rustfmt::skip]
         let form = kind_config::Form::new()
             .item("u_shell",       30.0, "gamma-beta of the launched shell")
+            .item("d_shell",       0.0,  "density enhancement (additive) of the launched shell")
             .item("r_inner",       1.0,  "inner boundary radius")
             .item("num_decades",   3,    "number of radial decades")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let setup = Self {
+            u_shell: form.get("u_shell").into(),
+            d_shell: form.get("d_shell").into(),
             r_inner: form.get("r_inner").into(),
             num_decades: form.get("num_decades").into(),
-            u_shell: form.get("u_shell").into(),
+            form,
         };
 
         if false {
             panic!()
         } else if setup.u_shell < 0.0 {
             Err(InvalidSetup(format!("u_shell must be >=0.0")))
+        } else if setup.d_shell < 0.0 {
+            Err(InvalidSetup(format!("d_shell must be >=0.0")))
         } else if setup.r_inner <= 0.0 {
             Err(InvalidSetup(format!("r_inner must be >0.0")))
         } else if setup.num_decades < 1 {
@@ -941,6 +948,17 @@ impl FromStr for EnvelopeShock {
 }
 
 impl Setup for EnvelopeShock {
+    fn print_parameters(&self) {
+        for key in self.form.sorted_keys() {
+            println!(
+                "{:.<20} {:<10} {}",
+                key,
+                self.form.get(&key),
+                self.form.about(&key)
+            );
+        }
+    }
+
     fn num_primitives(&self) -> usize {
         3
     }
@@ -952,8 +970,8 @@ impl Setup for EnvelopeShock {
     fn initial_primitive(&self, r: f64, _q: f64, primitive: &mut [f64]) {
         let w_shell = 1.0;
         let r_shell = 100.0;
-        let d_shell = 0.0;
-        let u_shell = 30.0;
+        let d_shell = self.d_shell;
+        let u_shell = self.u_shell;
 
         let prof = |r: f64| {
             if r > r_shell {
