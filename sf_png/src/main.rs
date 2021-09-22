@@ -55,11 +55,12 @@ impl State {
 
 struct Process {
     first_call: bool,
+    png_files_written: Vec<String>,
 }
 
 impl Process {
     fn new() -> Self {
-        Self { first_call: true }
+        Self { first_call: true, png_files_written: vec![] }
     }
 }
 
@@ -208,6 +209,7 @@ fn make_image(
     writer.write_image_data(&rgba_data).unwrap();
 
     process.first_call = false;
+    process.png_files_written.push(png_name);
     Ok(())
 }
 
@@ -241,6 +243,13 @@ struct Opts {
 
 fn main() -> Result<()> {
     let opts: Opts = Opts::parse();
+
+    if opts.paths.is_empty() {
+        println!("usage: sf_png [chkpt.0000.sf ...] <flags>");
+        println!("invoke with --help to see more details");
+        return Ok(())
+    }
+
     let scaling = if opts.scaling == "linear" {
         Scaling::linear(opts.vmin, opts.vmax)
     } else if opts.scaling == "log" {
