@@ -1,0 +1,13 @@
+[package]
+name = "sf_png"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+png             = { version = "*" }
+clap            = { version = "3.0.0-beta.4" }
+serde           = { version = "1.0", features = ["derive"] }
+serde_bytes     = { version = "0.11" }
+rmp-serde       = { version = "0.15" }
+anyhow          = { version = "*" }
+libm            = { version = "*" }
