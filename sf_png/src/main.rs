@@ -4,6 +4,9 @@ use std::fs::File;
 use std::io::{BufWriter, Read};
 use std::ops::Range;
 use std::path::Path;
+use std::process::Command;
+
+mod matplotlib_cmaps;
 
 type Rectangle<T> = (Range<T>, Range<T>);
 
@@ -60,7 +63,10 @@ struct Process {
 
 impl Process {
     fn new() -> Self {
-        Self { first_call: true, png_files_written: vec![] }
+        Self {
+            first_call: true,
+            png_files_written: vec![],
+        }
     }
 }
 
@@ -80,6 +86,7 @@ impl Scaling {
             log: false,
         }
     }
+
     fn log(vmin: f64, vmax: f64) -> Self {
         Self {
             vmin,
@@ -88,6 +95,7 @@ impl Scaling {
             log: true,
         }
     }
+
     fn plaw(vmin: f64, vmax: f64, index: f64) -> Self {
         Self {
             vmin,
@@ -96,6 +104,7 @@ impl Scaling {
             log: false,
         }
     }
+
     fn scale(&self, x: f64) -> f64 {
         let y = if self.log {
             x.log10()
@@ -106,11 +115,6 @@ impl Scaling {
         };
         (y - self.vmin) / (self.vmax - self.vmin)
     }
-}
-
-fn float_to_rgba(x: f64) -> [u8; 4] {
-    let c = (x * 255.0) as u8;
-    [c, c, c, 255]
 }
 
 fn sorted_field(filename: &str, field: usize) -> Result<Vec<f64>> {
@@ -129,6 +133,18 @@ fn sorted_field(filename: &str, field: usize) -> Result<Vec<f64>> {
     }
     data.sort_by(|a, b| a.partial_cmp(b).unwrap());
     Ok(data)
+}
+
+fn sample_rgba(colormap: &[[f64; 3]; 256], y: f64) -> [u8; 4] {
+    let k = (y.clamp(0.0, 1.0 - 1e-16) * 256.0) as usize;
+    let l = colormap[k];
+    let t = [
+        (l[0] * 256.0) as u8,
+        (l[1] * 256.0) as u8,
+        (l[2] * 256.0) as u8,
+        255,
+    ];
+    t
 }
 
 fn print_quantiles(filename: &str, field: usize) -> Result<()> {
@@ -153,6 +169,7 @@ fn make_image(
     filename: &str,
     field_index: usize,
     scaling: &Scaling,
+    colormap: &[[f64; 3]; 256],
     process: &mut Process,
 ) -> Result<()> {
     let state = State::load(filename)?;
@@ -186,9 +203,8 @@ fn make_image(
                     *a = *b
                 }
                 let x = f64::from_le_bytes(bytes);
-                let y = scaling.scale(x);
-                let c = float_to_rgba(y);
-                let m = (i + (nj - 1 - j)  * ni) * 4;
+                let c = sample_rgba(colormap, scaling.scale(x));
+                let m = (i + (nj - 1 - j) * ni) * 4;
                 rgba_data[m..m + 4].copy_from_slice(&c);
             }
         }
@@ -228,9 +244,17 @@ struct Opts {
     #[clap(long, short = 'q')]
     show_quantiles: bool,
 
+    /// Open written images (MacOS only)
+    #[clap(long)]
+    open: bool,
+
     /// Scaling rule: [log|linear|plaw:n]
     #[clap(long, short, default_value = "linear")]
     scaling: String,
+
+    /// Colormap
+    #[clap(long, short, default_value = "magma")]
+    colormap: String,
 
     /// The minimum data value ()
     #[clap(long, default_value = "0.0")]
@@ -247,13 +271,21 @@ fn main() -> Result<()> {
     if opts.paths.is_empty() {
         println!("usage: sf_png [chkpt.0000.sf ...] <flags>");
         println!("invoke with --help to see more details");
-        return Ok(())
+        return Ok(());
     }
+
+    let colormap = match opts.colormap.as_str() {
+        "inferno" => matplotlib_cmaps::INFERNO_DATA,
+        "magma" => matplotlib_cmaps::MAGMA_DATA,
+        "plasma" => matplotlib_cmaps::PLASMA_DATA,
+        "viridis" => matplotlib_cmaps::VIRIDIS_DATA,
+        _ => anyhow::bail!("colormap must be [inferno|magma|plasma|viridis]"),
+    };
 
     let scaling = if opts.scaling == "linear" {
         Scaling::linear(opts.vmin, opts.vmax)
     } else if opts.scaling == "log" {
-        Scaling::log(opts.vmin, opts.vmax)        
+        Scaling::log(opts.vmin, opts.vmax)
     } else if opts.scaling.starts_with("plaw:") {
         let index = opts.scaling[5..].parse()?;
         Scaling::plaw(opts.vmin, opts.vmax, index)
@@ -267,8 +299,14 @@ fn main() -> Result<()> {
         if opts.show_quantiles {
             print_quantiles(&filename, opts.field)?;
         } else {
-            make_image(&filename, opts.field, &scaling, &mut process)?;
+            make_image(&filename, opts.field, &scaling, &colormap, &mut process)?;
         }
+    }
+    if cfg!(target_os = "macos") && opts.open && !process.png_files_written.is_empty() {
+        Command::new("open")
+            .args(process.png_files_written)
+            .spawn()
+            .unwrap();
     }
     Ok(())
 }
