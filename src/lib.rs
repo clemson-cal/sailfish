@@ -210,6 +210,19 @@ impl StructuredMesh {
         }
     }
 
+
+        pub fn centered_rectangle(height: f64, resolution: u32, aspect: u32) -> Self {
+        Self {
+            x0: -0.5 * height * aspect as f64,
+            y0: -0.5 * height,
+            ni: resolution as i64 * aspect as i64,
+            nj: resolution as i64,
+            dx: height / resolution as f64,
+            dy: height / resolution as f64,
+        }
+    }
+
+    
     /// Returns the number of zones on the i-axis as a `u32`.
     pub fn ni(&self) -> u32 {
         self.ni as u32
