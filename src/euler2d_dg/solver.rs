@@ -14,6 +14,9 @@ use std::ops::DerefMut;
 use std::os::raw::c_ulong;
 use std::sync::{Arc, Mutex};
 
+static NUM_GUARD: usize = 1;
+static NUM_CONS:  usize = 4;
+
 enum SolverState {
     NotReady,
     RungeKuttaStage(usize),
@@ -25,13 +28,11 @@ pub struct Solver {
     state: SolverState,
     dt: Option<f64>,
     rk_order: usize,
-    weights_rd: Patch,
-    weights_wr: Patch,
-    // conserved0: Patch,
-    // source_buf: Arc<Mutex<Patch>>,
+    weights0: Patch,
+    weights1: Patch,
     wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
-    // incoming_count: usize,
+    incoming_count: usize,
     // received_count: usize,
     // outgoing_edges: Vec<Rectangle<i64>>,
     cell: Cell,
@@ -42,65 +43,36 @@ pub struct Solver {
 }
 
 impl Solver {
-    // pub fn new_timestep(&mut self) {
-    //     gpu_core::scope(self.device, || unsafe {
-    //         euler2d_dg::euler2d_dg_primitive_to_conserved(
-    //             self.mesh,
-    //             self.weights_rd.as_ptr(),
-    //             self.weights_wr.as_mut_ptr(),
-    //             self.mode,
-    //         );
-    //     });
-    //     self.time0 = self.time;
-    //     self.state = SolverState::RungeKuttaStage(0);
-    // }
 
-    pub fn advance_rk(&mut self, stage: usize) {
+    pub fn new_timestep(&mut self) {
+        self.time0 = self.time;
+        self.state = SolverState::RungeKuttaStage(0);
+    }
+
+    pub fn advance_rk(&mut self) {
         let dt = self.dt.unwrap();
-
-        let a = match self.rk_order {
-            1 => match stage {
-                0 => 0.0,
-                _ => panic!(),
-            },
-            2 => match stage {
-                0 => 0.0,
-                1 => 0.5,
-                _ => panic!(),
-            },
-            3 => match stage {
-                0 => 0.0,
-                1 => 3.0 / 4.0,
-                2 => 1.0 / 3.0,
-                _ => panic!(),
-            },
-            _ => panic!(),
-        };
 
         gpu_core::scope(self.device, || unsafe {
             euler2d_dg::euler2d_dg_advance_rk(
                 self.cell,
                 self.mesh,
-                self.weights_rd.as_ptr(),
-                self.weights_wr.as_mut_ptr(),
+                self.weights0.as_ptr(),
+                self.weights1.as_mut_ptr(),
                 dt,
                 self.mode,
             );
         });
-        swap(&mut self.weights_rd, &mut self.weights_wr);
 
-        self.time = self.time0 * a + (self.time + dt) * (1.0 - a);
-        self.state = if stage == self.rk_order - 1 {
-            SolverState::NotReady
-        } else {
-            SolverState::RungeKuttaStage(stage + 1)
-        }
+        swap(&mut self.weights0, &mut self.weights1);
+
+        self.time = self.time + dt;
+        self.state = SolverState::NotReady;
     }
 }
 
 impl PatchBasedSolve for Solver {
     fn primitive(&self) -> Patch {
-        self.weights_rd.extract(&self.index_space)
+        self.weights0.extract(&self.index_space)
     }
 
     fn max_wavespeed(&self) -> f64 {
@@ -111,7 +83,7 @@ impl PatchBasedSolve for Solver {
             euler2d_dg::euler2d_dg_wavespeed(
                 self.cell,
                 self.mesh,
-                self.weights_rd.as_ptr(),
+                self.weights0.as_ptr(),
                 wavespeeds.as_mut_ptr(),
                 self.mode,
             )
@@ -161,19 +133,19 @@ impl Automaton for Solver {
     }
 
     fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
-        todo!()
-        // self.outgoing_edges
-        //     .iter()
-        //     .map(IndexSpace::from)
-        //     .map(|neighbor_space| {
-        //         let overlap = neighbor_space
-        //             .extend_all(2)
-        //             .intersect(&self.index_space)
-        //             .unwrap();
-        //         let guard_patch = self.primitive1.extract(&overlap);
-        //         (neighbor_space.to_rect(), guard_patch)
-        //     })
-        //     .collect()
+
+        self.outgoing_edges
+            .iter()
+            .map(IndexSpace::from)
+            .map(|neighbor_space| {
+                let overlap = neighbor_space
+                    .extend_all(NUM_GUARD)
+                    .intersect(&self.index_space)
+                    .unwrap();
+                let guard_patch = self.weights1.extract(&overlap);
+                (neighbor_space.to_rect(), guard_patch)
+            })
+            .collect()
     }
 
     fn independent(&self) -> bool {
@@ -181,17 +153,15 @@ impl Automaton for Solver {
         todo!()
     }
 
-    fn receive(&mut self, _neighbor_patch: Self::Message) -> gridiron::automaton::Status {
-        todo!()
-        // neighbor_patch.copy_into(&mut self.primitive1);
-        // self.received_count = (self.received_count + 1) % self.incoming_count;
-        // Status::eligible_if(self.received_count == 0)
+    fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
+        neighbor_patch.copy_into(&mut self.weights1);
+        self.received_count = (self.received_count + 1) % self.incoming_count;
+        Status::eligible_if(self.received_count == 0)
     }
 
     fn value(mut self) -> Self::Value {
         if let SolverState::NotReady = self.state {
-            todo!()
-            // self.new_timestep()
+            self.new_timestep()
         }
         if let SolverState::RungeKuttaStage(stage) = self.state {
             self.advance_rk(stage)
@@ -208,7 +178,7 @@ impl PatchBasedBuild for Builder {
     fn build(
         &self,
         time: f64,
-        primitive: Patch,
+        weights: Patch,
         global_structured_mesh: StructuredMesh,
         _edge_list: &AdjacencyList<Rectangle<i64>>,
         rk_order: usize,
@@ -217,7 +187,7 @@ impl PatchBasedBuild for Builder {
         setup: Arc<dyn Setup>,
     ) -> Self::Solver {
         let cell = setup.dg_cell().expect("setup must provide a cell");
-        let num_fields = 4 * cell.quadrature_points().count();
+        let num_fields = NUM_CONS * cell.quadrature_points().count();
 
         assert! {
             (device.is_none() && std::matches!(mode, ExecutionMode::CPU | ExecutionMode::OMP)) ||
@@ -225,38 +195,36 @@ impl PatchBasedBuild for Builder {
             "device must be Some if and only if execution mode is GPU"
         };
         assert_eq! {
-            setup.num_primitives(),
+            setup.num_primitives() * cell.quadrature_points().count(),
             num_fields,
-            "this solver requires 4 primitive variable fields, by {} quadrature points",
+            "this solver requires {} primitive variable fields, by {} quadrature points",
+            NUM_CONS,
             cell.quadrature_points().count(),
         };
 
-        let rect = primitive.rect();
-        let local_space = primitive.index_space();
-        let local_space_ext = local_space.extend_all(2);
+        let rect = weights.rect();
+        let local_space = weights.index_space();
+        let local_space_ext = local_space.extend_all(NUM_GUARD);
         let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
-        let global_space_ext = global_mesh.index_space().extend_all(2);
+        let global_space_ext = global_mesh.index_space().extend_all(NUM_GUARD);
 
         let guard_spaces = [
-            global_space_ext.keep_lower(2, Axis::I),
-            global_space_ext.keep_upper(2, Axis::I),
-            global_space_ext.keep_lower(2, Axis::J),
-            global_space_ext.keep_upper(2, Axis::J),
+            global_space_ext.keep_lower(NUM_GUARD, Axis::I),
+            global_space_ext.keep_upper(NUM_GUARD, Axis::I),
+            global_space_ext.keep_lower(NUM_GUARD, Axis::J),
+            global_space_ext.keep_upper(NUM_GUARD, Axis::J),
         ];
 
-        let primitive1 = Patch::zeros(3, &local_space.extend_all(2)).on(device);
-        // let conserved0 = Patch::zeros(3, &local_space).on(device);
-        // let source_buf = Patch::zeros(3, &locaal_space).on(device);
+        let mut weights1 = Patch::zeros(num_fields, &local_space.extend_all(NUM_GUARD)).on(device);
         let wavespeeds = Patch::zeros(1, &local_space).on(device);
 
-        let mut primitive1 = primitive1;
-        primitive.copy_into(&mut primitive1);
+        weights.copy_into(&mut weights1);
 
         for space in guard_spaces {
             if let Some(overlap) = space.intersect(&local_space_ext) {
                 setup
                     .initial_primitive_patch(&overlap, &global_mesh)
-                    .copy_into(&mut primitive1);
+                    .copy_into(&mut weights1);
             }
         }
 
@@ -266,14 +234,12 @@ impl PatchBasedBuild for Builder {
             state: SolverState::NotReady,
             dt: None,
             rk_order,
-            weights_rd: primitive1.clone(),
-            weights_wr: primitive1,
-            // conserved0,
-            // source_buf: Arc::new(Mutex::new(source_buf)),
+            weights0: weights1.clone(),
+            weights1: weights1,
             wavespeeds: Arc::new(Mutex::new(wavespeeds)),
             // outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
             // incoming_count: edge_list.incoming_edges(&rect).count(),
-            // received_count: 0,
+            received_count: 0,
             index_space: local_space,
             mode,
             device,

@@ -4,13 +4,6 @@ use crate::{ExecutionMode, StructuredMesh};
 pub mod solver;
 
 extern "C" {
-    // fn euler2d_dg_primitive_to_weights(
-    //     cell: node_2d::Cell,
-    //     mesh: StructuredMesh,
-    //     primitive_ptr: *const f64,
-    //     weights_ptr: *mut f64,
-    //     mode: ExecutionMode,
-    // );
 
     fn euler2d_dg_advance_rk(
         cell: node_2d::Cell,
@@ -34,4 +27,5 @@ extern "C" {
         size: std::os::raw::c_ulong,
         mode: ExecutionMode,
     ) -> f64;
+    
 }
