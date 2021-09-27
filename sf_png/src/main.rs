@@ -58,14 +58,14 @@ impl State {
 
 struct Process {
     first_call: bool,
-    png_files_written: Vec<String>,
+    files_written: Vec<String>,
 }
 
 impl Process {
     fn new() -> Self {
         Self {
             first_call: true,
-            png_files_written: vec![],
+            files_written: vec![],
         }
     }
 }
@@ -225,7 +225,7 @@ fn make_image(
     writer.write_image_data(&rgba_data).unwrap();
 
     process.first_call = false;
-    process.png_files_written.push(png_name);
+    process.files_written.push(png_name);
     Ok(())
 }
 
@@ -302,11 +302,10 @@ fn main() -> Result<()> {
             make_image(&filename, opts.field, &scaling, &colormap, &mut process)?;
         }
     }
-    if cfg!(target_os = "macos") && opts.open && !process.png_files_written.is_empty() {
+    if cfg!(target_os = "macos") && opts.open && !process.files_written.is_empty() {
         Command::new("open")
-            .args(process.png_files_written)
-            .spawn()
-            .unwrap();
+            .args(process.files_written)
+            .spawn()?;
     }
     Ok(())
 }
