@@ -6,7 +6,7 @@ use crate::{ExecutionMode, PatchBasedBuild, PatchBasedSolve, Setup, StructuredMe
 use cfg_if::cfg_if;
 use gpu_core::Device;
 use gridiron::adjacency_list::AdjacencyList;
-use gridiron::automaton::Automaton;
+use gridiron::automaton::{Automaton, Status};
 use gridiron::index_space::{Axis, IndexSpace};
 use gridiron::rect_map::Rectangle;
 use std::mem::swap;
@@ -15,7 +15,7 @@ use std::os::raw::c_ulong;
 use std::sync::{Arc, Mutex};
 
 static NUM_GUARD: usize = 1;
-static NUM_CONS:  usize = 4;
+static NUM_CONS: usize = 4;
 
 enum SolverState {
     NotReady,
@@ -27,14 +27,14 @@ pub struct Solver {
     time0: f64,
     state: SolverState,
     dt: Option<f64>,
-    rk_order: usize,
+    // rk_order: usize,
     weights0: Patch,
     weights1: Patch,
     wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
     incoming_count: usize,
-    // received_count: usize,
-    // outgoing_edges: Vec<Rectangle<i64>>,
+    received_count: usize,
+    outgoing_edges: Vec<Rectangle<i64>>,
     cell: Cell,
     mesh: StructuredMesh,
     mode: ExecutionMode,
@@ -43,7 +43,6 @@ pub struct Solver {
 }
 
 impl Solver {
-
     pub fn new_timestep(&mut self) {
         self.time0 = self.time;
         self.state = SolverState::RungeKuttaStage(0);
@@ -133,13 +132,12 @@ impl Automaton for Solver {
     }
 
     fn messages(&self) -> Vec<(Self::Key, Self::Message)> {
-
         self.outgoing_edges
             .iter()
             .map(IndexSpace::from)
             .map(|neighbor_space| {
                 let overlap = neighbor_space
-                    .extend_all(NUM_GUARD)
+                    .extend_all(NUM_GUARD as i64)
                     .intersect(&self.index_space)
                     .unwrap();
                 let guard_patch = self.weights1.extract(&overlap);
@@ -149,8 +147,7 @@ impl Automaton for Solver {
     }
 
     fn independent(&self) -> bool {
-        // self.incoming_count == 0
-        todo!()
+        self.incoming_count == 0
     }
 
     fn receive(&mut self, neighbor_patch: Self::Message) -> gridiron::automaton::Status {
@@ -163,8 +160,8 @@ impl Automaton for Solver {
         if let SolverState::NotReady = self.state {
             self.new_timestep()
         }
-        if let SolverState::RungeKuttaStage(stage) = self.state {
-            self.advance_rk(stage)
+        if let SolverState::RungeKuttaStage(_) = self.state {
+            self.advance_rk()
         }
         self
     }
@@ -180,7 +177,7 @@ impl PatchBasedBuild for Builder {
         time: f64,
         weights: Patch,
         global_structured_mesh: StructuredMesh,
-        _edge_list: &AdjacencyList<Rectangle<i64>>,
+        edge_list: &AdjacencyList<Rectangle<i64>>,
         rk_order: usize,
         mode: ExecutionMode,
         device: Option<Device>,
@@ -188,12 +185,16 @@ impl PatchBasedBuild for Builder {
     ) -> Self::Solver {
         let cell = setup.dg_cell().expect("setup must provide a cell");
         let num_fields = NUM_CONS * cell.quadrature_points().count();
+        let num_guard = NUM_GUARD as i64;
 
         assert! {
             (device.is_none() && std::matches!(mode, ExecutionMode::CPU | ExecutionMode::OMP)) ||
             (device.is_some() && std::matches!(mode, ExecutionMode::GPU)),
             "device must be Some if and only if execution mode is GPU"
         };
+        assert_eq! {
+            rk_order, 1, "this solver is hard-coded for RK1 time advance"
+        }
         assert_eq! {
             setup.num_primitives() * cell.quadrature_points().count(),
             num_fields,
@@ -204,18 +205,18 @@ impl PatchBasedBuild for Builder {
 
         let rect = weights.rect();
         let local_space = weights.index_space();
-        let local_space_ext = local_space.extend_all(NUM_GUARD);
+        let local_space_ext = local_space.extend_all(num_guard);
         let global_mesh = mesh::Mesh::Structured(global_structured_mesh);
-        let global_space_ext = global_mesh.index_space().extend_all(NUM_GUARD);
+        let global_space_ext = global_mesh.index_space().extend_all(num_guard);
 
         let guard_spaces = [
-            global_space_ext.keep_lower(NUM_GUARD, Axis::I),
-            global_space_ext.keep_upper(NUM_GUARD, Axis::I),
-            global_space_ext.keep_lower(NUM_GUARD, Axis::J),
-            global_space_ext.keep_upper(NUM_GUARD, Axis::J),
+            global_space_ext.keep_lower(num_guard, Axis::I),
+            global_space_ext.keep_upper(num_guard, Axis::I),
+            global_space_ext.keep_lower(num_guard, Axis::J),
+            global_space_ext.keep_upper(num_guard, Axis::J),
         ];
 
-        let mut weights1 = Patch::zeros(num_fields, &local_space.extend_all(NUM_GUARD)).on(device);
+        let mut weights1 = Patch::zeros(num_fields, &local_space.extend_all(num_guard)).on(device);
         let wavespeeds = Patch::zeros(1, &local_space).on(device);
 
         weights.copy_into(&mut weights1);
@@ -233,12 +234,12 @@ impl PatchBasedBuild for Builder {
             time0: time,
             state: SolverState::NotReady,
             dt: None,
-            rk_order,
+            // rk_order,
             weights0: weights1.clone(),
-            weights1: weights1,
+            weights1,
             wavespeeds: Arc::new(Mutex::new(wavespeeds)),
-            // outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
-            // incoming_count: edge_list.incoming_edges(&rect).count(),
+            outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),
+            incoming_count: edge_list.incoming_edges(&rect).count(),
             received_count: 0,
             index_space: local_space,
             mode,
