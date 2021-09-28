@@ -184,7 +184,6 @@ impl PatchBasedBuild for Builder {
         setup: Arc<dyn Setup>,
     ) -> Self::Solver {
         let cell = setup.dg_cell().expect("setup must provide a cell");
-        //let num_fields = NUM_CONS * cell.quadrature_points().count();
         let num_fields = NUM_CONS * cell.num_polynomials();
         let num_guard = NUM_GUARD as i64;
 
@@ -199,9 +198,9 @@ impl PatchBasedBuild for Builder {
         assert_eq! {
             setup.num_primitives() * cell.num_polynomials(),
             num_fields,
-            "this solver requires {} primitive variable fields, by {} quadrature points",
+            "this solver requires {} conserved variable fields, by {} basis polynomials",
             NUM_CONS,
-            cell.quadrature_points().count(),
+            cell.quadrature_polynomials(),
         };
 
         let rect = weights.rect();
