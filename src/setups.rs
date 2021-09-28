@@ -339,6 +339,9 @@ impl Setup for VortexDG {
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
+    fn dg_cell(&self) -> Option<crate::node_2d::Cell> {
+        Some(crate::node_2d::Cell::new(3))
+    }
     fn end_time(&self) -> Option<f64> {
         Some(0.2)
     }
