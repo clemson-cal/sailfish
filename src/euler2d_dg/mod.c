@@ -19,6 +19,7 @@
 
 #define ADIABATIC_GAMMA (5.0 / 3.0)
 #define NCONS 4
+#define NUM_GUARD 1
 
 // ============================ MATH ==========================================
 // ============================================================================
@@ -202,14 +203,22 @@ static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, rea
 
 // ============================ PATCH =========================================
 // ============================================================================
-#define FOR_EACH(p) \
-    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
-    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
-#define FOR_EACH_OMP(p) \
+//#define FOR_EACH(p) \
+//    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+//    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define FOR_EACH(p, ng) \
+    for (int i = p.start[0] + ng; i < p.start[0] + p.count[0] - ng; ++i) \
+    for (int j = p.start[1] + ng; j < p.start[1] + p.count[1] - ng; ++j)
+//#define FOR_EACH_OMP(p) \
+//_Pragma("omp parallel for") \
+//    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
+//    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+#define FOR_EACH_OMP(p, ng) \
 _Pragma("omp parallel for") \
-    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
-    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
+    for (int i = p.start[0] + ng; i < p.start[0] + p.count[0] - ng; ++i) \
+    for (int j = p.start[1] + ng; j < p.start[1] + p.count[1] - ng; ++j)
 #define GET(p, i, j) (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
+
 
 struct Patch
 {
@@ -483,16 +492,15 @@ EXTERN_C void euler2d_dg_advance_rk(
     real dt,
     enum ExecutionMode mode)
 {
-    printf("euler2d_dg_advance_rk: ni = %lld nj = %lld\n", mesh.ni, mesh.nj);
 
     int n_poly = num_polynomials(cell);
 
-    struct Patch weights_rd = patch(mesh, n_poly * NCONS, 1, weights_rd_ptr);
-    struct Patch weights_wr = patch(mesh, n_poly * NCONS, 1, weights_wr_ptr);
+    struct Patch weights_rd = patch(mesh, n_poly * NCONS, NUM_GUARD, weights_rd_ptr);
+    struct Patch weights_wr = patch(mesh, n_poly * NCONS, NUM_GUARD, weights_wr_ptr);
 
     switch (mode) {
         case CPU: {
-            FOR_EACH(weights_rd) {
+            FOR_EACH(weights_rd, NUM_GUARD) {
                 advance_rk_zone_dg(
                     cell,
                     mesh,
@@ -507,7 +515,7 @@ EXTERN_C void euler2d_dg_advance_rk(
 
         case OMP: {
             #ifdef _OPENMP
-            FOR_EACH_OMP(weights_rd) {
+            FOR_EACH_OMP(weights_rd, NUM_GUARD) {
                 advance_rk_zone_dg(
                     cell,
                     mesh,
@@ -521,6 +529,7 @@ EXTERN_C void euler2d_dg_advance_rk(
             break;
         }
 
+// TODO: Don't inlcude guard cells
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
@@ -556,14 +565,15 @@ EXTERN_C void euler2d_dg_wavespeed(
     real *wavespeed_ptr,
     enum ExecutionMode mode)
 {
+
     int n_poly = num_polynomials(cell);
 
-    struct Patch weights   = patch(mesh, NCONS * n_poly, 1, weights_ptr);
+    struct Patch weights   = patch(mesh, NCONS * n_poly, NUM_GUARD, weights_ptr);
     struct Patch wavespeed = patch(mesh, 1, 0, wavespeed_ptr);
 
     switch (mode) {
         case CPU: {
-            FOR_EACH(weights)
+            FOR_EACH(weights, NUM_GUARD)
             {
                 wavespeed_zone(cell, weights, wavespeed, i, j);
             }
@@ -572,7 +582,7 @@ EXTERN_C void euler2d_dg_wavespeed(
 
         case OMP: {
             #ifdef _OPENMP
-            FOR_EACH_OMP(weights)
+            FOR_EACH_OMP(weights, NUM_GUARD)
             {
                 wavespeed_zone(cell, weights, wavespeed, i, j);
             }
