@@ -390,6 +390,7 @@ static __host__ __device__ void advance_rk_zone_dg(
             wout[q * n_poly + l] = wij[q * n_poly + l] + 0.5 * dwij[q * n_poly + l] * dt / dx; // assumes dy = dx
         }
     }
+
 }
 
 static __host__ __device__ void wavespeed_zone(
@@ -482,6 +483,8 @@ EXTERN_C void euler2d_dg_advance_rk(
     real dt,
     enum ExecutionMode mode)
 {
+    printf("euler2d_dg_advance_rk: ni = %lld nj = %lld\n", mesh.ni, mesh.nj);
+
     int n_poly = num_polynomials(cell);
 
     struct Patch weights_rd = patch(mesh, n_poly * NCONS, 1, weights_rd_ptr);
