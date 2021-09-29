@@ -194,13 +194,13 @@ impl PatchBasedBuild for Builder {
         };
         assert_eq! {
             rk_order, 1, "this solver is hard-coded for RK1 time advance"
-        }
+        };
         assert_eq! {
             setup.num_primitives() * cell.num_polynomials(),
             num_fields,
             "this solver requires {} conserved variable fields, by {} basis polynomials",
             NUM_CONS,
-            cell.quadrature_polynomials(),
+            cell.num_polynomials(),
         };
 
         let rect = weights.rect();
