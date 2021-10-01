@@ -28,8 +28,8 @@ pub struct Solver {
     state: SolverState,
     dt: Option<f64>,
     // rk_order: usize,
-    weights0: Patch,
     weights1: Patch,
+    weights2: Patch,
     wavespeeds: Arc<Mutex<Patch>>,
     index_space: IndexSpace,
     incoming_count: usize,
@@ -55,14 +55,14 @@ impl Solver {
             euler2d_dg::euler2d_dg_advance_rk(
                 self.cell,
                 self.mesh,
-                self.weights0.as_ptr(),
-                self.weights1.as_mut_ptr(),
+                self.weights1.as_ptr(),
+                self.weights2.as_mut_ptr(),
                 dt,
                 self.mode,
             );
         });
 
-        swap(&mut self.weights0, &mut self.weights1);
+        swap(&mut self.weights1, &mut self.weights2);
 
         self.time = self.time + dt;
         self.state = SolverState::NotReady;
@@ -71,7 +71,7 @@ impl Solver {
 
 impl PatchBasedSolve for Solver {
     fn primitive(&self) -> Patch {
-        self.weights0.extract(&self.index_space)
+        self.weights1.extract(&self.index_space)
     }
 
     fn max_wavespeed(&self) -> f64 {
@@ -82,7 +82,7 @@ impl PatchBasedSolve for Solver {
             euler2d_dg::euler2d_dg_wavespeed(
                 self.cell,
                 self.mesh,
-                self.weights0.as_ptr(),
+                self.weights1.as_ptr(),
                 wavespeeds.as_mut_ptr(),
                 self.mode,
             )
@@ -235,7 +235,7 @@ impl PatchBasedBuild for Builder {
             state: SolverState::NotReady,
             dt: None,
             // rk_order,
-            weights0: weights1.clone(),
+            weights2: weights1.clone(),
             weights1,
             wavespeeds: Arc::new(Mutex::new(wavespeeds)),
             outgoing_edges: edge_list.outgoing_edges(&rect).cloned().collect(),

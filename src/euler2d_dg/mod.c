@@ -20,6 +20,7 @@
 #define ADIABATIC_GAMMA (5.0 / 3.0)
 #define NCONS 4
 #define NUM_GUARD 1
+#define MAX_NUM_FIELDS 60 // this is NCONS * MAX_POLYNOMIALS
 
 // ============================ MATH ==========================================
 // ============================================================================
@@ -291,7 +292,7 @@ static __host__ __device__ void advance_rk_zone_dg(
     real flj[NCONS];
     real frj[NCONS];
 
-    real dwij[NCONS * n_poly];
+    real dwij[MAX_NUM_FIELDS];
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -376,7 +377,6 @@ static __host__ __device__ void advance_rk_zone_dg(
         }
 
         conserved_to_primitive(cons, primitive);
-
         primitive_to_flux(primitive, cons, flux_x, 0);
         primitive_to_flux(primitive, cons, flux_y, 1);
 
@@ -399,7 +399,6 @@ static __host__ __device__ void advance_rk_zone_dg(
             wout[q * n_poly + l] = wij[q * n_poly + l] + 0.5 * dwij[q * n_poly + l] * dt / dx; // assumes dy = dx
         }
     }
-
 }
 
 static __host__ __device__ void wavespeed_zone(
@@ -492,7 +491,6 @@ EXTERN_C void euler2d_dg_advance_rk(
     real dt,
     enum ExecutionMode mode)
 {
-
     int n_poly = num_polynomials(cell);
 
     struct Patch weights_rd = patch(mesh, n_poly * NCONS, NUM_GUARD, weights_rd_ptr);
@@ -529,7 +527,7 @@ EXTERN_C void euler2d_dg_advance_rk(
             break;
         }
 
-// TODO: Don't inlcude guard cells
+        // TODO: Don't include guard cells
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
@@ -565,7 +563,6 @@ EXTERN_C void euler2d_dg_wavespeed(
     real *wavespeed_ptr,
     enum ExecutionMode mode)
 {
-
     int n_poly = num_polynomials(cell);
 
     struct Patch weights   = patch(mesh, NCONS * n_poly, NUM_GUARD, weights_ptr);
