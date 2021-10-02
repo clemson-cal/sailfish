@@ -318,7 +318,8 @@ pub trait Setup: Send + Sync {
     /// (which must be implemented by the setup). Finally the conserved
     /// variables are converted into cell weights. The grid patch returned has
     /// the number of fields equal to `cell.num_polynomials()`, times
-    /// `self.num_primitives()`.
+    /// `self.num_primitives()`. The weights for a particular conserved
+    /// variable field (e.g. density) are contiguous.
     fn initial_primitive_patch_dg(
         &self,
         space: &IndexSpace,
@@ -331,13 +332,15 @@ pub trait Setup: Send + Sync {
                 let nq = self.num_primitives();
 
                 Patch::from_slice_function(space, np * nq, |(i, j), w| {
-                    let mut prim = vec![0.0; nq * cell.num_quadrature_points()];
+                    let mut cons = vec![0.0; nq * cell.num_quadrature_points()];
+                    let mut prim = vec![0.0; nq];
 
-                    for ([a, b], p) in cell.quadrature_points().zip(prim.chunks_mut(nq)) {
+                    for ([a, b], u) in cell.quadrature_points().zip(cons.chunks_mut(nq)) {
                         let [x, y] = mesh.subcell_coordinates(i, j, a, b);
-                        self.initial_primitive(x, y, p)
+                        self.initial_primitive(x, y, &mut prim);
+                        self.primitive_to_conserved(&prim, u);
                     }
-                    cell.to_weights(&prim, w, nq)
+                    cell.to_weights(&cons, w, nq)
                 })
             }
             _ => unimplemented!(),

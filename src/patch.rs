@@ -118,6 +118,10 @@ impl Patch {
         }
     }
 
+    pub fn num_fields(&self) -> usize {
+        self.num_fields
+    }
+
     /// Returns the index space for this patch.
     pub fn index_space(&self) -> IndexSpace {
         self.rect.clone().into()

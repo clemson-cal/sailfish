@@ -220,7 +220,6 @@ _Pragma("omp parallel for") \
     for (int j = p.start[1] + ng; j < p.start[1] + p.count[1] - ng; ++j)
 #define GET(p, i, j) (p.data + p.jumps[0] * ((i) - p.start[0]) + p.jumps[1] * ((j) - p.start[1]))
 
-
 struct Patch
 {
     int start[2];

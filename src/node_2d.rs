@@ -46,6 +46,33 @@ impl NodeData {
         }
         node
     }
+
+    fn describe(&self, order: usize) -> String {
+        use std::fmt::Write;
+        let mut d = String::new();
+        writeln!(
+            d,
+            "weight = {}; (x y) = ({} {})",
+            self.weight, self.xsi_x, self.xsi_y
+        )
+        .unwrap();
+        write!(d, "phi: [ ").unwrap();
+        for n in 0..num_polynomials(order) {
+            write!(d, "{} ", self.phi[n]).unwrap()
+        }
+        writeln!(d, "]").unwrap();
+        write!(d, "dphi_dx: [ ").unwrap();
+        for n in 0..num_polynomials(order) {
+            write!(d, "{} ", self.dphi_dx[n]).unwrap()
+        }
+        writeln!(d, "]").unwrap();
+        write!(d, "dphi_dy: [ ").unwrap();
+        for n in 0..num_polynomials(order) {
+            write!(d, "{} ", self.dphi_dy[n]).unwrap()
+        }
+        writeln!(d, "]").unwrap();
+        d
+    }
 }
 
 impl Default for NodeData {
@@ -139,39 +166,57 @@ impl Cell {
     }
 
     pub fn num_polynomials(&self) -> usize {
-        match self.order {
-            1 => 1,
-            2 => 3,
-            3 => 6,
-            4 => 10,
-            5 => 15,
-            _ => panic!(),
-        }
+        num_polynomials(self.order())
     }
 
     /// Converts a multi-component scalar field `y`, tabulated at the
     /// quadrature points of this cell, to a component-wise weights
     /// representation. The size of the input slice `y` is the number of
     /// quadrature points in this cell, times the number of fields
-    /// `num_fields`. The size of the output slice `weights` is the number of
-    /// polynomial basis functions for this cell, times `num_fields`.
-    pub fn to_weights(&self, y: &[f64], weights: &mut [f64], num_fields: usize) {
+    /// `num_scalars`. The size of the output slice `weights` is the number of
+    /// polynomial basis functions for this cell, times `num_scalars`. The
+    /// scalar field components are contiguous in memory at each quadtrature
+    /// point.
+    pub fn to_weights(&self, y: &[f64], weights: &mut [f64], num_scalars: usize) {
         let np = self.num_polynomials();
 
-        assert_eq!(y.len(), num_fields * self.num_quadrature_points());
-        assert_eq!(weights.len(), num_fields * np);
+        assert_eq!(y.len(), num_scalars * self.num_quadrature_points());
+        assert_eq!(weights.len(), num_scalars * np);
 
         for w in weights.iter_mut() {
             *w = 0.0;
         }
 
-        for (node, yp) in self.interior_nodes().zip(y.chunks_exact(num_fields)) {
-            for q in 0..num_fields {
+        for (node, yp) in self.interior_nodes().zip(y.chunks_exact(num_scalars)) {
+            for q in 0..num_scalars {
                 for l in 0..self.num_polynomials() {
-                    weights[q * np + l] = 0.25 * yp[q] * node.phi[l] * node.weight;
+                    weights[q * np + l] += 0.25 * yp[q] * node.phi[l] * node.weight;
                 }
             }
         }
+    }
+
+    pub fn describe(&self) -> String {
+        use std::fmt::Write;
+        let o = self.order();
+        let mut d = String::new();
+        writeln!(d, "cell order: {}", self.order).unwrap();
+        for (n, node) in self.interior_nodes().enumerate() {
+            writeln!(d, "interior node {}: {}", n, node.describe(o)).unwrap();
+        }
+        for (n, node) in self.face_nodes_li.iter().take(o).enumerate() {
+            writeln!(d, "face node li {}: {}", n, node.describe(o)).unwrap();
+        }
+        for (n, node) in self.face_nodes_ri.iter().take(o).enumerate() {
+            writeln!(d, "face node ri {}: {}", n, node.describe(o)).unwrap();
+        }
+        for (n, node) in self.face_nodes_lj.iter().take(o).enumerate() {
+            writeln!(d, "face node lj {}: {}", n, node.describe(o)).unwrap();
+        }
+        for (n, node) in self.face_nodes_rj.iter().take(o).enumerate() {
+            writeln!(d, "face node rj {}: {}", n, node.describe(o)).unwrap();
+        }
+        d
     }
 }
 
@@ -244,5 +289,16 @@ fn gaussian_weight(order: usize) -> [f64; 5] {
             (322.0 - 13.0 * f64::sqrt(70.0)) / 900.0,
         ],
         _ => panic!("unsupported order"),
+    }
+}
+
+fn num_polynomials(order: usize) -> usize {
+    match order {
+        1 => 1,
+        2 => 3,
+        3 => 6,
+        4 => 10,
+        5 => 15,
+        _ => panic!(),
     }
 }
