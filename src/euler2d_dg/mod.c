@@ -456,6 +456,7 @@ static void __global__ advance_rk_dg_kernel(
 
 static void __global__ wavespeed_kernel(
     struct Cell cell,
+    struct Mesh mesh,    
     struct Patch weights,
     struct Patch wavespeed)
 {
@@ -526,7 +527,6 @@ EXTERN_C void euler2d_dg_advance_rk(
             break;
         }
 
-        // TODO: Don't include guard cells
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
@@ -537,7 +537,7 @@ EXTERN_C void euler2d_dg_advance_rk(
                 mesh,
                 weights_rd,
                 weights_wr,
-                dt,
+                dt
             );
             #endif
             break;
@@ -590,7 +590,7 @@ EXTERN_C void euler2d_dg_wavespeed(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
-            wavespeed_kernel<<<bd, bs>>>(cell, weights, wavespeed);
+            wavespeed_kernel<<<bd, bs>>>(cell, mesh, weights, wavespeed);
             #endif
             break;
         }
