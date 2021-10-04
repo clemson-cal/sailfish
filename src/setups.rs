@@ -182,8 +182,8 @@ impl FromStr for IsentropicVortex {
         #[rustfmt::skip]
         let form = kind_config::Form::new()
             .item("gamma_law_index", 5.0/3.0, "Adiabatic index of gas")
-            .item("dg_order",              2, "Spatial order of DG scheme")
             .item("solver_type","euler2d_dg", "Solver type [euler2d_dg|euler2d]")
+            .item("dg_order",              2, "Spatial order if using DG scheme")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -209,10 +209,11 @@ impl Setup for IsentropicVortex {
                 self.form.about(&key)
             );
         }
-        println!(
+        if self.solver_type.eq("euler2d_dg") {
+            println!(
             "DG order is {}",
-            self.dg_order
-        );
+            self.dg_order)
+        };
     }
 
     fn model_parameter_string(&self) -> String {
