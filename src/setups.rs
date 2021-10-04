@@ -27,13 +27,11 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("binary", setup_builder!(Binary)),
         ("binary-therm", setup_builder!(BinaryWithThermodynamics)),
         ("explosion", setup_builder!(Explosion)),
-        ("explosionDG", setup_builder!(ExplosionDG)),
         ("fast-shell", setup_builder!(FastShell)),
         ("pulse-collision", setup_builder!(PulseCollision)),
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
-        ("shocktubeDG", setup_builder!(ShocktubeDG)),
-        ("vortexDG", setup_builder!(VortexDG)),
+        ("isentropic-vortex", setup_builder!(IsentropicVortex)),
         ("wind", setup_builder!(Wind)),
     ]
 }
@@ -118,55 +116,7 @@ impl Setup for Shocktube {
         Some(0.15)
     }
 }
-pub struct ShocktubeDG;
 
-impl FromStr for ShocktubeDG {
-    type Err = error::Error;
-    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
-        if parameters.is_empty() {
-            Ok(Self)
-        } else {
-            Err(InvalidSetup("setup does not take any parameters".into()))
-        }
-    }
-}
-
-impl Setup for ShocktubeDG {
-    fn num_primitives(&self) -> usize {
-        4
-    }
-
-    fn solver_name(&self) -> String {
-        "euler2d_dg".to_owned()
-    }
-
-    fn initial_primitive(&self, x: f64, _y: f64, primitive: &mut [f64]) {
-        if x < 0.5 {
-            primitive[0] = 1.0;
-            primitive[3] = 1.0;
-        } else {
-            primitive[0] = 0.1;
-            primitive[3] = 0.125;
-        }
-        primitive[1] = 0.0;
-        primitive[2] = 0.0;
-    }
-    fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::GammaLaw {
-            gamma_law_index: 5.0 / 3.0,
-        }
-    }
-    fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
-    }
-    fn coordinate_system(&self) -> Coordinates {
-        Coordinates::Cartesian
-    }
-
-    fn end_time(&self) -> Option<f64> {
-        Some(0.15)
-    }
-}
 /// A cylindrical explosion in 2D planar geometry; isothermal hydro.
 ///
 /// This problem is useful for testing bare-bones setups with minimal physics.
@@ -218,100 +168,65 @@ impl Setup for Explosion {
     }
 }
 
-pub struct ExplosionDG {
-    gamma_law_index: f64,
+pub struct IsentropicVortex {
+    pub gamma_law_index: f64,
+    pub dg_order: i64,
+    pub solver_type: String,
+    form: kind_config::Form,
 }
 
-impl FromStr for ExplosionDG {
+impl FromStr for IsentropicVortex {
     type Err = error::Error;
+
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
-        if parameters.is_empty() {
-            Ok(Self {
-                gamma_law_index: 5.0 / 3.0,
-            })
-        } else {
-            Err(InvalidSetup("setup does not take any parameters".into()))
-        }
+        #[rustfmt::skip]
+        let form = kind_config::Form::new()
+            .item("gamma_law_index", 5.0/3.0, "Adiabatic index of gas")
+            .item("dg_order",              2, "Spatial order of DG scheme")
+            .item("solver_type","euler2d_dg", "Solver type [euler2d_dg|euler2d]")
+            .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        Ok(Self {
+            gamma_law_index: form.get("gamma_law_index").into(),
+            dg_order:        form.get("dg_order").into(),
+            solver_type:     form.get("solver_type").into(),
+            form,
+        })
     }
 }
 
-impl Setup for ExplosionDG {
+impl Setup for IsentropicVortex {
     fn num_primitives(&self) -> usize {
         4
     }
+    fn print_parameters(&self) {
+        for key in self.form.sorted_keys() {
+            println!(
+                "{:.<20} {:<10} {}",
+                key,
+                self.form.get(&key),
+                self.form.about(&key)
+            );
+        }
+        println!(
+            "DG order is {}",
+            self.dg_order
+        );
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
     fn solver_name(&self) -> String {
-        "euler2d_dg".to_owned()
+        self.solver_type.to_owned()
     }
-    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-        if (x * x + y * y).sqrt() < 0.25 {
-            primitive[0] = 1.0;
-            primitive[3] = 1.0;
-        } else {
-            primitive[0] = 0.125;
-            primitive[3] = 0.100;
-        }
-        primitive[1] = 0.0;
-        primitive[2] = 0.0;
-    }
-    fn equation_of_state(&self) -> EquationOfState {
-        EquationOfState::GammaLaw {
-            gamma_law_index: self.gamma_law_index,
-        }
-    }
-    fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
-    }
-    fn coordinate_system(&self) -> Coordinates {
-        Coordinates::Cartesian
-    }
-    fn end_time(&self) -> Option<f64> {
-        Some(0.2)
-    }
-    fn dg_cell(&self) -> Option<crate::node_2d::Cell> {
-        Some(crate::node_2d::Cell::new(3))
-    }
-    fn primitive_to_conserved(&self, prim: &[f64], cons: &mut [f64]) {
-        let rho = prim[0];
-        let vx = prim[1];
-        let vy = prim[2];
-        let pre = prim[3];
 
-        let px = vx * rho;
-        let py = vy * rho;
-        let kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
-        let thermal_energy = pre / (self.gamma_law_index - 1.0);
-
-        cons[0] = rho;
-        cons[1] = px;
-        cons[2] = py;
-        cons[3] = kinetic_energy + thermal_energy;
-    }
-}
-
-pub struct VortexDG {
-    gamma_law_index: f64,
-}
-
-impl FromStr for VortexDG {
-    type Err = error::Error;
-    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
-        if parameters.is_empty() {
-            Ok(Self {
-                gamma_law_index: 5.0 / 3.0,
-            })
-        } else {
-            Err(InvalidSetup("setup does not take any parameters".into()))
-        }
-    }
-}
-
-impl Setup for VortexDG {
-    fn num_primitives(&self) -> usize {
-        4
-    }
-    fn solver_name(&self) -> String {
-        "euler2d_dg".to_owned()
-    }
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         // Schaal+(2015) Isentropic Vortex Sec. 5.1
         let r2 = x * x + y * y;
@@ -340,7 +255,11 @@ impl Setup for VortexDG {
         Coordinates::Cartesian
     }
     fn dg_cell(&self) -> Option<crate::node_2d::Cell> {
-        Some(crate::node_2d::Cell::new(2))
+        if self.solver_type.eq("euler2d_dg") {
+            Some(crate::node_2d::Cell::new(self.dg_order as usize))
+        } else{
+            None
+        }
     }
     fn end_time(&self) -> Option<f64> {
         Some(0.2)
