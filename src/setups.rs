@@ -258,7 +258,7 @@ impl Setup for IsentropicVortex {
     fn dg_cell(&self) -> Option<crate::node_2d::Cell> {
         if self.solver_type.eq("euler2d_dg") {
             Some(crate::node_2d::Cell::new(self.dg_order as usize))
-        } else{
+        } else {
             None
         }
     }

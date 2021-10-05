@@ -35,6 +35,24 @@
 // ============================ HYDRO =========================================
 // ============================================================================
 
+static __host__ __device__ int num_polynomials(struct Cell cell)
+{
+    switch (cell.order)
+    {
+        case 1: return 1;
+        case 2: return 3;
+        case 3: return 6;
+        case 4: return 10;
+        case 5: return 15;
+        default: return 0;
+    }
+}
+
+static __host__ __device__ int num_quadrature_points(struct Cell cell)
+{
+    return cell.order * cell.order;
+}
+
 static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
 {
     const real rho    = cons[0];
@@ -204,16 +222,9 @@ static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, rea
 
 // ============================ PATCH =========================================
 // ============================================================================
-//#define FOR_EACH(p) \
-//    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
-//    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
 #define FOR_EACH(p, ng) \
     for (int i = p.start[0] + ng; i < p.start[0] + p.count[0] - ng; ++i) \
     for (int j = p.start[1] + ng; j < p.start[1] + p.count[1] - ng; ++j)
-//#define FOR_EACH_OMP(p) \
-//_Pragma("omp parallel for") \
-//    for (int i = p.start[0]; i < p.start[0] + p.count[0]; ++i) \
-//    for (int j = p.start[1]; j < p.start[1] + p.count[1]; ++j)
 #define FOR_EACH_OMP(p, ng) \
 _Pragma("omp parallel for") \
     for (int i = p.start[0] + ng; i < p.start[0] + p.count[0] - ng; ++i) \

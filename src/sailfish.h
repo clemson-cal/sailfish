@@ -126,6 +126,7 @@ struct Cell {
     int order;
 };
 
+/*
 static int num_polynomials(struct Cell cell)
 {
     switch (cell.order)
@@ -143,5 +144,5 @@ static int num_quadrature_points(struct Cell cell)
 {
     return cell.order * cell.order;
 }
-
+*/
 #endif // DG_SOLVER
