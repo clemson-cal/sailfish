@@ -6,9 +6,9 @@
 // 9, 3, 6
 // 16, 4, 10
 // 25, 5, 15
-const MAX_INTERIOR_NODES: usize = 25;
-const MAX_FACE_NODES: usize = 5;
-const MAX_POLYNOMIALS: usize = 15;
+const MAX_INTERIOR_NODES: usize = 9;
+const MAX_FACE_NODES: usize = 3;
+const MAX_POLYNOMIALS: usize = 6;
 
 #[repr(C)]
 #[derive(Clone, Copy)]

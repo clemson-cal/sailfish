@@ -104,9 +104,13 @@ enum Coordinates
 
 #ifdef DG_SOLVER
 
-#define MAX_INTERIOR_NODES 25
-#define MAX_FACE_NODES 5
-#define MAX_POLYNOMIALS 15
+// #define MAX_INTERIOR_NODES 25
+// #define MAX_FACE_NODES 5
+// #define MAX_POLYNOMIALS 15
+
+#define MAX_INTERIOR_NODES 9
+#define MAX_FACE_NODES 3
+#define MAX_POLYNOMIALS 6
 
 struct NodeData {
     real xsi_x;

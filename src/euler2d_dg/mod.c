@@ -20,7 +20,8 @@
 #define ADIABATIC_GAMMA (5.0 / 3.0)
 #define NCONS 4
 #define NUM_GUARD 1
-#define MAX_NUM_FIELDS 60 // this is NCONS * MAX_POLYNOMIALS
+// #define MAX_NUM_FIELDS 60 // this is NCONS * MAX_POLYNOMIALS
+#define MAX_NUM_FIELDS 24
 
 // ============================ MATH ==========================================
 // ============================================================================
