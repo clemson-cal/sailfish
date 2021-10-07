@@ -216,8 +216,8 @@ impl PatchBasedBuild for Builder {
         };
         assert_eq! {
             setup.num_primitives(),
-            4,
-            "this solver is hard-coded for 4 primitive variable fields"
+            5,
+            "this solver is hard-coded for 5 primitive variable fields"
         };
 
         let rect = primitive.rect();
@@ -233,8 +233,8 @@ impl PatchBasedBuild for Builder {
             global_space_ext.keep_upper(2, Axis::J),
         ];
 
-        let primitive1 = Patch::zeros(4, &local_space.extend_all(2)).on(device);
-        let conserved0 = Patch::zeros(4, &local_space).on(device);
+        let primitive1 = Patch::zeros(5, &local_space.extend_all(2)).on(device);
+        let conserved0 = Patch::zeros(5, &local_space).on(device);
         let wavespeeds = Patch::zeros(1, &local_space).on(device);
 
         let mut primitive1 = primitive1;

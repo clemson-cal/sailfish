@@ -179,33 +179,33 @@ impl FromStr for Kilonova {
 
 impl Setup for Kilonova {
     fn num_primitives(&self) -> usize {
-        4
+        5
     }
 
     fn solver_name(&self) -> String {
         "euler_rz".to_owned()
     }
 
-    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-        if (0.15 < (x * x + y * y).sqrt()) & ((x * x + y * y).sqrt() < 0.25) {
-            primitive[0] = 1.0;
-            primitive[3] = 1.0;
-        } else {
-            primitive[0] = 0.1;
-            primitive[3] = 0.125;
-        }
-        primitive[1] = 0.0;
-        primitive[2] = 0.0;
+    // 1 unit of position = 1 kpc
+    // 1 unit of time = 0.1 Myr
+    // 1 unit of mass = 10M solar masses
 
-//        if x < 0.25 {
-//            primitive[0] = 1.0;
-//            primitive[3] = 1.0;
-//        } else {
-//            primitive[0] = 0.1;
-//            primitive[3] = 0.125;
-//        }
-//        primitive[1] = 0.0;
-//        primitive[2] = 0.0;
+    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
+        let scale_height: f64 = 0.25;
+        let euler_n: f64 = 2.7183;
+        if (0.002 < (x * x + y * y).sqrt()) & ((x * x + y * y).sqrt() < 0.004) {
+            primitive[0] = 100.0;
+            primitive[1] = 5.0 * x / (x * x + y * y).sqrt();
+            primitive[2] = 5.0 * y / (x * x + y * y).sqrt();
+            primitive[3] = 1.0;
+            primitive[4] = 1.0;
+        } else {
+            primitive[0] = 1.0 * euler_n.powf(-(y + 0.25) / scale_height);
+            primitive[1] = 0.0;
+            primitive[2] = 0.0;
+            primitive[3] = scale_height * euler_n.powf(-(y + 0.25) / scale_height);
+            primitive[4] = 0.0;
+        }
     }
 
     fn equation_of_state(&self) -> EquationOfState {
@@ -215,7 +215,7 @@ impl Setup for Kilonova {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::Structured(StructuredMesh::left_aligned_square(1.0, resolution))
+        Mesh::Structured(StructuredMesh::left_aligned_square(0.25, resolution))
     }
 
     fn coordinate_system(&self) -> Coordinates {
@@ -223,7 +223,7 @@ impl Setup for Kilonova {
     }
 
     fn end_time(&self) -> Option<f64> {
-        Some(0.1)
+        Some(1.0)
     }
 }
 

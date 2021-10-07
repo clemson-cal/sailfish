@@ -20,8 +20,8 @@
 
 // ============================ PHYSICS =======================================
 // ============================================================================
-#define NCONS 4
-#define PLM_THETA 1.5
+#define NCONS 5
+#define PLM_THETA 1.2
 #define ADIABATIC_GAMMA (5.0 / 3.0)
 
 
@@ -72,11 +72,13 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
     real kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
     real thermal_energy = energy - kinetic_energy;
     real pressure = thermal_energy * (ADIABATIC_GAMMA - 1.0);
+    real scalar_density = cons[4];
 
     prim[0] = rho;
     prim[1] = vx;
     prim[2] = vy;
     prim[3] = pressure;
+    prim[4] = scalar_density;
 }
 
 static __host__ __device__ void primitive_to_conserved(const real *prim, real *cons)
@@ -89,11 +91,13 @@ static __host__ __device__ void primitive_to_conserved(const real *prim, real *c
     real py = vy * rho;
     real kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
     real thermal_energy = pressure / (ADIABATIC_GAMMA - 1.0);
+    real scalar_density = prim[4];
 
     cons[0] = rho;
     cons[1] = px;
     cons[2] = py;
     cons[3] = kinetic_energy + thermal_energy;
+    cons[4] = scalar_density;
 }
 
 static __host__ __device__ real primitive_to_velocity(const real *prim, int direction)
@@ -114,11 +118,13 @@ static __host__ __device__ void primitive_to_flux(
 {
     real vn = primitive_to_velocity(prim, direction);
     real pressure = prim[3];
+    real scalar_density = prim[4];
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pressure * (direction == 0);
     flux[2] = vn * cons[2] + pressure * (direction == 1);
     flux[3] = vn * cons[3] + pressure * vn;
+    flux[4] = vn * cons[4];
 }
 
 static __host__ __device__ void primitive_to_outer_wavespeeds(
@@ -147,6 +153,14 @@ static __host__ __device__ void geometrical_source_terms(const real *prim, real 
     cons[1] += dt * prim[3] / xc;
 }
 
+static __host__ __device__ void physical_source_terms(const real *prim, real *cons, real yc, real dt)
+{
+    real g = 1.0;
+    //real g = (4.491E-7) * 2.468 * 2.0 * 3.14159 * 0.228 * 0.228 * 0.228 / (yc - 1.0) / (yc - 1.0);
+    cons[2] -= dt * prim[0] * g;
+    cons[3] -= dt * prim[0] * prim[2] * g;
+}
+
 static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, int direction)
 {
     real ul[NCONS];
@@ -171,6 +185,25 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
         flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
     }
 }
+
+//static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, real *flux, int direction)
+//{
+//    real ul[NCONS];
+//    real ur[NCONS];
+//    real fl[NCONS];
+//    real fr[NCONS];
+//    real al[2];
+//    real ar[2];
+//    real astar[2];
+//    real fstar[NCONS];
+//
+//    primitive_to_conserved(pl, ul);
+//    primitive_to_conserved(pr, ur);
+//    primitive_to_flux(pl, ul, fl, direction);
+//    primitive_to_flux(pr, ur, fr, direction);
+//    primitive_to_outer_wavespeeds(pl, al, direction);
+//    primitive_to_outer_wavespeeds(pr, ar, direction);
+//}
 
 
 // ============================ PATCH =========================================
@@ -236,6 +269,7 @@ static __host__ __device__ void advance_rk_zone(
     real xl = mesh.x0 + (i + 0.0) * dx;
     real xc = mesh.x0 + (i + 0.5) * dx;
     real xr = mesh.x0 + (i + 1.0) * dx;
+    real yc = mesh.y0 + (j + 0.5) * dy;
 
     real *un = GET(conserved_rk, i, j);
     real *pcc = GET(primitive_rd, i, j);
@@ -297,6 +331,7 @@ static __host__ __device__ void advance_rk_zone(
 
     primitive_to_conserved(pcc, ucc);
     geometrical_source_terms(pcc, ucc, xc, dt);
+    physical_source_terms(pcc, ucc, yc, dt);
 
     for (int q = 0; q < NCONS; ++q)
     {
