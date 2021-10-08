@@ -175,14 +175,14 @@ where
     let min_spacing = state.mesh.min_spacing();
     let edge_list = adjacency_list(&patch_map, 2);
     let mut solvers = vec![];
-    let mut devices = if let Some(device) = cline.device {
-        vec![gpu_core::Device::with_id(device).unwrap()]
+    let mut devices = if cline.use_gpu() {
+        match cline.device {
+            Some(device) => vec![Some(gpu_core::Device::with_id(device).unwrap())],
+            None => gpu_core::all_devices().map(Some).collect::<Vec<_>>(),
+        }
     } else {
-        gpu_core::all_devices().collect::<Vec<_>>()
-    }
-    .into_iter()
-    .cycle()
-    .filter(|_| cline.use_gpu());
+        vec![None]
+    }.into_iter().cycle();
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
@@ -197,7 +197,7 @@ where
             &edge_list,
             rk_order,
             cline.execution_mode(),
-            devices.next(),
+            devices.next().flatten(),
             setup.clone(),
         );
         solvers.push(solver)
