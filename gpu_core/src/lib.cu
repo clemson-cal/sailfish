@@ -148,7 +148,7 @@ static __global__ void gpu_memcpy_3d_kernel(
         dst[n_dst + q] = src[n_src + q];
     }
 }
-
+#include <stdio.h>
 extern "C" void gpu_memcpy_3d(
     char *dst,
     const char *src,
@@ -173,15 +173,7 @@ extern "C" void gpu_memcpy_3d(
     (void) dst_shape_i; // unused
 
     dim3 bs = dim3(8, 8, 8);
-
-    if (count_k == 1) {
-        bs.y *= bs.x;
-        bs.x = 1;
-    }
-    if (count_j == 1) {
-        bs.z *= bs.y;
-        bs.y = 1;
-    }
+    dim3 bd = dim3((count_k + bs.z - 1) / bs.z, (count_j + bs.y - 1) / bs.y, (count_i + bs.x - 1) / bs.x);
 
     // strides in dst
     ulong dst_si = bytes_per_elem * dst_shape_k * dst_shape_j;
@@ -192,8 +184,6 @@ extern "C" void gpu_memcpy_3d(
     ulong src_si = bytes_per_elem * src_shape_k * src_shape_j;
     ulong src_sj = bytes_per_elem * src_shape_k;
     ulong src_sk = bytes_per_elem;
-
-    dim3 bd = dim3((count_k + bs.z - 1) / bs.z, (count_j + bs.y - 1) / bs.y, (count_i + bs.x - 1) / bs.x);
 
     gpu_memcpy_3d_kernel<<<bd, bs>>>(
         dst,
