@@ -29,7 +29,7 @@ use std::str::FromStr;
 /// Returns the current version number (should be consistent with Cargo
 /// meta-data).
 pub fn sailfish_version() -> String {
-    "sailfish version 0.3.2".to_owned()
+    "sailfish version 0.3.5".to_owned()
 }
 
 /// Execution modes. These modes are referenced by Rust driver code, and by

@@ -103,6 +103,8 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
 
         if name.ends_with(".sf") {
             State::from_checkpoint(name, &parameters, cline)?
+        } else if let Some(ref file) = sailfish::parse::last_in_dir_ending_with(name, ".sf") {
+            State::from_checkpoint(file, &parameters, cline)?
         } else {
             new_state(cline.clone(), name, &parameters)?
         }
@@ -173,14 +175,14 @@ where
     let min_spacing = state.mesh.min_spacing();
     let edge_list = adjacency_list(&patch_map, 2);
     let mut solvers = vec![];
-    let mut devices = if let Some(device) = cline.device {
-        vec![gpu_core::Device::with_id(device).unwrap()]
+    let mut devices = if cline.use_gpu() {
+        match cline.device {
+            Some(device) => vec![Some(gpu_core::Device::with_id(device).unwrap())],
+            None => gpu_core::all_devices().map(Some).collect::<Vec<_>>(),
+        }
     } else {
-        gpu_core::all_devices().collect::<Vec<_>>()
-    }
-    .into_iter()
-    .cycle()
-    .filter(|_| cline.use_gpu());
+        vec![None]
+    }.into_iter().cycle();
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
@@ -195,7 +197,7 @@ where
             &edge_list,
             rk_order,
             cline.execution_mode(),
-            devices.next(),
+            devices.next().flatten(),
             setup.clone(),
         );
         solvers.push(solver)
@@ -290,8 +292,7 @@ fn launch_single_patch(
         cline.output_directory(&state.restart_file),
     );
     let mut solver = match &state.mesh {
-        Mesh::FacePositions1D(faces) => 
-        match setup.solver_name().as_str() {
+        Mesh::FacePositions1D(faces) => match setup.solver_name().as_str() {
             "euler1d" => euler1d::solver(
                 cline.execution_mode(),
                 cline.device,
@@ -309,7 +310,7 @@ fn launch_single_patch(
                 setup.coordinate_system(),
             )?,
             _ => panic!("unknown solver name"),
-        }
+        },
         _ => panic!("the single patch solver assumes you have a FacePositions mesh"),
     };
 

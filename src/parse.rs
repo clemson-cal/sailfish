@@ -1,6 +1,7 @@
 //! Helper functions to interpret string inputs.
 
-use std::path::Path;
+use std::ffi::OsString;
+use std::{fs::DirEntry, path::Path};
 
 /// Takes a string, and splits it into two parts, separated by the first
 /// instance of the given character. The first item in the pair is `Some`
@@ -34,4 +35,26 @@ pub fn parent_dir(path: &str) -> Option<&str> {
         .parent()
         .and_then(Path::to_str)
         .map(|s| if s.is_empty() { "." } else { s })
+}
+
+/// Attempts to interpret the given string as a directory and read its
+/// contents. If that succeeds, then returns the last entry in the directory,
+/// sorted alphabetically, which ends with `extension`. If no matching files
+/// are found or if `dir` was not a directory, then returns `None`.
+pub fn last_in_dir_ending_with(dir: &str, extension: &str) -> Option<String> {
+    if let Ok(entries) = std::fs::read_dir(dir) {
+        return if let Ok(mut entries) = entries.collect::<Result<Vec<DirEntry>, _>>() {
+            entries.retain(|e| e.file_name().to_str().unwrap().ends_with(extension));
+            entries.sort_by_key(DirEntry::file_name);
+            entries
+                .last()
+                .map(DirEntry::file_name)
+                .map(OsString::into_string)
+                .map(Result::ok)
+                .flatten()
+        } else {
+            None
+        }
+    }
+    None
 }
