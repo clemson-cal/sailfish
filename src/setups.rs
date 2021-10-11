@@ -925,7 +925,7 @@ impl FromStr for EnvelopeShock {
             .item("t_start",    2.0,  "time when the simulation starts")
             .item("x_inner",    0.1,  "inner radius at start")
             .item("x_outer",   10.0,  "outer radius at start")
-            .item("v_outer",    0.9,  "outer boundary speed (0.0 for no mesh motion)")
+            .item("v_outer",    1.0,  "outer boundary speed (0.0 for no mesh motion)")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -961,7 +961,7 @@ impl EnvelopeShock {
         self.x_outer * (1.0 - self.t_shell / self.t_start)
     }
 
-    fn initial_scale_factor(&self) -> f64 {
+    fn a0(&self) -> f64 {
         if self.v_outer > 0.0 {
             0.0
         } else {
@@ -993,7 +993,6 @@ impl Setup for EnvelopeShock {
             );
         }
         println!("r_shell ....... {}", self.r_shell());
-        println!("scale factor .. {}", self.initial_scale_factor());
         println!("a_dot ......... {}", self.a_dot());
     }
 
@@ -1039,7 +1038,7 @@ impl Setup for EnvelopeShock {
         let mdot = ambient.mass_rate_per_steradian(r, t);
         let u_ambient = ambient.gamma_beta(r, t);
         let d_ambient = mdot / (u_ambient * r * r);
-        let p = 1e-6 * d_ambient;
+        let p = 1e-5 * d_ambient;
 
         primitive[0] = d_ambient + d_shell * prof(r);
         primitive[1] = u_ambient + u_shell * prof(r);
@@ -1057,7 +1056,7 @@ impl Setup for EnvelopeShock {
     }
 
     fn homologous_mesh(&self) -> Option<(f64, f64)> {
-        Some((self.initial_scale_factor(), self.a_dot()))
+        Some((self.a0(), self.a_dot()))
     }
 
     fn coordinate_system(&self) -> Coordinates {

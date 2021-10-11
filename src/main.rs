@@ -182,7 +182,9 @@ where
         }
     } else {
         vec![None]
-    }.into_iter().cycle();
+    }
+    .into_iter()
+    .cycle();
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
@@ -332,13 +334,15 @@ fn launch_single_patch(
         }
 
         if !dt_each_iter {
-            dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
+            dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref())
+                * setup.mesh_scale_factor(state.time);
         }
 
         let elapsed = time_exec(cline.device, || {
             for _ in 0..fold {
                 if dt_each_iter {
-                    dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
+                    dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref())
+                        * setup.mesh_scale_factor(state.time);
                 }
                 solver.advance(setup.as_ref(), rk_order as u32, state.time, dt);
                 state.time += dt;

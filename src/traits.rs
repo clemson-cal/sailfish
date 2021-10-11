@@ -270,6 +270,17 @@ pub trait Setup: Send + Sync {
         None
     }
 
+    /// Provided method to conveniently determine a scale factor for
+    /// homologously expanding meshes. Returns 1.0 if this setup does not
+    /// specify a scale factor.
+    fn mesh_scale_factor(&self, time: f64) -> f64 {
+        if let Some((a0, a1)) = self.homologous_mesh() {
+            (a0 + a1 * time) / (a0 + a1 * self.initial_time())
+        } else {
+            1.0
+        }
+    }
+
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
         match mesh {
             Mesh::Structured(_) => {

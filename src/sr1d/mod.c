@@ -201,14 +201,28 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     primitive_to_outer_wavespeeds(pl, al);
     primitive_to_outer_wavespeeds(pr, ar);
 
-    const real am = min3(0.0, al[0], ar[0]);
-    const real ap = max3(0.0, al[1], ar[1]);
+    const real am = min2(al[0], ar[0]);
+    const real ap = max2(al[1], ar[1]);
 
-    for (int q = 0; q < NCONS; ++q)
-    {
-        real u_hll = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
-        real f_hll = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
-        flux[q] = f_hll - v_face * u_hll;
+    if (v_face < am) {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fl[q] - v_face * ul[q];
+        }
+    }
+    else if (v_face > ap) {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fr[q] - v_face * ur[q];
+        }
+    }
+    else {    
+        for (int q = 0; q < NCONS; ++q)
+        {
+            real u_hll = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
+            real f_hll = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+            flux[q] = f_hll - v_face * u_hll;
+        }
     }
 }
 
@@ -360,23 +374,6 @@ static __host__ __device__ void advance_rk_zone(
     riemann_hlle(prim, prip, xr * adot, fri);
     primitive_to_conserved(pcc, ucc);
     geometric_source_terms(coords, xl, xr, pcc, sources);
-
-    // real tau_heat = 100.0;
-    // real mach_ceiling = 1000.0;
-
-    // real u = pcc[1];
-    // real e = pcc[2] / pcc[0] * 3.0;
-    // real G = sqrt(1.0 + u * u);
-    // real emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
-
-    // if (e < emin) {
-    //     real edot = -(e - emin) / tau_heat * (e < emin);
-    //     sources[0] += dv * 0.0;
-    //     sources[1] += dv * pcc[0] * edot * 4.0 / 3.0 * G * u;
-    //     sources[2] += dv * pcc[0] * edot * (1.0 + 4.0 / 3.0 * (G - 1.0));
-    //     // printf("emin=%4.3e e=%4.3e\n", emin, e);
-    //     // printf("adding fake heat tau=%f -> %f at r=%e\n", ucc[2], ucc[2] + sources[2], xl);
-    // }
 
     for (int q = 0; q < NCONS; ++q)
     {
