@@ -910,7 +910,7 @@ pub struct EnvelopeShock {
     t_start: f64,
     x_inner: f64,
     x_outer: f64,
-    expand: bool,
+    v_outer: f64,
     form: kind_config::Form,
 }
 
@@ -925,7 +925,7 @@ impl FromStr for EnvelopeShock {
             .item("t_start",    2.0,  "time when the simulation starts")
             .item("x_inner",    0.1,  "inner radius at start")
             .item("x_outer",   10.0,  "outer radius at start")
-            .item("expand",    true,  "whether or not to homologously expand the mesh")
+            .item("v_outer",    0.9,  "outer boundary speed (0.0 for no mesh motion)")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -936,7 +936,7 @@ impl FromStr for EnvelopeShock {
             t_start: form.get("t_start").into(),
             x_inner: form.get("x_inner").into(),
             x_outer: form.get("x_outer").into(),
-            expand: form.get("expand").into(),
+            v_outer: form.get("v_outer").into(),
             form,
         };
 
@@ -948,6 +948,8 @@ impl FromStr for EnvelopeShock {
             Err(InvalidSetup(format!("d_shell must be >=0.0")))
         } else if setup.x_inner >= setup.x_outer {
             Err(InvalidSetup(format!("x_inner must be <x_outer")))
+        } else if setup.v_outer < 0.0 || setup.v_outer > 1.0 {
+            Err(InvalidSetup(format!("v_outer must be >=0.0 and <1.0")))
         } else {
             Ok(setup)
         }
@@ -958,20 +960,23 @@ impl EnvelopeShock {
     fn r_shell(&self) -> f64 {
         self.x_outer * (1.0 - self.t_shell / self.t_start)
     }
+
     fn initial_scale_factor(&self) -> f64 {
-        if self.expand {
+        if self.v_outer > 0.0 {
             0.0
         } else {
             1.0
         }
     }
+
     fn a_dot(&self) -> f64 {
-        if self.expand {
-            1.0 / self.t_start
+        if self.v_outer > 0.0 {
+            self.v_outer / self.t_start
         } else {
             0.0
         }
     }
+
     fn num_decades(&self) -> f64 {
         (self.x_outer / self.x_inner).log10()
     }
@@ -1025,7 +1030,7 @@ impl Setup for EnvelopeShock {
 
         let ambient = RelativisticEnvelope {
             envelope_m1: 1.0,
-            envelope_fastest_beta: 0.99,
+            envelope_fastest_beta: 0.999,
             envelope_slowest_beta: 0.00,
             envelope_psi: 0.25,
             wind_mdot: 100.0,
