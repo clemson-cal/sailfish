@@ -18,10 +18,9 @@ impl Mesh {
     }
 
     /// Creates a `FacePositions1D` mesh with logarithmic zone spacing.
-    pub fn logarithmic_radial(num_decades: u32, zones_per_decade: u32) -> Self {
-        let r_inner = 1.0;
+    pub fn logarithmic_radial(inner_radius: f64, num_decades: u32, zones_per_decade: u32) -> Self {
         let faces = (0..(zones_per_decade * num_decades + 1) as u32)
-            .map(|i| r_inner * f64::powf(10.0, i as f64 / zones_per_decade as f64))
+            .map(|i| inner_radius * f64::powf(10.0, i as f64 / zones_per_decade as f64))
             .collect();
         Self::FacePositions1D(faces)
     }
