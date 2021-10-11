@@ -16,6 +16,9 @@ extern "C" {
         conserved_rk_ptr: *const f64,
         primitive_rd_ptr: *const f64,
         primitive_wr_ptr: *mut f64,
+        a0: f64,
+        adot: f64,
+        t: f64,
         a: f64,
         dt: f64,
         boundary_condition: BoundaryCondition,
@@ -39,20 +42,23 @@ pub fn solver(
     device: Option<i32>,
     faces: &[f64],
     primitive: &[f64],
+    homologous_expansion: Option<(f64, f64)>,
     boundary_condition: BoundaryCondition,
     coords: Coordinates,
 ) -> Result<Box<dyn Solve>, Error> {
+    let homologous_expansion = homologous_expansion.unwrap_or((1.0, 0.0));
     match mode {
         ExecutionMode::CPU => Ok(Box::new(cpu::Solver::new(
             faces,
             primitive,
+            homologous_expansion,
             boundary_condition,
             coords,
         ))),
         ExecutionMode::OMP => {
             cfg_if! {
                 if #[cfg(feature = "omp")] {
-                    Ok(Box::new(omp::Solver::new(faces, primitive, boundary_condition, coords)))
+                    Ok(Box::new(omp::Solver::new(faces, primitive, homologous_expansion, boundary_condition, coords)))
                 } else {
                     panic!()
                 }
@@ -61,7 +67,7 @@ pub fn solver(
         ExecutionMode::GPU => {
             cfg_if! {
                 if #[cfg(feature = "gpu")] {
-                    Ok(Box::new(gpu::Solver::new(device, faces, primitive, boundary_condition, coords)?))
+                    Ok(Box::new(gpu::Solver::new(device, faces, primitive, homologous_expansion, boundary_condition, coords)?))
                 } else {
                     std::convert::identity(device); // black-box
                     panic!()
@@ -79,6 +85,7 @@ pub mod cpu {
         primitive1: Vec<f64>,
         primitive2: Vec<f64>,
         conserved0: Vec<f64>,
+        homologous_parameters: (f64, f64),
         boundary_condition: BoundaryCondition,
         coords: Coordinates,
         pub(super) mode: ExecutionMode,
@@ -88,6 +95,7 @@ pub mod cpu {
         pub fn new(
             faces: &[f64],
             primitive: &[f64],
+            homologous_parameters: (f64, f64),
             boundary_condition: BoundaryCondition,
             coords: Coordinates,
         ) -> Self {
@@ -98,6 +106,7 @@ pub mod cpu {
                 primitive1: primitive.to_vec(),
                 primitive2: primitive.to_vec(),
                 conserved0: vec![0.0; num_zones * 3],
+                homologous_parameters,
                 boundary_condition,
                 coords,
                 mode: ExecutionMode::CPU,
@@ -123,7 +132,7 @@ pub mod cpu {
                 );
             }
         }
-        fn advance_rk(&mut self, _setup: &dyn Setup, _time: f64, a: f64, dt: f64) {
+        fn advance_rk(&mut self, _setup: &dyn Setup, time: f64, a: f64, dt: f64) {
             unsafe {
                 sr1d_advance_rk(
                     self.num_zones() as i32,
@@ -131,6 +140,9 @@ pub mod cpu {
                     self.conserved0.as_ptr(),
                     self.primitive1.as_ptr(),
                     self.primitive2.as_mut_ptr(),
+                    self.homologous_parameters.0,
+                    self.homologous_parameters.1,
+                    time,
                     a,
                     dt,
                     self.boundary_condition,
@@ -156,10 +168,11 @@ pub mod omp {
         pub fn new(
             faces: &[f64],
             primitive: &[f64],
+            homologous_parameters: (f64, f64),
             boundary_condition: BoundaryCondition,
             coords: Coordinates,
         ) -> Self {
-            let mut solver = cpu::Solver::new(faces, primitive, boundary_condition, coords);
+            let mut solver = cpu::Solver::new(faces, primitive, homologous_parameters, boundary_condition, coords);
             solver.mode = ExecutionMode::OMP;
             Self(solver)
         }
@@ -192,6 +205,7 @@ pub mod gpu {
         primitive2: DeviceBuffer<f64>,
         conserved0: DeviceBuffer<f64>,
         wavespeeds: DeviceBuffer<f64>,
+        homologous_parameters: (f64, f64),
         boundary_condition: BoundaryCondition,
         coords: Coordinates,
         device: Device,
@@ -202,6 +216,7 @@ pub mod gpu {
             device: Option<i32>,
             faces: &[f64],
             primitive: &[f64],
+            homologous_parameters: (f64, f64),
             boundary_condition: BoundaryCondition,
             coords: Coordinates,
         ) -> Result<Self, Error> {
@@ -215,6 +230,7 @@ pub mod gpu {
                 primitive2: device.buffer_from(primitive),
                 conserved0: device.buffer_from(&vec![0.0; num_zones * 3]),
                 wavespeeds: device.buffer_from(&vec![0.0; num_zones]),
+                homologous_parameters,
                 boundary_condition,
                 coords,
                 device,
@@ -240,7 +256,7 @@ pub mod gpu {
                 );
             })
         }
-        fn advance_rk(&mut self, _setup: &dyn Setup, _time: f64, a: f64, dt: f64) {
+        fn advance_rk(&mut self, _setup: &dyn Setup, time: f64, a: f64, dt: f64) {
             self.device.scope(|_| {
                 unsafe {
                     sr1d_advance_rk(
@@ -249,6 +265,9 @@ pub mod gpu {
                         self.conserved0.as_device_ptr(),
                         self.primitive1.as_device_ptr(),
                         self.primitive2.as_device_ptr() as *mut f64,
+                        self.homologous_parameters.0,
+                        self.homologous_parameters.1,
+                        time,
                         a,
                         dt,
                         self.boundary_condition,

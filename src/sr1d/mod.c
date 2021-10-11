@@ -185,7 +185,7 @@ static __host__ __device__ real primitive_to_max_wavespeed(const real *prim)
     return max2(fabs(wavespeeds[0]), fabs(wavespeeds[1]));
 }
 
-static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux)
+static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real v_face, real *flux)
 {
     real ul[NCONS];
     real ur[NCONS];
@@ -206,7 +206,9 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
 
     for (int q = 0; q < NCONS; ++q)
     {
-        flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+        real u_hll = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
+        real f_hll = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+        flux[q] = f_hll - v_face * u_hll;
     }
 }
 
@@ -299,6 +301,9 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch primitive_wr,
     struct BoundaryCondition bc,
     enum Coordinates coords,
+    real a0,
+    real adot,
+    real t,
     real a,
     real dt,
     int i)
@@ -308,8 +313,10 @@ static __host__ __device__ void advance_rk_zone(
     }
     int ni = face_positions.count - 1;
 
-    real xl = *GET(face_positions, i);
-    real xr = *GET(face_positions, i + 1);
+    real yl = *GET(face_positions, i);
+    real yr = *GET(face_positions, i + 1);
+    real xl = yl * (a0 + adot * t);
+    real xr = yr * (a0 + adot * t);
 
     real *un = GET(conserved_rk, i);
     real *pcc = GET(primitive_rd, i);
@@ -349,8 +356,8 @@ static __host__ __device__ void advance_rk_zone(
     real dar = face_area(coords, xr);
     real dv = cell_volume(coords, xl, xr);
 
-    riemann_hlle(plim, plip, fli);
-    riemann_hlle(prim, prip, fri);
+    riemann_hlle(plim, plip, xl * adot, fli);
+    riemann_hlle(prim, prip, xr * adot, fri);
     primitive_to_conserved(pcc, ucc);
     geometric_source_terms(coords, xl, xr, pcc, sources);
 
@@ -428,6 +435,9 @@ static void __global__ advance_rk_kernel(
     struct Patch primitive_wr,
     struct BoundaryCondition bc,
     enum Coordinates coords,
+    real a0,
+    real adot,
+    real t,
     real a,
     real dt)
 {
@@ -435,7 +445,7 @@ static void __global__ advance_rk_kernel(
 
     if (i < primitive_wr.count)
     {
-        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt, i);
+        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt, i);
     }
 }
 
@@ -511,6 +521,8 @@ EXTERN_C void sr1d_primitive_to_conserved(
  * @param conserved_rk_ptr[in]   [num_zones] [3]
  * @param primitive_rd_ptr[in]   [num_zones] [3]
  * @param primitive_wr_ptr[out]  [num_zones] [3]
+ * @param a0                     The scale factor at t=0
+ * @param adot                   The expansion rate
  * @param a                      The RK averaging parameter
  * @param dt                     The time step
  * @param bc                     The boundary conditions type
@@ -523,6 +535,9 @@ EXTERN_C void sr1d_advance_rk(
     real *conserved_rk_ptr,
     real *primitive_rd_ptr,
     real *primitive_wr_ptr,
+    real a0,
+    real adot,
+    real t,
     real a,
     real dt,
     struct BoundaryCondition bc,
@@ -537,7 +552,7 @@ EXTERN_C void sr1d_advance_rk(
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt, i);
             }
             break;
         }
@@ -545,7 +560,7 @@ EXTERN_C void sr1d_advance_rk(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt, i);
             }
             #endif
             break;
@@ -555,7 +570,7 @@ EXTERN_C void sr1d_advance_rk(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a, dt);
+            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt);
             #endif
             break;
         }

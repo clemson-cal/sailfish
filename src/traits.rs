@@ -232,6 +232,13 @@ pub trait Setup: Send + Sync {
         BoundaryCondition::Default
     }
 
+    /// May be implemented to enable homologous mesh expansion in certain
+    /// solvers. The numbers are (a0, adot): the scale factor at t=0, and the
+    /// the expansion rate.
+    fn homologous_mesh(&self) -> Option<(f64, f64)> {
+        None
+    }
+
     /// Invoked by solver modules which support viscous stresses.
     fn viscosity(&self) -> Option<f64> {
         None

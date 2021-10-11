@@ -306,6 +306,7 @@ fn launch_single_patch(
                 cline.device,
                 faces,
                 &state.primitive,
+                setup.homologous_mesh(),
                 setup.boundary_condition(),
                 setup.coordinate_system(),
             )?,

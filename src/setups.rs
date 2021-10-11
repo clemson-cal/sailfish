@@ -834,7 +834,7 @@ impl Setup for FastShell {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(1.0, 2, resolution)
+        Mesh::logarithmic_radial(1.0, 2.0, resolution)
     }
 
     fn coordinate_system(&self) -> Coordinates {
@@ -886,7 +886,7 @@ impl Setup for Wind {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(1.0, 2, resolution)
+        Mesh::logarithmic_radial(1.0, 2.0, resolution)
     }
 
     fn boundary_condition(&self) -> BoundaryCondition {
@@ -906,8 +906,11 @@ impl Setup for Wind {
 pub struct EnvelopeShock {
     u_shell: f64,
     d_shell: f64,
-    r_inner: f64,
-    num_decades: i64,
+    t_shell: f64,
+    t_start: f64,
+    x_inner: f64,
+    x_outer: f64,
+    expand: bool,
     form: kind_config::Form,
 }
 
@@ -916,18 +919,24 @@ impl FromStr for EnvelopeShock {
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         #[rustfmt::skip]
         let form = kind_config::Form::new()
-            .item("u_shell",       30.0, "gamma-beta of the launched shell")
-            .item("d_shell",       0.0,  "density enhancement (additive) of the launched shell")
-            .item("r_inner",       1.0,  "inner boundary radius")
-            .item("num_decades",   3,    "number of radial decades")
+            .item("u_shell",    30.0, "gamma-beta of the launched shell")
+            .item("d_shell",    0.0,  "density enhancement (additive) of the launched shell")
+            .item("t_shell",    1.0,  "time when the shell is launched from r=0")
+            .item("t_start",    2.0,  "time when the simulation starts")
+            .item("x_inner",    0.1,  "inner radius at start")
+            .item("x_outer",   10.0,  "outer radius at start")
+            .item("expand",    true,  "whether or not to homologously expand the mesh")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let setup = Self {
             u_shell: form.get("u_shell").into(),
             d_shell: form.get("d_shell").into(),
-            r_inner: form.get("r_inner").into(),
-            num_decades: form.get("num_decades").into(),
+            t_shell: form.get("t_shell").into(),
+            t_start: form.get("t_start").into(),
+            x_inner: form.get("x_inner").into(),
+            x_outer: form.get("x_outer").into(),
+            expand: form.get("expand").into(),
             form,
         };
 
@@ -937,13 +946,34 @@ impl FromStr for EnvelopeShock {
             Err(InvalidSetup(format!("u_shell must be >=0.0")))
         } else if setup.d_shell < 0.0 {
             Err(InvalidSetup(format!("d_shell must be >=0.0")))
-        } else if setup.r_inner <= 0.0 {
-            Err(InvalidSetup(format!("r_inner must be >0.0")))
-        } else if setup.num_decades < 1 {
-            Err(InvalidSetup(format!("num_decades must be >0")))
+        } else if setup.x_inner >= setup.x_outer {
+            Err(InvalidSetup(format!("x_inner must be <x_outer")))
         } else {
             Ok(setup)
         }
+    }
+}
+
+impl EnvelopeShock {
+    fn r_shell(&self) -> f64 {
+        self.x_outer * (1.0 - self.t_shell / self.t_start)
+    }
+    fn initial_scale_factor(&self) -> f64 {
+        if self.expand {
+            0.0
+        } else {
+            1.0
+        }
+    }
+    fn a_dot(&self) -> f64 {
+        if self.expand {
+            1.0 / self.t_start
+        } else {
+            0.0
+        }
+    }
+    fn num_decades(&self) -> f64 {
+        (self.x_outer / self.x_inner).log10()
     }
 }
 
@@ -957,6 +987,17 @@ impl Setup for EnvelopeShock {
                 self.form.about(&key)
             );
         }
+        println!("r_shell ....... {}", self.r_shell());
+        println!("scale factor .. {}", self.initial_scale_factor());
+        println!("a_dot ......... {}", self.a_dot());
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
     }
 
     fn num_primitives(&self) -> usize {
@@ -968,8 +1009,9 @@ impl Setup for EnvelopeShock {
     }
 
     fn initial_primitive(&self, r: f64, _q: f64, primitive: &mut [f64]) {
-        let w_shell = 1.0;
-        let r_shell = 100.0;
+        let t = self.t_start;
+        let r_shell = self.r_shell();
+        let w_shell = self.r_shell() * 0.1;
         let d_shell = self.d_shell;
         let u_shell = self.u_shell;
 
@@ -989,7 +1031,6 @@ impl Setup for EnvelopeShock {
             wind_mdot: 100.0,
         };
 
-        let t = self.initial_time();
         let mdot = ambient.mass_rate_per_steradian(r, t);
         let u_ambient = ambient.gamma_beta(r, t);
         let d_ambient = mdot / (u_ambient * r * r);
@@ -1007,7 +1048,11 @@ impl Setup for EnvelopeShock {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(self.r_inner, self.num_decades as u32, resolution)
+        Mesh::logarithmic_radial(self.x_inner, self.num_decades(), resolution)
+    }
+
+    fn homologous_mesh(&self) -> Option<(f64, f64)> {
+        Some((self.initial_scale_factor(), self.a_dot()))
     }
 
     fn coordinate_system(&self) -> Coordinates {
@@ -1015,7 +1060,7 @@ impl Setup for EnvelopeShock {
     }
 
     fn initial_time(&self) -> f64 {
-        500.0
+        self.t_start
     }
 }
 
