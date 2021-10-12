@@ -311,6 +311,7 @@ fn launch_single_patch(
                 setup.homologous_mesh(),
                 setup.boundary_condition(),
                 setup.coordinate_system(),
+                setup.mesh_scale_factor(state.time),
             )?,
             _ => panic!("unknown solver name"),
         },
@@ -329,7 +330,7 @@ fn launch_single_patch(
 
     while state.time < end_time {
         if state.checkpoint.is_due(state.time, checkpoint_rule) {
-            state.set_primitive(solver.primitive());
+            state.set_primitive(solver.primitive(state.time));
             state.write_checkpoint(setup.as_ref(), &outdir)?;
         }
 
@@ -359,7 +360,7 @@ fn launch_single_patch(
             mzps,
         );
     }
-    state.set_primitive(solver.primitive());
+    state.set_primitive(solver.primitive(state.time));
     state.write_checkpoint(setup.as_ref(), &outdir)?;
     Ok(())
 }

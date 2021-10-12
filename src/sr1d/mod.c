@@ -178,13 +178,6 @@ static __host__ __device__ void primitive_to_outer_wavespeeds(const real *prim, 
     wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
 }
 
-static __host__ __device__ real primitive_to_max_wavespeed(const real *prim)
-{
-    real wavespeeds[2];
-    primitive_to_outer_wavespeeds(prim, wavespeeds);
-    return max2(fabs(wavespeeds[0]), fabs(wavespeeds[1]));
-}
-
 static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real v_face, real *flux)
 {
     real ul[NCONS];
@@ -302,27 +295,44 @@ static __host__ __device__ void primitive_to_conserved_zone(
     struct Patch face_positions,
     struct Patch primitive,
     struct Patch conserved,
+    real scale_factor,
     enum Coordinates coords,
-    real a0,
-    real adot,
-    real t,
     int i)
 {
     real *p = GET(primitive, i);
     real *u = GET(conserved, i);
     real yl = *GET(face_positions, i);
     real yr = *GET(face_positions, i + 1);
-    real xl = yl * (a0 + adot * t);
-    real xr = yr * (a0 + adot * t);
+    real xl = yl * scale_factor;
+    real xr = yr * scale_factor;
     real dv = cell_volume(coords, xl, xr);
     primitive_to_conserved(p, u, dv);
+}
+
+static __host__ __device__ void conserved_to_primitive_zone(
+    struct Patch face_positions,
+    struct Patch conserved,
+    struct Patch primitive,
+    real scale_factor,
+    enum Coordinates coords,
+    int i)
+{
+    real *p = GET(primitive, i);
+    real *u = GET(conserved, i);
+    real yl = *GET(face_positions, i);
+    real yr = *GET(face_positions, i + 1);
+    real xl = yl * scale_factor;
+    real xr = yr * scale_factor;
+    real dv = cell_volume(coords, xl, xr);
+    conserved_to_primitive(u, p, dv);
 }
 
 static __host__ __device__ void advance_rk_zone(
     struct Patch face_positions,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
-    struct Patch primitive_wr,
+    struct Patch conserved_rd,
+    struct Patch conserved_wr,
     struct BoundaryCondition bc,
     enum Coordinates coords,
     real a0,
@@ -342,8 +352,10 @@ static __host__ __device__ void advance_rk_zone(
     real xl = yl * (a0 + adot * t);
     real xr = yr * (a0 + adot * t);
 
-    real *un = GET(conserved_rk, i);
-    real *pcc = GET(primitive_rd, i);
+    real *urk = GET(conserved_rk, i);
+    real *prd = GET(primitive_rd, i);
+    real *urd = GET(conserved_rd, i);
+    real *uwr = GET(conserved_wr, i);
     real *pli = i >= 0 + 1 ? GET(primitive_rd, i - 1) : NULL;
     real *pri = i < ni - 1 ? GET(primitive_rd, i + 1) : NULL;
     real *pki = i >= 0 + 2 ? GET(primitive_rd, i - 2) : NULL;
@@ -360,62 +372,50 @@ static __host__ __device__ void advance_rk_zone(
     // NOTE: the gradient calculation here assumes smoothly varying face
     // separations. Also note plm_gradient initializes the gradients to zero
     // if any of the inputs are NULL.
-    plm_gradient(pki, pli, pcc, gxli);
-    plm_gradient(pli, pcc, pri, gxcc);
-    plm_gradient(pcc, pri, pti, gxri);
+    plm_gradient(pki, pli, prd, gxli);
+    plm_gradient(pli, prd, pri, gxcc);
+    plm_gradient(prd, pri, pti, gxri);
 
     for (int q = 0; q < NCONS; ++q)
     {
-        plim[q] = pli ? pli[q] + 0.5 * gxli[q] : pcc[q];
-        plip[q] = pcc[q] - 0.5 * gxcc[q];
-        prim[q] = pcc[q] + 0.5 * gxcc[q];
-        prip[q] = pri ? pri[q] - 0.5 * gxri[q] : pcc[q];
+        plim[q] = pli ? pli[q] + 0.5 * gxli[q] : prd[q];
+        plip[q] = prd[q] - 0.5 * gxcc[q];
+        prim[q] = prd[q] + 0.5 * gxcc[q];
+        prip[q] = pri ? pri[q] - 0.5 * gxri[q] : prd[q];
     }
 
     real fli[NCONS];
     real fri[NCONS];
-    real ucc[NCONS];
     real sources[NCONS];
     real dal = face_area(coords, xl);
     real dar = face_area(coords, xr);
-    real dv = cell_volume(coords, xl, xr);
 
     riemann_hlle(plim, plip, yl * adot, fli);
     riemann_hlle(prim, prip, yr * adot, fri);
-    primitive_to_conserved(pcc, ucc, dv);
-    geometric_source_terms(coords, xl, xr, pcc, sources);
+    geometric_source_terms(coords, xl, xr, prd, sources);
 
     for (int q = 0; q < NCONS; ++q)
     {
-        ucc[q] += (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
-        ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
-    }
-    real *pout = GET(primitive_wr, i);
-    conserved_to_primitive(ucc, pout, dv);
-
-    real mach_ceiling = 1000.0;
-    real u = pcc[1];
-    real e = pcc[2] / pcc[0] * 3.0;
-    real emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
-
-    if (e < emin) {
-        pout[2] = pout[0] * emin * (ADIABATIC_GAMMA - 1.0);
+        uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
+        uwr[q] = (1.0 - a) * uwr[q] + a * urk[q];
     }
 
-    if (pout[2] < 0.0 || pout[2] != pout[2]) {
-        printf("[FATAL] sr1d got negative pressure p=%e at r=%e\n", pout[2], xl);
-        exit(1);
-    }
-}
+    // real *pout = GET(primitive_wr, i);
+    // conserved_to_primitive(ucc, pout, dv);
 
-static __host__ __device__ void wavespeed_zone(
-    struct Patch primitive,
-    struct Patch wavespeed,
-    int i)
-{
-    real *pc = GET(primitive, i);
-    real a = primitive_to_max_wavespeed(pc);
-    GET(wavespeed, i)[0] = a;
+    // real mach_ceiling = 1000.0;
+    // real u = pcc[1];
+    // real e = pcc[2] / pcc[0] * 3.0;
+    // real emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
+
+    // if (e < emin) {
+    //     pout[2] = pout[0] * emin * (ADIABATIC_GAMMA - 1.0);
+    // }
+
+    // if (pout[2] < 0.0 || pout[2] != pout[2]) {
+    //     printf("[FATAL] sr1d got negative pressure p=%e at r=%e\n", pout[2], xl);
+    //     exit(1);
+    // }
 }
 
 
@@ -427,16 +427,29 @@ static void __global__ primitive_to_conserved_kernel(
     struct Patch face_positions,
     struct Patch primitive,
     struct Patch conserved,
-    enum Coordinates coords,
-    real a0,
-    real adot,
-    real t)
+    real scale_factor,
+    enum Coordinates coords)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (i < conserved.count)
     {
-        primitive_to_conserved_zone(face_positions, primitive, conserved, coords, a0, adot, t, i);
+        primitive_to_conserved_zone(face_positions, primitive, conserved, scale_factor, coords, i);
+    }
+}
+
+static void __global__ conserved_to_primitive_kernel(
+    struct Patch face_positions,
+    struct Patch primitive,
+    struct Patch conserved,
+    real scale_factor,
+    enum Coordinates coords)
+{
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < conserved.count)
+    {
+        conserved_to_primitive_zone(face_positions, conserved, primitive, scale_factor, coords, i);
     }
 }
 
@@ -461,18 +474,6 @@ static void __global__ advance_rk_kernel(
     }
 }
 
-static void __global__ wavespeed_kernel(
-    struct Patch primitive,
-    struct Patch wavespeed)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (i < wavespeed.count)
-    {
-        wavespeed_zone(primitive, wavespeed, i);
-    }
-}
-
 #endif
 
 
@@ -493,10 +494,8 @@ EXTERN_C void sr1d_primitive_to_conserved(
     real *face_positions_ptr,
     real *primitive_ptr,
     real *conserved_ptr,
+    real scale_factor,
     enum Coordinates coords,
-    real a0,
-    real adot,
-    real t,
     enum ExecutionMode mode)
 {
     struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
@@ -506,7 +505,7 @@ EXTERN_C void sr1d_primitive_to_conserved(
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved) {
-                primitive_to_conserved_zone(face_positions, primitive, conserved, coords, a0, adot, t, i);
+                primitive_to_conserved_zone(face_positions, primitive, conserved, scale_factor, coords, i);
             }
             break;
         }
@@ -514,7 +513,7 @@ EXTERN_C void sr1d_primitive_to_conserved(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved) {
-                primitive_to_conserved_zone(face_positions, primitive, conserved, coords, a0, adot, t, i);
+                primitive_to_conserved_zone(face_positions, primitive, conserved, scale_factor, coords, i);
             }
             #endif
             break;
@@ -524,7 +523,57 @@ EXTERN_C void sr1d_primitive_to_conserved(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            primitive_to_conserved_kernel<<<bd, bs>>>(face_positions, primitive, conserved, coords, a0, adot, t);
+            primitive_to_conserved_kernel<<<bd, bs>>>(face_positions, primitive, conserved, scale_factor, coords);
+            #endif
+            break;
+        }
+    }
+}
+
+
+/**
+ * Converts an array of conserved data to an array of primitive data. The
+ * array index space must follow the descriptions below.
+ * @param faces              The faces [ni = num_zones]
+ * @param primitive_ptr[in ] [0] [ni] [3]
+ * @param conserved_ptr[out] [0] [ni] [3]
+ * @param mode               The execution mode
+ */
+EXTERN_C void sr1d_conserved_to_primitive(
+    int num_zones,
+    real *face_positions_ptr,
+    real *conserved_ptr,
+    real *primitive_ptr,
+    real scale_factor,
+    enum Coordinates coords,
+    enum ExecutionMode mode)
+{
+    struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
+    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
+    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);    
+
+    switch (mode) {
+        case CPU: {
+            FOR_EACH(conserved) {
+                conserved_to_primitive_zone(face_positions, conserved, primitive, scale_factor, coords, i);
+            }
+            break;
+        }
+
+        case OMP: {
+            #ifdef _OPENMP
+            FOR_EACH_OMP(conserved) {
+                conserved_to_primitive_zone(face_positions, conserved, primitive, scale_factor, coords, i);
+            }
+            #endif
+            break;
+        }
+
+        case GPU: {
+            #if defined(__NVCC__) || defined(__ROCM__)
+            dim3 bs = dim3(256);
+            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
+            conserved_to_primitive_kernel<<<bd, bs>>>(face_positions, conserved, primitive, scale_factor, coords);
             #endif
             break;
         }
@@ -538,7 +587,8 @@ EXTERN_C void sr1d_primitive_to_conserved(
  * @param face_positions_ptr[in] [num_zones + 1] [1]
  * @param conserved_rk_ptr[in]   [num_zones] [3]
  * @param primitive_rd_ptr[in]   [num_zones] [3]
- * @param primitive_wr_ptr[out]  [num_zones] [3]
+ * @param conserved_rd_ptr[in]   [num_zones] [3]
+ * @param conserved_wr_ptr[out]  [num_zones] [3]
  * @param a0                     The scale factor at t=0
  * @param adot                   The expansion rate
  * @param a                      The RK averaging parameter
@@ -552,7 +602,8 @@ EXTERN_C void sr1d_advance_rk(
     real *face_positions_ptr,
     real *conserved_rk_ptr,
     real *primitive_rd_ptr,
-    real *primitive_wr_ptr,
+    real *conserved_rd_ptr,
+    real *conserved_wr_ptr,
     real a0,
     real adot,
     real t,
@@ -565,12 +616,13 @@ EXTERN_C void sr1d_advance_rk(
     struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
     struct Patch conserved_rk = patch(num_zones, NCONS, conserved_rk_ptr);
     struct Patch primitive_rd = patch(num_zones, NCONS, primitive_rd_ptr);
-    struct Patch primitive_wr = patch(num_zones, NCONS, primitive_wr_ptr);
+    struct Patch conserved_rd = patch(num_zones, NCONS, conserved_rd_ptr);
+    struct Patch conserved_wr = patch(num_zones, NCONS, conserved_wr_ptr);
 
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
             }
             break;
         }
@@ -578,7 +630,7 @@ EXTERN_C void sr1d_advance_rk(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
             }
             #endif
             break;
@@ -588,94 +640,9 @@ EXTERN_C void sr1d_advance_rk(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt);
+            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt);
             #endif
             break;
         }
     }
-}
-
-
-/**
- * Fill a buffer with the maximum wavespeed in each zone.
- * @param primitive_ptr[in]   [num_zones] [3]
- * @param wavespeed_ptr[out]  [num_zones] [1]
- * @param mode                The execution mode
- */
-EXTERN_C void sr1d_wavespeed(
-    int num_zones,
-    real *primitive_ptr,
-    real *wavespeed_ptr,
-    enum ExecutionMode mode)
-{
-    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
-    struct Patch wavespeed = patch(num_zones, 1,     wavespeed_ptr);
-
-    switch (mode) {
-        case CPU: {
-            FOR_EACH(wavespeed) {
-                wavespeed_zone(primitive, wavespeed, i);
-            }
-            break;
-        }
-
-        case OMP: {
-            #ifdef _OPENMP
-            FOR_EACH_OMP(wavespeed) {
-                wavespeed_zone(primitive, wavespeed, i);
-            }
-            #endif
-            break;
-        }
-
-        case GPU: {
-            #if defined(__NVCC__) || defined(__ROCM__)
-            dim3 bs = dim3(256);
-            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            wavespeed_kernel<<<bd, bs>>>(primitive, wavespeed);
-            #endif
-            break;
-        }
-    }
-}
-
-
-/**
- * Return the maximum wavespeed over all zones. Not implemented for GPU
- * execution.
- * @param primitive_ptr[in]   [num_zones] [3]
- * @param mode                The execution mode
- */
-EXTERN_C real sr1d_max_wavespeed(
-    int num_zones,
-    real *primitive_ptr,
-    enum ExecutionMode mode)
-{
-    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
-    real a_max = 0.0;
-
-    switch (mode) {
-        case CPU: {
-            for (int i = 0; i < num_zones; ++i)
-            {
-                a_max = max2(a_max, primitive_to_max_wavespeed(GET(primitive, i)));
-            }
-            break;
-        }
-
-        case OMP: {
-            #ifdef _OPENMP
-            #pragma omp parallel for reduction(max:a_max)
-            for (int i = 0; i < num_zones; ++i)
-            {
-                a_max = max2(a_max, primitive_to_max_wavespeed(GET(primitive, i)));
-            }
-            #endif
-            break;
-        }
-
-        case GPU: break; // Not implemented, use sr1d_wavespeed
-                         // followed by a GPU reduction.
-    }
-    return a_max;
 }
