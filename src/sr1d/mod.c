@@ -457,7 +457,8 @@ static void __global__ advance_rk_kernel(
     struct Patch faces,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
-    struct Patch primitive_wr,
+    struct Patch conserved_rd,
+    struct Patch conserved_wr,
     struct BoundaryCondition bc,
     enum Coordinates coords,
     real a0,
@@ -468,9 +469,9 @@ static void __global__ advance_rk_kernel(
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
-    if (i < primitive_wr.count)
+    if (i < primitive_rd.count)
     {
-        advance_rk_zone(faces, conserved_rk, primitive_rd, primitive_wr, bc, coords, a0, adot, t, a, dt, i);
+        advance_rk_zone(faces, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
     }
 }
 
