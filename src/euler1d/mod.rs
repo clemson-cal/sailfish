@@ -114,7 +114,7 @@ pub mod cpu {
         fn primitive(&self) -> Vec<f64> {
             self.primitive1.clone()
         }
-        fn primitive_to_conserved(&mut self) {
+        fn primitive_to_conserved(&mut self, _t: f64) {
             unsafe {
                 euler1d_primitive_to_conserved(
                     self.num_zones() as i32,
@@ -170,8 +170,8 @@ pub mod omp {
         fn primitive(&self) -> Vec<f64> {
             self.0.primitive()
         }
-        fn primitive_to_conserved(&mut self) {
-            self.0.primitive_to_conserved()
+        fn primitive_to_conserved(&mut self, time: f64) {
+            self.0.primitive_to_conserved(time)
         }
         fn advance_rk(&mut self, setup: &dyn Setup, time: f64, a: f64, dt: f64) {
             self.0.advance_rk(setup, time, a, dt)
@@ -232,7 +232,7 @@ pub mod gpu {
         fn primitive(&self) -> Vec<f64> {
             Vec::from(&self.primitive1)
         }
-        fn primitive_to_conserved(&mut self) {
+        fn primitive_to_conserved(&mut self, _time: f64) {
             self.device.scope(|_| unsafe {
                 euler1d_primitive_to_conserved(
                     self.num_zones() as i32,

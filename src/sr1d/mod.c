@@ -95,14 +95,14 @@ static __host__ __device__ real primitive_to_enthalpy_density(const real* prim)
     return rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
 }
 
-static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim)
+static __host__ __device__ void conserved_to_primitive(const real *cons, real *prim, real dv)
 {
     const real newton_iter_max = 50;
-    const real error_tolerance = 1e-12 * cons[0];
+    const real error_tolerance = 1e-12 * cons[0] / dv;
     const real gm              = ADIABATIC_GAMMA;
-    const real m               = cons[0];
-    const real tau             = cons[2];
-    const real ss              = cons[1] * cons[1];
+    const real m               = cons[0] / dv;
+    const real tau             = cons[2] / dv;
+    const real ss              = cons[1] / dv * cons[1] / dv;
     int iteration              = 0;
     real p                     = prim[2];
     real w0;
@@ -128,11 +128,11 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
         iteration += 1;
     }
     prim[0] = m / w0;
-    prim[1] = w0 * cons[1] / (tau + m + p);
+    prim[1] = w0 * cons[1] / dv / (tau + m + p);
     prim[2] = p;
 }
 
-static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons)
+static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons, real dv)
 {
     const real rho = prim[0];
     const real u1 = prim[1];
@@ -142,9 +142,9 @@ static __device__ __host__ void primitive_to_conserved(const real *prim, real *c
     const real h = primitive_to_enthalpy_density(prim) / rho;
     const real m = rho * w;
 
-    cons[0] = m;
-    cons[1] = m * h * u1;
-    cons[2] = m * (h * w - 1.0) - pre;
+    cons[0] = dv * m;
+    cons[1] = dv * m * h * u1;
+    cons[2] = dv * m * (h * w - 1.0) - dv * pre;
 }
 
 static __host__ __device__ void primitive_to_flux(const real *prim, const real *cons, real *flux)
@@ -194,8 +194,8 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     real al[2];
     real ar[2];
 
-    primitive_to_conserved(pl, ul);
-    primitive_to_conserved(pr, ur);
+    primitive_to_conserved(pl, ul, 1.0);
+    primitive_to_conserved(pr, ur, 1.0);
     primitive_to_flux(pl, ul, fl);
     primitive_to_flux(pr, ur, fr);
     primitive_to_outer_wavespeeds(pl, al);
@@ -299,13 +299,23 @@ static struct Patch patch(int num_elements, int num_fields, real *data)
 // ============================ SCHEME ========================================
 // ============================================================================
 static __host__ __device__ void primitive_to_conserved_zone(
+    struct Patch face_positions,
     struct Patch primitive,
     struct Patch conserved,
+    enum Coordinates coords,
+    real a0,
+    real adot,
+    real t,
     int i)
 {
     real *p = GET(primitive, i);
     real *u = GET(conserved, i);
-    primitive_to_conserved(p, u);
+    real yl = *GET(face_positions, i);
+    real yr = *GET(face_positions, i + 1);
+    real xl = yl * (a0 + adot * t);
+    real xr = yr * (a0 + adot * t);
+    real dv = cell_volume(coords, xl, xr);
+    primitive_to_conserved(p, u, dv);
 }
 
 static __host__ __device__ void advance_rk_zone(
@@ -372,16 +382,16 @@ static __host__ __device__ void advance_rk_zone(
 
     riemann_hlle(plim, plip, xl * adot, fli);
     riemann_hlle(prim, prip, xr * adot, fri);
-    primitive_to_conserved(pcc, ucc);
+    primitive_to_conserved(pcc, ucc, dv);
     geometric_source_terms(coords, xl, xr, pcc, sources);
 
     for (int q = 0; q < NCONS; ++q)
     {
-        ucc[q] += (fli[q] * dal - fri[q] * dar + sources[q]) / dv * dt;
+        ucc[q] += (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
         ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
     }
     real *pout = GET(primitive_wr, i);
-    conserved_to_primitive(ucc, pout);
+    conserved_to_primitive(ucc, pout, dv);
 
     real mach_ceiling = 1000.0;
     real u = pcc[1];
@@ -414,14 +424,19 @@ static __host__ __device__ void wavespeed_zone(
 #if defined(__NVCC__) || defined(__ROCM__)
 
 static void __global__ primitive_to_conserved_kernel(
+    struct Patch face_positions,
     struct Patch primitive,
-    struct Patch conserved)
+    struct Patch conserved,
+    enum Coordinates coords,
+    real a0,
+    real adot,
+    real t)
 {
     int i = threadIdx.x + blockIdx.x * blockDim.x;
 
     if (i < conserved.count)
     {
-        primitive_to_conserved_zone(primitive, conserved, i);
+        primitive_to_conserved_zone(face_positions, primitive, conserved, coords, a0, adot, t, i);
     }
 }
 
@@ -475,17 +490,23 @@ static void __global__ wavespeed_kernel(
  */
 EXTERN_C void sr1d_primitive_to_conserved(
     int num_zones,
+    real *face_positions_ptr,
     real *primitive_ptr,
     real *conserved_ptr,
+    enum Coordinates coords,
+    real a0,
+    real adot,
+    real t,
     enum ExecutionMode mode)
 {
+    struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
     struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
     struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);    
 
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved) {
-                primitive_to_conserved_zone(primitive, conserved, i);
+                primitive_to_conserved_zone(face_positions, primitive, conserved, coords, a0, adot, t, i);
             }
             break;
         }
@@ -493,7 +514,7 @@ EXTERN_C void sr1d_primitive_to_conserved(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved) {
-                primitive_to_conserved_zone(primitive, conserved, i);
+                primitive_to_conserved_zone(face_positions, primitive, conserved, coords, a0, adot, t, i);
             }
             #endif
             break;
@@ -503,7 +524,7 @@ EXTERN_C void sr1d_primitive_to_conserved(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            primitive_to_conserved_kernel<<<bd, bs>>>(primitive, conserved);
+            primitive_to_conserved_kernel<<<bd, bs>>>(face_positions, primitive, conserved, coords, a0, adot, t);
             #endif
             break;
         }

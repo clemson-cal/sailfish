@@ -17,7 +17,7 @@ pub trait Solve {
 
     /// Converts the internal primitive variable array to a conserved variable
     /// array, and stores that array in the solver's conserved variable buffer.
-    fn primitive_to_conserved(&mut self);
+    fn primitive_to_conserved(&mut self, time: f64);
 
     /// Returns the largest wavespeed among the zones in the solver's current
     /// primitive array.
@@ -30,7 +30,7 @@ pub trait Solve {
     /// Primitive variable array in a solver using first, second, or third-order
     /// Runge-Kutta time stepping.
     fn advance(&mut self, setup: &dyn Setup, rk_order: u32, time: f64, dt: f64) {
-        self.primitive_to_conserved();
+        self.primitive_to_conserved(time);
         match rk_order {
             1 => {
                 self.advance_rk(setup, time, 0.0, dt);

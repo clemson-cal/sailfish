@@ -5,8 +5,13 @@ use cfg_if::cfg_if;
 extern "C" {
     fn sr1d_primitive_to_conserved(
         num_zones: i32,
+        face_positions_ptr: *const f64,
         primitive_ptr: *const f64,
         conserved_ptr: *mut f64,
+        coords: Coordinates,
+        a0: f64,
+        adot: f64,
+        time: f64,
         mode: ExecutionMode,
     );
 
@@ -18,7 +23,7 @@ extern "C" {
         primitive_wr_ptr: *mut f64,
         a0: f64,
         adot: f64,
-        t: f64,
+        time: f64,
         a: f64,
         dt: f64,
         boundary_condition: BoundaryCondition,
@@ -122,12 +127,17 @@ pub mod cpu {
         fn primitive(&self) -> Vec<f64> {
             self.primitive1.clone()
         }
-        fn primitive_to_conserved(&mut self) {
+        fn primitive_to_conserved(&mut self, time: f64) {
             unsafe {
                 sr1d_primitive_to_conserved(
                     self.num_zones() as i32,
+                    self.faces.as_ptr(),
                     self.primitive1.as_ptr(),
                     self.conserved0.as_mut_ptr(),
+                    self.coords,
+                    self.homologous_parameters.0,
+                    self.homologous_parameters.1,
+                    time,
                     self.mode,
                 );
             }
@@ -182,8 +192,8 @@ pub mod omp {
         fn primitive(&self) -> Vec<f64> {
             self.0.primitive()
         }
-        fn primitive_to_conserved(&mut self) {
-            self.0.primitive_to_conserved()
+        fn primitive_to_conserved(&mut self, time: f64) {
+            self.0.primitive_to_conserved(time)
         }
         fn advance_rk(&mut self, setup: &dyn Setup, time: f64, a: f64, dt: f64) {
             self.0.advance_rk(setup, time, a, dt)
@@ -246,12 +256,17 @@ pub mod gpu {
         fn primitive(&self) -> Vec<f64> {
             Vec::from(&self.primitive1)
         }
-        fn primitive_to_conserved(&mut self) {
+        fn primitive_to_conserved(&mut self, time: f64) {
             self.device.scope(|_| unsafe {
                 sr1d_primitive_to_conserved(
                     self.num_zones() as i32,
+                    self.faces.as_device_ptr(),
                     self.primitive1.as_device_ptr(),
                     self.conserved0.as_device_ptr() as *mut f64,
+                    self.coords,
+                    self.homologous_parameters.0,
+                    self.homologous_parameters.1,
+                    time,
                     ExecutionMode::GPU,
                 );
             })

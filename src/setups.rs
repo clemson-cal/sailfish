@@ -908,9 +908,9 @@ pub struct EnvelopeShock {
     d_shell: f64,
     t_shell: f64,
     t_start: f64,
-    x_inner: f64,
-    x_outer: f64,
-    v_outer: f64,
+    r_inner: f64,
+    r_outer: f64,
+    expand: bool,
     form: kind_config::Form,
 }
 
@@ -923,9 +923,9 @@ impl FromStr for EnvelopeShock {
             .item("d_shell",    0.0,  "density enhancement (additive) of the launched shell")
             .item("t_shell",    1.0,  "time when the shell is launched from r=0")
             .item("t_start",    2.0,  "time when the simulation starts")
-            .item("x_inner",    0.1,  "inner radius at start")
-            .item("x_outer",   10.0,  "outer radius at start")
-            .item("v_outer",    1.0,  "outer boundary speed (0.0 for no mesh motion)")
+            .item("r_inner",    0.1,  "inner radius at start")
+            .item("r_outer",   10.0,  "outer radius at start")
+            .item("expand",    true,  "whether to expand the mesh homologously")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -934,9 +934,9 @@ impl FromStr for EnvelopeShock {
             d_shell: form.get("d_shell").into(),
             t_shell: form.get("t_shell").into(),
             t_start: form.get("t_start").into(),
-            x_inner: form.get("x_inner").into(),
-            x_outer: form.get("x_outer").into(),
-            v_outer: form.get("v_outer").into(),
+            r_inner: form.get("r_inner").into(),
+            r_outer: form.get("r_outer").into(),
+            expand: form.get("expand").into(),
             form,
         };
 
@@ -946,10 +946,8 @@ impl FromStr for EnvelopeShock {
             Err(InvalidSetup(format!("u_shell must be >=0.0")))
         } else if setup.d_shell < 0.0 {
             Err(InvalidSetup(format!("d_shell must be >=0.0")))
-        } else if setup.x_inner >= setup.x_outer {
-            Err(InvalidSetup(format!("x_inner must be <x_outer")))
-        } else if setup.v_outer < 0.0 || setup.v_outer > 1.0 {
-            Err(InvalidSetup(format!("v_outer must be >=0.0 and <1.0")))
+        } else if setup.r_inner >= setup.r_outer {
+            Err(InvalidSetup(format!("r_inner must be <r_outer")))
         } else {
             Ok(setup)
         }
@@ -958,11 +956,11 @@ impl FromStr for EnvelopeShock {
 
 impl EnvelopeShock {
     fn r_shell(&self) -> f64 {
-        self.x_outer * (1.0 - self.t_shell / self.t_start)
+        self.t_start - self.t_shell
     }
 
     fn a0(&self) -> f64 {
-        if self.v_outer > 0.0 {
+        if self.expand {
             0.0
         } else {
             1.0
@@ -970,15 +968,15 @@ impl EnvelopeShock {
     }
 
     fn a_dot(&self) -> f64 {
-        if self.v_outer > 0.0 {
-            self.v_outer / self.t_start
+        if self.expand {
+            1.0 / self.t_start
         } else {
             0.0
         }
     }
 
     fn num_decades(&self) -> f64 {
-        (self.x_outer / self.x_inner).log10()
+        (self.r_outer / self.r_inner).log10()
     }
 }
 
@@ -1052,7 +1050,7 @@ impl Setup for EnvelopeShock {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(self.x_inner, self.num_decades(), resolution)
+        Mesh::logarithmic_radial(self.r_inner, self.num_decades(), resolution)
     }
 
     fn homologous_mesh(&self) -> Option<(f64, f64)> {
