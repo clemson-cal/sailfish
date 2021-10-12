@@ -380,8 +380,8 @@ static __host__ __device__ void advance_rk_zone(
     real dar = face_area(coords, xr);
     real dv = cell_volume(coords, xl, xr);
 
-    riemann_hlle(plim, plip, xl * adot, fli);
-    riemann_hlle(prim, prip, xr * adot, fri);
+    riemann_hlle(plim, plip, yl * adot, fli);
+    riemann_hlle(prim, prip, yr * adot, fri);
     primitive_to_conserved(pcc, ucc, dv);
     geometric_source_terms(coords, xl, xr, pcc, sources);
 
