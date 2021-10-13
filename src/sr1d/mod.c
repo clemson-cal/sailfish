@@ -438,8 +438,8 @@ static void __global__ primitive_to_conserved_kernel(
 
 static void __global__ conserved_to_primitive_kernel(
     struct Patch face_positions,
-    struct Patch primitive,
     struct Patch conserved,
+    struct Patch primitive,
     real scale_factor,
     enum Coordinates coords)
 {
