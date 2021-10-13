@@ -127,9 +127,24 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
         }
         iteration += 1;
     }
+
     prim[0] = m / w0;
     prim[1] = w0 * cons[1] / dv / (tau + m + p);
     prim[2] = p;
+
+    real mach_ceiling = 1000.0;
+    real u = prim[1];
+    real e = prim[2] / prim[0] * 3.0;
+    real emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
+
+    if (e < emin) {
+        prim[2] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
+    }
+
+    if (prim[2] < 0.0 || prim[2] != prim[2]) {
+        printf("[FATAL] sr1d got negative pressure p=%e at r=%e\n", prim[2], 0.0);
+        exit(1);
+    }
 }
 
 static __device__ __host__ void primitive_to_conserved(const real *prim, real *cons, real dv)
@@ -399,23 +414,6 @@ static __host__ __device__ void advance_rk_zone(
         uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
         uwr[q] = (1.0 - a) * uwr[q] + a * urk[q];
     }
-
-    // real *pout = GET(primitive_wr, i);
-    // conserved_to_primitive(ucc, pout, dv);
-
-    // real mach_ceiling = 1000.0;
-    // real u = pcc[1];
-    // real e = pcc[2] / pcc[0] * 3.0;
-    // real emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
-
-    // if (e < emin) {
-    //     pout[2] = pout[0] * emin * (ADIABATIC_GAMMA - 1.0);
-    // }
-
-    // if (pout[2] < 0.0 || pout[2] != pout[2]) {
-    //     printf("[FATAL] sr1d got negative pressure p=%e at r=%e\n", pout[2], xl);
-    //     exit(1);
-    // }
 }
 
 

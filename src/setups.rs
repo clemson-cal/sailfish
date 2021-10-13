@@ -975,6 +975,38 @@ impl EnvelopeShock {
         }
     }
 
+    fn ambient(&self) -> RelativisticEnvelope {
+        RelativisticEnvelope {
+            envelope_m1: 1.0,
+            envelope_fastest_beta: 0.999,
+            envelope_slowest_beta: 0.00,
+            envelope_psi: 0.25,
+            wind_mdot: 100.0,
+        }
+    }
+
+    fn shell_delta_r_over_r(&self) -> f64 {
+        0.1
+    }
+
+    fn shell_inertia(&self) -> f64 {
+        let amb = self.ambient();
+        let u_shell = 1.0 - self.t_shell / self.t_start;
+        let m_shell = amb.envelope_m1 * u_shell.powf(-1.0 / amb.envelope_psi);
+        let r_shell = self.r_shell();
+        let t_shell = self.t_shell;
+        let shell_mass = 4.0
+            * PI
+            * r_shell.powi(3)
+            * self.shell_delta_r_over_r()
+            * self
+                .d_shell
+                .max(amb.comoving_mass_density(r_shell, t_shell));
+        let shell_gamma = (1.0 + self.u_shell.powi(2)).sqrt();
+        let m_dec = shell_mass / shell_gamma;
+        m_dec / m_shell
+    }
+
     fn num_decades(&self) -> f64 {
         (self.r_outer / self.r_inner).log10()
     }
@@ -990,8 +1022,9 @@ impl Setup for EnvelopeShock {
                 self.form.about(&key)
             );
         }
-        println!("r_shell ....... {}", self.r_shell());
-        println!("a_dot ......... {}", self.a_dot());
+        println!("r_shell ......... {}", self.r_shell());
+        println!("a_dot ........... {}", self.a_dot());
+        println!("shell inertia ... {}", self.shell_inertia());
     }
 
     fn model_parameter_string(&self) -> String {
@@ -1013,7 +1046,7 @@ impl Setup for EnvelopeShock {
     fn initial_primitive(&self, r: f64, _q: f64, primitive: &mut [f64]) {
         let t = self.t_start;
         let r_shell = self.r_shell();
-        let w_shell = self.r_shell() * 0.1;
+        let w_shell = self.r_shell() * self.shell_delta_r_over_r();
         let d_shell = self.d_shell;
         let u_shell = self.u_shell;
 
@@ -1025,17 +1058,9 @@ impl Setup for EnvelopeShock {
             }
         };
 
-        let ambient = RelativisticEnvelope {
-            envelope_m1: 1.0,
-            envelope_fastest_beta: 0.999,
-            envelope_slowest_beta: 0.00,
-            envelope_psi: 0.25,
-            wind_mdot: 100.0,
-        };
-
-        let mdot = ambient.mass_rate_per_steradian(r, t);
+        let ambient = self.ambient();
         let u_ambient = ambient.gamma_beta(r, t);
-        let d_ambient = mdot / (u_ambient * r * r);
+        let d_ambient = ambient.comoving_mass_density(r, t);
         let p = 1e-5 * d_ambient;
 
         primitive[0] = d_ambient + d_shell * prof(r);
@@ -1126,6 +1151,10 @@ impl RelativisticEnvelope {
                 self.envelope_m1 / (4.0 * PI * y * t) * f
             }
         }
+    }
+
+    pub fn comoving_mass_density(&self, r: f64, t: f64) -> f64 {
+        self.mass_rate_per_steradian(r, t) / (self.gamma_beta(r, t) * r * r)
     }
 
     pub fn wind_mass_rate_per_steradian(&self) -> f64 {
