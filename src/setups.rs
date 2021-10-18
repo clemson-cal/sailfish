@@ -862,7 +862,7 @@ impl FromStr for Wind {
 
 impl Setup for Wind {
     fn num_primitives(&self) -> usize {
-        3
+        4
     }
 
     fn solver_name(&self) -> String {
@@ -877,6 +877,7 @@ impl Setup for Wind {
         primitive[0] = rho;
         primitive[1] = vel;
         primitive[2] = pre;
+        primitive[3] = 0.0;
     }
 
     fn equation_of_state(&self) -> EquationOfState {
@@ -1036,7 +1037,7 @@ impl Setup for EnvelopeShock {
     }
 
     fn num_primitives(&self) -> usize {
-        3
+        4
     }
 
     fn solver_name(&self) -> String {
@@ -1066,6 +1067,11 @@ impl Setup for EnvelopeShock {
         primitive[0] = d_ambient + d_shell * prof(r);
         primitive[1] = u_ambient + u_shell * prof(r);
         primitive[2] = p;
+        primitive[3] = if r < r_shell && r > r_shell - w_shell {
+            1.0
+        } else {
+            0.0
+        };
     }
 
     fn equation_of_state(&self) -> EquationOfState {

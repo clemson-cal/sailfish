@@ -22,7 +22,7 @@
 
 // ============================ PHYSICS =======================================
 // ============================================================================
-#define NCONS 3
+#define NCONS 4
 #define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
 
@@ -131,6 +131,7 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
     prim[0] = m / w0;
     prim[1] = w0 * cons[1] / dv / (tau + m + p);
     prim[2] = p;
+    prim[3] = cons[3] / cons[0];
 
     real mach_ceiling = 1000.0;
     real u = prim[1];
@@ -160,16 +161,19 @@ static __device__ __host__ void primitive_to_conserved(const real *prim, real *c
     cons[0] = dv * m;
     cons[1] = dv * m * h * u1;
     cons[2] = dv * m * (h * w - 1.0) - dv * pre;
+    cons[3] = dv * m * prim[3];
 }
 
 static __host__ __device__ void primitive_to_flux(const real *prim, const real *cons, real *flux)
 {
     const real vn = primitive_to_beta_component(prim);
     const real pre = prim[2];
+    const real s = prim[3]; // scalar concentration
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pre;
     flux[2] = vn * cons[2] + pre * vn;
+    flux[3] = vn * cons[0] * s;
 }
 
 static __host__ __device__ real primitive_to_sound_speed_squared(const real *prim)
@@ -212,19 +216,22 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     const real am = min2(al[0], ar[0]);
     const real ap = max2(al[1], ar[1]);
 
-    if (v_face < am) {
+    if (v_face < am)
+    {
         for (int q = 0; q < NCONS; ++q)
         {
             flux[q] = fl[q] - v_face * ul[q];
         }
     }
-    else if (v_face > ap) {
+    else if (v_face > ap)
+    {
         for (int q = 0; q < NCONS; ++q)
         {
             flux[q] = fr[q] - v_face * ur[q];
         }
     }
-    else {    
+    else
+    {    
         for (int q = 0; q < NCONS; ++q)
         {
             real u_hll = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
@@ -263,12 +270,14 @@ static __host__ __device__ void geometric_source_terms(enum Coordinates coords, 
             source[0] = 0.0;
             source[1] = p * (x1 * x1 - x0 * x0);
             source[2] = 0.0;
+            source[3] = 0.0;
             break;
         }
         default: {
             source[0] = 0.0;
             source[1] = 0.0;
             source[2] = 0.0;
+            source[3] = 0.0;
         }   
     }
 }

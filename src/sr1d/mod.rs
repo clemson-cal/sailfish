@@ -2,6 +2,8 @@ use crate::error::Error;
 use crate::{BoundaryCondition, Coordinates, ExecutionMode, Setup, Solve};
 use cfg_if::cfg_if;
 
+static NUM_CONS: usize = 4; // [D, S, tau, D s]
+
 extern "C" {
     fn sr1d_primitive_to_conserved(
         num_zones: i32,
@@ -133,13 +135,13 @@ pub mod cpu {
                     ExecutionMode::CPU,
                 );
             }
-            assert_eq!(primitive.len(), num_zones * 3);
+            assert_eq!(primitive.len(), num_zones * NUM_CONS);
             Self {
                 faces: faces.to_vec(),
                 primitive1: primitive.to_vec(),
                 conserved1: conserved.clone(),
                 conserved2: conserved,
-                conserved0: vec![0.0; num_zones * 3],
+                conserved0: vec![0.0; num_zones * NUM_CONS],
                 homologous_parameters,
                 boundary_condition,
                 coords,
@@ -277,7 +279,7 @@ pub mod gpu {
             scale_factor: f64,
         ) -> Result<Self, Error> {
             let num_zones = faces.len() - 1;
-            assert_eq!(primitive.len(), num_zones * 3);
+            assert_eq!(primitive.len(), num_zones * NUM_CONS);
 
             let mut conserved = vec![0.0; primitive.len()];
             unsafe {
