@@ -224,7 +224,7 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
             flux[q] = fr[q] - v_face * ur[q];
         }
     }
-    else {    
+    else {
         for (int q = 0; q < NCONS; ++q)
         {
             real u_hll = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
@@ -246,7 +246,7 @@ static __host__ __device__ real face_area(enum Coordinates coords, real x)
     return 0.0;
 }
 
-static __host__ __device__ real cell_volume(enum Coordinates coords, real x0, real x1) 
+static __host__ __device__ real cell_volume(enum Coordinates coords, real x0, real x1)
 {
     switch (coords) {
         case Cartesian: return x1 - x0;
@@ -269,9 +269,36 @@ static __host__ __device__ void geometric_source_terms(enum Coordinates coords, 
             source[0] = 0.0;
             source[1] = 0.0;
             source[2] = 0.0;
-        }   
+        }
     }
 }
+
+static __host__ __device__ void cooling_source_terms(enum Coordinates coords, const real *prim, real *source)
+{
+    switch (coords) {
+        case SphericalPolar: {
+            // double p = prim[2];
+            double rho = prim[1];
+            double u = prim[0];
+            double sigmaT_epsilon = 1e-5; // (8/3 pi r_electron^2)*epsilon
+            double gamma = sqrt(u * u + 1.0);
+            double e = (gamma - 1.0);
+            double e_dot = (4.0/3.0) * sigmaT_epsilon * rho * ((e + 1.0)*(e + 1.0) - 1.0) * e;
+            double h_dot = e_dot * gamma;
+
+            source[0] = 0.0;
+            source[1] = rho * h_dot * u; //rho*h_dot(gamma e_dot)*gamma_beta
+            source[2] = rho * h_dot * (gamma*gamma - 1.0); //rho*h_dot*(gamma*gamma - 1.0)
+            break;
+        }
+        default: {
+            source[0] = 0.0;
+            source[1] = 0.0;
+            source[2] = 0.0;
+        }
+    }
+}
+
 
 
 // ============================ PATCH =========================================
@@ -408,6 +435,7 @@ static __host__ __device__ void advance_rk_zone(
     riemann_hlle(plim, plip, yl * adot, fli);
     riemann_hlle(prim, prip, yr * adot, fri);
     geometric_source_terms(coords, xl, xr, prd, sources);
+    cooling_source_terms(coords, prd, sources);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -499,7 +527,7 @@ EXTERN_C void sr1d_primitive_to_conserved(
 {
     struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
     struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
-    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);    
+    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);
 
     switch (mode) {
         case CPU: {
@@ -549,7 +577,7 @@ EXTERN_C void sr1d_conserved_to_primitive(
 {
     struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
     struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
-    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);    
+    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);
 
     switch (mode) {
         case CPU: {
