@@ -923,7 +923,7 @@ impl FromStr for EnvelopeShock {
             .item("u_shell",   30.0, "gamma-beta of the launched shell")
             .item("m_shell",    1.0, "mass coordinate of the launched shell")
             .item("w_shell",    1.0, "width of the shell in dm/m")
-            .item("t_start",    2.0, "time when the simulation starts")
+            .item("t_start",    1.0, "time when the simulation starts")
             .item("r_inner",    0.1, "inner radius at start")
             .item("r_outer",   10.0, "outer radius at start")
             .item("expand",    true, "whether to expand the mesh homologously")
@@ -1052,7 +1052,7 @@ impl Setup for EnvelopeShock {
         };
 
         primitive[0] = d;
-        primitive[1] = u + u_prof(m);
+        primitive[1] = u + u_prof(m) * self.u_shell;
         primitive[2] = p;
         primitive[3] = if m > self.m_shell && m < self.m_shell * (1.0 + self.w_shell) {
             1.0
