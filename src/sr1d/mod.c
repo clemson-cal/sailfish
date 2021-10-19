@@ -277,14 +277,18 @@ static __host__ __device__ void cooling_source_terms(enum Coordinates coords, co
 {
     switch (coords) {
         case SphericalPolar: {
-            // double p = prim[2];
-            double rho = prim[1];
-            double u = prim[0];
-            double sigmaT_epsilon = 1e-5; // (8/3 pi r_electron^2)*epsilon
+            double rho = prim[0];
+            double u = prim[1];
+            double c = 1.0;
             double gamma = sqrt(u * u + 1.0);
-            double e = (gamma - 1.0);
-            double e_dot = (4.0/3.0) * sigmaT_epsilon * rho * ((e + 1.0)*(e + 1.0) - 1.0) * e;
-            double h_dot = e_dot * gamma;
+            double num_protons = rho / 1.67e-24;
+            double e_per_particle = gamma * rho * c * c / num_protons;
+            double gamma_th = e_per_particle / 1.67e-24 /c /c;
+            double sigmaT_epsilon = 1e-5; // (8/3 pi r_electron^2)*epsilon
+            double gm = ADIABATIC_GAMMA;
+            double e = c * c * (gamma_th - 1.0);
+            double e_dot = (4.0/3.0) * sigmaT_epsilon * rho * ((e/c/c + 1.0)*(e/c/c + 1.0) - 1.0) * e;
+            double h_dot = e_dot * gm;
 
             source[0] = 0.0;
             source[1] = rho * h_dot * u; //rho*h_dot(gamma e_dot)*gamma_beta
