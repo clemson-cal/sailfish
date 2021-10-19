@@ -791,7 +791,7 @@ impl Setup for FastShell {
     }
 
     fn solver_name(&self) -> String {
-        "euler1d".to_owned()
+        "sr1d".to_owned()
     }
 
     fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
@@ -804,22 +804,22 @@ impl Setup for FastShell {
         // r_dec is 100.
 
         let r_shell: f64 = 10.0;
-        let dr = 1.0;
-        let rho_0 = 0.01;
-        let rho_1 = 1.0;
-        let v_max = 1.0;
+        let dr: f64 = 1.0;
+        let rho_0: f64 = 0.01;
+        let rho_1: f64 = 1.0;
+        let u_max: f64 = 2.0;
 
         let prof = |r: f64| {
             if r > r_shell {
                 0.0
             } else {
-                f64::exp((r - r_shell) / dr)
+                f64::exp(-(r - r_shell).powi(4) / dr.powi(4))
             }
         };
 
         let rho_ambient = rho_0 * (r / r_shell).powi(-2);
         let rho = rho_1 * prof(r) + rho_ambient;
-        let vel = v_max * prof(r);
+        let vel = u_max * prof(r);
         let pre = 1e-3 * rho_ambient;
 
         primitive[0] = rho;
