@@ -273,25 +273,27 @@ static __host__ __device__ void geometric_source_terms(enum Coordinates coords, 
     }
 }
 
-static __host__ __device__ void cooling_source_terms(enum Coordinates coords, const real *prim, real *source)
+static __host__ __device__ void cooling_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source)
 {
     switch (coords) {
         case SphericalPolar: {
             double rho = prim[0];
             double u = prim[1];
+            double p = prim[2];
             double c = 1.0;
+            double t_expansion = 10.0 / c; //=r/c
+            double cooling_strength = 1.0;
+            double t_cool = cooling_strength * t_expansion;
+            double vol_cell = cell_volume(coords, x0, x1);
             double gamma = sqrt(u * u + 1.0);
-            double num_protons = rho / 1.67e-24;
-            double e_per_particle = gamma * rho * c * c / num_protons;
-            double gamma_th = e_per_particle / 1.67e-24 /c /c;
-            double sigmaT_epsilon = 1e-5; // (8/3 pi r_electron^2)*epsilon
+            double gamma_th = gamma * rho * vol_cell / 1.0; // gamma_thermal = gamma_bulk * density * volume_cell / mass_p
             double gm = ADIABATIC_GAMMA;
             double e = c * c * (gamma_th - 1.0);
-            double e_dot = (4.0/3.0) * sigmaT_epsilon * rho * ((e/c/c + 1.0)*(e/c/c + 1.0) - 1.0) * e;
+            double e_dot = e / t_cool;
             double h_dot = e_dot * gm;
 
             source[0] = 0.0;
-            source[1] = rho * h_dot * u; //rho*h_dot(gamma e_dot)*gamma_beta
+            source[1] = p * (x1 * x1 - x0 * x0) + rho * h_dot * u; //rho*h_dot(gamma e_dot)*gamma_beta + geometric source
             source[2] = rho * h_dot * (gamma*gamma - 1.0); //rho*h_dot*(gamma*gamma - 1.0)
             break;
         }
@@ -438,8 +440,8 @@ static __host__ __device__ void advance_rk_zone(
 
     riemann_hlle(plim, plip, yl * adot, fli);
     riemann_hlle(prim, prip, yr * adot, fri);
-    geometric_source_terms(coords, xl, xr, prd, sources);
-    cooling_source_terms(coords, prd, sources);
+    // geometric_source_terms(coords, xl, xr, prd, sources);
+    cooling_source_terms(coords, xl, xr, prd, sources);
 
     for (int q = 0; q < NCONS; ++q)
     {
