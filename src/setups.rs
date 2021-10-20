@@ -807,6 +807,7 @@ impl Setup for FastShell {
         let dr: f64 = 1.0;
         let rho_0: f64 = 0.01;
         let rho_1: f64 = 1.0;
+        let u_0: f64 = 0.001;
         let u_max: f64 = 2.0;
 
         let prof = |r: f64| {
@@ -819,7 +820,7 @@ impl Setup for FastShell {
 
         let rho_ambient = rho_0 * (r / r_shell).powi(-2);
         let rho = rho_1 * prof(r) + rho_ambient;
-        let vel = u_max * prof(r);
+        let vel = u_0 + u_max * prof(r);
         let pre = 1e-3 * rho_ambient;
 
         primitive[0] = rho;
