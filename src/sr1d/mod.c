@@ -281,20 +281,19 @@ static __host__ __device__ void cooling_source_terms(enum Coordinates coords, re
             double u = prim[1];
             double p = prim[2];
             double c = 1.0;
-            double t_expansion = 10.0 / c; //=r/c
+            double t_expansion = x0 / c;
             double cooling_strength = 1.0;
             double t_cool = cooling_strength * t_expansion;
             double vol_cell = cell_volume(coords, x0, x1);
             double gamma = sqrt(u * u + 1.0);
-            double gamma_th = gamma * rho * vol_cell / 1.0; // gamma_thermal = gamma_bulk * density * volume_cell / mass_p
             double gm = ADIABATIC_GAMMA;
-            double e = c * c * (gamma_th - 1.0);
+            double e = p / (rho * (gm - 1.0));
             double e_dot = e / t_cool;
             double h_dot = e_dot * gm;
 
             source[0] = 0.0;
-            source[1] = p * (x1 * x1 - x0 * x0) + rho * h_dot * u; //rho*h_dot(gamma e_dot)*gamma_beta + geometric source
-            source[2] = rho * h_dot * (gamma*gamma - 1.0); //rho*h_dot*(gamma*gamma - 1.0)
+            source[1] = p * (x1 * x1 - x0 * x0) + rho * h_dot * u * gamma * vol_cell; //rho*h_dot(gamma e_dot)*gamma^2*beta + geometric source
+            source[2] = rho * (h_dot * (gamma*gamma - 1.0) + e_dot) * vol_cell; //rho*h_dot*(gamma*gamma - 1.0) + rho*e_dot
             break;
         }
         default: {
