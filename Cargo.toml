@@ -1,7 +1,7 @@
 [package]
 name = "sailfish"
 description = "GPU-accelerated astrophysics gas dynamics code"
-version = "0.3.3"
+version = "0.3.5"
 edition = "2018"
 authors = [
 	"J. Zrake <jzrake@clemson.edu>",

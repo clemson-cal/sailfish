@@ -1,5 +1,4 @@
 use anyhow::Result;
-use clap::{AppSettings, Clap};
 use std::fs::File;
 use std::io::{BufWriter, Read};
 use std::ops::Range;
@@ -58,14 +57,14 @@ impl State {
 
 struct Process {
     first_call: bool,
-    png_files_written: Vec<String>,
+    files_written: Vec<String>,
 }
 
 impl Process {
     fn new() -> Self {
         Self {
             first_call: true,
-            png_files_written: vec![],
+            files_written: vec![],
         }
     }
 }
@@ -225,52 +224,47 @@ fn make_image(
     writer.write_image_data(&rgba_data).unwrap();
 
     process.first_call = false;
-    process.png_files_written.push(png_name);
+    process.files_written.push(png_name);
     Ok(())
 }
 
-#[derive(Clap)]
-#[clap(version = "1.0", author = "J. Zrake <jzrake@clemson.edu>")]
-#[clap(setting = AppSettings::ColoredHelp)]
-struct Opts {
-    /// Location to read checkpoint files from
+#[derive(Debug, gumdrop::Options)]
+struct MyOptions {
+    #[options(free, help = "location to read checkpoint files from")]
     paths: Vec<String>,
 
-    /// The field index to read
-    #[clap(long, short, default_value = "0")]
+    #[options(help = "the field index to read", default = "0")]
     field: usize,
 
-    /// Just print the data quantiles and exit
-    #[clap(long, short = 'q')]
+    #[options(help = "just print the data quantiles and exit", short = 'q')]
     show_quantiles: bool,
 
-    /// Open written images (MacOS only)
-    #[clap(long)]
+    #[options(help = "open written images (MacOS only)")]
     open: bool,
 
-    /// Scaling rule: [log|linear|plaw:n]
-    #[clap(long, short, default_value = "linear")]
+    #[options(help = "scaling rule: [log|linear|plaw:n]", default = "linear")]
     scaling: String,
 
-    /// Colormap
-    #[clap(long, short, default_value = "magma")]
+    #[options(help = "colormap name", default = "magma")]
     colormap: String,
 
-    /// The minimum data value ()
-    #[clap(long, default_value = "0.0")]
+    #[options(help = "the minimum data value", default = "0.0")]
     vmin: f64,
 
-    /// The maximum data value
-    #[clap(long, default_value = "1.0")]
+    #[options(help = "the maximum data value", default = "1.0")]
     vmax: f64,
+
+    #[options(help_flag)]
+    help: bool,
 }
 
 fn main() -> Result<()> {
-    let opts: Opts = Opts::parse();
+    use gumdrop::Options;
+
+    let opts = MyOptions::parse_args_default_or_exit();
 
     if opts.paths.is_empty() {
-        println!("usage: sf_png [chkpt.0000.sf ...] <flags>");
-        println!("invoke with --help to see more details");
+        println!("{}", MyOptions::usage());
         return Ok(());
     }
 
@@ -302,11 +296,8 @@ fn main() -> Result<()> {
             make_image(&filename, opts.field, &scaling, &colormap, &mut process)?;
         }
     }
-    if cfg!(target_os = "macos") && opts.open && !process.png_files_written.is_empty() {
-        Command::new("open")
-            .args(process.png_files_written)
-            .spawn()
-            .unwrap();
+    if cfg!(target_os = "macos") && opts.open && !process.files_written.is_empty() {
+        Command::new("open").args(process.files_written).spawn()?;
     }
     Ok(())
 }

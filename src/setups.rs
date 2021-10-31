@@ -1056,7 +1056,7 @@ impl Setup for FastShell {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(1.0, 2, resolution)
+        Mesh::logarithmic_radial(1.0, 2.0, resolution)
     }
 
     fn coordinate_system(&self) -> Coordinates {
@@ -1084,7 +1084,7 @@ impl FromStr for Wind {
 
 impl Setup for Wind {
     fn num_primitives(&self) -> usize {
-        3
+        4
     }
 
     fn solver_name(&self) -> String {
@@ -1099,6 +1099,7 @@ impl Setup for Wind {
         primitive[0] = rho;
         primitive[1] = vel;
         primitive[2] = pre;
+        primitive[3] = 0.0;
     }
 
     fn equation_of_state(&self) -> EquationOfState {
@@ -1108,7 +1109,7 @@ impl Setup for Wind {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(1.0, 2, resolution)
+        Mesh::logarithmic_radial(1.0, 2.0, resolution)
     }
 
     fn boundary_condition(&self) -> BoundaryCondition {
@@ -1127,9 +1128,12 @@ impl Setup for Wind {
 /// A relativistic shell is launched into a homologous, relativistic envelope.
 pub struct EnvelopeShock {
     u_shell: f64,
-    d_shell: f64,
+    m_shell: f64,
+    w_shell: f64,
+    t_start: f64,
     r_inner: f64,
-    num_decades: i64,
+    r_outer: f64,
+    expand: bool,
     form: kind_config::Form,
 }
 
@@ -1138,18 +1142,24 @@ impl FromStr for EnvelopeShock {
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         #[rustfmt::skip]
         let form = kind_config::Form::new()
-            .item("u_shell",       30.0, "gamma-beta of the launched shell")
-            .item("d_shell",       0.0,  "density enhancement (additive) of the launched shell")
-            .item("r_inner",       1.0,  "inner boundary radius")
-            .item("num_decades",   3,    "number of radial decades")
+            .item("u_shell",   30.0, "gamma-beta of the launched shell")
+            .item("m_shell",    1.0, "mass coordinate of the launched shell")
+            .item("w_shell",    1.0, "width of the shell in dm/m")
+            .item("t_start",    1.0, "time when the simulation starts")
+            .item("r_inner",    0.1, "inner radius at start")
+            .item("r_outer",   10.0, "outer radius at start")
+            .item("expand",    true, "whether to expand the mesh homologously")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let setup = Self {
             u_shell: form.get("u_shell").into(),
-            d_shell: form.get("d_shell").into(),
+            m_shell: form.get("m_shell").into(),
+            w_shell: form.get("w_shell").into(),
+            t_start: form.get("t_start").into(),
             r_inner: form.get("r_inner").into(),
-            num_decades: form.get("num_decades").into(),
+            r_outer: form.get("r_outer").into(),
+            expand: form.get("expand").into(),
             form,
         };
 
@@ -1157,15 +1167,59 @@ impl FromStr for EnvelopeShock {
             panic!()
         } else if setup.u_shell < 0.0 {
             Err(InvalidSetup(format!("u_shell must be >=0.0")))
-        } else if setup.d_shell < 0.0 {
-            Err(InvalidSetup(format!("d_shell must be >=0.0")))
-        } else if setup.r_inner <= 0.0 {
-            Err(InvalidSetup(format!("r_inner must be >0.0")))
-        } else if setup.num_decades < 1 {
-            Err(InvalidSetup(format!("num_decades must be >0")))
+        } else if setup.m_shell < 0.0 {
+            Err(InvalidSetup(format!("m_shell must be >=0.0")))
+        } else if setup.r_inner >= setup.r_outer {
+            Err(InvalidSetup(format!("r_inner must be <r_outer")))
         } else {
             Ok(setup)
         }
+    }
+}
+
+impl EnvelopeShock {
+    fn r_shell(&self) -> f64 {
+        let u = self.m_shell.powf(-0.25);
+        let s = u / (1.0 + u * u).sqrt();
+        self.t_start * s
+    }
+
+    fn a0(&self) -> f64 {
+        if self.expand {
+            0.0
+        } else {
+            1.0
+        }
+    }
+
+    fn a_dot(&self) -> f64 {
+        if self.expand {
+            1.0 / self.t_start
+        } else {
+            0.0
+        }
+    }
+
+    fn ambient(&self) -> RelativisticEnvelope {
+        RelativisticEnvelope {
+            envelope_m1: 1.0,
+            envelope_fastest_beta: 0.999,
+            envelope_slowest_beta: 0.00,
+            envelope_psi: 0.25,
+            wind_mdot: 100.0,
+        }
+    }
+
+    fn gamma_shell(&self) -> f64 {
+        (1.0 + self.u_shell.powi(2)).sqrt()
+    }
+
+    fn shell_energy(&self) -> f64 {
+        self.w_shell * self.m_shell * (self.gamma_shell() - 1.0)
+    }
+
+    fn num_decades(&self) -> f64 {
+        (self.r_outer / self.r_inner).log10()
     }
 }
 
@@ -1179,10 +1233,21 @@ impl Setup for EnvelopeShock {
                 self.form.about(&key)
             );
         }
+        println!("r_shell ............ {}", self.r_shell());
+        println!("a_dot .............. {}", self.a_dot());
+        println!("shell energy ....... {} m1 c^2", self.shell_energy());
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
     }
 
     fn num_primitives(&self) -> usize {
-        3
+        4
     }
 
     fn solver_name(&self) -> String {
@@ -1190,36 +1255,32 @@ impl Setup for EnvelopeShock {
     }
 
     fn initial_primitive(&self, r: f64, _q: f64, primitive: &mut [f64]) {
-        let w_shell = 1.0;
-        let r_shell = 100.0;
-        let d_shell = self.d_shell;
-        let u_shell = self.u_shell;
+        let ambient = self.ambient();
+        let psi = ambient.envelope_psi;
+        let m1 = ambient.envelope_m1;
+        let t = self.t_start;
+        let s = (r / t).min(ambient.envelope_fastest_beta);
+        let u = s / (1.0 - s * s).sqrt();
+        let m = m1 * u.powf(-1.0 / psi);
+        let d = ambient.comoving_mass_density(r, t);
+        let p = 1e-5 * d;
 
-        let prof = |r: f64| {
-            if r > r_shell {
+        let u_prof = |m: f64| {
+            if m < self.m_shell {
                 0.0
             } else {
-                f64::exp((r - r_shell) / w_shell)
+                f64::exp(-(m / self.m_shell - 1.0) / self.w_shell)
             }
         };
 
-        let ambient = RelativisticEnvelope {
-            envelope_m1: 1.0,
-            envelope_fastest_beta: 0.99,
-            envelope_slowest_beta: 0.00,
-            envelope_psi: 0.25,
-            wind_mdot: 100.0,
-        };
-
-        let t = self.initial_time();
-        let mdot = ambient.mass_rate_per_steradian(r, t);
-        let u_ambient = ambient.gamma_beta(r, t);
-        let d_ambient = mdot / (u_ambient * r * r);
-        let p = 1e-6 * d_ambient;
-
-        primitive[0] = d_ambient + d_shell * prof(r);
-        primitive[1] = u_ambient + u_shell * prof(r);
+        primitive[0] = d;
+        primitive[1] = u + u_prof(m) * self.u_shell;
         primitive[2] = p;
+        primitive[3] = if m > self.m_shell && m < self.m_shell * (1.0 + self.w_shell) {
+            1.0
+        } else {
+            0.0
+        };
     }
 
     fn equation_of_state(&self) -> EquationOfState {
@@ -1229,7 +1290,11 @@ impl Setup for EnvelopeShock {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(self.r_inner, self.num_decades as u32, resolution)
+        Mesh::logarithmic_radial(self.r_inner, self.num_decades(), resolution)
+    }
+
+    fn homologous_mesh(&self) -> Option<(f64, f64)> {
+        Some((self.a0(), self.a_dot()))
     }
 
     fn coordinate_system(&self) -> Coordinates {
@@ -1237,7 +1302,7 @@ impl Setup for EnvelopeShock {
     }
 
     fn initial_time(&self) -> f64 {
-        500.0
+        self.t_start
     }
 }
 
@@ -1301,6 +1366,10 @@ impl RelativisticEnvelope {
                 self.envelope_m1 / (4.0 * PI * y * t) * f
             }
         }
+    }
+
+    pub fn comoving_mass_density(&self, r: f64, t: f64) -> f64 {
+        self.mass_rate_per_steradian(r, t) / (self.gamma_beta(r, t) * r * r)
     }
 
     pub fn wind_mass_rate_per_steradian(&self) -> f64 {

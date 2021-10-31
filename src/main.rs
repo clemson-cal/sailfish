@@ -175,14 +175,16 @@ where
     let min_spacing = state.mesh.min_spacing();
     let edge_list = adjacency_list(&patch_map, 2);
     let mut solvers = vec![];
-    let mut devices = if let Some(device) = cline.device {
-        vec![gpu_core::Device::with_id(device).unwrap()]
+    let mut devices = if cline.use_gpu() {
+        match cline.device {
+            Some(device) => vec![Some(gpu_core::Device::with_id(device).unwrap())],
+            None => gpu_core::all_devices().map(Some).collect::<Vec<_>>(),
+        }
     } else {
-        gpu_core::all_devices().collect::<Vec<_>>()
+        vec![None]
     }
     .into_iter()
-    .cycle()
-    .filter(|_| cline.use_gpu());
+    .cycle();
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
@@ -197,7 +199,7 @@ where
             &edge_list,
             rk_order,
             cline.execution_mode(),
-            devices.next(),
+            devices.next().flatten(),
             setup.clone(),
         );
         solvers.push(solver)
@@ -306,8 +308,10 @@ fn launch_single_patch(
                 cline.device,
                 faces,
                 &state.primitive,
+                setup.homologous_mesh(),
                 setup.boundary_condition(),
                 setup.coordinate_system(),
+                setup.mesh_scale_factor(state.time),
             )?,
             _ => panic!("unknown solver name"),
         },
@@ -326,18 +330,20 @@ fn launch_single_patch(
 
     while state.time < end_time {
         if state.checkpoint.is_due(state.time, checkpoint_rule) {
-            state.set_primitive(solver.primitive());
+            state.set_primitive(solver.primitive(state.time));
             state.write_checkpoint(setup.as_ref(), &outdir)?;
         }
 
         if !dt_each_iter {
-            dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
+            dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref())
+                * setup.mesh_scale_factor(state.time);
         }
 
         let elapsed = time_exec(cline.device, || {
             for _ in 0..fold {
                 if dt_each_iter {
-                    dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
+                    dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref())
+                        * setup.mesh_scale_factor(state.time);
                 }
                 solver.advance(setup.as_ref(), rk_order as u32, state.time, dt);
                 state.time += dt;
@@ -354,7 +360,7 @@ fn launch_single_patch(
             mzps,
         );
     }
-    state.set_primitive(solver.primitive());
+    state.set_primitive(solver.primitive(state.time));
     state.write_checkpoint(setup.as_ref(), &outdir)?;
     Ok(())
 }
