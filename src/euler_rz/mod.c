@@ -204,7 +204,7 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     primitive_to_outer_wavespeeds(pl, al, direction);
     primitive_to_outer_wavespeeds(pr, ar, direction);
 
-    const real am = min3(0.0, al[0], ar[0]); //Torro refers to am as Sl, ap as Sr
+    const real am = min3(0.0, al[0], ar[0]); //Toro refers to am as Sl, ap as Sr
     const real ap = max3(0.0, al[1], ar[1]);
 
     for (int q = 0; q < NCONS; ++q)
@@ -232,7 +232,7 @@ static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, rea
     primitive_to_outer_wavespeeds(pl, al, direction);
     primitive_to_outer_wavespeeds(pr, ar, direction);
 
-    const real am = min3(0.0, al[0], ar[0]); //Torro refers to am as Sl, ap as Sr
+    const real am = min3(0.0, al[0], ar[0]); //Toro refers to am as Sl, ap as Sr
     const real ap = max3(0.0, al[1], ar[1]);
 
     real a_star = primitive_to_a_star(pl, pr, am, ap, direction);

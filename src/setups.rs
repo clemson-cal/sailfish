@@ -172,6 +172,7 @@ pub struct Kilonova {
     domain_height: f64,
     explosion_altitude: f64,
     deceleration_length: f64,
+    shell_radius: f64,
     shell_mach: f64,
 }
 
@@ -181,10 +182,11 @@ impl FromStr for Kilonova {
         if parameters.is_empty() {
             Ok(Self {
                 domain_base: 1.0,
-                domain_height: 5.0,
+                domain_height: 2.0,
                 explosion_altitude: 2.0,
                 deceleration_length: 0.1,
-                shell_mach: 10.0,
+                shell_radius: 0.1,
+                shell_mach: 1.0,
             })
         } else {
             Err(InvalidSetup("setup does not take any parameters".into()))
@@ -210,6 +212,10 @@ impl Kilonova {
 }
 
 impl Setup for Kilonova {
+    fn print_parameters(&self) {
+        println!("shell mass: {:.3}", self.shell_mass())
+    }
+
     fn num_primitives(&self) -> usize {
         5
     }
@@ -218,25 +224,23 @@ impl Setup for Kilonova {
         "euler_rz".to_owned()
     }
 
-    // 1 unit of position = 100 pc
-    // 1 unit of time     = 100 000 yr
-    // 1 unit of mass     = 10M solar masses
-
     fn initial_primitive(&self, x: f64, z: f64, primitive: &mut [f64]) {
         use std::f64::consts::PI;
         let g = 1.0; // euler_rz solver hard-codes little-g = 1.0
-        let r = (x * x + (z - self.explosion_altitude).powi(2)).sqrt();
+        let x0 = 0.0;
+        let z0 = self.explosion_altitude;
+        let r = ((x - x0).powi(2) + (z - z0).powi(2)).sqrt();
         let scale_height = 1.0;
-        let shell_temperature = 1e-2;
+        let shell_temperature = 1e-4;
         let w_shell = 0.1; // dr_shell / r
-        let r_shell = 0.1;
-        let v_shell = self.shell_mach * (g * self.explosion_altitude).sqrt();
+        let r_shell = self.shell_radius;
+        let v_shell = self.shell_mach * f64::sqrt(scale_height * g);
         let d_shell = self.shell_mass() / (4.0 * PI * f64::powi(r_shell, 3) * w_shell);
         let rho0 = 1.0;
         if r > r_shell && r < r_shell + r_shell * w_shell {
             primitive[0] = d_shell;
-            primitive[1] = v_shell * x / r;
-            primitive[2] = v_shell * z / r;
+            primitive[1] = v_shell * (x - x0) / r;
+            primitive[2] = v_shell * (z - z0) / r;
             primitive[3] = d_shell * shell_temperature;
             primitive[4] = 1.0;
         } else {
@@ -258,8 +262,8 @@ impl Setup for Kilonova {
         Mesh::Structured(StructuredMesh {
             x0: 0.0,
             y0: self.domain_base,
-            ni: resolution as i64,
-            nj: resolution as i64 * 2,
+            ni: resolution as i64 / 2,
+            nj: resolution as i64,
             dx: self.domain_height / resolution as f64,
             dy: self.domain_height / resolution as f64,
         })
