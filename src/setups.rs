@@ -3,7 +3,10 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::{BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel, StructuredMesh};
+use crate::{
+    BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
+    StructuredMesh,
+};
 
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::fmt::Write;
@@ -164,16 +167,45 @@ impl Setup for Explosion {
     }
 }
 
-pub struct Kilonova;
+pub struct Kilonova {
+    domain_base: f64,
+    domain_height: f64,
+    explosion_altitude: f64,
+    deceleration_length: f64,
+    shell_mach: f64,
+}
 
 impl FromStr for Kilonova {
     type Err = error::Error;
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         if parameters.is_empty() {
-            Ok(Self)
+            Ok(Self {
+                domain_base: 1.0,
+                domain_height: 5.0,
+                explosion_altitude: 2.0,
+                deceleration_length: 0.1,
+                shell_mach: 10.0,
+            })
         } else {
             Err(InvalidSetup("setup does not take any parameters".into()))
         }
+    }
+}
+
+impl Kilonova {
+    fn shell_mass(&self) -> f64 {
+        use std::f64::consts::PI;
+        let z0 = self.explosion_altitude;
+        let dl = self.deceleration_length;
+        let rho0 = 1.0;
+        let b = 1.0;
+
+        4.0 * PI
+            * rho0
+            * b
+            * f64::exp(-z0 / b)
+            * (-2.0 * b * b - 2.0 * b * z0 - z0 * z0
+                + f64::exp(dl / b) * (2.0 * b * b + (dl - z0).powi(2) + 2.0 * b * (z0 - dl)))
     }
 }
 
@@ -190,32 +222,47 @@ impl Setup for Kilonova {
     // 1 unit of time     = 100 000 yr
     // 1 unit of mass     = 10M solar masses
 
-    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
-        let scale_height: f64 = 0.25;
-        let euler_n: f64 = 2.7183;
-        if (0.0085 < (x * x + y * y).sqrt()) & ((x * x + y * y).sqrt() < 0.01) {
-            primitive[0] = 10.0;
-            primitive[1] = 0.25 * x / (x * x + y * y).sqrt();
-            primitive[2] = 0.25 * y / (x * x + y * y).sqrt();
-            primitive[3] = 0.1;
+    fn initial_primitive(&self, x: f64, z: f64, primitive: &mut [f64]) {
+        use std::f64::consts::PI;
+        let g = 1.0; // euler_rz solver hard-codes little-g = 1.0
+        let r = (x * x + (z - self.explosion_altitude).powi(2)).sqrt();
+        let scale_height = 1.0;
+        let shell_temperature = 1e-2;
+        let w_shell = 0.1; // dr_shell / r
+        let r_shell = 0.1;
+        let v_shell = self.shell_mach * (g * self.explosion_altitude).sqrt();
+        let d_shell = self.shell_mass() / (4.0 * PI * f64::powi(r_shell, 3) * w_shell);
+        let rho0 = 1.0;
+        if r > r_shell && r < r_shell + r_shell * w_shell {
+            primitive[0] = d_shell;
+            primitive[1] = v_shell * x / r;
+            primitive[2] = v_shell * z / r;
+            primitive[3] = d_shell * shell_temperature;
             primitive[4] = 1.0;
         } else {
-            primitive[0] = 0.1 * euler_n.powf(-(y + 0.5) / scale_height);
+            primitive[0] = rho0 * f64::exp(-z / scale_height);
             primitive[1] = 0.0;
             primitive[2] = 0.0;
-            primitive[3] = 0.1 * scale_height * euler_n.powf(-(y + 0.5) / scale_height);
+            primitive[3] = rho0 * f64::exp(-z / scale_height) * scale_height * g;
             primitive[4] = 0.0;
         }
     }
 
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
-            gamma_law_index: 5.0 / 3.0
+            gamma_law_index: 5.0 / 3.0,
         }
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::Structured(StructuredMesh::left_aligned_square(0.1, resolution))
+        Mesh::Structured(StructuredMesh {
+            x0: 0.0,
+            y0: self.domain_base,
+            ni: resolution as i64,
+            nj: resolution as i64 * 2,
+            dx: self.domain_height / resolution as f64,
+            dy: self.domain_height / resolution as f64,
+        })
     }
 
     fn coordinate_system(&self) -> Coordinates {
@@ -256,8 +303,8 @@ impl FromStr for Binary {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sradius1, sradius2) =
-            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+        let (sradius1, sradius2) = crate::parse::parse_pair(form.get("sink_radius").into(), ',')
+            .map_err(ParseFloatError)?;
 
         let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
@@ -290,7 +337,10 @@ impl Setup for Binary {
                 self.form.about(&key)
             );
         }
-        println!("sink radii are [{}, {}]", self.sink_radius1, self.sink_radius2);
+        println!(
+            "sink radii are [{}, {}]",
+            self.sink_radius1, self.sink_radius2
+        );
         println!("sink rates are [{}, {}]", self.sink_rate1, self.sink_rate2);
     }
 
@@ -313,7 +363,7 @@ impl Setup for Binary {
     #[allow(clippy::many_single_char_names)]
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let r = (x * x + y * y).sqrt();
-        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt();//use primary sink radius for both masses
+        let rs = (x * x + y * y + self.sink_radius1.powf(2.0)).sqrt(); //use primary sink radius for both masses
         let phi_hat_x = -y / r.max(1e-12);
         let phi_hat_y = x / r.max(1e-12);
         let d = 1.0;
@@ -429,8 +479,8 @@ impl FromStr for BinaryWithThermodynamics {
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
-        let (sradius1, sradius2) =
-            crate::parse::parse_pair(form.get("sink_radius").into(), ',').map_err(ParseFloatError)?;
+        let (sradius1, sradius2) = crate::parse::parse_pair(form.get("sink_radius").into(), ',')
+            .map_err(ParseFloatError)?;
 
         let (srate1, srate2) =
             crate::parse::parse_pair(form.get("sink_rate").into(), ',').map_err(ParseFloatError)?;
