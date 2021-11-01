@@ -72,13 +72,13 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
     real kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
     real thermal_energy = energy - kinetic_energy;
     real pressure = thermal_energy * (ADIABATIC_GAMMA - 1.0);
-    real scalar_density = cons[4];
+    real scalar_concentration = cons[4] / rho;
 
     prim[0] = rho;
     prim[1] = vx;
     prim[2] = vy;
     prim[3] = pressure;
-    prim[4] = scalar_density;
+    prim[4] = scalar_concentration;
 }
 
 static __host__ __device__ void primitive_to_conserved(const real *prim, real *cons)
@@ -91,13 +91,13 @@ static __host__ __device__ void primitive_to_conserved(const real *prim, real *c
     real py = vy * rho;
     real kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
     real thermal_energy = pressure / (ADIABATIC_GAMMA - 1.0);
-    real scalar_density = prim[4];
+    real scalar_concentration = prim[4];
 
     cons[0] = rho;
     cons[1] = px;
     cons[2] = py;
     cons[3] = kinetic_energy + thermal_energy;
-    cons[4] = scalar_density;
+    cons[4] = scalar_concentration * rho;
 }
 
 static __host__ __device__ real primitive_to_velocity(const real *prim, int direction)
@@ -118,13 +118,40 @@ static __host__ __device__ void primitive_to_flux(
 {
     real vn = primitive_to_velocity(prim, direction);
     real pressure = prim[3];
-    real scalar_density = prim[4];
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pressure * (direction == 0);
     flux[2] = vn * cons[2] + pressure * (direction == 1);
     flux[3] = vn * cons[3] + pressure * vn;
     flux[4] = vn * cons[4];
+}
+
+static __host__ __device__ real primitive_to_a_star(const real *pl, const real *pr, const real am, const real ap, int direction)
+{
+    switch (direction)
+    {
+        case 0: return (pr[3] - pl[3] + pl[0] * pl[1] * (am - pl[1]) - pr[0] * pr[1] * (ap - pr[1])) / (pl[0] * (am - pl[1]) - pr[0] * (ap - pr[1]));
+        case 1: return (pr[3] - pl[3] + pl[0] * pl[2] * (am - pl[2]) - pr[0] * pr[2] * (ap - pr[2])) / (pl[0] * (am - pl[2]) - pr[0] * (ap - pr[2]));
+        default: return 0.0;
+    }
+}
+
+static __host__ __device__ void primitive_to_flux_star(const real *pl, const real *ul, const real *pr, const real *ur, const real *fl, const real *fr, real *fl_star, real *fr_star, const real am, const real ap, const real a_star, int direction)
+{
+    real d_star[4]  = {0.0, 0.0, 0.0, a_star};
+
+    d_star[direction + 1] = 1.0;
+
+    real vnl = primitive_to_velocity(pl, direction);
+    real vnr = primitive_to_velocity(pr, direction);
+
+    for (int q = 0; q < (NCONS-1); ++q)
+    {
+        fl_star[q] = (a_star * (am * ul[q] - fl[q]) + am * (pl[3] + pl[0] * (am - vnl) * (a_star - vnl)) * d_star[q]) / (am - a_star);
+        fr_star[q] = (a_star * (ap * ur[q] - fr[q]) + ap * (pr[3] + pr[0] * (ap - vnr) * (a_star - vnr)) * d_star[q]) / (ap - a_star);
+    }
+    fl_star[4] = (a_star * (am * ul[0] - fl[0])) * pl[4] / (am - a_star);
+    fr_star[4] = (a_star * (ap * ur[0] - fr[0])) * pr[4] / (ap - a_star);
 }
 
 static __host__ __device__ void primitive_to_outer_wavespeeds(
@@ -177,7 +204,7 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     primitive_to_outer_wavespeeds(pl, al, direction);
     primitive_to_outer_wavespeeds(pr, ar, direction);
 
-    const real am = min3(0.0, al[0], ar[0]);
+    const real am = min3(0.0, al[0], ar[0]); //Torro refers to am as Sl, ap as Sr
     const real ap = max3(0.0, al[1], ar[1]);
 
     for (int q = 0; q < NCONS; ++q)
@@ -186,24 +213,44 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     }
 }
 
-//static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, real *flux, int direction)
-//{
-//    real ul[NCONS];
-//    real ur[NCONS];
-//    real fl[NCONS];
-//    real fr[NCONS];
-//    real al[2];
-//    real ar[2];
-//    real astar[2];
-//    real fstar[NCONS];
-//
-//    primitive_to_conserved(pl, ul);
-//    primitive_to_conserved(pr, ur);
-//    primitive_to_flux(pl, ul, fl, direction);
-//    primitive_to_flux(pr, ur, fr, direction);
-//    primitive_to_outer_wavespeeds(pl, al, direction);
-//    primitive_to_outer_wavespeeds(pr, ar, direction);
-//}
+static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, real *flux, int direction)
+{
+    real ul[NCONS];
+    real ur[NCONS];
+    real fl[NCONS];
+    real fr[NCONS];
+    real al[2];
+    real ar[2];
+
+    real fl_star[NCONS];
+    real fr_star[NCONS];
+
+    primitive_to_conserved(pl, ul);
+    primitive_to_conserved(pr, ur);
+    primitive_to_flux(pl, ul, fl, direction);
+    primitive_to_flux(pr, ur, fr, direction);
+    primitive_to_outer_wavespeeds(pl, al, direction);
+    primitive_to_outer_wavespeeds(pr, ar, direction);
+
+    const real am = min3(0.0, al[0], ar[0]); //Torro refers to am as Sl, ap as Sr
+    const real ap = max3(0.0, al[1], ar[1]);
+
+    real a_star = primitive_to_a_star(pl, pr, am, ap, direction);
+    primitive_to_flux_star(pl, ul, pr, ur, fl, fr, fl_star, fr_star, am, ap, a_star, direction);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        if (0 <= am) {
+          flux[q] = fl[q];
+        } else if ((am <= 0) && (0 < a_star)) {
+          flux[q] = fl_star[q];
+        } else if ((a_star <= 0) && (0 < ap)) {
+          flux[q] = fr_star[q];
+        } else {
+          flux[q] = fr[q];
+        }
+    }
+}
 
 
 // ============================ PATCH =========================================

@@ -186,24 +186,24 @@ impl Setup for Kilonova {
         "euler_rz".to_owned()
     }
 
-    // 1 unit of position = 1 kpc
-    // 1 unit of time = 0.1 Myr
-    // 1 unit of mass = 10M solar masses
+    // 1 unit of position = 100 pc
+    // 1 unit of time     = 100 000 yr
+    // 1 unit of mass     = 10M solar masses
 
     fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) {
         let scale_height: f64 = 0.25;
         let euler_n: f64 = 2.7183;
-        if (0.002 < (x * x + y * y).sqrt()) & ((x * x + y * y).sqrt() < 0.004) {
-            primitive[0] = 100.0;
-            primitive[1] = 5.0 * x / (x * x + y * y).sqrt();
-            primitive[2] = 5.0 * y / (x * x + y * y).sqrt();
-            primitive[3] = 1.0;
+        if (0.0085 < (x * x + y * y).sqrt()) & ((x * x + y * y).sqrt() < 0.01) {
+            primitive[0] = 10.0;
+            primitive[1] = 0.25 * x / (x * x + y * y).sqrt();
+            primitive[2] = 0.25 * y / (x * x + y * y).sqrt();
+            primitive[3] = 0.1;
             primitive[4] = 1.0;
         } else {
-            primitive[0] = 1.0 * euler_n.powf(-(y + 0.25) / scale_height);
+            primitive[0] = 0.1 * euler_n.powf(-(y + 0.5) / scale_height);
             primitive[1] = 0.0;
             primitive[2] = 0.0;
-            primitive[3] = scale_height * euler_n.powf(-(y + 0.25) / scale_height);
+            primitive[3] = 0.1 * scale_height * euler_n.powf(-(y + 0.5) / scale_height);
             primitive[4] = 0.0;
         }
     }
@@ -215,7 +215,7 @@ impl Setup for Kilonova {
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::Structured(StructuredMesh::left_aligned_square(0.25, resolution))
+        Mesh::Structured(StructuredMesh::left_aligned_square(0.1, resolution))
     }
 
     fn coordinate_system(&self) -> Coordinates {

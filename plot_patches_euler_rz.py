@@ -4,7 +4,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 import msgpack
 
-plt.figure(figsize=(8, 12), dpi=80)
+plt.figure(figsize=(8, 12), dpi=150)
 
 for i in range(500):
     if i > 99:
@@ -23,6 +23,6 @@ for i in range(500):
         j1 = patch['rect'][1]['end']
         local_prim = np.array(np.frombuffer(patch['data'])).reshape([i1 - i0, j1 - j0, 5])
         prim[i0:i1, j0:j1] = local_prim
-    plt.imshow(prim[:,:,0].T, origin='lower', extent=[0, 0.25, 0.0, 0.5], vmin=0.0, vmax=1.5)
+    plt.imshow(prim[:,:,4].T, origin='lower', extent=[0, 1, -1, 1], vmin=0.0, vmax=1.0)
     plt.savefig('figures/Figure%d.png' %i)
     plt.clf()
