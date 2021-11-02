@@ -273,23 +273,18 @@ static __host__ __device__ void add_geometric_source_terms(enum Coordinates coor
     }
 }
 
-static __host__ __device__ void add_cooling_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source, real cooling_strength)
+static __host__ __device__ void add_cooling_source_terms(enum Coordinates coords, real r0, real r1, const real *prim, real *source, real cooling_strength)
 {
-    double rho = prim[0];
-    double u = prim[1];
-    double p = prim[2];
-    double c = 1.0;
-    double t_expansion = x0 / c;
-    double cooling_rate = cooling_strength / t_expansion;
-    double vol_cell = cell_volume(coords, x0, x1);
-    double gamma = sqrt(u * u + 1.0);
-    double gm = ADIABATIC_GAMMA;
-    double e = p / (rho * (gm - 1.0));
-    double e_dot = -e * cooling_rate;
-    double h_dot = e_dot * gm;
+    real dv = cell_volume(coords, r0, r1);
+    real r = 0.5 * (r0 + r1); // this expression only makes sense in spherical coordinates
+    real internal_energy_per_volume = prim[2] / (ADIABATIC_GAMMA - 1.0);
+    real u1 = prim[1];
+    real u0 = sqrt(u1 * u1 + 1.0);
 
-    source[1] += rho * h_dot * u * gamma * vol_cell;
-    source[2] += rho * h_dot * u * u * vol_cell;
+    real comoving_cooling_rate = cooling_strength / r / u0;
+    real comoving_luminosity_per_volume = internal_energy_per_volume * comoving_cooling_rate;
+    source[1] -= dv * comoving_luminosity_per_volume * u1;
+    source[2] -= dv * comoving_luminosity_per_volume * u0;
 }
 
 
