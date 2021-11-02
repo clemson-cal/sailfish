@@ -29,6 +29,7 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
         ("isentropic-vortex", setup_builder!(IsentropicVortex)),
+        ("keplerian-disk", setup_builder!(KeplerianDisk)),
         ("wind", setup_builder!(Wind)),
     ]
 }
@@ -267,6 +268,125 @@ impl Setup for IsentropicVortex {
         }
     }
 
+    fn primitive_to_conserved(&self, prim: &[f64], cons: &mut [f64]) {
+        euler2d_dg::primitive_to_conserved(prim, cons, self.gamma_law_index)
+    }
+}
+
+pub struct KeplerianDisk {
+    pub gamma_law_index: f64,
+    pub dg_order: i64,
+    pub solver_type: String,
+    form: kind_config::Form,
+}
+
+impl FromStr for KeplerianDisk {
+    type Err = error::Error;
+
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        #[rustfmt::skip]
+        let form = kind_config::Form::new()
+            .item("gamma_law_index", 5.0/3.0, "Adiabatic index of gas")
+            .item("solver_type","euler2d_dg", "Solver type [euler2d_dg|euler2d]")
+            .item("dg_order",              2, "Spatial order if using DG scheme")
+            .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        Ok(Self {
+            gamma_law_index: form.get("gamma_law_index").into(),
+            dg_order: form.get("dg_order").into(),
+            solver_type: form.get("solver_type").into(),
+            form,
+        })
+    }
+}
+
+impl Setup for KeplerianDisk {
+    fn num_primitives(&self) -> usize {
+        4
+    }
+    fn print_parameters(&self) {
+        for key in self.form.sorted_keys() {
+            println!(
+                "{:.<20} {:<10} {}",
+                key,
+                self.form.get(&key),
+                self.form.about(&key)
+            );
+        }
+        if self.solver_type.eq("euler2d_dg") {
+            println!("DG order is {}", self.dg_order)
+        };
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
+    fn solver_name(&self) -> String {
+        self.solver_type.to_owned()
+    }
+
+    fn initial_primitive(&self, x: f64, y: f64, primitive: &mut [f64]) { 
+        //Schaal+(2015) Sec. 5.5
+        let r = (x * x + y * y).sqrt();
+
+        let deltar = 0.1;
+        let rho0  = 1e-5;
+        let rhod  = 1.0;
+        let p0    = 1e-5;
+
+        if r < 0.5 - 0.5 * deltar {
+            primitive[0] = rho0;     
+        }
+        else if r > 0.5 - 0.5 * deltar && r < 0.5 + 0.5 * deltar {
+            primitive[0] = rho0 + (rhod-rho0)/deltar*(r-(0.5-0.5*deltar));
+        }
+        else if r > 0.5 + 0.5 * deltar && r < 2.0 - 0.5 * deltar {
+            primitive[0] = rhod;
+        }
+        else if r > 2.0 - 0.5 * deltar && r < 2.0 + 0.5 * deltar {
+            primitive[0] = rhod + (rho0-rhod)/deltar*(r-(2.0-0.5*deltar));
+        }
+        else {
+            primitive[0] = rho0;
+        }
+
+        if r > 0.5 - 2.0 * deltar && r < 2.0 + 2.0 * deltar {
+            primitive[1] = -y/r.powf(1.5);
+            primitive[2] =  x/r.powf(1.5);
+        } else {
+            primitive[1] = 0.0;
+            primitive[2] = 0.0;            
+        }
+
+        primitive[3] = p0;
+    }
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::GammaLaw {
+            gamma_law_index: self.gamma_law_index,
+        }
+    }
+    fn mesh(&self, resolution: u32) -> Mesh {
+        Mesh::Structured(StructuredMesh::centered_square(3.0, resolution))
+    }
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+    fn dg_cell(&self) -> Option<crate::node_2d::Cell> {
+        if self.solver_type.eq("euler2d_dg") {
+            Some(crate::node_2d::Cell::new(self.dg_order as usize))
+        } else {
+            None
+        }
+    }
+    fn end_time(&self) -> Option<f64> {
+        Some(0.2)
+    }
     fn primitive_to_conserved(&self, prim: &[f64], cons: &mut [f64]) {
         euler2d_dg::primitive_to_conserved(prim, cons, self.gamma_law_index)
     }
