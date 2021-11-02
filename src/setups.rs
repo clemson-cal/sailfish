@@ -3,10 +3,7 @@
 use crate::error::{self, Error::*};
 use crate::lookup_table::LookupTable;
 use crate::mesh::Mesh;
-use crate::{
-    BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel,
-    StructuredMesh,
-};
+use crate::{BoundaryCondition, Coordinates, EquationOfState, PointMass, PointMassList, Setup, SinkModel, StructuredMesh, euler2d_dg};
 use kepler_two_body::{OrbitalElements, OrbitalState};
 use std::f64::consts::PI;
 use std::fmt::Write;
@@ -200,6 +197,7 @@ impl Setup for IsentropicVortex {
     fn num_primitives(&self) -> usize {
         4
     }
+
     fn print_parameters(&self) {
         for key in self.form.sorted_keys() {
             println!(
@@ -242,17 +240,25 @@ impl Setup for IsentropicVortex {
         primitive[2] = vy + vb;
         primitive[3] = pressure;
     }
+
     fn equation_of_state(&self) -> EquationOfState {
         EquationOfState::GammaLaw {
             gamma_law_index: self.gamma_law_index,
         }
     }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(1.0, resolution))
     }
+
     fn coordinate_system(&self) -> Coordinates {
         Coordinates::Cartesian
     }
+
+    fn end_time(&self) -> Option<f64> {
+        Some(0.2)
+    }
+
     fn dg_cell(&self) -> Option<crate::node_2d::Cell> {
         if self.solver_type.eq("euler2d_dg") {
             Some(crate::node_2d::Cell::new(self.dg_order as usize))
@@ -260,24 +266,9 @@ impl Setup for IsentropicVortex {
             None
         }
     }
-    fn end_time(&self) -> Option<f64> {
-        Some(0.2)
-    }
+
     fn primitive_to_conserved(&self, prim: &[f64], cons: &mut [f64]) {
-        let rho = prim[0];
-        let vx = prim[1];
-        let vy = prim[2];
-        let pre = prim[3];
-
-        let px = vx * rho;
-        let py = vy * rho;
-        let kinetic_energy = 0.5 * rho * (vx * vx + vy * vy);
-        let thermal_energy = pre / (self.gamma_law_index - 1.0);
-
-        cons[0] = rho;
-        cons[1] = px;
-        cons[2] = py;
-        cons[3] = kinetic_energy + thermal_energy;
+        euler2d_dg::primitive_to_conserved(prim, cons, self.gamma_law_index)
     }
 }
 

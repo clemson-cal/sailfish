@@ -144,47 +144,14 @@ static __host__ __device__ real primitive_max_wavespeed(const real *prim)
     return max2(ax, ay);
 }
 
-// static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, int direction)
-// {
-//     real ul[4];
-//     real ur[4];
-//     real fl[4];
-//     real fr[4];
-//     real al[2];
-//     real ar[2];
-
-//     primitive_to_conserved(pl, ul);
-//     primitive_to_conserved(pr, ur);
-//     primitive_to_flux(pl, ul, fl, direction);
-//     primitive_to_flux(pr, ur, fr, direction);
-//     primitive_to_outer_wavespeeds(pl, al, direction);
-//     primitive_to_outer_wavespeeds(pr, ar, direction);
-
-//     const real am = min2(0.0, min2(al[0], ar[0]));
-//     const real ap = max2(0.0, max2(al[1], ar[1]));
-
-//     for (int q = 0; q < NCONS; ++q)
-//     {
-//         flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
-//     }
-// }
-
-static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, real *flux, int direction)
+static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, real *flux, int direction)
 {
-    enum { d, px, py, e }; // Conserved
-    enum { rho, vx, vy, p }; // Primitive
-
-    real ul[NCONS];
-    real ur[NCONS];
-    real ulstar[NCONS];
-    real urstar[NCONS];
-    real fl[NCONS];
-    real fr[NCONS];
+    real ul[4];
+    real ur[4];
+    real fl[4];
+    real fr[4];
     real al[2];
     real ar[2];
-
-    const real vnl = primitive_to_velocity_component(pl, direction);
-    const real vnr = primitive_to_velocity_component(pr, direction);
 
     primitive_to_conserved(pl, ul);
     primitive_to_conserved(pr, ur);
@@ -193,33 +160,68 @@ static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, rea
     primitive_to_outer_wavespeeds(pl, al, direction);
     primitive_to_outer_wavespeeds(pr, ar, direction);
 
-    const real am = min3(0.0, al[0], ar[0]);
-    const real ap = max3(0.0, al[1], ar[1]);
+    const real am = min2(0.0, min2(al[0], ar[0]));
+    const real ap = max2(0.0, max2(al[1], ar[1]));
 
-    real lc = (
-        + (pr[p] - pr[rho] * vnr * (ap - vnr))
-        - (pl[p] - pl[rho] * vnl * (am - vnl))) / (pl[rho] * (am - vnl) - pr[rho] * (ap - vnr));
-
-    real ffl = pl[rho] * (am - vnl) / (am - lc);
-    real ffr = pr[rho] * (ap - vnr) / (ap - lc);
-
-    ulstar[d] = ffl;
-    ulstar[e] = ffl * (ul[e] / pl[rho] + (lc - vnl) * (lc + pl[p] / (pl[rho] * (am - vnl))));
-    ulstar[px] = ffl * ((lc - vnl) * (direction == 0) + pl[vx]);
-    ulstar[py] = ffl * ((lc - vnl) * (direction == 1) + pl[vy]);
-
-    urstar[d] = ffr;
-    urstar[e] = ffr * (ur[e] / pr[rho] + (lc - vnl) * (lc + pr[p] / (pr[rho] * (ap - vnl))));
-    urstar[px] = ffr * ((lc - vnl) * (direction == 0) + pl[vx]);
-    urstar[py] = ffr * ((lc - vnl) * (direction == 1) + pl[vy]);
-
-    const real s = 0.0; // stationary face s = x / t
-
-    if      (s  <= am)          for (int i = 0; i < NCONS; ++i) flux[i] = fl[i];
-    else if (am < s && s <= lc) for (int i = 0; i < NCONS; ++i) flux[i] = fl[i] + am * (ulstar[i] - ul[i]);
-    else if (lc < s && s <= ap) for (int i = 0; i < NCONS; ++i) flux[i] = fr[i] + ap * (urstar[i] - ur[i]);
-    else if (ap < s)            for (int i = 0; i < NCONS; ++i) flux[i] = fr[i];
+    for (int q = 0; q < NCONS; ++q)
+    {
+        flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+    }
 }
+
+// static __host__ __device__ void riemann_hllc(const real *pl, const real *pr, real *flux, int direction)
+// {
+//     enum { d, px, py, e }; // Conserved
+//     enum { rho, vx, vy, p }; // Primitive
+
+//     real ul[NCONS];
+//     real ur[NCONS];
+//     real ulstar[NCONS];
+//     real urstar[NCONS];
+//     real fl[NCONS];
+//     real fr[NCONS];
+//     real al[2];
+//     real ar[2];
+
+//     const real vnl = primitive_to_velocity_component(pl, direction);
+//     const real vnr = primitive_to_velocity_component(pr, direction);
+
+//     primitive_to_conserved(pl, ul);
+//     primitive_to_conserved(pr, ur);
+//     primitive_to_flux(pl, ul, fl, direction);
+//     primitive_to_flux(pr, ur, fr, direction);
+//     primitive_to_outer_wavespeeds(pl, al, direction);
+//     primitive_to_outer_wavespeeds(pr, ar, direction);
+
+//     const real am = min3(0.0, al[0], ar[0]);
+//     const real ap = max3(0.0, al[1], ar[1]);
+
+//     REVIEW THE FORMULAS BELOW (maybe typos?):
+//     
+//     real lc = (
+//         + (pr[p] - pr[rho] * vnr * (ap - vnr))
+//         - (pl[p] - pl[rho] * vnl * (am - vnl))) / (pl[rho] * (am - vnl) - pr[rho] * (ap - vnr));
+
+//     real ffl = pl[rho] * (am - vnl) / (am - lc);
+//     real ffr = pr[rho] * (ap - vnr) / (ap - lc);
+
+//     ulstar[d] = ffl;
+//     ulstar[e] = ffl * (ul[e] / pl[rho] + (lc - vnl) * (lc + pl[p] / (pl[rho] * (am - vnl))));
+//     ulstar[px] = ffl * ((lc - vnl) * (direction == 0) + pl[vx]);
+//     ulstar[py] = ffl * ((lc - vnl) * (direction == 1) + pl[vy]);
+
+//     urstar[d] = ffr;
+//     urstar[e] = ffr * (ur[e] / pr[rho] + (lc - vnl) * (lc + pr[p] / (pr[rho] * (ap - vnl))));
+//     urstar[px] = ffr * ((lc - vnl) * (direction == 0) + pl[vx]);
+//     urstar[py] = ffr * ((lc - vnl) * (direction == 1) + pl[vy]);
+
+//     const real s = 0.0; // stationary face s = x / t
+
+//     if      (s  <= am)          for (int i = 0; i < NCONS; ++i) flux[i] = fl[i];
+//     else if (am < s && s <= lc) for (int i = 0; i < NCONS; ++i) flux[i] = fl[i] + am * (ulstar[i] - ul[i]);
+//     else if (lc < s && s <= ap) for (int i = 0; i < NCONS; ++i) flux[i] = fr[i] + ap * (urstar[i] - ur[i]);
+//     else if (ap < s)            for (int i = 0; i < NCONS; ++i) flux[i] = fr[i];
+// }
 
 // ============================ PATCH =========================================
 // ============================================================================
@@ -349,10 +351,10 @@ static __host__ __device__ void advance_rk_zone_dg(
         conserved_to_primitive(urjm, prjm);
         conserved_to_primitive(urjp, prjp);
 
-        riemann_hllc(plim, plip, fli, 0);
-        riemann_hllc(prim, prip, fri, 0);
-        riemann_hllc(pljm, pljp, flj, 1);
-        riemann_hllc(prjm, prjp, frj, 1);
+        riemann_hlle(plim, plip, fli, 0);
+        riemann_hlle(prim, prip, fri, 0);
+        riemann_hlle(pljm, pljp, flj, 1);
+        riemann_hlle(prjm, prjp, frj, 1);
 
         for (int q = 0; q < NCONS; ++q)
         {
