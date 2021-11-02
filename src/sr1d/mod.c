@@ -22,7 +22,7 @@
 
 // ============================ PHYSICS =======================================
 // ============================================================================
-#define NCONS 3
+#define NCONS 4
 #define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
 
@@ -131,6 +131,7 @@ static __host__ __device__ void conserved_to_primitive(const real *cons, real *p
     prim[0] = m / w0;
     prim[1] = w0 * cons[1] / dv / (tau + m + p);
     prim[2] = p;
+    prim[3] = cons[3] / cons[0];
 
     real mach_ceiling = 1000.0;
     real u = prim[1];
@@ -160,16 +161,19 @@ static __device__ __host__ void primitive_to_conserved(const real *prim, real *c
     cons[0] = dv * m;
     cons[1] = dv * m * h * u1;
     cons[2] = dv * m * (h * w - 1.0) - dv * pre;
+    cons[3] = dv * m * prim[3];
 }
 
 static __host__ __device__ void primitive_to_flux(const real *prim, const real *cons, real *flux)
 {
     const real vn = primitive_to_beta_component(prim);
     const real pre = prim[2];
+    const real s = prim[3]; // scalar concentration
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pre;
     flux[2] = vn * cons[2] + pre * vn;
+    flux[3] = vn * cons[0] * s;
 }
 
 static __host__ __device__ real primitive_to_sound_speed_squared(const real *prim)
@@ -212,19 +216,22 @@ static __host__ __device__ void riemann_hlle(const real *pl, const real *pr, rea
     const real am = min2(al[0], ar[0]);
     const real ap = max2(al[1], ar[1]);
 
-    if (v_face < am) {
+    if (v_face < am)
+    {
         for (int q = 0; q < NCONS; ++q)
         {
             flux[q] = fl[q] - v_face * ul[q];
         }
     }
-    else if (v_face > ap) {
+    else if (v_face > ap)
+    {
         for (int q = 0; q < NCONS; ++q)
         {
             flux[q] = fr[q] - v_face * ur[q];
         }
     }
-    else {
+    else
+    {
         for (int q = 0; q < NCONS; ++q)
         {
             real u_hll = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
@@ -255,55 +262,35 @@ static __host__ __device__ real cell_volume(enum Coordinates coords, real x0, re
     return 0.0;
 }
 
-static __host__ __device__ void geometric_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source)
+static __host__ __device__ void add_geometric_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source)
 {
     switch (coords) {
-        case SphericalPolar: {
-            double p = prim[2];
-            source[0] = 0.0;
-            source[1] = p * (x1 * x1 - x0 * x0);
-            source[2] = 0.0;
+        case SphericalPolar:
+            source[1] += prim[2] * (x1 * x1 - x0 * x0);
             break;
-        }
-        default: {
-            source[0] = 0.0;
-            source[1] = 0.0;
-            source[2] = 0.0;
-        }
+        default:
+            break;
     }
 }
 
-static __host__ __device__ void cooling_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source)
+static __host__ __device__ void add_cooling_source_terms(enum Coordinates coords, real x0, real x1, const real *prim, real *source, real cooling_strength)
 {
-    switch (coords) {
-        case SphericalPolar: {
-            double rho = prim[0];
-            double u = prim[1];
-            double p = prim[2];
-            double c = 1.0;
-            double t_expansion = x0 / c;
-            double cooling_strength = 5.0;
-            double cooling_rate = cooling_strength / t_expansion;
-            double vol_cell = cell_volume(coords, x0, x1);
-            double gamma = sqrt(u * u + 1.0);
-            double gm = ADIABATIC_GAMMA;
-            double e = p / (rho * (gm - 1.0));
-            double e_dot = -e * cooling_rate;
-            double h_dot = e_dot * gm;
+    double rho = prim[0];
+    double u = prim[1];
+    double p = prim[2];
+    double c = 1.0;
+    double t_expansion = x0 / c;
+    double cooling_rate = cooling_strength / t_expansion;
+    double vol_cell = cell_volume(coords, x0, x1);
+    double gamma = sqrt(u * u + 1.0);
+    double gm = ADIABATIC_GAMMA;
+    double e = p / (rho * (gm - 1.0));
+    double e_dot = -e * cooling_rate;
+    double h_dot = e_dot * gm;
 
-            source[0] = 0.0;
-            source[1] = p * (x1 * x1 - x0 * x0) + rho * h_dot * u * gamma * vol_cell; //rho*h_dot(gamma e_dot)*gamma^2*beta + geometric source
-            source[2] = rho * h_dot * (gamma*gamma - 1.0) * vol_cell; //rho*h_dot*(gamma*gamma - 1.0)
-            break;
-        }
-        default: {
-            source[0] = 0.0;
-            source[1] = 0.0;
-            source[2] = 0.0;
-        }
-    }
+    source[1] += rho * h_dot * u * gamma * vol_cell;
+    source[2] += rho * h_dot * u * u * vol_cell;
 }
-
 
 
 // ============================ PATCH =========================================
@@ -382,6 +369,7 @@ static __host__ __device__ void advance_rk_zone(
     struct Patch conserved_wr,
     struct BoundaryCondition bc,
     enum Coordinates coords,
+    real cooling_strength,
     real a0,
     real adot,
     real t,
@@ -433,14 +421,14 @@ static __host__ __device__ void advance_rk_zone(
 
     real fli[NCONS];
     real fri[NCONS];
-    real sources[NCONS];
+    real sources[NCONS] = {0.0, 0.0, 0.0, 0.0};
     real dal = face_area(coords, xl);
     real dar = face_area(coords, xr);
 
     riemann_hlle(plim, plip, yl * adot, fli);
     riemann_hlle(prim, prip, yr * adot, fri);
-    // geometric_source_terms(coords, xl, xr, prd, sources);
-    cooling_source_terms(coords, xl, xr, prd, sources);
+    add_geometric_source_terms(coords, xl, xr, prd, sources);
+    add_cooling_source_terms(coords, xl, xr, prd, sources, cooling_strength);
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -492,6 +480,7 @@ static void __global__ advance_rk_kernel(
     struct Patch conserved_wr,
     struct BoundaryCondition bc,
     enum Coordinates coords,
+    real cooling_strength,
     real a0,
     real adot,
     real t,
@@ -502,7 +491,7 @@ static void __global__ advance_rk_kernel(
 
     if (i < primitive_rd.count)
     {
-        advance_rk_zone(faces, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
+        advance_rk_zone(faces, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, cooling_strength, a0, adot, t, a, dt, i);
     }
 }
 
@@ -625,6 +614,7 @@ EXTERN_C void sr1d_conserved_to_primitive(
  * @param adot                   The expansion rate
  * @param a                      The RK averaging parameter
  * @param dt                     The time step
+ * @param cooling_strength       The cooling parameter (beta cooling; cooling_rate = cooling_strength / (r / c))
  * @param bc                     The boundary conditions type
  * @param coords                 The coordinate system
  * @param mode                   The execution mode
@@ -641,6 +631,7 @@ EXTERN_C void sr1d_advance_rk(
     real t,
     real a,
     real dt,
+    real cooling_strength,
     struct BoundaryCondition bc,
     enum Coordinates coords,
     enum ExecutionMode mode)
@@ -654,7 +645,7 @@ EXTERN_C void sr1d_advance_rk(
     switch (mode) {
         case CPU: {
             FOR_EACH(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, cooling_strength, a0, adot, t, a, dt, i);
             }
             break;
         }
@@ -662,7 +653,7 @@ EXTERN_C void sr1d_advance_rk(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
+                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, cooling_strength, a0, adot, t, a, dt, i);
             }
             #endif
             break;
@@ -672,7 +663,7 @@ EXTERN_C void sr1d_advance_rk(
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(256);
             dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt);
+            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, cooling_strength, a0, adot, t, a, dt);
             #endif
             break;
         }

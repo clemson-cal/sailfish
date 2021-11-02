@@ -2,6 +2,8 @@ use crate::error::Error;
 use crate::{BoundaryCondition, Coordinates, ExecutionMode, Setup, Solve};
 use cfg_if::cfg_if;
 
+static NUM_CONS: usize = 4; // [D, S, tau, D s]
+
 extern "C" {
     fn sr1d_primitive_to_conserved(
         num_zones: i32,
@@ -35,6 +37,7 @@ extern "C" {
         time: f64,
         a: f64,
         dt: f64,
+        cooling_strength: f64,
         boundary_condition: BoundaryCondition,
         coords: Coordinates,
         mode: ExecutionMode,
@@ -47,6 +50,7 @@ pub fn solver(
     faces: &[f64],
     primitive: &[f64],
     homologous_expansion: Option<(f64, f64)>,
+    cooling_strength: f64,
     boundary_condition: BoundaryCondition,
     coords: Coordinates,
     scale_factor: f64,
@@ -57,6 +61,7 @@ pub fn solver(
             faces,
             primitive,
             homologous_expansion,
+            cooling_strength,
             boundary_condition,
             coords,
             scale_factor,
@@ -68,6 +73,7 @@ pub fn solver(
                         faces,
                         primitive,
                         homologous_expansion,
+                        cooling_strength,
                         boundary_condition,
                         coords,
                         scale_factor)))
@@ -84,6 +90,7 @@ pub fn solver(
                         faces,
                         primitive,
                         homologous_expansion,
+                        cooling_strength,
                         boundary_condition,
                         coords,
                         scale_factor)?))
@@ -106,6 +113,7 @@ pub mod cpu {
         conserved2: Vec<f64>,
         conserved0: Vec<f64>,
         homologous_parameters: (f64, f64),
+        cooling_strength: f64,
         boundary_condition: BoundaryCondition,
         coords: Coordinates,
         pub(super) mode: ExecutionMode,
@@ -116,6 +124,7 @@ pub mod cpu {
             faces: &[f64],
             primitive: &[f64],
             homologous_parameters: (f64, f64),
+            cooling_strength: f64,
             boundary_condition: BoundaryCondition,
             coords: Coordinates,
             scale_factor: f64,
@@ -133,14 +142,15 @@ pub mod cpu {
                     ExecutionMode::CPU,
                 );
             }
-            assert_eq!(primitive.len(), num_zones * 3);
+            assert_eq!(primitive.len(), num_zones * NUM_CONS);
             Self {
                 faces: faces.to_vec(),
                 primitive1: primitive.to_vec(),
                 conserved1: conserved.clone(),
                 conserved2: conserved,
-                conserved0: vec![0.0; num_zones * 3],
+                conserved0: vec![0.0; num_zones * NUM_CONS],
                 homologous_parameters,
+                cooling_strength,
                 boundary_condition,
                 coords,
                 mode: ExecutionMode::CPU,
@@ -194,6 +204,7 @@ pub mod cpu {
                     time,
                     a,
                     dt,
+                    self.cooling_strength,
                     self.boundary_condition,
                     self.coords,
                     self.mode,
@@ -216,6 +227,7 @@ pub mod omp {
             faces: &[f64],
             primitive: &[f64],
             homologous_parameters: (f64, f64),
+            cooling_strength: f64,
             boundary_condition: BoundaryCondition,
             coords: Coordinates,
             scale_factor: f64,
@@ -224,6 +236,7 @@ pub mod omp {
                 faces,
                 primitive,
                 homologous_parameters,
+                cooling_strength,
                 boundary_condition,
                 coords,
                 scale_factor,
@@ -261,6 +274,7 @@ pub mod gpu {
         conserved1: DeviceBuffer<f64>,
         conserved2: DeviceBuffer<f64>,
         homologous_parameters: (f64, f64),
+        cooling_strength: f64,
         boundary_condition: BoundaryCondition,
         coords: Coordinates,
         device: Device,
@@ -272,12 +286,13 @@ pub mod gpu {
             faces: &[f64],
             primitive: &[f64],
             homologous_parameters: (f64, f64),
+            cooling_strength: f64,
             boundary_condition: BoundaryCondition,
             coords: Coordinates,
             scale_factor: f64,
         ) -> Result<Self, Error> {
             let num_zones = faces.len() - 1;
-            assert_eq!(primitive.len(), num_zones * 3);
+            assert_eq!(primitive.len(), num_zones * NUM_CONS);
 
             let mut conserved = vec![0.0; primitive.len()];
             unsafe {
@@ -301,6 +316,7 @@ pub mod gpu {
                 conserved1: device.buffer_from(&conserved),
                 conserved2: device.buffer_from(&conserved),
                 homologous_parameters,
+                cooling_strength,
                 boundary_condition,
                 coords,
                 device,
@@ -357,6 +373,7 @@ pub mod gpu {
                         time,
                         a,
                         dt,
+                        self.cooling_strength,
                         self.boundary_condition,
                         self.coords,
                         ExecutionMode::GPU,

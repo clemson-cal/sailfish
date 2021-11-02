@@ -309,6 +309,7 @@ fn launch_single_patch(
                 faces,
                 &state.primitive,
                 setup.homologous_mesh(),
+                setup.cooling_coefficient().unwrap_or(0.0),
                 setup.boundary_condition(),
                 setup.coordinate_system(),
                 setup.mesh_scale_factor(state.time),
