@@ -282,13 +282,13 @@ static __host__ __device__ void cooling_source_terms(enum Coordinates coords, re
             double p = prim[2];
             double c = 1.0;
             double t_expansion = x0 / c;
-            double cooling_strength = 1.0;
+            double cooling_strength = 5.0;
             double cooling_rate = cooling_strength / t_expansion;
             double vol_cell = cell_volume(coords, x0, x1);
             double gamma = sqrt(u * u + 1.0);
             double gm = ADIABATIC_GAMMA;
             double e = p / (rho * (gm - 1.0));
-            double e_dot = e * cooling_rate;
+            double e_dot = -e * cooling_rate;
             double h_dot = e_dot * gm;
 
             source[0] = 0.0;
