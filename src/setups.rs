@@ -769,12 +769,12 @@ impl Setup for PulseCollision {
 
 /// Collision of a fast shell with a wind-like target medium in spherical
 /// geometry.
-///
-/// The fluid is non-relativistic. The setup does not have runtime model
-/// parameters yet.
 pub struct FastShell {
     u_shell: f64,
-    cooling_strength: f64,
+    r_shell: f64,
+    r_outer: f64,
+    r_decel: f64,
+    cooling: f64,
     form: kind_config::Form,
 }
 
@@ -784,17 +784,36 @@ impl FromStr for FastShell {
 
         #[rustfmt::skip]
         let form = kind_config::Form::new()
-            .item("u_shell", 2.0, "radial four velocity of the launched shell")
-            .item("cooling_strength", 0.0, "cooling strength (rate = strength / t_expansion)")
+            .item("u_shell",   2.0, "radial four velocity of the launched shell")
+            .item("r_shell",  10.0, "the initial shell radius")
+            .item("r_outer", 100.0, "the outer domain boundary")
+            .item("r_decel", 100.0, "radius of shell deceleration (sets ambient density)")
+            .item("cooling",   0.0, "dimensionless cooling strength")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
         let setup = Self {
             u_shell: form.get("u_shell").into(),
-            cooling_strength: form.get("cooling_strength").into(),
+            r_shell: form.get("r_shell").into(),
+            r_outer: form.get("r_outer").into(),
+            r_decel: form.get("r_decel").into(),
+            cooling: form.get("cooling").into(),
             form,
         };
-        Ok(setup)
+
+        if false {
+            panic!()
+        } else if setup.u_shell < 0.0 {
+            Err(InvalidSetup(format!("u_shell must be >=0.0")))
+        } else if setup.r_shell < 1.0 {
+            Err(InvalidSetup(format!("r_shell must be >=1.0")))
+        } else if setup.r_shell > setup.r_outer {
+            Err(InvalidSetup(format!("r_shell must be <r_outer")))
+        } else if setup.r_shell >= setup.r_decel {
+            Err(InvalidSetup(format!("r_shell must be <r_decel")))
+        } else {
+            Ok(setup)
+        }
     }
 }
 
@@ -819,20 +838,15 @@ impl Setup for FastShell {
     }
 
     fn initial_primitive(&self, r: f64, _y: f64, primitive: &mut [f64]) {
-        // The deceleration radius is defined as the radius at which the shell
-        // will have transferred its kinetic energy to the ambient medium. In
-        // non-relativistic hydrodynamics, this is the radius the shell
-        // expands to when it as swept up its own mass. The shell width is dr,
-        // and its mass is roughly rho_1 * dr * 4 * pi * r^2. The deceleration
-        // radius is r_dec = dr * rho_1 / rho_0. For the fiducial setup below,
-        // r_dec is 100.
+        let m_shell: f64 = 1.0; // the shell mass (set to 1 without loss of generality)
+        let r_decel = self.r_decel;
+        let r_shell = self.r_shell;
+        let u_shell = self.u_shell;
+        let g_shell = (1.0 + u_shell.powi(2)).sqrt();
 
-        let r_shell = 10.0;
-        let dr = 1.0;
-        let rho_0 = 0.1;
-        let rho_1 = 1.0;
-        let u_0 = 0.001;
-        let u_max = self.u_shell;
+        let dr = 0.1 * r_shell;
+        let d_wind0 = m_shell / g_shell / r_shell.powi(3) / (r_decel / r_shell - 1.0);
+        let d_shell = m_shell / r_shell.powi(2) / dr;
 
         let prof = |r: f64| {
             if r > r_shell {
@@ -842,14 +856,14 @@ impl Setup for FastShell {
             }
         };
 
-        let rho_ambient = rho_0 * (r / r_shell).powi(-2);
-        let rho = rho_1 * prof(r) + rho_ambient;
-        let vel = u_0 + u_max * prof(r);
-        let pre = 1e-3 * rho_ambient;
+        let d_ambient = d_wind0 * (r / r_shell).powi(-2);
+        let d = d_shell * prof(r) + d_ambient;
+        let u = u_shell * prof(r) + 0.001;
+        let p = 1e-3 * d_ambient;
 
-        primitive[0] = rho;
-        primitive[1] = vel;
-        primitive[2] = pre;
+        primitive[0] = d;
+        primitive[1] = u;
+        primitive[2] = p;
         primitive[3] = 0.0; // passive scalar
     }
 
@@ -860,11 +874,11 @@ impl Setup for FastShell {
     }
 
     fn cooling_coefficient(&self) -> Option<f64> {
-        Some(self.cooling_strength)
+        Some(self.cooling)
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
-        Mesh::logarithmic_radial(1.0, 2.0, resolution)
+        Mesh::logarithmic_radial(1.0, self.r_outer.log10(), resolution)
     }
 
     fn coordinate_system(&self) -> Coordinates {
