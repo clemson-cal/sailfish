@@ -335,22 +335,22 @@ impl Setup for KeplerianDisk {
         //Schaal+(2015) Sec. 5.5
         let r = (x * x + y * y).sqrt();
 
-        let deltar = 0.1;
-        let rho0  = 1e-5;
-        let rhod  = 1.0;
-        let p0    = 1e-5;
+        let deltar = 0.3;
+        let rho0   = 1e-1;
+        let rhod   = 1.0;
+        let p0     = 1e-2;
 
         if r < 0.5 - 0.5 * deltar {
             primitive[0] = rho0;     
         }
         else if r > 0.5 - 0.5 * deltar && r < 0.5 + 0.5 * deltar {
-            primitive[0] = rho0 + (rhod-rho0)/deltar*(r-(0.5-0.5*deltar));
+            primitive[0] = rho0 + (rhod - rho0) / deltar * (r - (0.5 - 0.5 * deltar));
         }
         else if r > 0.5 + 0.5 * deltar && r < 2.0 - 0.5 * deltar {
             primitive[0] = rhod;
         }
         else if r > 2.0 - 0.5 * deltar && r < 2.0 + 0.5 * deltar {
-            primitive[0] = rhod + (rho0-rhod)/deltar*(r-(2.0-0.5*deltar));
+            primitive[0] = rhod + (rho0 - rhod) / deltar * (r - (2.0 - 0.5 * deltar));
         }
         else {
             primitive[0] = rho0;

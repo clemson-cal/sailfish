@@ -52,6 +52,19 @@ impl Solver {
         let dt = self.dt.unwrap();
 
         gpu_core::scope(self.device, || unsafe {
+            euler2d_dg::euler2d_dg_limit_slopes(
+                self.cell,
+                self.mesh,
+                self.weights1.as_ptr(),
+                self.weights2.as_mut_ptr(),
+                dt,
+                self.mode,
+            );
+        });
+
+        swap(&mut self.weights1, &mut self.weights2);
+
+        gpu_core::scope(self.device, || unsafe {
             euler2d_dg::euler2d_dg_advance_rk(
                 self.cell,
                 self.mesh,

@@ -14,6 +14,15 @@ extern "C" {
         mode: ExecutionMode,
     );
 
+    fn euler2d_dg_limit_slopes(
+        cell: node_2d::Cell,
+        mesh: StructuredMesh,
+        weights_rd_ptr: *const f64,
+        weights_wr_ptr: *mut f64,
+        dt: f64,
+        mode: ExecutionMode,
+    );
+
     fn euler2d_dg_wavespeed(
         cell: node_2d::Cell,
         mesh: StructuredMesh,
