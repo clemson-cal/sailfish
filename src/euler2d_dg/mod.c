@@ -248,23 +248,23 @@ static __host__ __device__ real minmodTVB(real w1, real w0l, real w0, real w0r, 
 }
 
 
-//static __host__ __device__ real minmodB(real a, real b, real c, real dl)
-//{
-//    const real M = 1.0; //SAVE Cockburn & Shu, JCP 141, 199 (1998) eq. 3.7 suggest M~50.0
-//
-//    if (fabs(a) <= M * dl * dl)
-//    {        
-//        return a;
-//    }
-//    else
-//    {
-//        real x1 = fabs(sign(a) + sign(b)) * (sign(a) + sign(c));
-//        real x2 = minabs(a, b, c);
-//        real x  = 0.25 * x1 * x2;
-//    
-//        return x;
-//    }
-//}
+static __host__ __device__ real minmodB(real a, real b, real c, real dl)
+{
+    const real M = 1.0; //SAVE Cockburn & Shu, JCP 141, 199 (1998) eq. 3.7 suggest M~50.0
+
+    if (fabs(a) <= M * dl * dl)
+    {        
+        return a;
+    }
+    else
+    {
+        real x1 = fabs(sign(a) + sign(b)) * (sign(a) + sign(c));
+        real x2 = minabs(a, b, c);
+        real x  = 0.25 * x1 * x2;
+    
+        return x;
+    }
+}
 
 // ============================ PATCH =========================================
 // ============================================================================
@@ -513,170 +513,183 @@ static __host__ __device__ void limit_conserved_slopes_zone(
     }
 }
 
-//static __host__ __device__ void limit_characteristic_slopes_zone(
-//    struct Cell cell,
-//    struct Mesh mesh,
-//    struct Patch weights_rd,
-//    struct Patch weights_wr,
-//    real dt,
-//    int i,
-//    int j)
-//{
-//    real dx = mesh.dx;
-//    real dy = mesh.dy;
-//    real xc = mesh.x0 + (i + 0.5) * dx;
-//    real yc = mesh.y0 + (j + 0.5) * dy;
-//
-//    int n_quad = num_quadrature_points(cell);
-//    int n_poly = num_polynomials(cell);
-//    int n_face = cell.order;
-//
-//    real *wij = GET(weights_rd, i, j);
-//    real *wli = GET(weights_rd, i - 1, j);
-//    real *wri = GET(weights_rd, i + 1, j);
-//    real *wlj = GET(weights_rd, i, j - 1);
-//    real *wrj = GET(weights_rd, i, j + 1);
-//
-//    // limit slopes
-//
-//    real wtilde[MAX_NUM_FIELDS];
-//
-//    real cons[NCONS];
-//    real prim[NCONS];
-//    real   w0[NCONS];
-//    real  w0l[NCONS];
-//    real  w0r[NCONS];
-//    real  w0b[NCONS];
-//    real  w0t[NCONS];
-//
-//    // slopes of conserved variables
-//    real w1[NCONS]; // y slopes
-//    real w2[NCONS]; // x slopes
-//
-//    // slopes of characteristic variables
-//    real c1[NCONS]; // y slopes
-//    real c2[NCONS]; // x slopes
-//
-//    // limited "tilde" slopes
-//    real w1t[NCONS];
-//    real w2t[NCONS]; 
-//    real c1t[NCONS];
-//    real c2t[NCONS];
-//
-//    // characteristic version of difference of mean values (l=0) to neighbor zones
-//    real cl[NCONS]; // left
-//    real cr[NCONS]; // right   
-//    real cb[NCONS]; // bottom
-//    real ct[NCONS]; // top
-//
-//    // Call routine to detect if this is a troubled cell
-//    // If so:
-//    if ( 1 )
-//    {
-//        for (int q = 0; q < NCONS; ++q)
-//        {
-//            // mean values (l=0) of conserved variables in the cell and nearest neighbor cells
-//            w0[q]  = wij[q * n_poly + 0];
-//            w0l[q] = wli[q * n_poly + 0]; // left 
-//            w0r[q] = wri[q * n_poly + 0]; // right
-//            w0b[q] = wlj[q * n_poly + 0]; // bottom
-//            w0t[q] = wrj[q * n_poly + 0]; // top
-//
-//            // slopes (l=1, l=2) of conserved variables in the cell
-//            w1[q] =  wij[q * n_poly + 1]; // y slopes
-//            w2[q] =  wij[q * n_poly + 2]; // x slopes
-//        }
-//    
-//        conserved_to_primitive(w0, prim);
-//        const real cs2 = primitive_to_sound_speed_squared(prim);
-//        real cs  = square_root(cs2);
-//        const real g1 = ADIABATIC_GAMMA - 1.0;
-//        real vx = prim[1];
-//        real vy = prim[2];
-//        real k = 0.5 * (vx * vx + vy * vy);
-//        real h = (cs2 / g1) + k;
-//        real phi = g1 * k;
-//        real beta = 1.0 / (2.0 * cs2);
-//
-//        real lx[4][4]= {
-//              {beta*(phi+cs*vx),  -beta*(g1*vx+cs),  -beta*g1*vy,       beta*g1},
-//              {(1.0-2.0*beta*phi), 2.0*beta*g1*vx,   2.0*beta*g1*vy,    -2.0*beta*g1},
-//              {beta*(phi-cs*vx),  -beta*(g1*vx-cs),  -beta*g1*vy,       beta*g1},
-//              {vy,                      0.0,            -1.0,            0.0}};
-//
-//        real ly[4][4] = {
-//              {beta*(phi+cs*vy),  -beta*g1*vx,  -beta*(g1*vy+cs),       beta*g1},
-//              {(1.0-2.0*beta*phi), 2.0*beta*g1*vx,   2.0*beta*g1*vy,    -2.0*beta*g1},
-//              {beta*(phi-cs*vy),  -beta*g1*vx,  -beta*(g1*vy-cs),       beta*g1},
-//              {-vx,                      1.0,            0.0,            0.0}};
-//                
-//        real rx[4][4] = {
-//              { 1.0,        1.0,        1.0,        0.0},
-//              {(vx - cs),   vx,     (vx + cs),      0.0},
-//              {  vy,        vy,         vy,        -1.0},
-//              {(h - cs*vx), k,      (h + cs*vx),    -vy}};
-//                  
-//        real ry[4][4] = {
-//              { 1.0,        1.0,        1.0,        0.0},
-//              {vx,   vx,     vx,      1.0},
-//              {  vy-cs,        vy,         vy+cs,        0.0},
-//              {(h - cs*vy), k,      (h + cs*vy),    vx}};
-//
-//        // convert to characteristic variables
-//        for (int qi = 0; qi < NCONS; ++qi)
-//        {
-//            c2[qi] = 0.0;
-//            c1[qi] = 0.0;
-//            cl[qi] = 0.0;
-//            cr[qi] = 0.0;
-//            cb[qi] = 0.0;
-//            ct[qi] = 0.0;
-//
-//            for (int qj = 0; qj < NCONS; ++qj)
-//            {
-//                c2[qi] += lx[qi][qj] *   w2[qj]; // x slopes
-//                cl[qi] += lx[qi][qj] *  (w0[qj]  - w0l[qj]); // left difference
-//                cr[qi] += lx[qi][qj] * (w0r[qj]  -  w0[qj]); // right differ
-//                c1[qi] += ly[qi][qj] *   w1[qj]; // y slopes
-//                cb[qi] += ly[qi][qj] *  (w0[qj]  - w0b[qj]); // bottom difference
-//                ct[qi] += ly[qi][qj] * (w0t[qj]  -  w0[qj]); // top difference
-//            }
-//        }
-//
-//        // limit characteristic slopes (for l=1, l=2)
-//        for (int q = 0; q < NCONS; ++q)
-//        {
-//            c1t[q] = minmodB(SQRT_THREE * c1[q], BETA_TVB * cb[q], BETA_TVB * ct[q], dy) / SQRT_THREE;
-//            c2t[q] = minmodB(SQRT_THREE * c2[q], BETA_TVB * cl[q], BETA_TVB * cr[q], dx) / SQRT_THREE;
-//        }
-//
-//        // compute limited conservative slopes (for l=1, l=2)
-//        for (int qi = 0; qi < NCONS; ++qi)
-//        {
-//            w2t[qi] = 0.0;
-//            w1t[qi] = 0.0;
-//            for (int qj = 0; qj < NCONS; ++qj)
-//            {
-//                w1t[qi] += ry[qi][qj] * c1t[qj]; // y slopes
-//                w2t[qi] += rx[qi][qj] * c2t[qj]; // x slopes
-//            }
-//        }
-//
-//        for (int q = 0; q < NCONS; ++q)
-//        {
-//            if ( (c2t[q] != c2[q]) || (c1t[q] != c1[q]) )
-//            {              
-//                wij[q * n_poly + 2] = w2t[q];
-//                wij[q * n_poly + 1] = w1t[q];
-//                
-//                for (int l = 3; l < n_poly; ++l)
-//                {
-//                    wij[q * n_poly + l] = 0.0;
-//                }                        
-//            }
-//        }
-//    }
-//}
+static __host__ __device__ void limit_characteristic_slopes_zone(
+    struct Cell cell,
+    struct Mesh mesh,
+    struct Patch weights_rd,
+    struct Patch weights_wr,
+    real dt,
+    int i,
+    int j)
+{
+    real dx = mesh.dx;
+    real dy = mesh.dy;
+    real xc = mesh.x0 + (i + 0.5) * dx;
+    real yc = mesh.y0 + (j + 0.5) * dy;
+
+    int n_quad = num_quadrature_points(cell);
+    int n_poly = num_polynomials(cell);
+    int n_face = cell.order;
+
+    real BETA_TVB = 1.0;
+    real SQRT_THREE = sqrt(3.0);
+
+    real *wij = GET(weights_rd, i, j);
+    real *wli = GET(weights_rd, i - 1, j);
+    real *wri = GET(weights_rd, i + 1, j);
+    real *wlj = GET(weights_rd, i, j - 1);
+    real *wrj = GET(weights_rd, i, j + 1);
+
+    // limit slopes
+
+    real wtilde[MAX_NUM_FIELDS];
+
+    real cons[NCONS];
+    real prim[NCONS];
+    real   w0[NCONS];
+    real  w0l[NCONS];
+    real  w0r[NCONS];
+    real  w0b[NCONS];
+    real  w0t[NCONS];
+
+    // slopes of conserved variables
+    real w1[NCONS]; // y slopes
+    real w2[NCONS]; // x slopes
+
+    // slopes of characteristic variables
+    real c1[NCONS]; // y slopes
+    real c2[NCONS]; // x slopes
+
+    // limited "tilde" slopes
+    real w1t[NCONS];
+    real w2t[NCONS]; 
+    real c1t[NCONS];
+    real c2t[NCONS];
+
+    // characteristic version of difference of mean values (l=0) to neighbor zones
+    real cl[NCONS]; // left
+    real cr[NCONS]; // right   
+    real cb[NCONS]; // bottom
+    real ct[NCONS]; // top
+
+    // Call routine to detect if this is a troubled cell
+    // If so:
+    if ( 1 )
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            // mean values (l=0) of conserved variables in the cell and nearest neighbor cells
+            w0[q]  = wij[q * n_poly + 0];
+            w0l[q] = wli[q * n_poly + 0]; // left 
+            w0r[q] = wri[q * n_poly + 0]; // right
+            w0b[q] = wlj[q * n_poly + 0]; // bottom
+            w0t[q] = wrj[q * n_poly + 0]; // top
+
+            // slopes (l=1, l=2) of conserved variables in the cell
+            w1[q] =  wij[q * n_poly + 1]; // y slopes
+            w2[q] =  wij[q * n_poly + 2]; // x slopes
+        }
+    
+        conserved_to_primitive(w0, prim);
+        const real cs2 = primitive_to_sound_speed_squared(prim);
+        real cs  = sqrt(cs2);
+        const real g1 = ADIABATIC_GAMMA - 1.0;
+        real vx = prim[1];
+        real vy = prim[2];
+        real k = 0.5 * (vx * vx + vy * vy);
+        real h = (cs2 / g1) + k;
+        real phi = g1 * k;
+        real beta = 1.0 / (2.0 * cs2);
+
+        real lx[4][4]= {
+              {beta*(phi+cs*vx),  -beta*(g1*vx+cs),  -beta*g1*vy,       beta*g1},
+              {(1.0-2.0*beta*phi), 2.0*beta*g1*vx,   2.0*beta*g1*vy,    -2.0*beta*g1},
+              {beta*(phi-cs*vx),  -beta*(g1*vx-cs),  -beta*g1*vy,       beta*g1},
+              {vy,                      0.0,            -1.0,            0.0}};
+
+        real ly[4][4] = {
+              {beta*(phi+cs*vy),  -beta*g1*vx,  -beta*(g1*vy+cs),       beta*g1},
+              {(1.0-2.0*beta*phi), 2.0*beta*g1*vx,   2.0*beta*g1*vy,    -2.0*beta*g1},
+              {beta*(phi-cs*vy),  -beta*g1*vx,  -beta*(g1*vy-cs),       beta*g1},
+              {-vx,                      1.0,            0.0,            0.0}};
+                
+        real rx[4][4] = {
+              { 1.0,        1.0,        1.0,        0.0},
+              {(vx - cs),   vx,     (vx + cs),      0.0},
+              {  vy,        vy,         vy,        -1.0},
+              {(h - cs*vx), k,      (h + cs*vx),    -vy}};
+                  
+        real ry[4][4] = {
+              { 1.0,        1.0,        1.0,        0.0},
+              {vx,   vx,     vx,      1.0},
+              {  vy-cs,        vy,         vy+cs,        0.0},
+              {(h - cs*vy), k,      (h + cs*vy),    vx}};
+
+        // convert to characteristic variables
+        for (int qi = 0; qi < NCONS; ++qi)
+        {
+            c2[qi] = 0.0;
+            c1[qi] = 0.0;
+            cl[qi] = 0.0;
+            cr[qi] = 0.0;
+            cb[qi] = 0.0;
+            ct[qi] = 0.0;
+
+            for (int qj = 0; qj < NCONS; ++qj)
+            {
+                c2[qi] += lx[qi][qj] *   w2[qj]; // x slopes
+                cl[qi] += lx[qi][qj] *  (w0[qj]  - w0l[qj]); // left difference
+                cr[qi] += lx[qi][qj] * (w0r[qj]  -  w0[qj]); // right differ
+                c1[qi] += ly[qi][qj] *   w1[qj]; // y slopes
+                cb[qi] += ly[qi][qj] *  (w0[qj]  - w0b[qj]); // bottom difference
+                ct[qi] += ly[qi][qj] * (w0t[qj]  -  w0[qj]); // top difference
+            }
+        }
+
+        // limit characteristic slopes (for l=1, l=2)
+        for (int q = 0; q < NCONS; ++q)
+        {
+            c1t[q] = minmodB(SQRT_THREE * c1[q], BETA_TVB * cb[q], BETA_TVB * ct[q], dy) / SQRT_THREE;
+            c2t[q] = minmodB(SQRT_THREE * c2[q], BETA_TVB * cl[q], BETA_TVB * cr[q], dx) / SQRT_THREE;
+        }
+
+        // compute limited conservative slopes (for l=1, l=2)
+        for (int qi = 0; qi < NCONS; ++qi)
+        {
+            w2t[qi] = 0.0;
+            w1t[qi] = 0.0;
+            for (int qj = 0; qj < NCONS; ++qj)
+            {
+                w1t[qi] += ry[qi][qj] * c1t[qj]; // y slopes
+                w2t[qi] += rx[qi][qj] * c2t[qj]; // x slopes
+            }
+        }
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            if ( (c2t[q] != c2[q]) || (c1t[q] != c1[q]) )
+            {              
+                wij[q * n_poly + 2] = w2t[q];
+                wij[q * n_poly + 1] = w1t[q];
+                
+                for (int l = 3; l < n_poly; ++l)
+                {
+                    wij[q * n_poly + l] = 0.0;
+                }                        
+            }
+        }
+    }
+
+    real *wout = GET(weights_wr, i, j);
+
+    for (int q = 0; q < NCONS; ++q)
+    {
+        for (int l = 0; l < n_poly; ++l)
+        {
+            wout[q * n_poly + l] = wij[q * n_poly + l];
+        }
+    }
+}
 
 static __host__ __device__ void wavespeed_zone(
     struct Cell cell,
@@ -745,6 +758,29 @@ static void __global__ limit_conserved_slopes_kernel(
     if (i < mesh.ni && j < mesh.nj)
     {
         limit_conserved_slopes_zone(
+            cell,
+            mesh,
+            weights_rd,
+            weights_wr,
+            dt,
+            i, j
+        );
+    }
+}
+
+static void __global__ limit_characteristic_slopes_kernel(
+    struct Cell cell,
+    struct Mesh mesh,
+    struct Patch weights_rd,
+    struct Patch weights_wr,
+    real dt)
+{
+    int i = threadIdx.y + blockIdx.y * blockDim.y;
+    int j = threadIdx.x + blockIdx.x * blockDim.x;
+
+    if (i < mesh.ni && j < mesh.nj)
+    {
+        limit_characteristic_slopes_zone(
             cell,
             mesh,
             weights_rd,
@@ -870,7 +906,7 @@ EXTERN_C void euler2d_dg_limit_slopes(
     switch (mode) {
         case CPU: {
             FOR_EACH(weights_rd, NUM_GUARD) {
-                limit_conserved_slopes_zone(
+                limit_characteristic_slopes_zone(
                     cell,
                     mesh,
                     weights_rd,
@@ -885,7 +921,7 @@ EXTERN_C void euler2d_dg_limit_slopes(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(weights_rd, NUM_GUARD) {
-                limit_conserved_slopes_zone(
+                limit_characteristic_slopes_zone(
                     cell,
                     mesh,
                     weights_rd,
@@ -903,7 +939,7 @@ EXTERN_C void euler2d_dg_limit_slopes(
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
 
-            limit_conserved_slopes_kernel<<<bd, bs>>>(
+            limit_characteristic_slopes_kernel<<<bd, bs>>>(
                 cell,
                 mesh,
                 weights_rd,
