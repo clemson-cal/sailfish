@@ -18,16 +18,14 @@ static NUM_GUARD: usize = 1;
 static NUM_CONS: usize = 4;
 
 enum SolverState {
-    NotReady,
-    RungeKuttaStage(usize),
+    PreSlopeLimiting,
+    PostSlopeLimiting,
 }
 
 pub struct Solver {
     time: f64,
-    time0: f64,
     state: SolverState,
     dt: Option<f64>,
-    // rk_order: usize,
     weights1: Patch,
     weights2: Patch,
     wavespeeds: Arc<Mutex<Patch>>,
@@ -39,17 +37,11 @@ pub struct Solver {
     mesh: StructuredMesh,
     mode: ExecutionMode,
     device: Option<Device>,
-    // setup: Arc<dyn Setup>,
 }
 
 impl Solver {
-    pub fn new_timestep(&mut self) {
-        self.time0 = self.time;
-        self.state = SolverState::RungeKuttaStage(0);
-    }
-
-    pub fn advance_rk(&mut self) {
-        let dt = self.dt.unwrap();
+    pub fn limit_slopes(&mut self) {
+        assert!(matches!(self.state, SolverState::PreSlopeLimiting));
 
         gpu_core::scope(self.device, || unsafe {
             euler2d_dg::euler2d_dg_limit_slopes(
@@ -57,12 +49,16 @@ impl Solver {
                 self.mesh,
                 self.weights1.as_ptr(),
                 self.weights2.as_mut_ptr(),
-                dt,
                 self.mode,
             );
         });
-
         swap(&mut self.weights1, &mut self.weights2);
+        self.state = SolverState::PostSlopeLimiting;
+    }
+
+    pub fn advance_weights(&mut self) {
+        assert!(matches!(self.state, SolverState::PostSlopeLimiting));
+        let dt = self.dt.unwrap();
 
         gpu_core::scope(self.device, || unsafe {
             euler2d_dg::euler2d_dg_advance_rk(
@@ -74,11 +70,10 @@ impl Solver {
                 self.mode,
             );
         });
-
         swap(&mut self.weights1, &mut self.weights2);
 
         self.time = self.time + dt;
-        self.state = SolverState::NotReady;
+        self.state = SolverState::PreSlopeLimiting;
     }
 }
 
@@ -170,11 +165,9 @@ impl Automaton for Solver {
     }
 
     fn value(mut self) -> Self::Value {
-        if let SolverState::NotReady = self.state {
-            self.new_timestep()
-        }
-        if let SolverState::RungeKuttaStage(_) = self.state {
-            self.advance_rk()
+        match self.state {
+            SolverState::PreSlopeLimiting => self.limit_slopes(),
+            SolverState::PostSlopeLimiting => self.advance_weights(),
         }
         self
     }
@@ -184,6 +177,10 @@ pub struct Builder;
 
 impl PatchBasedBuild for Builder {
     type Solver = Solver;
+
+    fn stages_per_rk_step(&self) -> usize {
+        2
+    }
 
     fn build(
         &self,
@@ -244,10 +241,8 @@ impl PatchBasedBuild for Builder {
 
         Solver {
             time,
-            time0: time,
-            state: SolverState::NotReady,
+            state: SolverState::PreSlopeLimiting,
             dt: None,
-            // rk_order,
             weights2: weights1.clone(),
             weights1,
             wavespeeds: Arc::new(Mutex::new(wavespeeds)),
@@ -259,7 +254,6 @@ impl PatchBasedBuild for Builder {
             device,
             cell,
             mesh: global_structured_mesh.sub_mesh(rect.0, rect.1),
-            // setup,
         }
     }
 }

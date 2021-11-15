@@ -462,7 +462,6 @@ static __host__ __device__ void limit_conserved_slopes_zone(
     struct Mesh mesh,
     struct Patch weights_rd,
     struct Patch weights_wr,
-    real dt,
     int i,
     int j)
 {
@@ -518,22 +517,15 @@ static __host__ __device__ void limit_characteristic_slopes_zone(
     struct Mesh mesh,
     struct Patch weights_rd,
     struct Patch weights_wr,
-    real dt,
     int i,
     int j)
 {
+    int n_poly = num_polynomials(cell);
+
     real dx = mesh.dx;
     real dy = mesh.dy;
-    real xc = mesh.x0 + (i + 0.5) * dx;
-    real yc = mesh.y0 + (j + 0.5) * dy;
-
-    int n_quad = num_quadrature_points(cell);
-    int n_poly = num_polynomials(cell);
-    int n_face = cell.order;
-
     real BETA_TVB = 1.0;
     real SQRT_THREE = sqrt(3.0);
-
     real *wij = GET(weights_rd, i, j);
     real *wli = GET(weights_rd, i - 1, j);
     real *wri = GET(weights_rd, i + 1, j);
@@ -541,10 +533,6 @@ static __host__ __device__ void limit_characteristic_slopes_zone(
     real *wrj = GET(weights_rd, i, j + 1);
 
     // limit slopes
-
-    real wtilde[MAX_NUM_FIELDS];
-
-    real cons[NCONS];
     real prim[NCONS];
     real   w0[NCONS];
     real  w0l[NCONS];
@@ -574,7 +562,7 @@ static __host__ __device__ void limit_characteristic_slopes_zone(
 
     // Call routine to detect if this is a troubled cell
     // If so:
-    if ( 1 )
+    if (1)
     {
         for (int q = 0; q < NCONS; ++q)
         {
@@ -589,11 +577,11 @@ static __host__ __device__ void limit_characteristic_slopes_zone(
             w1[q] =  wij[q * n_poly + 1]; // y slopes
             w2[q] =  wij[q * n_poly + 2]; // x slopes
         }
-    
+
         conserved_to_primitive(w0, prim);
-        const real cs2 = primitive_to_sound_speed_squared(prim);
-        real cs  = sqrt(cs2);
-        const real g1 = ADIABATIC_GAMMA - 1.0;
+        real cs2 = primitive_to_sound_speed_squared(prim);
+        real cs = sqrt(cs2);
+        real g1 = ADIABATIC_GAMMA - 1.0;
         real vx = prim[1];
         real vy = prim[2];
         real k = 0.5 * (vx * vx + vy * vy);
@@ -612,13 +600,13 @@ static __host__ __device__ void limit_characteristic_slopes_zone(
               {(1.0-2.0*beta*phi), 2.0*beta*g1*vx,   2.0*beta*g1*vy,    -2.0*beta*g1},
               {beta*(phi-cs*vy),  -beta*g1*vx,  -beta*(g1*vy-cs),       beta*g1},
               {-vx,                      1.0,            0.0,            0.0}};
-                
+
         real rx[4][4] = {
               { 1.0,        1.0,        1.0,        0.0},
               {(vx - cs),   vx,     (vx + cs),      0.0},
               {  vy,        vy,         vy,        -1.0},
               {(h - cs*vx), k,      (h + cs*vx),    -vy}};
-                  
+
         real ry[4][4] = {
               { 1.0,        1.0,        1.0,        0.0},
               {vx,   vx,     vx,      1.0},
@@ -671,7 +659,6 @@ static __host__ __device__ void limit_characteristic_slopes_zone(
             {              
                 wij[q * n_poly + 2] = w2t[q];
                 wij[q * n_poly + 1] = w1t[q];
-                
                 for (int l = 3; l < n_poly; ++l)
                 {
                     wij[q * n_poly + l] = 0.0;
@@ -749,8 +736,7 @@ static void __global__ limit_conserved_slopes_kernel(
     struct Cell cell,
     struct Mesh mesh,
     struct Patch weights_rd,
-    struct Patch weights_wr,
-    real dt)
+    struct Patch weights_wr)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -762,7 +748,6 @@ static void __global__ limit_conserved_slopes_kernel(
             mesh,
             weights_rd,
             weights_wr,
-            dt,
             i, j
         );
     }
@@ -772,8 +757,7 @@ static void __global__ limit_characteristic_slopes_kernel(
     struct Cell cell,
     struct Mesh mesh,
     struct Patch weights_rd,
-    struct Patch weights_wr,
-    real dt)
+    struct Patch weights_wr)
 {
     int i = threadIdx.y + blockIdx.y * blockDim.y;
     int j = threadIdx.x + blockIdx.x * blockDim.x;
@@ -785,7 +769,6 @@ static void __global__ limit_characteristic_slopes_kernel(
             mesh,
             weights_rd,
             weights_wr,
-            dt,
             i, j
         );
     }
@@ -887,7 +870,6 @@ EXTERN_C void euler2d_dg_advance_rk(
  * @param mesh                  The mesh [ni,     nj]
  * @param weights_rd_ptr[in]    [-1, -1] [ni + 2, nj + 2] [4]
  * @param weights_wr_ptr[out]   [-1, -1] [ni + 2, nj + 2] [4]
- * @param dt                    The time step
  * @param mode                  The execution mode
  */
 EXTERN_C void euler2d_dg_limit_slopes(
@@ -895,7 +877,6 @@ EXTERN_C void euler2d_dg_limit_slopes(
     struct Mesh mesh,
     real *weights_rd_ptr,
     real *weights_wr_ptr,
-    real dt,
     enum ExecutionMode mode)
 {
     int n_poly = num_polynomials(cell);
@@ -911,7 +892,6 @@ EXTERN_C void euler2d_dg_limit_slopes(
                     mesh,
                     weights_rd,
                     weights_wr,
-                    dt,
                     i, j
                 );
             }
@@ -926,7 +906,6 @@ EXTERN_C void euler2d_dg_limit_slopes(
                     mesh,
                     weights_rd,
                     weights_wr,
-                    dt,
                     i, j
                 );
             }
@@ -944,7 +923,6 @@ EXTERN_C void euler2d_dg_limit_slopes(
                 mesh,
                 weights_rd,
                 weights_wr,
-                dt
             );
             #endif
             break;

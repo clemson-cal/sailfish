@@ -19,7 +19,6 @@ extern "C" {
         mesh: StructuredMesh,
         weights_rd_ptr: *const f64,
         weights_wr_ptr: *mut f64,
-        dt: f64,
         mode: ExecutionMode,
     );
 

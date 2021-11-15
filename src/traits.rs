@@ -63,6 +63,10 @@ pub trait Solve {
 pub trait PatchBasedBuild {
     type Solver: PatchBasedSolve;
 
+    fn stages_per_rk_step(&self) -> usize {
+        1
+    }
+
     #[allow(clippy::too_many_arguments)]
     fn build(
         &self,

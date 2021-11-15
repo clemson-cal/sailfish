@@ -248,7 +248,7 @@ where
             if dt_each_iter {
                 dt = set_timestep(&mut solvers);
             }
-            for _ in 0..rk_order {
+            for _ in 0..rk_order * builder.stages_per_rk_step() {
                 solvers = match pool {
                     Some(ref pool) => {
                         pool.scope(|s| automaton::execute_rayon(s, solvers).collect())
