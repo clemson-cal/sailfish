@@ -34,7 +34,7 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("shocktube", setup_builder!(Shocktube)),
         ("wind", setup_builder!(Wind)),
         ("bondi", setup_builder!(Bondi)),
-        ("binary-bondi", setup_builder!(BinaryBondi)),
+        ("BinaryBondi", setup_builder!(BinaryBondi)),
     ]
 }
 
