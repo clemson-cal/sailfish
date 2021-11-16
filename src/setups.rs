@@ -33,8 +33,8 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
         ("wind", setup_builder!(Wind)),
-        ("Bondi", setup_builder!(Bondi)),
-        ("BinaryBondi", setup_builder!(BinaryBondi)),
+        ("bondi", setup_builder!(Bondi)),
+        ("binary-bondi", setup_builder!(BinaryBondi)),
     ]
 }
 
@@ -695,19 +695,18 @@ impl Setup for Bondi {
     }
 }
 
+/// Binary setup for bondi accretion.
 pub struct BinaryBondi{
     pub bh_rad: f64,
     pub sink_rate: f64,
     pub bh_mass: f64,
     pub fluid_vel_x: f64,
-    pub aspect: f64,
+    pub x_bin: f64,
+    pub aspect: i64,
     pub height: f64,
     pub sink_model: SinkModel,
     form: kind_config::Form,
 }
-
-//Binary setup for bondi accretion
-
 
 impl FromStr for BinaryBondi {
     type Err = error::Error;
@@ -715,12 +714,13 @@ impl FromStr for BinaryBondi {
     fn from_str(parameters: &str) -> Result<Self, Self::Err> {
         #[rustfmt::skip]
         let form = kind_config::Form::new()
-            .item("bh_rad",      5e-2, "black hole's radius")
-            .item("sink_rate",        1e2, "rate of mass subtraction in the sink (Omega)")
-            .item("bh_mass",                   1.0, "black hole's mass")
-            .item("fluid_vel_x",                1.0, "background fluid velocity")
-            .item("aspect",                    2.0, "aspect ratio for domain")
-            .item("height",                    1.0, "height")
+            .item("bh_rad",        5e-2, "black hole's radius")
+            .item("sink_rate",      1e2, "rate of mass subtraction in the sink (Omega)")
+            .item("bh_mass",        1.0, "black hole's mass")
+            .item("fluid_vel_x",    1.0, "background fluid velocity")
+            .item("x_bin",          0.0, "horizontal position of binary COM (with respect to domain centroid)")
+            .item("aspect",           2, "aspect ratio for domain")
+            .item("height",         1.0, "height")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
             .item("q",              1.0, "system mass ratio: [0-1]")
             .item("e",              0.0, "orbital eccentricity: [0-1]")
@@ -732,6 +732,7 @@ impl FromStr for BinaryBondi {
             sink_rate: form.get("sink_rate").into(),
             bh_mass: form.get("bh_mass").into(),
             fluid_vel_x: form.get("fluid_vel_x").into(),
+            x_bin: form.get("x_bin").into(),
             aspect: form.get("aspect").into(),
             height: form.get("height").into(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
@@ -784,7 +785,7 @@ impl Setup for BinaryBondi {
         let binary = OrbitalElements(a, m, q, e);
         let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
         let mass1 = PointMass {
-            x: mass1.position_x(),
+            x: mass1.position_x() + self.x_bin,
             y: mass1.position_y(),
             vx: mass1.velocity_x(),
             vy: mass1.velocity_y(),
@@ -794,7 +795,7 @@ impl Setup for BinaryBondi {
             model: self.sink_model,
         };
         let mass2 = PointMass {
-            x: mass2.position_x(),
+            x: mass2.position_x() + self.x_bin,
             y: mass2.position_y(),
             vx: mass2.velocity_x(),
             vy: mass2.velocity_y(),
