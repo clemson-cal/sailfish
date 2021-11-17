@@ -269,6 +269,9 @@ pub trait Setup: Send + Sync {
     fn constant_softening(&self) -> Option<bool> {
         None
     }
+    fn soft_length(&self) -> Option<f64> {
+        None
+    }
 
     /// Provided method to conveniently determine a scale factor for
     /// homologously expanding meshes. Returns 1.0 if this setup does not

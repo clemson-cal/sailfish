@@ -332,6 +332,7 @@ pub struct BinaryWithThermodynamics {
     pub sink_rate1: f64,
     pub sink_rate2: f64,
     pub sink_model: SinkModel,
+    pub soft_length: f64,
     pub gamma_law_index: f64,
     pub cooling_coefficient: f64,
     pub pressure_floor: f64,
@@ -357,6 +358,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("sink_radius",      "0.05", "sink kernel radii (a)")
             .item("sink_model",         "af", "sink prescription: [none|af|tf|ff]")
             .item("sink_rate",        "10.0", "rate(s) of mass subtraction in the sink (Omega)")
+            .item("soft_length",        0.05, "gravitational softening length (a)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
             .item("gamma_law_index",     1.666666666666666, "adiabatic index")
@@ -369,7 +371,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
             .item("test_model",        false, "use test model")
             .item("one_body",          false, "use one point mass")
-            .item("constant_softening",false, "use constant gravitational softening = sink_radius")
+            .item("constant_softening",false, "use constant gravitational softening = soft length")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -387,6 +389,7 @@ impl FromStr for BinaryWithThermodynamics {
             sink_rate1: srate1.unwrap(),
             sink_rate2: srate2.or(srate1).unwrap(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
+            soft_length: form.get("soft_length").into(),
             gamma_law_index: form.get("gamma_law_index").into(),
             cooling_coefficient: form.get("cooling_coefficient").into(),
             pressure_floor: form.get("pressure_floor").into(),
@@ -582,6 +585,10 @@ impl Setup for BinaryWithThermodynamics {
 
     fn constant_softening(&self) -> Option<bool> {
         Some(self.constant_softening)
+    }
+
+    fn soft_length(&self) -> Option<f64> {
+        Some(self.soft_length)
     }
 
     fn mesh(&self, resolution: u32) -> Mesh {
