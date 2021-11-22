@@ -1,5 +1,6 @@
 /target
 /data
+/palmetto
 *.bin
 *.sf
 *.png

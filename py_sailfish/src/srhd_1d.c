@@ -555,6 +555,7 @@ EXTERN_C int srhd_1d_primitive_to_conserved(
             #endif
         }
     }
+    return 1;
 }
 
 
