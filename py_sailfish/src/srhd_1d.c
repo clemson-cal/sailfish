@@ -1,14 +1,18 @@
-#include <math.h>
-#include <stddef.h>
-
-
 // ============================ MODES =========================================
 // ============================================================================
-enum ExecutionMode {
-    CPU,
-    OMP,
-    GPU,
-};
+#define EXEC_CPU 0
+#define EXEC_OMP 1
+#define EXEC_GPU 2
+
+#if (EXEC_MODE != EXEC_GPU)
+#include <math.h>
+#include <stddef.h>
+#define EXTERN_C
+#define __device__
+#define __global__
+#else
+#define EXTERN_C extern "C"
+#endif
 
 enum BoundaryCondition {
     Inflow,
@@ -19,21 +23,6 @@ enum Coordinates {
     Cartesian,
     Spherical,
 };
-
-
-// ============================ COMPAT ========================================
-// ============================================================================
-#ifdef __ROCM__
-#include <hip/hip_runtime.h>
-#endif
-
-#if !defined(__NVCC__) && !defined(__ROCM__)
-#define __device__
-#define __host__
-#define EXTERN_C
-#else
-#define EXTERN_C extern "C"
-#endif
 
 
 // ============================ PHYSICS =======================================
@@ -52,7 +41,7 @@ enum Coordinates {
 #define sign(x) copysign(1.0, x)
 #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
 
-static __host__ __device__ double plm_gradient_scalar(double yl, double y0, double yr)
+static __device__ double plm_gradient_scalar(double yl, double y0, double yr)
 {
     double a = (y0 - yl) * PLM_THETA;
     double b = (yr - yl) * 0.5;
@@ -60,7 +49,7 @@ static __host__ __device__ double plm_gradient_scalar(double yl, double y0, doub
     return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
 }
 
-static __host__ __device__ void plm_gradient(double *yl, double *y0, double *yr, double *g)
+static __device__ void plm_gradient(double *yl, double *y0, double *yr, double *g)
 {
     if (yl && y0 && yr)
     {
@@ -81,36 +70,36 @@ static __host__ __device__ void plm_gradient(double *yl, double *y0, double *yr,
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __host__ __device__ double primitive_to_gamma_beta_squared(const double *prim)
+static __device__ double primitive_to_gamma_beta_squared(const double *prim)
 {
     const double u1 = prim[1];
     return u1 * u1;
 }
 
-static __host__ __device__ double primitive_to_lorentz_factor(const double *prim)
+static __device__ double primitive_to_lorentz_factor(const double *prim)
 {
     return sqrt(1.0 + primitive_to_gamma_beta_squared(prim));
 }
 
-static __host__ __device__ double primitive_to_gamma_beta_component(const double *prim)
+static __device__ double primitive_to_gamma_beta_component(const double *prim)
 {
     return prim[1];
 }
 
-static __host__ __device__ double primitive_to_beta_component(const double *prim)
+static __device__ double primitive_to_beta_component(const double *prim)
 {
     const double w = primitive_to_lorentz_factor(prim);
     return prim[1] / w;
 }
 
-static __host__ __device__ double primitive_to_enthalpy_density(const double* prim)
+static __device__ double primitive_to_enthalpy_density(const double* prim)
 {
     const double rho = prim[0];
     const double pre = prim[2];
     return rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
 }
 
-static __host__ __device__ void conserved_to_primitive(const double *cons, double *prim, double dv)
+static __device__ void conserved_to_primitive(const double *cons, double *prim, double dv)
 {
     const double newton_iter_max = 50;
     const double error_tolerance = 1e-12 * cons[0] / dv;
@@ -163,7 +152,7 @@ static __host__ __device__ void conserved_to_primitive(const double *cons, doubl
     // }
 }
 
-static __device__ __host__ void primitive_to_conserved(const double *prim, double *cons, double dv)
+static __device__ void primitive_to_conserved(const double *prim, double *cons, double dv)
 {
     const double rho = prim[0];
     const double u1 = prim[1];
@@ -179,7 +168,7 @@ static __device__ __host__ void primitive_to_conserved(const double *prim, doubl
     cons[3] = dv * m * prim[3];
 }
 
-static __host__ __device__ void primitive_to_flux(const double *prim, const double *cons, double *flux)
+static __device__ void primitive_to_flux(const double *prim, const double *cons, double *flux)
 {
     const double vn = primitive_to_beta_component(prim);
     const double pre = prim[2];
@@ -191,14 +180,14 @@ static __host__ __device__ void primitive_to_flux(const double *prim, const doub
     flux[3] = vn * cons[0] * s;
 }
 
-static __host__ __device__ double primitive_to_sound_speed_squared(const double *prim)
+static __device__ double primitive_to_sound_speed_squared(const double *prim)
 {
     const double pre = prim[2];
     const double rho_h = primitive_to_enthalpy_density(prim);
     return ADIABATIC_GAMMA * pre / rho_h;
 }
 
-static __host__ __device__ void primitive_to_outer_wavespeeds(const double *prim, double *wavespeeds)
+static __device__ void primitive_to_outer_wavespeeds(const double *prim, double *wavespeeds)
 {
     const double a2 = primitive_to_sound_speed_squared(prim);
     const double un = primitive_to_gamma_beta_component(prim);
@@ -212,7 +201,7 @@ static __host__ __device__ void primitive_to_outer_wavespeeds(const double *prim
     wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
 }
 
-static __host__ __device__ void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux)
+static __device__ void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux)
 {
     double ul[NCONS];
     double ur[NCONS];
@@ -257,9 +246,9 @@ static __host__ __device__ void riemann_hlle(const double *pl, const double *pr,
 }
 
 
-// ============================ PATCH =========================================
+// ============================ GEOMETRY ======================================
 // ============================================================================
-static __host__ __device__ double face_area(enum Coordinates coords, double x)
+static __device__ double face_area(enum Coordinates coords, double x)
 {
     switch (coords) {
         case Cartesian: return 1.0;
@@ -268,16 +257,16 @@ static __host__ __device__ double face_area(enum Coordinates coords, double x)
     return 0.0;
 }
 
-static __host__ __device__ double cell_volume(enum Coordinates coords, double x0, double x1) 
+static __device__ double cell_volume(enum Coordinates coords, double x0, double x1) 
 {
     switch (coords) {
         case Cartesian: return x1 - x0;
-        case Spherical: return (pow(x1, 3) - pow(x0, 3)) / 3.0;
+        case Spherical: return (pow(x1, 3.0) - pow(x0, 3.0)) / 3.0;
     }
     return 0.0;
 }
 
-static __host__ __device__ void geometric_source_terms(enum Coordinates coords, double x0, double x1, const double *prim, double *source)
+static __device__ void geometric_source_terms(enum Coordinates coords, double x0, double x1, const double *prim, double *source)
 {
     switch (coords) {
         case Spherical: {
@@ -298,389 +287,190 @@ static __host__ __device__ void geometric_source_terms(enum Coordinates coords, 
 }
 
 
-// ============================ PATCH =========================================
-// ============================================================================
-#define FOR_EACH(p) \
-    for (int i = p.start; i < p.start + p.count; ++i)
-#define FOR_EACH_OMP(p) \
-_Pragma("omp parallel for") \
-    for (int i = p.start; i < p.start + p.count; ++i)
-#define GET(p, i) (p.data + p.jumps * ((i) - p.start))
-
-struct Patch
-{
-    int start;
-    int count;
-    int jumps;
-    int num_fields;
-    double *data;
-};
-
-static struct Patch patch(int num_elements, int num_fields, double *data)
-{
-    struct Patch patch;
-    patch.start = 0;
-    patch.count = num_elements;
-    patch.jumps = num_fields;
-    patch.num_fields = num_fields;
-    patch.data = data;
-    return patch;
-}
-
-
-// ============================ SCHEME ========================================
-// ============================================================================
-static __host__ __device__ void primitive_to_conserved_zone(
-    struct Patch face_positions,
-    struct Patch primitive,
-    struct Patch conserved,
-    double scale_factor,
-    enum Coordinates coords,
-    int i)
-{
-    double *p = GET(primitive, i);
-    double *u = GET(conserved, i);
-    double yl = *GET(face_positions, i);
-    double yr = *GET(face_positions, i + 1);
-    double xl = yl * scale_factor;
-    double xr = yr * scale_factor;
-    double dv = cell_volume(coords, xl, xr);
-    primitive_to_conserved(p, u, dv);
-}
-
-static __host__ __device__ void conserved_to_primitive_zone(
-    struct Patch face_positions,
-    struct Patch conserved,
-    struct Patch primitive,
-    double scale_factor,
-    enum Coordinates coords,
-    int i)
-{
-    double *p = GET(primitive, i);
-    double *u = GET(conserved, i);
-    double yl = *GET(face_positions, i);
-    double yr = *GET(face_positions, i + 1);
-    double xl = yl * scale_factor;
-    double xr = yr * scale_factor;
-    double dv = cell_volume(coords, xl, xr);
-    conserved_to_primitive(u, p, dv);
-}
-
-static __host__ __device__ void advance_rk_zone(
-    struct Patch face_positions,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch conserved_rd,
-    struct Patch conserved_wr,
-    enum BoundaryCondition bc,
-    enum Coordinates coords,
-    double a0,
-    double adot,
-    double t,
-    double a,
-    double dt,
-    int i)
-{
-    if (bc == Inflow && i == 0) {
-        return;
-    }
-    int ni = face_positions.count - 1;
-
-    double yl = *GET(face_positions, i);
-    double yr = *GET(face_positions, i + 1);
-    double xl = yl * (a0 + adot * t);
-    double xr = yr * (a0 + adot * t);
-
-    double *urk = GET(conserved_rk, i);
-    double *prd = GET(primitive_rd, i);
-    double *urd = GET(conserved_rd, i);
-    double *uwr = GET(conserved_wr, i);
-    double *pli = i >= 0 + 1 ? GET(primitive_rd, i - 1) : NULL;
-    double *pri = i < ni - 1 ? GET(primitive_rd, i + 1) : NULL;
-    double *pki = i >= 0 + 2 ? GET(primitive_rd, i - 2) : NULL;
-    double *pti = i < ni - 2 ? GET(primitive_rd, i + 2) : NULL;
-
-    double plip[NCONS];
-    double plim[NCONS];
-    double prip[NCONS];
-    double prim[NCONS];
-    double gxli[NCONS];
-    double gxri[NCONS];
-    double gxcc[NCONS];
-
-    // NOTE: the gradient calculation here assumes smoothly varying face
-    // separations. Also note plm_gradient initializes the gradients to zero
-    // if any of the inputs are NULL.
-    plm_gradient(pki, pli, prd, gxli);
-    plm_gradient(pli, prd, pri, gxcc);
-    plm_gradient(prd, pri, pti, gxri);
-
-    for (int q = 0; q < NCONS; ++q)
-    {
-        plim[q] = pli ? pli[q] + 0.5 * gxli[q] : prd[q];
-        plip[q] = prd[q] - 0.5 * gxcc[q];
-        prim[q] = prd[q] + 0.5 * gxcc[q];
-        prip[q] = pri ? pri[q] - 0.5 * gxri[q] : prd[q];
-    }
-
-    double fli[NCONS];
-    double fri[NCONS];
-    double sources[NCONS];
-    double dal = face_area(coords, xl);
-    double dar = face_area(coords, xr);
-
-    riemann_hlle(plim, plip, yl * adot, fli);
-    riemann_hlle(prim, prip, yr * adot, fri);
-    geometric_source_terms(coords, xl, xr, prd, sources);
-
-    for (int q = 0; q < NCONS; ++q)
-    {
-        uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
-        uwr[q] = (1.0 - a) * uwr[q] + a * urk[q];
-    }
-}
-
-
 // ============================ KERNELS =======================================
 // ============================================================================
-#if defined(__NVCC__) || defined(__ROCM__)
-
-static void __global__ primitive_to_conserved_kernel(
-    struct Patch face_positions,
-    struct Patch primitive,
-    struct Patch conserved,
-    double scale_factor,
-    enum Coordinates coords)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (i < conserved.count)
-    {
-        primitive_to_conserved_zone(face_positions, primitive, conserved, scale_factor, coords, i);
-    }
-}
-
-static void __global__ conserved_to_primitive_kernel(
-    struct Patch face_positions,
-    struct Patch conserved,
-    struct Patch primitive,
-    double scale_factor,
-    enum Coordinates coords)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (i < conserved.count)
-    {
-        conserved_to_primitive_zone(face_positions, conserved, primitive, scale_factor, coords, i);
-    }
-}
-
-static void __global__ advance_rk_kernel(
-    struct Patch faces,
-    struct Patch conserved_rk,
-    struct Patch primitive_rd,
-    struct Patch conserved_rd,
-    struct Patch conserved_wr,
-    enum BoundaryCondition bc,
-    enum Coordinates coords,
-    double a0,
-    double adot,
-    double t,
-    double a,
-    double dt)
-{
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-
-    if (i < primitive_rd.count)
-    {
-        advance_rk_zone(faces, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
-    }
-}
-
-#endif
-
-
-// ============================ PUBLIC API ====================================
-// ============================================================================
 
 
 /**
- * Converts an array of primitive data to an array of conserved data. The
- * array index space must follow the descriptions below.
- * @param faces              The faces [ni = num_zones]
- * @param conserved_ptr[in]  [0] [ni] [3]
- * @param primitive_ptr[out] [0] [ni] [3]
- * @param mode               The execution mode
+ * Converts an array of primitive data to an array of conserved data.
+ *
+ * @param num_zones              The number of zones in the grid
+ * @param face_positions         The faces [num_zones + 1]
+ * @param primitive[in]          [num_zones] [NCONS]
+ * @param conserved[out]         [num_zones] [NCONS]
+ * @param scale_factor           The scale factor
+ * @param coords                 The coordinate system
  */
-EXTERN_C int srhd_1d_primitive_to_conserved(
+EXTERN_C void __global__ srhd_1d_primitive_to_conserved(
     int num_zones,
-    double *face_positions_ptr,
-    double *primitive_ptr,
-    double *conserved_ptr,
+    double *face_positions,
+    double *primitive,
+    double *conserved,
     double scale_factor,
-    enum Coordinates coords,
-    enum ExecutionMode mode)
+    enum Coordinates coords)
 {
-    struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
-    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
-    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);    
+    #if (EXEC_MODE == EXEC_GPU)
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= num_zones) return;
+    #elif (EXEC_MODE == EXEC_CPU)
+    for (int i = 0; i < num_zones; ++i)
+    #elif (EXEC_MODE == EXEC_OMP)
+    #pragma omp parallel for
+    for (int i = 0; i < num_zones; ++i)
+    #endif
 
-    switch (mode) {
-        case CPU: {
-            FOR_EACH(conserved) {
-                primitive_to_conserved_zone(face_positions, primitive, conserved, scale_factor, coords, i);
-            }
-            return 0;
-        }
-
-        case OMP: {
-            #ifdef _OPENMP
-            FOR_EACH_OMP(conserved) {
-                primitive_to_conserved_zone(face_positions, primitive, conserved, scale_factor, coords, i);
-            }
-            return 0;
-            #else
-            return 1;
-            #endif
-        }
-
-        case GPU: {
-            #if defined(__NVCC__) || defined(__ROCM__)
-            dim3 bs = dim3(256);
-            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            primitive_to_conserved_kernel<<<bd, bs>>>(face_positions, primitive, conserved, scale_factor, coords);
-            return 0;
-            #else
-            return 1;
-            #endif
-        }
+    {
+        double *p = &primitive[NCONS * i];
+        double *u = &conserved[NCONS * i];
+        double yl = face_positions[i];
+        double yr = face_positions[i + 1];
+        double xl = yl * scale_factor;
+        double xr = yr * scale_factor;
+        double dv = cell_volume(coords, xl, xr);
+        primitive_to_conserved(p, u, dv);
     }
-    return 1;
 }
 
 
 /**
- * Converts an array of conserved data to an array of primitive data. The
- * array index space must follow the descriptions below.
- * @param faces              The faces [ni = num_zones]
- * @param primitive_ptr[in ] [0] [ni] [3]
- * @param conserved_ptr[out] [0] [ni] [3]
- * @param mode               The execution mode
+ * Converts an array of conserved data to an array of primitive data.
+ *
+ * @param num_zones              The number of zones in the grid
+ * @param face_positions         The faces [num_zones + 1]
+ * @param conserved[out]         [num_zones] [NCONS]
+ * @param primitive[in]          [num_zones] [NCONS]
+ * @param scale_factor           The scale factor
+ * @param coords                 The coordinate system
  */
-EXTERN_C int srhd_1d_conserved_to_primitive(
+EXTERN_C void __global__ srhd_1d_conserved_to_primitive(
     int num_zones,
-    double *face_positions_ptr,
-    double *conserved_ptr,
-    double *primitive_ptr,
+    double *face_positions,
+    double *conserved,
+    double *primitive,
     double scale_factor,
-    enum Coordinates coords,
-    enum ExecutionMode mode)
+    enum Coordinates coords)
 {
-    struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
-    struct Patch primitive = patch(num_zones, NCONS, primitive_ptr);
-    struct Patch conserved = patch(num_zones, NCONS, conserved_ptr);    
+    #if (EXEC_MODE == EXEC_GPU)
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= num_zones) return;
+    #elif (EXEC_MODE == EXEC_CPU)
+    for (int i = 0; i < num_zones; ++i)
+    #elif (EXEC_MODE == EXEC_OMP)
+    #pragma omp parallel for
+    for (int i = 0; i < num_zones; ++i)
+    #endif
 
-    switch (mode) {
-        case CPU: {
-            FOR_EACH(conserved) {
-                conserved_to_primitive_zone(face_positions, conserved, primitive, scale_factor, coords, i);
-            }
-            return 0;
-        }
-
-        case OMP: {
-            #ifdef _OPENMP
-            FOR_EACH_OMP(conserved) {
-                conserved_to_primitive_zone(face_positions, conserved, primitive, scale_factor, coords, i);
-            }
-            return 0;
-            #else
-            return 1;
-            #endif
-        }
-
-        case GPU: {
-            #if defined(__NVCC__) || defined(__ROCM__)
-            dim3 bs = dim3(256);
-            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            conserved_to_primitive_kernel<<<bd, bs>>>(face_positions, conserved, primitive, scale_factor, coords);
-            return 0;
-            #else
-            return 1;
-            #endif
-        }
+    {
+        double *p = &primitive[NCONS * i];
+        double *u = &conserved[NCONS * i];
+        double yl = face_positions[i];
+        double yr = face_positions[i + 1];
+        double xl = yl * scale_factor;
+        double xr = yr * scale_factor;
+        double dv = cell_volume(coords, xl, xr);
+        conserved_to_primitive(u, p, dv);
     }
-    return 1;
 }
 
 
 /**
  * Updates an array of primitive data by advancing it a single Runge-Kutta
  * step.
- * @param face_positions_ptr[in] [num_zones + 1] [1]
- * @param conserved_rk_ptr[in]   [num_zones] [3]
- * @param primitive_rd_ptr[in]   [num_zones] [3]
- * @param conserved_rd_ptr[in]   [num_zones] [3]
- * @param conserved_wr_ptr[out]  [num_zones] [3]
+ *
+ * @param num_zones              The number of zones in the grid
+ * @param face_positions[in]     [num_zones + 1] [1]
+ * @param conserved_rk[in]       [num_zones] [NCONS]
+ * @param primitive_rd[in]       [num_zones] [NCONS]
+ * @param conserved_rd[in]       [num_zones] [NCONS]
+ * @param conserved_wr[out]      [num_zones] [NCONS]
  * @param a0                     The scale factor at t=0
  * @param adot                   The expansion rate
- * @param a                      The RK averaging parameter
+ * @param t                      The current time
+ * @param rk_param               The RK averaging parameter
  * @param dt                     The time step
- * @param bc                     The boundary conditions type
  * @param coords                 The coordinate system
- * @param mode                   The execution mode
+ * @param bc                     The boundary conditions type
  */
-EXTERN_C int srhd_1d_advance_rk(
+EXTERN_C void __global__ srhd_1d_advance_rk(
     int num_zones,
-    double *face_positions_ptr,
-    double *conserved_rk_ptr,
-    double *primitive_rd_ptr,
-    double *conserved_rd_ptr,
-    double *conserved_wr_ptr,
+    double *face_positions,
+    double *conserved_rk,
+    double *primitive_rd,
+    double *conserved_rd,
+    double *conserved_wr,
     double a0,
     double adot,
     double t,
-    double a,
+    double rk_param,
     double dt,
-    enum BoundaryCondition bc,
     enum Coordinates coords,
-    enum ExecutionMode mode)
+    enum BoundaryCondition bc)
 {
-    struct Patch face_positions = patch(num_zones + 1, 1, face_positions_ptr);
-    struct Patch conserved_rk = patch(num_zones, NCONS, conserved_rk_ptr);
-    struct Patch primitive_rd = patch(num_zones, NCONS, primitive_rd_ptr);
-    struct Patch conserved_rd = patch(num_zones, NCONS, conserved_rd_ptr);
-    struct Patch conserved_wr = patch(num_zones, NCONS, conserved_wr_ptr);
+    #if (EXEC_MODE == EXEC_GPU)
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= num_zones) return;
+    #elif (EXEC_MODE == EXEC_CPU)
+    for (int i = 0; i < num_zones; ++i)
+    #elif (EXEC_MODE == EXEC_OMP)
+    #pragma omp parallel for
+    for (int i = 0; i < num_zones; ++i)
+    #else
+    #endif
 
-    switch (mode) {
-        case CPU: {
-            FOR_EACH(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
-            }
-            return 0;
+    if (!(bc == Inflow && i == 0))
+    {
+        int ni = num_zones;
+        double yl = face_positions[i];
+        double yr = face_positions[i + 1];
+        double xl = yl * (a0 + adot * t);
+        double xr = yr * (a0 + adot * t);
+
+        double *urk = &conserved_rk[NCONS * i];
+        double *prd = &primitive_rd[NCONS * i];
+        double *urd = &conserved_rd[NCONS * i];
+        double *uwr = &conserved_wr[NCONS * i];
+        double *pli = i >= 0 + 1 ? &primitive_rd[NCONS * (i - 1)] : NULL;
+        double *pri = i < ni - 1 ? &primitive_rd[NCONS * (i + 1)] : NULL;
+        double *pki = i >= 0 + 2 ? &primitive_rd[NCONS * (i - 2)] : NULL;
+        double *pti = i < ni - 2 ? &primitive_rd[NCONS * (i + 2)] : NULL;
+
+        double plip[NCONS];
+        double plim[NCONS];
+        double prip[NCONS];
+        double prim[NCONS];
+        double gxli[NCONS];
+        double gxri[NCONS];
+        double gxcc[NCONS];
+
+        // NOTE: the gradient calculation here assumes smoothly varying face
+        // separations. Also note plm_gradient initializes the gradients to zero
+        // if any of the inputs are NULL.
+        plm_gradient(pki, pli, prd, gxli);
+        plm_gradient(pli, prd, pri, gxcc);
+        plm_gradient(prd, pri, pti, gxri);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            plim[q] = pli ? pli[q] + 0.5 * gxli[q] : prd[q];
+            plip[q] = prd[q] - 0.5 * gxcc[q];
+            prim[q] = prd[q] + 0.5 * gxcc[q];
+            prip[q] = pri ? pri[q] - 0.5 * gxri[q] : prd[q];
         }
 
-        case OMP: {
-            #ifdef _OPENMP
-            FOR_EACH_OMP(conserved_rk) {
-                advance_rk_zone(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt, i);
-            }
-            return 0;
-            #else
-            return 1;
-            #endif
-        }
+        double fli[NCONS];
+        double fri[NCONS];
+        double sources[NCONS];
+        double dal = face_area(coords, xl);
+        double dar = face_area(coords, xr);
 
-        case GPU: {
-            #if defined(__NVCC__) || defined(__ROCM__)
-            dim3 bs = dim3(256);
-            dim3 bd = dim3((num_zones + bs.x - 1) / bs.x);
-            advance_rk_kernel<<<bd, bs>>>(face_positions, conserved_rk, primitive_rd, conserved_rd, conserved_wr, bc, coords, a0, adot, t, a, dt);
-            return 0;
-            #else
-            return 1;
-            #endif
+        riemann_hlle(plim, plip, yl * adot, fli);
+        riemann_hlle(prim, prip, yr * adot, fri);
+        geometric_source_terms(coords, xl, xr, prd, sources);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
+            uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
         }
     }
-    return 1;
 }
