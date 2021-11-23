@@ -2,11 +2,11 @@ import logging
 import argparse
 import platform
 import time
-import numpy as np
 logging.basicConfig(level=logging.INFO, format='-> %(name)-22s %(message)s')
 
 
 def initial_condition(xcells):
+    import numpy as np
     primitive = np.zeros([xcells.size, 4])
     for x, p in zip(xcells, primitive):
         if x < 0.5:
@@ -18,21 +18,13 @@ def initial_condition(xcells):
     return primitive
 
 
-def main():
+def main(args):
     from sailfish.solvers import srhd_1d
     from sailfish import system
+    import numpy as np
 
-    parser = argparse.ArgumentParser()
-    exec_group = parser.add_mutually_exclusive_group()
-    exec_group.add_argument('--use-cpu', action='store_true', default=False, help='single-core (default)')
-    exec_group.add_argument('--use-omp', '-p', action='store_true', default=False, help='multi-core with OpenMP')
-    exec_group.add_argument('--use-gpu', '-g', action='store_true', default=False, help='gpu acceleration')
-    parser.add_argument('--resolution', '-n', metavar='N', default=10000, type=int, help='Grid resolution')
-    parser.add_argument('--fold', '-f', metavar='F', default=10, type=int, help='iterations between messages and side effects')
-
-    args = parser.parse_args()
+    logger = logging.getLogger('driver')
     mode = ['cpu', 'omp', 'gpu'][[args.use_cpu, args.use_omp, args.use_gpu, True].index(True) % 3]
-
     system.log_system_info(mode)
     system.configure_build()
 
@@ -44,6 +36,8 @@ def main():
 
     xcells = np.linspace(0.0, 1.0, num_zones)
     solver = srhd_1d.Solver(initial_condition(xcells), mode=mode)
+
+    logger.info('start simulation')
 
     while solver.time < 0.01:
         start = time.perf_counter()
@@ -64,7 +58,16 @@ def main():
 
 if __name__ == "__main__":
     try:
-        main()
+        parser = argparse.ArgumentParser()
+        exec_group = parser.add_mutually_exclusive_group()
+        exec_group.add_argument('--use-cpu', action='store_true', default=False, help='single-core (default)')
+        exec_group.add_argument('--use-omp', '-p', action='store_true', default=False, help='multi-core with OpenMP')
+        exec_group.add_argument('--use-gpu', '-g', action='store_true', default=False, help='gpu acceleration')
+        parser.add_argument('--resolution', '-n', metavar='N', default=10000, type=int, help='Grid resolution')
+        parser.add_argument('--fold', '-f', metavar='F', default=10, type=int, help='iterations between messages and side effects')
+        args = parser.parse_args()
+        main(args)
+
     except KeyboardInterrupt:
         print('')
         pass
