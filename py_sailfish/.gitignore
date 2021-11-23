@@ -1,4 +1,4 @@
 /trash
-/sailfish/__pycache__
+__pycache__
 *.so
 *.o
