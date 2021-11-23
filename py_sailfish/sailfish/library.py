@@ -1,3 +1,4 @@
+import tempfile
 import logging
 import os
 from ctypes import c_double, c_int, POINTER, CDLL
@@ -34,9 +35,9 @@ class Library:
                 extra_compile_args=build_config['extra_compile_args'],
                 extra_link_args=build_config['extra_link_args'],
             )
-            target = f'lib/{module}.so'
-            target = ffi.compile(target=target)
-            self.module = CDLL(target)
+            with tempfile.TemporaryDirectory() as tmpdir:
+                target = ffi.compile(tmpdir=tmpdir)
+                self.module = CDLL(target)
             self.xp = numpy
         if self.mode == 'gpu':
             import cupy
