@@ -1,9 +1,10 @@
 import logging
 import os
 from ctypes import c_double, c_int, POINTER, CDLL
-from sailfish import build_config
+from sailfish.system import build_config
 
 
+logger = logging.getLogger(__name__)
 block_size = 64
 
 
@@ -17,7 +18,7 @@ class Library:
         abs_path, _ = os.path.splitext(module_file)
         module = os.path.basename(abs_path)
 
-        logging.info(f'load solver library {module} for {mode} execution')
+        logger.info(f'load solver library {module} for {mode} execution')
 
         with open(f'{abs_path}.c', 'r') as srcfile:
             code = srcfile.read()

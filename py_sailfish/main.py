@@ -3,7 +3,7 @@ import argparse
 import platform
 import time
 import numpy as np
-logging.basicConfig(level=logging.INFO, format='[sailfish] %(message)s')
+logging.basicConfig(level=logging.INFO, format='-> %(name)-22s %(message)s')
 
 
 def initial_condition(xcells):
@@ -20,6 +20,7 @@ def initial_condition(xcells):
 
 def main():
     from sailfish.solvers import srhd_1d
+    from sailfish import system
 
     parser = argparse.ArgumentParser()
     exec_group = parser.add_mutually_exclusive_group()
@@ -31,7 +32,10 @@ def main():
 
     args = parser.parse_args()
     mode = ['cpu', 'omp', 'gpu'][[args.use_cpu, args.use_omp, args.use_gpu, True].index(True) % 3]
-    
+
+    system.log_system_info(mode)
+    system.configure_build()
+
     num_zones = args.resolution
     fold = args.fold
     cfl_number = 0.6

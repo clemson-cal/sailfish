@@ -1,4 +1,5 @@
-from sailfish import Library, get_array_module
+from sailfish import Library
+from sailfish.system import get_array_module
 
 
 """
