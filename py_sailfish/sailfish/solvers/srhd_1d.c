@@ -7,11 +7,11 @@
 #if (EXEC_MODE != EXEC_GPU)
 #include <math.h>
 #include <stddef.h>
-#define EXTERN_C
-#define __device__
-#define __global__
+#define PRIVATE static
+#define PUBLIC
 #else
-#define EXTERN_C extern "C"
+#define PRIVATE static __device__
+#define PUBLIC extern "C" __global__
 #endif
 
 enum BoundaryCondition {
@@ -41,7 +41,7 @@ enum Coordinates {
 #define sign(x) copysign(1.0, x)
 #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
 
-static __device__ double plm_gradient_scalar(double yl, double y0, double yr)
+PRIVATE double plm_gradient_scalar(double yl, double y0, double yr)
 {
     double a = (y0 - yl) * PLM_THETA;
     double b = (yr - yl) * 0.5;
@@ -49,7 +49,7 @@ static __device__ double plm_gradient_scalar(double yl, double y0, double yr)
     return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
 }
 
-static __device__ void plm_gradient(double *yl, double *y0, double *yr, double *g)
+PRIVATE void plm_gradient(double *yl, double *y0, double *yr, double *g)
 {
     if (yl && y0 && yr)
     {
@@ -70,36 +70,36 @@ static __device__ void plm_gradient(double *yl, double *y0, double *yr, double *
 
 // ============================ HYDRO =========================================
 // ============================================================================
-static __device__ double primitive_to_gamma_beta_squared(const double *prim)
+PRIVATE double primitive_to_gamma_beta_squared(const double *prim)
 {
     const double u1 = prim[1];
     return u1 * u1;
 }
 
-static __device__ double primitive_to_lorentz_factor(const double *prim)
+PRIVATE double primitive_to_lorentz_factor(const double *prim)
 {
     return sqrt(1.0 + primitive_to_gamma_beta_squared(prim));
 }
 
-static __device__ double primitive_to_gamma_beta_component(const double *prim)
+PRIVATE double primitive_to_gamma_beta_component(const double *prim)
 {
     return prim[1];
 }
 
-static __device__ double primitive_to_beta_component(const double *prim)
+PRIVATE double primitive_to_beta_component(const double *prim)
 {
     const double w = primitive_to_lorentz_factor(prim);
     return prim[1] / w;
 }
 
-static __device__ double primitive_to_enthalpy_density(const double* prim)
+PRIVATE double primitive_to_enthalpy_density(const double* prim)
 {
     const double rho = prim[0];
     const double pre = prim[2];
     return rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
 }
 
-static __device__ void conserved_to_primitive(const double *cons, double *prim, double dv)
+PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
 {
     const double newton_iter_max = 50;
     const double error_tolerance = 1e-12 * cons[0] / dv;
@@ -152,7 +152,7 @@ static __device__ void conserved_to_primitive(const double *cons, double *prim, 
     // }
 }
 
-static __device__ void primitive_to_conserved(const double *prim, double *cons, double dv)
+PRIVATE void primitive_to_conserved(const double *prim, double *cons, double dv)
 {
     const double rho = prim[0];
     const double u1 = prim[1];
@@ -168,7 +168,7 @@ static __device__ void primitive_to_conserved(const double *prim, double *cons, 
     cons[3] = dv * m * prim[3];
 }
 
-static __device__ void primitive_to_flux(const double *prim, const double *cons, double *flux)
+PRIVATE void primitive_to_flux(const double *prim, const double *cons, double *flux)
 {
     const double vn = primitive_to_beta_component(prim);
     const double pre = prim[2];
@@ -180,14 +180,14 @@ static __device__ void primitive_to_flux(const double *prim, const double *cons,
     flux[3] = vn * cons[0] * s;
 }
 
-static __device__ double primitive_to_sound_speed_squared(const double *prim)
+PRIVATE double primitive_to_sound_speed_squared(const double *prim)
 {
     const double pre = prim[2];
     const double rho_h = primitive_to_enthalpy_density(prim);
     return ADIABATIC_GAMMA * pre / rho_h;
 }
 
-static __device__ void primitive_to_outer_wavespeeds(const double *prim, double *wavespeeds)
+PRIVATE void primitive_to_outer_wavespeeds(const double *prim, double *wavespeeds)
 {
     const double a2 = primitive_to_sound_speed_squared(prim);
     const double un = primitive_to_gamma_beta_component(prim);
@@ -201,7 +201,7 @@ static __device__ void primitive_to_outer_wavespeeds(const double *prim, double 
     wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
 }
 
-static __device__ void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux)
+PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux)
 {
     double ul[NCONS];
     double ur[NCONS];
@@ -248,7 +248,7 @@ static __device__ void riemann_hlle(const double *pl, const double *pr, double v
 
 // ============================ GEOMETRY ======================================
 // ============================================================================
-static __device__ double face_area(enum Coordinates coords, double x)
+PRIVATE double face_area(enum Coordinates coords, double x)
 {
     switch (coords) {
         case Cartesian: return 1.0;
@@ -257,7 +257,7 @@ static __device__ double face_area(enum Coordinates coords, double x)
     return 0.0;
 }
 
-static __device__ double cell_volume(enum Coordinates coords, double x0, double x1) 
+PRIVATE double cell_volume(enum Coordinates coords, double x0, double x1) 
 {
     switch (coords) {
         case Cartesian: return x1 - x0;
@@ -266,7 +266,7 @@ static __device__ double cell_volume(enum Coordinates coords, double x0, double 
     return 0.0;
 }
 
-static __device__ void geometric_source_terms(enum Coordinates coords, double x0, double x1, const double *prim, double *source)
+PRIVATE void geometric_source_terms(enum Coordinates coords, double x0, double x1, const double *prim, double *source)
 {
     switch (coords) {
         case Spherical: {
@@ -301,7 +301,7 @@ static __device__ void geometric_source_terms(enum Coordinates coords, double x0
  * @param scale_factor           The scale factor
  * @param coords                 The coordinate system
  */
-EXTERN_C void __global__ srhd_1d_primitive_to_conserved(
+PUBLIC void srhd_1d_primitive_to_conserved(
     int num_zones,
     double *face_positions,
     double *primitive,
@@ -342,7 +342,7 @@ EXTERN_C void __global__ srhd_1d_primitive_to_conserved(
  * @param scale_factor           The scale factor
  * @param coords                 The coordinate system
  */
-EXTERN_C void __global__ srhd_1d_conserved_to_primitive(
+PUBLIC void srhd_1d_conserved_to_primitive(
     int num_zones,
     double *face_positions,
     double *conserved,
@@ -391,7 +391,7 @@ EXTERN_C void __global__ srhd_1d_conserved_to_primitive(
  * @param coords                 The coordinate system
  * @param bc                     The boundary conditions type
  */
-EXTERN_C void __global__ srhd_1d_advance_rk(
+PUBLIC void srhd_1d_advance_rk(
     int num_zones,
     double *face_positions,
     double *conserved_rk,
