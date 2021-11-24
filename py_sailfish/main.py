@@ -3,7 +3,37 @@ import argparse
 import platform
 import time
 
-logging.basicConfig(level=logging.INFO, format="-> %(name)-22s %(message)s")
+logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
+
+
+class RecurringTask:
+    def __init__(self, name, interval):
+        self.name = name
+        self.interval = interval
+        self.last_time = None
+        self.number = 0
+
+    def next_time(self, time):
+        if self.last_time is None:
+            return time
+        else:
+            return self.last_time + self.interval
+
+    def is_due(self, time):
+        return time >= self.next_time(time)
+
+    def next(self, time):
+        self.last_time = self.next_time(time)
+        self.number += 1
+
+
+def write_checkpoint(number, logger=None, **kwargs):
+    import pickle
+
+    with open(f"chkpt.{number:04d}.pk", "wb") as chkpt:
+        if logger is not None:
+            logger.info(f"write checkpoint {chkpt.name}")
+        pickle.dump(kwargs, chkpt)
 
 
 def initial_condition(xcells):
@@ -35,13 +65,26 @@ def main(args):
     cfl_number = 0.6
     dt = 1.0 / num_zones * cfl_number
     n = 0
+    checkpoint_task = RecurringTask("checkpoint", args.checkpoint)
 
+    logger.info("generate initial data")
     xcells = np.linspace(0.0, 1.0, num_zones)
     solver = srhd_1d.Solver(initial_condition(xcells), mode=mode)
-
     logger.info("start simulation")
 
-    while solver.time < 0.01:
+    def checkpoint():
+        write_checkpoint(
+            checkpoint_task.number,
+            logger=logger,
+            time=solver.time,
+            iteration=n,
+            primitive=solver.primitive,
+        )
+
+    while args.end_time is None or args.end_time > solver.time:
+        if checkpoint_task.is_due(solver.time):
+            checkpoint()
+            checkpoint_task.next(solver.time)
         start = time.perf_counter()
         for _ in range(fold):
             solver.new_timestep()
@@ -50,12 +93,10 @@ def main(args):
             n += 1
         stop = time.perf_counter()
         Mzps = num_zones / (stop - start) * 1e-6 * fold
+
         print(f"[{n:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
-    # np.save('chkpt.0000.npy', solver.primitive)
-    # import matplotlib.pyplot as plt
-    # plt.plot(xcells, solver.primitive[:,0])
-    # plt.show()
+    checkpoint()
 
 
 if __name__ == "__main__":
@@ -63,12 +104,10 @@ if __name__ == "__main__":
         parser = argparse.ArgumentParser()
         exec_group = parser.add_mutually_exclusive_group()
         exec_group.add_argument(
-            "--use-cpu",
-            "-c",
-            dest="mode",
-            action="store_const",
-            const="cpu",
-            help="single-core (default)",
+            "--mode",
+            default="cpu",
+            help="execution mode",
+            choices=["cpu", "omp", "gpu"],
         )
         exec_group.add_argument(
             "--use-omp",
@@ -86,19 +125,13 @@ if __name__ == "__main__":
             const="gpu",
             help="gpu acceleration",
         )
-        exec_group.add_argument(
-            "--mode",
-            default="cpu",
-            help="execution mode",
-            choices=["cpu", "omp", "gpu"],
-        )
         parser.add_argument(
             "--resolution",
             "-n",
             metavar="N",
             default=10000,
             type=int,
-            help="Grid resolution",
+            help="grid resolution",
         )
         parser.add_argument(
             "--fold",
@@ -108,9 +141,28 @@ if __name__ == "__main__":
             type=int,
             help="iterations between messages and side effects",
         )
+        parser.add_argument(
+            "--checkpoint",
+            "-c",
+            metavar="C",
+            default=1.0,
+            type=float,
+            help="how often to write a checkpoint file",
+        )
+        parser.add_argument(
+            "--end-time",
+            "-e",
+            metavar="E",
+            default=None,
+            type=float,
+            help="when to end the simulation",
+        )
         args = parser.parse_args()
         main(args)
 
     except KeyboardInterrupt:
         print("")
         pass
+
+# except Exception as e:
+#     print(e)
