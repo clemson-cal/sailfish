@@ -14,15 +14,11 @@
 #define PUBLIC extern "C" __global__
 #endif
 
-enum BoundaryCondition {
-    Inflow,
-    ZeroFlux,
-};
 
-enum Coordinates {
-    Cartesian,
-    Spherical,
-};
+#define BC_INFLOW 0
+#define BC_ZEROFLUX 1
+#define COORDS_CARTESIAN 0
+#define COORDS_SPHERICAL 1
 
 
 // ============================ PHYSICS =======================================
@@ -107,7 +103,7 @@ PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
     const double m               = cons[0] / dv;
     const double tau             = cons[2] / dv;
     const double ss              = cons[1] / dv * cons[1] / dv;
-    int iteration              = 0;
+    int iteration                = 0;
     double p                     = prim[2];
     double w0;
 
@@ -248,28 +244,28 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, dou
 
 // ============================ GEOMETRY ======================================
 // ============================================================================
-PRIVATE double face_area(enum Coordinates coords, double x)
+PRIVATE double face_area(int coords, double x)
 {
     switch (coords) {
-        case Cartesian: return 1.0;
-        case Spherical: return x * x;
+        case COORDS_CARTESIAN: return 1.0;
+        case COORDS_SPHERICAL: return x * x;
     }
     return 0.0;
 }
 
-PRIVATE double cell_volume(enum Coordinates coords, double x0, double x1) 
+PRIVATE double cell_volume(int coords, double x0, double x1) 
 {
     switch (coords) {
-        case Cartesian: return x1 - x0;
-        case Spherical: return (pow(x1, 3.0) - pow(x0, 3.0)) / 3.0;
+        case COORDS_CARTESIAN: return x1 - x0;
+        case COORDS_SPHERICAL: return (pow(x1, 3.0) - pow(x0, 3.0)) / 3.0;
     }
     return 0.0;
 }
 
-PRIVATE void geometric_source_terms(enum Coordinates coords, double x0, double x1, const double *prim, double *source)
+PRIVATE void geometric_source_terms(int coords, double x0, double x1, const double *prim, double *source)
 {
     switch (coords) {
-        case Spherical: {
+        case COORDS_SPHERICAL: {
             double p = prim[2];
             source[0] = 0.0;
             source[1] = p * (x1 * x1 - x0 * x0);
@@ -416,7 +412,7 @@ PUBLIC void srhd_1d_advance_rk(
     if (i >= num_zones) return;
     #endif
 
-    if (!(bc == Inflow && i == 0))
+    if (!(bc == BC_INFLOW && i == 0))
     {
         int ni = num_zones;
         double yl = face_positions[i];

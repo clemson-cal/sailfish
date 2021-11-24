@@ -79,26 +79,30 @@ class Library:
         if self.cpu_mode:
             kernel = getattr(self.module, symbol)
 
-            def invoke_cpu_kernel(*args):
+            def invoke_kernel(*args):
                 kernel(
                     *convert_args(self.cpu_mode, self.xp, symbol, expected_args, *args)
                 )
 
-            return invoke_cpu_kernel
+            return invoke_kernel
         else:
             kernel = self.module.get_function(symbol)
 
-            def invoke_gpu_kernel(*args):
+            def invoke_kernel(*args):
                 num_zones = args[0]
                 nb = ((num_zones + block_size - 1) // block_size,)
                 bs = (block_size,)
                 kernel(
                     nb,
                     bs,
-                    convert_args(self.cpu_mode, self.xp, symbol, expected_args, *args),
+                    tuple(
+                        convert_args(
+                            self.cpu_mode, self.xp, symbol, expected_args, *args
+                        )
+                    ),
                 )
 
-            return invoke_cpu_kernel
+            return invoke_kernel
 
 
 def convert_args(cpu_mode, xp, symbol, expected_args, *args):
