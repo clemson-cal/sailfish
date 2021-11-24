@@ -64,7 +64,7 @@ def main(args):
     fold = args.fold
     cfl_number = 0.6
     dt = 1.0 / num_zones * cfl_number
-    n = 0
+    iteration = 0
     checkpoint_task = RecurringTask("checkpoint", args.checkpoint)
 
     logger.info("generate initial data")
@@ -77,7 +77,7 @@ def main(args):
             checkpoint_task.number,
             logger=logger,
             time=solver.time,
-            iteration=n,
+            iteration=iteration,
             primitive=solver.primitive,
         )
 
@@ -90,11 +90,11 @@ def main(args):
             solver.new_timestep()
             solver.advance_rk(0.0, dt)
             solver.advance_rk(0.5, dt)
-            n += 1
+            iteration += 1
         stop = time.perf_counter()
         Mzps = num_zones / (stop - start) * 1e-6 * fold
 
-        print(f"[{n:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+        print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
     checkpoint()
 

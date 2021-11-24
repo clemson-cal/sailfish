@@ -1,4 +1,4 @@
-from sailfish import Library
+from sailfish.library import Library
 from sailfish.system import get_array_module
 
 
@@ -26,7 +26,7 @@ class Solver:
 
     def primitive_to_conserved(self, primitive):
         conserved = self.xp.zeros_like(primitive)
-        args = (
+        self.lib.srhd_1d_primitive_to_conserved(
             self.num_zones,
             self.faces,
             primitive,
@@ -34,11 +34,10 @@ class Solver:
             self.scale_factor(),
             self.coords,
         )
-        self.lib.invoke("srhd_1d_primitive_to_conserved", self.num_zones, args)
         return conserved
 
     def recompute_primitive(self):
-        args = (
+        self.lib.srhd_1d_conserved_to_primitive(
             self.num_zones,
             self.faces,
             self.conserved1,
@@ -46,11 +45,10 @@ class Solver:
             self.scale_factor(),
             self.coords,
         )
-        self.lib.invoke("srhd_1d_conserved_to_primitive", self.num_zones, args)
 
     def advance_rk(self, rk_param, dt):
         self.recompute_primitive()
-        args = (
+        self.lib.srhd_1d_advance_rk(
             self.num_zones,
             self.faces,
             self.conserved0,
@@ -65,7 +63,6 @@ class Solver:
             self.coords,
             self.boundary_condition,
         )
-        self.lib.invoke("srhd_1d_advance_rk", self.num_zones, args)
         self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 

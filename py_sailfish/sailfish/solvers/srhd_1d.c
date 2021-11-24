@@ -307,16 +307,16 @@ PUBLIC void srhd_1d_primitive_to_conserved(
     double *primitive,
     double *conserved,
     double scale_factor,
-    enum Coordinates coords)
+    int coords)
 {
-    #if (EXEC_MODE == EXEC_GPU)
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= num_zones) return;
-    #elif (EXEC_MODE == EXEC_CPU)
+    #if (EXEC_MODE == EXEC_CPU)
     for (int i = 0; i < num_zones; ++i)
     #elif (EXEC_MODE == EXEC_OMP)
     #pragma omp parallel for
     for (int i = 0; i < num_zones; ++i)
+    #elif (EXEC_MODE == EXEC_GPU)
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= num_zones) return;
     #endif
 
     {
@@ -348,16 +348,16 @@ PUBLIC void srhd_1d_conserved_to_primitive(
     double *conserved,
     double *primitive,
     double scale_factor,
-    enum Coordinates coords)
+    int coords)
 {
-    #if (EXEC_MODE == EXEC_GPU)
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= num_zones) return;
-    #elif (EXEC_MODE == EXEC_CPU)
+    #if (EXEC_MODE == EXEC_CPU)
     for (int i = 0; i < num_zones; ++i)
     #elif (EXEC_MODE == EXEC_OMP)
     #pragma omp parallel for
     for (int i = 0; i < num_zones; ++i)
+    #elif (EXEC_MODE == EXEC_GPU)
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= num_zones) return;
     #endif
 
     {
@@ -393,28 +393,27 @@ PUBLIC void srhd_1d_conserved_to_primitive(
  */
 PUBLIC void srhd_1d_advance_rk(
     int num_zones,
-    double *face_positions,
-    double *conserved_rk,
-    double *primitive_rd,
-    double *conserved_rd,
-    double *conserved_wr,
+    double *face_positions, /// [num_zones + 1, 1]
+    double *conserved_rk,   /// [num_zones, 4]
+    double *primitive_rd,   /// [num_zones, 4]
+    double *conserved_rd,   /// [num_zones, 4]
+    double *conserved_wr,   /// [num_zones, 4]
     double a0,
     double adot,
-    double t,
+    double time,
     double rk_param,
     double dt,
-    enum Coordinates coords,
-    enum BoundaryCondition bc)
+    int coords,
+    int bc)
 {
-    #if (EXEC_MODE == EXEC_GPU)
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= num_zones) return;
-    #elif (EXEC_MODE == EXEC_CPU)
+    #if (EXEC_MODE == EXEC_CPU)
     for (int i = 0; i < num_zones; ++i)
     #elif (EXEC_MODE == EXEC_OMP)
     #pragma omp parallel for
     for (int i = 0; i < num_zones; ++i)
-    #else
+    #elif (EXEC_MODE == EXEC_GPU)
+    int i = threadIdx.x + blockIdx.x * blockDim.x;
+    if (i >= num_zones) return;
     #endif
 
     if (!(bc == Inflow && i == 0))
@@ -422,8 +421,8 @@ PUBLIC void srhd_1d_advance_rk(
         int ni = num_zones;
         double yl = face_positions[i];
         double yr = face_positions[i + 1];
-        double xl = yl * (a0 + adot * t);
-        double xr = yr * (a0 + adot * t);
+        double xl = yl * (a0 + adot * time);
+        double xr = yr * (a0 + adot * time);
 
         double *urk = &conserved_rk[NCONS * i];
         double *prd = &primitive_rd[NCONS * i];
