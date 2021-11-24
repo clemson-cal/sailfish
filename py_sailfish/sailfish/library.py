@@ -70,6 +70,16 @@ class Library:
             self.xp = cupy
 
     def invoke(self, symbol, num_zones, args):
+        """
+        Invoke a function in the library.
+
+        The kernel name `symbol` must exist in the dynamic library. No
+        argument checking is possible here; `args` must be a tuple containing
+        the correct data types for the function signature, otherwise stack
+        correction is likely. The argument `num_zones` must be supplied for
+        GPU kernel launches, and is used to determine the total number of
+        threads involved in the launch.
+        """
         converted_args = [self.convert(arg) for arg in args]
         if self.mode in ['cpu', 'omp']:
             kernel = getattr(self.module, symbol)
@@ -81,6 +91,9 @@ class Library:
             kernel(nb, bs, converted_args)
 
     def convert(self, arg):
+        """
+        Prepare an argument to be passed to the kernel function.
+        """
         if self.mode in ['cpu', 'omp']:
             if type(arg) == int:
                 return c_int(arg)
