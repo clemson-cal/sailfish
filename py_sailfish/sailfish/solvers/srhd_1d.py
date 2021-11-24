@@ -2,11 +2,14 @@ from sailfish import Library
 from sailfish.system import get_array_module
 
 
+"""Adapter class to drive the srhd_1d C extension module.
 """
-Adapter class to drive the srhd_1d C extension module.
-"""
+
+
 class Solver:
-    def __init__(self, primitive, time=0.0, bc='inflow', coords='cartesian', mode='cpu'):
+    def __init__(
+        self, primitive, time=0.0, bc="inflow", coords="cartesian", mode="cpu"
+    ):
         self.xp = get_array_module(mode)
         self.lib = Library(__file__, mode=mode)
         self.num_zones = primitive.shape[0]
@@ -31,7 +34,7 @@ class Solver:
             self.scale_factor(),
             self.coords,
         )
-        self.lib.invoke('srhd_1d_primitive_to_conserved', self.num_zones, args)
+        self.lib.invoke("srhd_1d_primitive_to_conserved", self.num_zones, args)
         return conserved
 
     def recompute_primitive(self):
@@ -43,7 +46,7 @@ class Solver:
             self.scale_factor(),
             self.coords,
         )
-        self.lib.invoke('srhd_1d_conserved_to_primitive', self.num_zones, args)
+        self.lib.invoke("srhd_1d_conserved_to_primitive", self.num_zones, args)
 
     def advance_rk(self, rk_param, dt):
         self.recompute_primitive()
@@ -62,7 +65,7 @@ class Solver:
             self.coords,
             self.boundary_condition,
         )
-        self.lib.invoke('srhd_1d_advance_rk', self.num_zones, args)
+        self.lib.invoke("srhd_1d_advance_rk", self.num_zones, args)
         self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 

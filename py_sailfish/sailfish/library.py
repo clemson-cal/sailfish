@@ -35,36 +35,40 @@ is the responsibility of the user of the `Library` object to invoke the kernel
 functions with appropriate arguments. Kernels must be void functions, and only
 accept arguments in the form of int (or enum), double, or pointer-to-double.
 """
+
+
 class Library:
-    def __init__(self, module_file, mode='cpu'):
+    def __init__(self, module_file, mode="cpu"):
         self.mode = mode
 
         abs_path, _ = os.path.splitext(module_file)
         module = os.path.basename(abs_path)
 
-        logger.info(f'load solver library {module} for {mode} execution')
+        logger.info(f"load solver library {module} for {mode} execution")
 
-        with open(f'{abs_path}.c', 'r') as srcfile:
+        with open(f"{abs_path}.c", "r") as srcfile:
             code = srcfile.read()
 
-        if self.mode in ['cpu', 'omp']:
+        if self.mode in ["cpu", "omp"]:
             import cffi
             import numpy
+
             ffi = cffi.FFI()
             ffi.set_source(
                 module,
                 code,
-                define_macros=[('EXEC_MODE', dict(cpu=0, omp=1)[mode])],
-                extra_compile_args=build_config['extra_compile_args'],
-                extra_link_args=build_config['extra_link_args'],
+                define_macros=[("EXEC_MODE", dict(cpu=0, omp=1)[mode])],
+                extra_compile_args=build_config["extra_compile_args"],
+                extra_link_args=build_config["extra_link_args"],
             )
             with tempfile.TemporaryDirectory() as tmpdir:
                 target = ffi.compile(tmpdir=tmpdir)
                 self.module = CDLL(target)
             self.xp = numpy
-        if self.mode == 'gpu':
+        if self.mode == "gpu":
             import cupy
-            module = cupy.RawModule(code=code, options=('-D EXEC_MODE=2',))
+
+            module = cupy.RawModule(code=code, options=("-D EXEC_MODE=2",))
             module.compile()
             self.module = module
             self.xp = cupy
@@ -81,10 +85,10 @@ class Library:
         threads involved in the launch.
         """
         converted_args = [self.convert(arg) for arg in args]
-        if self.mode in ['cpu', 'omp']:
+        if self.mode in ["cpu", "omp"]:
             kernel = getattr(self.module, symbol)
             kernel(*converted_args)
-        elif self.mode == 'gpu':
+        elif self.mode == "gpu":
             nb = ((num_zones + block_size - 1) // block_size,)
             bs = (block_size,)
             kernel = self.module.get_function(symbol)
@@ -94,20 +98,20 @@ class Library:
         """
         Prepare an argument to be passed to the kernel function.
         """
-        if self.mode in ['cpu', 'omp']:
+        if self.mode in ["cpu", "omp"]:
             if type(arg) == int:
                 return c_int(arg)
             if type(arg) == float:
                 return c_double(arg)
             if type(arg) == self.xp.ndarray:
-                assert(arg.dtype == float)
+                assert arg.dtype == float
                 return arg.ctypes.data_as(POINTER(c_double))
-        elif self.mode == 'gpu':
+        elif self.mode == "gpu":
             if type(arg) == int:
                 return arg
             if type(arg) == float:
                 return arg
             if type(arg) == self.xp.ndarray:
-                assert(arg.dtype == float)
+                assert arg.dtype == float
                 return arg.data.ptr
         raise ValueError("kernel arguments must be int, float, or ndarray[float]")
