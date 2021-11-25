@@ -3,7 +3,7 @@ def scan(lines):
 
     function_name = re.compile(r"\s*PUBLIC\s+void\s+(?P<symbol>\w+)")
     argument_name = re.compile(
-        r"\s*(?P<dtype>\w+\s*\**)\s*(?P<argname>\w+)\s*[,\)]\s*(?:///)?\s*(?P<constraint>.*)"
+        r"\s*(?P<dtype>\w+\s*\**)\s*(?P<argname>\w+)\s*[,\)]\s*(?://)?\s*(?P<comment>.*)"
     )
     symbol = None
     for line in lines:
@@ -15,8 +15,10 @@ def scan(lines):
         else:
             match = argument_name.match(line)
             if match is not None:
-                dtype, argname, constraint = match.groups()
-                yield "argument", (dtype.replace(" ", ""), argname, constraint)
+                dtype, argname, comment = match.groups()
+                dtype = dtype.replace(" ", "")
+                constraint = comment.partition("::")[2]
+                yield "argument", (dtype, argname, constraint)
             else:
                 symbol = None
                 yield "end_symbol", None

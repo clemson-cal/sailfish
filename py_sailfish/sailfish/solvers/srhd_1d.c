@@ -289,13 +289,6 @@ PRIVATE void geometric_source_terms(int coords, double x0, double x1, const doub
 
 /**
  * Converts an array of primitive data to an array of conserved data.
- *
- * @param num_zones              The number of zones in the grid
- * @param face_positions         The faces [num_zones + 1]
- * @param primitive[in]          [num_zones] [NCONS]
- * @param conserved[out]         [num_zones] [NCONS]
- * @param scale_factor           The scale factor
- * @param coords                 The coordinate system
  */
 PUBLIC void srhd_1d_primitive_to_conserved(
     int num_zones,
@@ -330,13 +323,6 @@ PUBLIC void srhd_1d_primitive_to_conserved(
 
 /**
  * Converts an array of conserved data to an array of primitive data.
- *
- * @param num_zones              The number of zones in the grid
- * @param face_positions         The faces [num_zones + 1]
- * @param conserved[out]         [num_zones] [NCONS]
- * @param primitive[in]          [num_zones] [NCONS]
- * @param scale_factor           The scale factor
- * @param coords                 The coordinate system
  */
 PUBLIC void srhd_1d_conserved_to_primitive(
     int num_zones,
@@ -372,35 +358,21 @@ PUBLIC void srhd_1d_conserved_to_primitive(
 /**
  * Updates an array of primitive data by advancing it a single Runge-Kutta
  * step.
- *
- * @param num_zones              The number of zones in the grid
- * @param face_positions[in]     [num_zones + 1] [1]
- * @param conserved_rk[in]       [num_zones] [NCONS]
- * @param primitive_rd[in]       [num_zones] [NCONS]
- * @param conserved_rd[in]       [num_zones] [NCONS]
- * @param conserved_wr[out]      [num_zones] [NCONS]
- * @param a0                     The scale factor at t=0
- * @param adot                   The expansion rate
- * @param t                      The current time
- * @param rk_param               The RK averaging parameter
- * @param dt                     The time step
- * @param coords                 The coordinate system
- * @param bc                     The boundary conditions type
  */
 PUBLIC void srhd_1d_advance_rk(
-    int num_zones,
-    double *face_positions, /// [num_zones + 1, 1]
-    double *conserved_rk,   /// [num_zones, 4]
-    double *primitive_rd,   /// [num_zones, 4]
-    double *conserved_rd,   /// [num_zones, 4]
-    double *conserved_wr,   /// [num_zones, 4]
-    double a0,
-    double adot,
-    double time,
-    double rk_param,
-    double dt,
-    int coords,
-    int bc)
+    int num_zones,          // number of zones in the grid
+    double *face_positions, // :: $.shape == (num_zones + 1,)
+    double *conserved_rk,   // :: $.shape == (num_zones, 4)
+    double *primitive_rd,   // :: $.shape == (num_zones, 4)
+    double *conserved_rd,   // :: $.shape == (num_zones, 4)
+    double *conserved_wr,   // :: $.shape == (num_zones, 4)
+    double a0,              // scale factor at t=0
+    double adot,            // scale factor derivative
+    double time,            // current time
+    double rk_param,        // runge-kutta parameter
+    double dt,              // timestep size
+    int coords,             // :: $ in [0, 1]
+    int bc)                 // :: $ in [0, 1]
 {
     #if (EXEC_MODE == EXEC_CPU)
     for (int i = 0; i < num_zones; ++i)

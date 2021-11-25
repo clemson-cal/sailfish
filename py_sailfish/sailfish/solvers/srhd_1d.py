@@ -8,10 +8,15 @@ from sailfish.system import get_array_module
 
 class Solver:
     def __init__(
-        self, primitive, time=0.0, bc="inflow", coords="cartesian", mode="cpu"
+        self,
+        primitive,
+        time=0.0,
+        bc="inflow",
+        coords="cartesian",
+        mode="cpu",
     ):
         self.xp = get_array_module(mode)
-        self.lib = Library(__file__, mode=mode)
+        self.lib = Library(__file__, mode=mode, debug=True)
         self.num_zones = primitive.shape[0]
         self.faces = self.xp.linspace(0.0, 1.0, self.num_zones + 1)
         self.boundary_condition = dict(inflow=0, zeroflux=1)[bc]

@@ -6,7 +6,7 @@ from sailfish.system import build_config
 from sailfish.parse_api import parse_api
 
 logger = logging.getLogger(__name__)
-block_size = 64
+THREAD_BLOCK_SIZE = 64
 
 
 """
@@ -35,11 +35,15 @@ Supported arguments to kernel functions are int, double, or pointer-to-double.
 
 
 class Library:
-    def __init__(self, module_file, mode="cpu"):
+    def __init__(self, module_file, mode="cpu", debug=True):
         abs_path, _ = os.path.splitext(module_file)
         module = os.path.basename(abs_path)
+
         logger.info(f"load solver library {module} for {mode} execution")
+        logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
+
         filename = f"{abs_path}.c"
+        self.debug = debug
         self.cpu_mode = mode != "gpu"
         self.api = parse_api(filename)
 
@@ -74,64 +78,56 @@ class Library:
             self.xp = cupy
 
     def __getattr__(self, symbol):
-        expected_args = self.api[symbol]
+        arg_format = self.api[symbol]
 
         if self.cpu_mode:
             kernel = getattr(self.module, symbol)
-
-            def invoke_kernel(*args):
-                kernel(
-                    *convert_args(self.cpu_mode, self.xp, symbol, expected_args, *args)
-                )
-
-            return invoke_kernel
         else:
             kernel = self.module.get_function(symbol)
 
-            def invoke_kernel(*args):
+        def invoke_kernel(*args):
+            if self.debug:
+                validate_constraints(args, arg_format, symbol)
+                validate_types(args, arg_format, symbol, self.xp)
+
+            if self.cpu_mode:
+                kernel(*to_ctypes(args, arg_format))
+            else:
                 num_zones = args[0]
-                nb = ((num_zones + block_size - 1) // block_size,)
-                bs = (block_size,)
-                kernel(
-                    nb,
-                    bs,
-                    tuple(
-                        convert_args(
-                            self.cpu_mode, self.xp, symbol, expected_args, *args
-                        )
-                    ),
-                )
+                nb = ((num_zones + THREAD_BLOCK_SIZE - 1) // THREAD_BLOCK_SIZE,)
+                bs = (THREAD_BLOCK_SIZE,)
+                kernel(nb, bs, args)
 
-            return invoke_kernel
+        return invoke_kernel
 
 
-def convert_args(cpu_mode, xp, symbol, expected_args, *args):
-    if len(args) != len(expected_args):
+def to_ctypes(args, arg_format):
+    for arg, (typename, _, _) in zip(args, arg_format):
+        if typename == "int":
+            yield c_int(arg)
+        elif typename == "double":
+            yield c_double(arg)
+        elif typename == "double*":
+            yield arg.ctypes.data_as(POINTER(c_double))
+
+
+def validate_types(args, arg_format, symbol, xp):
+    if len(args) != len(arg_format):
         raise TypeError(
-            f"{symbol} takes exactly {len(expected_args)} arguments ({len(args)}) given"
+            f"{symbol} takes exactly {len(arg_format)} arguments ({len(args)}) given"
         )
-    for n, (arg, (typename, argname, constraint)) in enumerate(
-        zip(args, expected_args)
-    ):
+
+    for n, (arg, (typename, argname, constraint)) in enumerate(zip(args, arg_format)):
         if typename == "int":
             if type(arg) is not int:
                 raise TypeError(
                     f"argument {n} to {symbol} has type {type(arg)}, expected int"
                 )
-            if cpu_mode:
-                yield c_int(arg)
-            else:
-                yield arg
         elif typename == "double":
             if type(arg) is not float:
                 raise TypeError(
                     f"argument {n} to {symbol} has type {type(arg)}, expected float64"
                 )
-            if cpu_mode:
-                yield c_double(arg)
-            else:
-                assert type(arg) is float
-                yield arg
         elif typename == "double*":
             if type(arg) is not xp.ndarray:
                 raise TypeError(
@@ -141,7 +137,12 @@ def convert_args(cpu_mode, xp, symbol, expected_args, *args):
                 raise TypeError(
                     f"argument {n} to {symbol} has dtype {arg.dtype}, expected float64"
                 )
-            if cpu_mode:
-                yield arg.ctypes.data_as(POINTER(c_double))
-            else:
-                yield arg
+
+
+def validate_constraints(args, arg_format, symbol):
+    scope = dict(zip([a[1] for a in arg_format], args))
+    for arg, (_, name, constraint) in zip(args, arg_format):
+        if constraint:
+            c = constraint.replace("$", name)
+            if not eval(c, None, scope):
+                raise ValueError(f"argument constraint for {symbol} not satisfied: {c}")
