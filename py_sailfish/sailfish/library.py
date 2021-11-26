@@ -39,16 +39,13 @@ class Library:
         abs_path, _ = os.path.splitext(module_file)
         module = os.path.basename(abs_path)
 
-        logger.info(f"load solver library {module} for {mode} execution")
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
+        logger.info(f"load solver library {module} for {mode} execution")
 
         filename = f"{abs_path}.c"
         self.debug = debug
         self.cpu_mode = mode != "gpu"
         self.api = parse_api(filename)
-
-        for symbol in self.api:
-            logger.info(f"- {symbol}")
 
         with open(filename, "r") as srcfile:
             code = srcfile.read()
@@ -68,6 +65,7 @@ class Library:
             with tempfile.TemporaryDirectory() as tmpdir:
                 target = ffi.compile(tmpdir=tmpdir)
                 self.module = CDLL(target)
+
             self.xp = numpy
         else:
             import cupy
@@ -76,6 +74,9 @@ class Library:
             module.compile()
             self.module = module
             self.xp = cupy
+
+        for symbol in self.api:
+            logger.info(f"- {symbol}")
 
     def __getattr__(self, symbol):
         arg_format = self.api[symbol]
