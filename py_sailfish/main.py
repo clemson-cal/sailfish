@@ -1,12 +1,11 @@
-import logging
-
-logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
+class ConfigurationError(Exception):
+    """An invalid runtime configuration"""
 
 
 class RecurringTask:
-    def __init__(self, name, interval):
+    def __init__(self, name):
         self.name = name
-        self.interval = interval
+        self.interval = None
         self.last_time = None
         self.number = 0
 
@@ -28,7 +27,29 @@ def first_rest(a):
     if len(a) > 1:
         return a[0], a[1:]
     else:
-        return a[0], None
+        return a[0], []
+
+
+def update_namespace(new_args, old_args, frozen=[]):
+    for key in vars(new_args):
+        new_val = getattr(new_args, key)
+        old_val = getattr(old_args, key)
+        if old_val is not None:
+            if new_val is None:
+                setattr(new_args, key, old_val)
+            elif key in frozen and new_val != old_val:
+                raise ConfigurationError(f"{key} cannot be changed")
+
+
+def parse_parameters(item_list):
+    parameters = dict()
+    for item in item_list:
+        try:
+            key, val = item.split("=")
+            parameters[key] = eval(val)
+        except NameError:
+            raise ConfigurationError(f"badly formed model parameter {item}")
+    return parameters
 
 
 def write_checkpoint(number, logger=None, **kwargs):
@@ -40,7 +61,7 @@ def write_checkpoint(number, logger=None, **kwargs):
         pickle.dump(kwargs, chkpt)
 
 
-def initial_condition(num_zones):
+def initial_condition(num_zones, left_pressure=1.0):
     import numpy as np
 
     xcells = np.linspace(0.0, 1.0, num_zones)
@@ -59,35 +80,55 @@ def initial_condition(num_zones):
 def main(args):
     import numpy as np
     import pickle
+    import logging
+
     from time import perf_counter
     from sailfish.solvers import srhd_1d
     from sailfish import system
 
+    logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
     logger = logging.getLogger("driver")
-    mode = args.mode or "cpu"
-    system.log_system_info(mode)
-    system.configure_build()
-
-    num_zones = args.resolution or 10000
-    fold = args.fold or 10
-    cfl_number = 0.6
-    dt = 1.0 / num_zones * cfl_number
-    checkpoint_task = RecurringTask("checkpoint", args.checkpoint or 0.1)
-
-    setup_or_checkpoint, model_parameter_str = first_rest(args.command.split(":"))
+    setup_or_checkpoint, parameter_list = first_rest(args.command.split(":"))
 
     if setup_or_checkpoint.endswith(".pk"):
         logger.info("load checkpoint")
+
         with open(setup_or_checkpoint, "rb") as file:
             chkpt = pickle.load(file)
-        initial = chkpt["primitive"]
+        update_namespace(args, chkpt["args"], frozen=["resolution"])
+
+        parameters = chkpt["parameters"]
+        parameters.update(parse_parameters(parameter_list))
         iteration = chkpt["iteration"]
         time = chkpt["time"]
+        checkpoint_task = chkpt["checkpoint_task"]
+        initial = chkpt["primitive"]
+
     else:
         logger.info("generate initial data")
-        initial = initial_condition(num_zones)
+
+        if args.resolution is None:
+            args.resolution = 10000
+
+        parameters = parse_parameters(parameter_list)
         iteration = 0
         time = 0.0
+        checkpoint_task = RecurringTask("checkpoint")
+
+        try:
+            initial = initial_condition(args.resolution, **parameters)
+        except TypeError as e:
+            raise ConfigurationError(e)
+
+    num_zones = args.resolution
+    mode = args.mode or "cpu"
+    fold = args.fold or 10
+    cfl_number = 0.6
+    dt = 1.0 / num_zones * cfl_number
+    checkpoint_task.interval = args.checkpoint or 0.1
+
+    system.log_system_info(mode)
+    system.configure_build()
 
     solver = srhd_1d.Solver(initial, time, mode=mode)
     logger.info("start simulation")
@@ -102,6 +143,8 @@ def main(args):
             iteration=iteration,
             primitive=solver.primitive,
             args=args,
+            checkpoint_task=checkpoint_task,
+            parameters=parameters,
         )
 
     while end_time is None or end_time > solver.time:
@@ -127,28 +170,6 @@ if __name__ == "__main__":
 
     try:
         parser = argparse.ArgumentParser()
-        exec_group = parser.add_mutually_exclusive_group()
-        exec_group.add_argument(
-            "--mode",
-            help="execution mode",
-            choices=["cpu", "omp", "gpu"],
-        )
-        exec_group.add_argument(
-            "--use-omp",
-            "-p",
-            dest="mode",
-            action="store_const",
-            const="omp",
-            help="multi-core with OpenMP",
-        )
-        exec_group.add_argument(
-            "--use-gpu",
-            "-g",
-            dest="mode",
-            action="store_const",
-            const="gpu",
-            help="gpu acceleration",
-        )
         parser.add_argument(
             "command",
             help="setup name or restart file",
@@ -181,7 +202,32 @@ if __name__ == "__main__":
             type=float,
             help="when to end the simulation",
         )
+        exec_group = parser.add_mutually_exclusive_group()
+        exec_group.add_argument(
+            "--mode",
+            help="execution mode",
+            choices=["cpu", "omp", "gpu"],
+        )
+        exec_group.add_argument(
+            "--use-omp",
+            "-p",
+            dest="mode",
+            action="store_const",
+            const="omp",
+            help="multi-core with OpenMP",
+        )
+        exec_group.add_argument(
+            "--use-gpu",
+            "-g",
+            dest="mode",
+            action="store_const",
+            const="gpu",
+            help="gpu acceleration",
+        )
         main(parser.parse_args())
+
+    except ConfigurationError as e:
+        print(f"bad configuration: {e}")
 
     except ModuleNotFoundError as e:
         print(f"unsatisfied dependency: {e}")

@@ -115,7 +115,7 @@ def to_ctypes(args, arg_format):
 def validate_types(args, arg_format, symbol, xp):
     if len(args) != len(arg_format):
         raise TypeError(
-            f"{symbol} takes exactly {len(arg_format)} arguments ({len(args)}) given"
+            f"{symbol} takes exactly {len(arg_format)} arguments ({len(args)} given)"
         )
 
     for n, (arg, (typename, argname, constraint)) in enumerate(zip(args, arg_format)):
