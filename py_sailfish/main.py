@@ -68,18 +68,22 @@ def write_checkpoint(number, logger=None, **kwargs):
 
 
 def initial_condition(num_zones, left_pressure=1.0):
+    import math
     import numpy as np
 
     xcells = np.linspace(0.0, 1.0, num_zones)
     primitive = np.zeros([num_zones, 4])
 
     for x, p in zip(xcells, primitive):
-        if x < 0.5:
-            p[0] = 1.0
-            p[2] = 1.0
-        else:
-            p[0] = 0.1
-            p[2] = 0.125
+        p[0] = 1.0 + np.sin(x * 2 * math.pi) * 0.5
+        p[1] = 0.1
+        p[2] = 1.0
+        # if x < 0.5:
+        #     p[0] = 1.0
+        #     p[2] = 1.0
+        # else:
+        #     p[0] = 0.1
+        #     p[2] = 0.125
     return primitive
 
 
@@ -139,7 +143,7 @@ def main(args):
     solver = srhd_1d.Solver(initial, time, mode=mode)
     logger.info("start simulation")
 
-    end_time = args.end_time or 0.4
+    end_time = args.end_time if args.end_time is not None else 0.4
 
     def checkpoint():
         write_checkpoint(

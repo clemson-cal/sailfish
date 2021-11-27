@@ -2,7 +2,7 @@ from sailfish.library import Library
 from sailfish.system import get_array_module
 from sailfish.subdivide import subdivide
 
-NUM_PATCHES = 1
+NUM_PATCHES = 4
 
 
 class Patch:
@@ -111,10 +111,21 @@ class Solver:
             )
 
     def advance_rk(self, rk_param, dt):
-        self.patches[0].primitive1[:+2] = self.patches[0].primitive1[2:4]
-        self.patches[0].primitive1[-2:] = self.patches[0].primitive1[-4:-2]
-        self.patches[0].conserved1[:+2] = self.patches[0].conserved1[2:4]
-        self.patches[0].conserved1[-2:] = self.patches[0].conserved1[-4:-2]
+        patches = self.patches
+        num_patches = len(patches)
+        ng = 2
+        for i in range(num_patches):
+            im1 = (i + num_patches - 1) % num_patches
+            ip1 = (i + num_patches + 1) % num_patches
+            patches[i].primitive1[:+ng] = patches[im1].primitive1[-2 * ng : -ng]
+            patches[i].conserved1[:+ng] = patches[im1].conserved1[-2 * ng : -ng]
+            patches[i].primitive1[-ng:] = patches[ip1].primitive1[ng : 2 * ng]
+            patches[i].conserved1[-ng:] = patches[ip1].conserved1[ng : 2 * ng]
+
+        # self.patches[0].primitive1[:+2] = self.patches[0].primitive1[2:4]
+        # self.patches[0].primitive1[-2:] = self.patches[0].primitive1[-4:-2]
+        # self.patches[0].conserved1[:+2] = self.patches[0].conserved1[2:4]
+        # self.patches[0].conserved1[-2:] = self.patches[0].conserved1[-4:-2]
 
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
