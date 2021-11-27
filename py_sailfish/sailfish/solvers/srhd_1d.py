@@ -1,24 +1,26 @@
 from sailfish.library import Library
 from sailfish.system import get_array_module
+from sailfish.subdivide import subdivide
+
+NUM_PATCHES = 1
 
 
-"""Adapter class to drive the srhd_1d C extension module.
-"""
-
-
-class Solver:
+class Patch:
     def __init__(
         self,
+        idxrng,
+        dx,
         primitive,
-        time=0.0,
+        time,
+        lib,
+        xp,
         bc="inflow",
         coords="cartesian",
-        mode="cpu",
     ):
-        self.xp = get_array_module(mode)
-        self.lib = Library(__file__, mode=mode, debug=True)
+        self.lib = lib
+        self.xp = xp
         self.num_zones = primitive.shape[0]
-        self.faces = self.xp.linspace(0.0, 1.0, self.num_zones + 1)
+        self.faces = self.xp.array([i * dx for i in range(idxrng[0], idxrng[1] + 1)])
         self.boundary_condition = dict(inflow=0, zeroflux=1)[bc]
         self.coords = dict(cartesian=0, spherical=1)[coords]
         self.scale_factor_initial = 1.0
@@ -81,4 +83,54 @@ class Solver:
     @property
     def primitive(self):
         self.recompute_primitive()
-        return self.primitive1.copy()
+        return self.primitive1
+
+
+"""
+Adapter class to drive the srhd_1d C extension module.
+"""
+
+
+class Solver:
+    def __init__(self, primitive, time, mode="cpu", **kwargs):
+        num_zones = primitive.shape[0]
+        xp = get_array_module(mode)
+        dx = 1.0 / num_zones
+        ng = 2
+        lib = Library(__file__, mode=mode, debug=True)
+
+        self.patches = []
+        self.num_zones = num_zones
+        self.xp = xp
+
+        for (a, b) in subdivide(self.num_zones, NUM_PATCHES):
+            prim = xp.zeros([b - a + 2 * ng, 4])
+            prim[ng:-ng] = primitive[a:b]
+            self.patches.append(
+                Patch((a - ng, b + ng), dx, prim, time, lib, xp, **kwargs)
+            )
+
+    def advance_rk(self, rk_param, dt):
+        self.patches[0].primitive1[:+2] = self.patches[0].primitive1[2:4]
+        self.patches[0].primitive1[-2:] = self.patches[0].primitive1[-4:-2]
+        self.patches[0].conserved1[:+2] = self.patches[0].conserved1[2:4]
+        self.patches[0].conserved1[-2:] = self.patches[0].conserved1[-4:-2]
+
+        for patch in self.patches:
+            patch.advance_rk(rk_param, dt)
+
+    def new_timestep(self):
+        for patch in self.patches:
+            patch.new_timestep()
+
+    @property
+    def primitive(self):
+        ng = 2
+        primitive = self.xp.zeros([self.num_zones, 4])
+        for (a, b), patch in zip(subdivide(self.num_zones, NUM_PATCHES), self.patches):
+            primitive[a:b] = patch.primitive[ng:-ng]
+        return primitive
+
+    @property
+    def time(self):
+        return self.patches[0].time

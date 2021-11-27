@@ -3,11 +3,17 @@ class ConfigurationError(Exception):
 
 
 class RecurringTask:
-    def __init__(self, name):
-        self.name = name
-        self.interval = None
-        self.last_time = None
-        self.number = 0
+    def __init__(self, name_or_dict):
+        if type(name_or_dict) is dict:
+            self.name = name_or_dict["name"]
+            self.interval = name_or_dict["interval"]
+            self.last_time = name_or_dict["last_time"]
+            self.number = name_or_dict["number"]
+        else:
+            self.name = name_or_dict
+            self.interval = None
+            self.last_time = None
+            self.number = 0
 
     def next_time(self, time):
         if self.last_time is None:
@@ -101,7 +107,7 @@ def main(args):
         parameters.update(parse_parameters(parameter_list))
         iteration = chkpt["iteration"]
         time = chkpt["time"]
-        checkpoint_task = chkpt["checkpoint_task"]
+        checkpoint_task = RecurringTask(chkpt["checkpoint_task"])
         initial = chkpt["primitive"]
 
     else:
@@ -143,7 +149,7 @@ def main(args):
             iteration=iteration,
             primitive=solver.primitive,
             args=args,
-            checkpoint_task=checkpoint_task,
+            checkpoint_task=vars(checkpoint_task),
             parameters=parameters,
         )
 
