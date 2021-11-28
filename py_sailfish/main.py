@@ -1,5 +1,59 @@
+#!/usr/bin/env python3
+
+
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
+
+
+from abc import ABC, abstractmethod
+
+
+class Setup(ABC):
+    @abstractmethod
+    def initial_condition(self, x):
+        pass
+
+    @property
+    @abstractmethod
+    def domain(self):
+        pass
+
+    @property
+    @abstractmethod
+    def boundary_condition(self):
+        pass
+
+
+class Shocktube(Setup):
+    def __init__(self, pressure=1.0):
+        pass
+
+    def initial_condition(self, x):
+        pass
+
+    @property
+    def domain(self):
+        return [0.0, 1.0]
+
+    @property
+    def boundary_condition(self):
+        pass
+
+
+class DensityWave(Setup):
+    def __init__(self, pressure=1.0):
+        pass
+
+    def initial_condition(self, x):
+        pass
+
+    @property
+    def domain(self):
+        return [0.0, 1.0]
+
+    @property
+    def boundary_condition(self):
+        pass
 
 
 class RecurringTask:
@@ -96,7 +150,6 @@ def main(args):
     from sailfish.solvers import srhd_1d
     from sailfish import system
 
-    logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
     logger = logging.getLogger("driver")
     setup_or_checkpoint, parameter_list = first_rest(args.command.split(":"))
 
@@ -111,7 +164,7 @@ def main(args):
         parameters.update(parse_parameters(parameter_list))
         iteration = chkpt["iteration"]
         time = chkpt["time"]
-        checkpoint_task = RecurringTask(chkpt["checkpoint_task"])
+        checkpoint_task = RecurringTask(chkpt["tasks"]["checkpoint"])
         initial = chkpt["primitive"]
 
     else:
@@ -159,7 +212,7 @@ def main(args):
             iteration=iteration,
             primitive=solver.primitive,
             args=args,
-            checkpoint_task=vars(checkpoint_task),
+            tasks=dict(checkpoint=vars(checkpoint_task)),
             parameters=parameters,
         )
 
@@ -181,66 +234,100 @@ def main(args):
     checkpoint()
 
 
+def setups():
+    for subclass in Setup.__subclasses__():
+        yield "".join(
+            ["-" + c.lower() if c.isupper() else c for c in subclass.__name__]
+        ).lstrip("-")
+
+
 if __name__ == "__main__":
     import argparse
+    import logging
+    import textwrap
+
+    logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
+
+    parser = argparse.ArgumentParser(
+        prog="sailfish",
+        usage="%(prog)s <command> [options]",
+        description="gpu-accelerated astrophysical gasdynamics code",
+    )
+    parser.add_argument(
+        "command",
+        nargs="?",
+        help="setup name or restart file",
+    )
+    parser.add_argument(
+        "--describe",
+        nargs="*",
+        metavar="",
+        # action="store_true",
+        help="print a description of the setup and exit",
+    )
+    parser.add_argument(
+        "--resolution",
+        "-n",
+        metavar="N",
+        type=int,
+        help="grid resolution",
+    )
+    parser.add_argument(
+        "--fold",
+        "-f",
+        metavar="F",
+        type=int,
+        help="iterations between messages and side effects",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        "-c",
+        metavar="C",
+        type=float,
+        help="how often to write a checkpoint file",
+    )
+    parser.add_argument(
+        "--end-time",
+        "-e",
+        metavar="E",
+        type=float,
+        help="when to end the simulation",
+    )
+    exec_group = parser.add_mutually_exclusive_group()
+    exec_group.add_argument(
+        "--mode",
+        help="execution mode",
+        choices=["cpu", "omp", "gpu"],
+    )
+    exec_group.add_argument(
+        "--use-omp",
+        "-p",
+        dest="mode",
+        action="store_const",
+        const="omp",
+        help="multi-core with OpenMP",
+    )
+    exec_group.add_argument(
+        "--use-gpu",
+        "-g",
+        dest="mode",
+        action="store_const",
+        const="gpu",
+        help="gpu acceleration",
+    )
 
     try:
-        parser = argparse.ArgumentParser()
-        parser.add_argument(
-            "command",
-            help="setup name or restart file",
-        )
-        parser.add_argument(
-            "--resolution",
-            "-n",
-            metavar="N",
-            type=int,
-            help="grid resolution",
-        )
-        parser.add_argument(
-            "--fold",
-            "-f",
-            metavar="F",
-            type=int,
-            help="iterations between messages and side effects",
-        )
-        parser.add_argument(
-            "--checkpoint",
-            "-c",
-            metavar="C",
-            type=float,
-            help="how often to write a checkpoint file",
-        )
-        parser.add_argument(
-            "--end-time",
-            "-e",
-            metavar="E",
-            type=float,
-            help="when to end the simulation",
-        )
-        exec_group = parser.add_mutually_exclusive_group()
-        exec_group.add_argument(
-            "--mode",
-            help="execution mode",
-            choices=["cpu", "omp", "gpu"],
-        )
-        exec_group.add_argument(
-            "--use-omp",
-            "-p",
-            dest="mode",
-            action="store_const",
-            const="omp",
-            help="multi-core with OpenMP",
-        )
-        exec_group.add_argument(
-            "--use-gpu",
-            "-g",
-            dest="mode",
-            action="store_const",
-            const="gpu",
-            help="gpu acceleration",
-        )
-        main(parser.parse_args())
+        args = parser.parse_args()
+        if args.describe:
+            for setup in [args.command] + args.describe:
+                if setup is not None:
+                    print(f"printing setup description here for {setup}")
+        elif args.command is None:
+            print("specify setup:")
+            for setup in setups():
+                print(f"    {setup}")
+        else:
+            main(args)
 
     except ConfigurationError as e:
         print(f"bad configuration: {e}")

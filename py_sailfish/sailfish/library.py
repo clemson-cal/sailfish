@@ -40,7 +40,7 @@ class Library:
         module = os.path.basename(abs_path)
 
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
-        logger.info(f"load solver library {module} for {mode} execution")
+        logger.info(f"load module {module} for {mode} execution")
 
         filename = f"{abs_path}.c"
         self.debug = debug
@@ -76,7 +76,7 @@ class Library:
             self.xp = cupy
 
         for symbol in self.api:
-            logger.info(f"- {symbol}")
+            logger.info(f"  +-- {symbol}")
 
     def __getattr__(self, symbol):
         arg_format = self.api[symbol]

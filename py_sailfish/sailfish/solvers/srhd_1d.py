@@ -7,21 +7,28 @@ from sailfish.subdivide import subdivide
 logger = getLogger(__name__)
 
 
+"""
+Holds the array buffer state for the solution on a subset of the solution
+domain.
+"""
+
+
 class Patch:
     def __init__(
         self,
-        idxrng,
-        dx,
+        index_range,
+        grid_spacing,
         primitive,
         time,
         lib,
         xp,
         coordinates="cartesian",
     ):
+        i0, i1 = index_range
         self.lib = lib
         self.xp = xp
         self.num_zones = primitive.shape[0]
-        self.faces = self.xp.array([i * dx for i in range(idxrng[0], idxrng[1] + 1)])
+        self.faces = self.xp.array([i * grid_spacing for i in range(i0, i1 + 1)])
         self.coordinates = dict(cartesian=0, spherical=1)[coordinates]
         self.scale_factor_initial = 1.0
         self.scale_factor_derivative = 0.0
@@ -107,31 +114,32 @@ class Solver:
         num_patches=1,
         mode="cpu",
         boundary_condition="outflow",
-        **kwargs,
+        coordinates="cartesian",
     ):
         num_zones = primitive.shape[0]
         xp = get_array_module(mode)
         dx = 1.0 / num_zones
-        ng = 2
-        nq = 4
+        ng = 2  # number of guard zones
+        nq = 4  # number of conserved quantities
         lib = Library(__file__, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
-        logger.info(f"use {boundary_condition} boundary condition")
         logger.info(f"subdivide grid over {num_patches} patches")
+        logger.info(f"use {boundary_condition} boundary condition")
+        logger.info(f"use {coordinates} coordinates")
 
         self.boundary_condition = boundary_condition
         self.num_guard = ng
         self.num_cons = nq
-        self.patches = []
         self.num_zones = num_zones
         self.xp = xp
+        self.patches = []
 
         for (a, b) in subdivide(self.num_zones, num_patches):
             prim = xp.zeros([b - a + 2 * ng, nq])
             prim[ng:-ng] = primitive[a:b]
             self.patches.append(
-                Patch((a - ng, b + ng), dx, prim, time, lib, xp, **kwargs)
+                Patch((a - ng, b + ng), dx, prim, time, lib, xp, coordinates)
             )
 
     def advance_rk(self, rk_param, dt):
@@ -173,12 +181,12 @@ class Solver:
 
     @property
     def primitive(self):
+        nz = self.num_zones
         ng = self.num_guard
         nq = self.num_cons
+        np = len(self.patches)
         primitive = self.xp.zeros([self.num_zones, nq])
-        for (a, b), patch in zip(
-            subdivide(self.num_zones, len(self.patches)), self.patches
-        ):
+        for (a, b), patch in zip(subdivide(nz, np), self.patches):
             primitive[a:b] = patch.primitive[ng:-ng]
         return primitive
 
