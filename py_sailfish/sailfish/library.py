@@ -9,32 +9,33 @@ logger = logging.getLogger(__name__)
 THREAD_BLOCK_SIZE = 64
 
 
-"""
-Builds and maintains (in memory) a CPU or GPU dynamically compiled module.
-
-CPU modules are built with the cffi module. Build products including the .so
-file itself are placed in a temporary directory, and removed as soon as the
-module is loaded in memory. GPU modules are compiled with cupy.
-
-The C source code must adhere to several conventions:
-
-1. Be on the filesystem alongside `module_file`, with .c extension replacing
-   the .py extension
-2. Define a set of public API methods, or kernels
-3. Kernel functions are implemented in one of three modes: cpu=0, omp=1, or
-   gpu=2, specified to the C code as `EXEC_MODE`
-
-The kernel functions are configured by preprocessor macros to:
-
-- In CPU mode: wrap the function body in a serialized for-loop
-- In OMP mode: wrap the function body in an OpenMP-parallelized for-loop
-- In GPU mode: discover the kernel index and execute the function body once
-
-Supported arguments to kernel functions are int, double, or pointer-to-double.
-"""
-
-
 class Library:
+    """
+    Builds and maintains (in memory) a CPU or GPU dynamically compiled module.
+
+    CPU modules are built with the cffi module. Build products including the
+    .so file itself are placed in a temporary directory, and removed as soon
+    as the module is loaded in memory. GPU modules are compiled with cupy.
+
+    The C source code must adhere to several conventions:
+
+    1. Be on the filesystem alongside `module_file`, with .c extension
+       replacing the .py extension
+    2. Define a set of public API methods, or kernels
+    3. Kernel functions are implemented in one of three modes: cpu=0, omp=1,
+       or gpu=2, specified to the C code as `EXEC_MODE`
+
+    The kernel functions are configured by preprocessor macros to:
+
+    - In CPU mode: wrap the function body in a serialized for-loop
+    - In OMP mode: wrap the function body in an OpenMP-parallelized for-loop
+    - In GPU mode: discover the kernel index and execute the function body
+      once
+
+    Supported arguments to kernel functions are int, double, or
+    pointer-to-double.
+    """
+
     def __init__(self, module_file, mode="cpu", debug=True):
         abs_path, _ = os.path.splitext(module_file)
         module = os.path.basename(abs_path)

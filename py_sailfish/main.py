@@ -5,57 +5,6 @@ class ConfigurationError(Exception):
     """An invalid runtime configuration"""
 
 
-from abc import ABC, abstractmethod
-
-
-class Setup(ABC):
-    @abstractmethod
-    def initial_condition(self, x):
-        pass
-
-    @property
-    @abstractmethod
-    def domain(self):
-        pass
-
-    @property
-    @abstractmethod
-    def boundary_condition(self):
-        pass
-
-
-class Shocktube(Setup):
-    def __init__(self, pressure=1.0):
-        pass
-
-    def initial_condition(self, x):
-        pass
-
-    @property
-    def domain(self):
-        return [0.0, 1.0]
-
-    @property
-    def boundary_condition(self):
-        pass
-
-
-class DensityWave(Setup):
-    def __init__(self, pressure=1.0):
-        pass
-
-    def initial_condition(self, x):
-        pass
-
-    @property
-    def domain(self):
-        return [0.0, 1.0]
-
-    @property
-    def boundary_condition(self):
-        pass
-
-
 class RecurringTask:
     def __init__(self, name_or_dict):
         if type(name_or_dict) is dict:
@@ -121,7 +70,7 @@ def write_checkpoint(number, logger=None, **kwargs):
         pickle.dump(kwargs, chkpt)
 
 
-def initial_condition(num_zones, left_pressure=1.0):
+def initial_condition(setup, num_zones):
     import math
     import numpy as np
 
@@ -129,15 +78,8 @@ def initial_condition(num_zones, left_pressure=1.0):
     primitive = np.zeros([num_zones, 4])
 
     for x, p in zip(xcells, primitive):
-        # p[0] = 1.0 + np.sin(x * 2 * math.pi) * 0.5
-        # p[1] = 0.1
-        # p[2] = 1.0
-        if x < 0.5:
-            p[0] = 1.0
-            p[2] = 1.0
-        else:
-            p[0] = 0.1
-            p[2] = 0.125
+        setup.initial_primitive(x, p)
+
     return primitive
 
 
@@ -148,6 +90,7 @@ def main(args):
 
     from time import perf_counter
     from sailfish.solvers import srhd_1d
+    from sailfish.setup import Setup
     from sailfish import system
 
     logger = logging.getLogger("driver")
@@ -160,28 +103,33 @@ def main(args):
             chkpt = pickle.load(file)
         update_namespace(args, chkpt["args"], frozen=["resolution"])
 
+        chkpt["parameters"].update(parse_parameters(parameter_list))
+
+        setup_name = chkpt["setup_name"]
         parameters = chkpt["parameters"]
-        parameters.update(parse_parameters(parameter_list))
         iteration = chkpt["iteration"]
         time = chkpt["time"]
         checkpoint_task = RecurringTask(chkpt["tasks"]["checkpoint"])
         initial = chkpt["primitive"]
 
     else:
-        logger.info("generate initial data")
-
         if args.resolution is None:
             args.resolution = 10000
 
+        logger.info(f"generate initial data for setup {setup_or_checkpoint}")
+
+        setup_name = setup_or_checkpoint
         parameters = parse_parameters(parameter_list)
         iteration = 0
         time = 0.0
         checkpoint_task = RecurringTask("checkpoint")
+        setup = Setup.find_setup(setup_name)(**parameters)
+        initial = initial_condition(setup, args.resolution)
 
-        try:
-            initial = initial_condition(args.resolution, **parameters)
-        except TypeError as e:
-            raise ConfigurationError(e)
+        # try:
+        #     initial = initial_condition(args.resolution, **parameters)
+        # except TypeError as e:
+        #     raise ConfigurationError(e)
 
     num_zones = args.resolution
     mode = args.mode or "cpu"
@@ -214,6 +162,7 @@ def main(args):
             args=args,
             tasks=dict(checkpoint=vars(checkpoint_task)),
             parameters=parameters,
+            setup_name=setup_name,
         )
 
     while end_time is None or end_time > solver.time:
@@ -234,17 +183,11 @@ def main(args):
     checkpoint()
 
 
-def setups():
-    for subclass in Setup.__subclasses__():
-        yield "".join(
-            ["-" + c.lower() if c.isupper() else c for c in subclass.__name__]
-        ).lstrip("-")
-
-
 if __name__ == "__main__":
     import argparse
     import logging
     import textwrap
+    from sailfish.setup import Setup, SetupError
 
     logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
 
@@ -260,9 +203,7 @@ if __name__ == "__main__":
     )
     parser.add_argument(
         "--describe",
-        nargs="*",
-        metavar="",
-        # action="store_true",
+        action="store_true",
         help="print a description of the setup and exit",
     )
     parser.add_argument(
@@ -318,14 +259,24 @@ if __name__ == "__main__":
 
     try:
         args = parser.parse_args()
-        if args.describe:
-            for setup in [args.command] + args.describe:
-                if setup is not None:
-                    print(f"printing setup description here for {setup}")
+
+        if args.describe and args.command is not None:
+            setup_name = args.command
+            setup = Setup.find_setup(setup_name)
+            print(f"setup: {setup_name}")
+            print()
+            print(textwrap.dedent(setup.__doc__).strip())
+            print()
+            print("model parameters:")
+            for name, default, about in setup.model_parameters():
+                print(f"{name:.<16s} {default:<5} {about}")
+            print()
+
         elif args.command is None:
             print("specify setup:")
-            for setup in setups():
-                print(f"    {setup}")
+            for setup in Setup.__subclasses__():
+                print(f"    {setup.dash_case_class_name()}")
+
         else:
             main(args)
 
@@ -334,6 +285,9 @@ if __name__ == "__main__":
 
     except ModuleNotFoundError as e:
         print(f"unsatisfied dependency: {e}")
+
+    except SetupError as e:
+        print(f"error: {e}")
 
     except KeyboardInterrupt:
         print("")

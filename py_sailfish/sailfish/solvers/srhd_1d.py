@@ -7,13 +7,12 @@ from sailfish.subdivide import subdivide
 logger = getLogger(__name__)
 
 
-"""
-Holds the array buffer state for the solution on a subset of the solution
-domain.
-"""
-
-
 class Patch:
+    """
+    Holds the array buffer state for the solution on a subset of the
+    solution domain.
+    """
+
     def __init__(
         self,
         index_range,
