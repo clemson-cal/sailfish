@@ -19,14 +19,14 @@ class Setup(ABC):
     def __init__(self, **kwargs):
         for key, val, about in self.model_parameters():
             if key in kwargs:
-                if type(kwargs[key]) != type(val.default):
+                if type(kwargs[key]) != type(val):
                     raise SetupError(
-                        f"parameter '{key}' has type {type(val.default).__name__} "
+                        f"parameter '{key}' has type {type(val).__name__} "
                         f"(got {type(kwargs[key]).__name__})"
                     )
                 setattr(self, key, kwargs[key])
             else:
-                setattr(self, key, val.default)
+                setattr(self, key, val)
 
         for key, val in kwargs.items():
             if not hasattr(self, key):

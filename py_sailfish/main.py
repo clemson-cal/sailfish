@@ -70,11 +70,21 @@ def write_checkpoint(number, logger=None, **kwargs):
         pickle.dump(kwargs, chkpt)
 
 
-def initial_condition(setup, num_zones):
+def load_checkpoint(chkpt_name):
+    import pickle
+
+    try:
+        with open(chkpt_name, "rb") as file:
+            return pickle.load(file)
+    except FileNotFoundError:
+        raise ConfigurationError(f"could not open checkpoint file {chkpt_name}")
+
+
+def initial_condition(setup, num_zones, domain):
     import math
     import numpy as np
 
-    xcells = np.linspace(0.0, 1.0, num_zones)
+    xcells = np.linspace(domain[0], domain[1], num_zones)
     primitive = np.zeros([num_zones, 4])
 
     for x, p in zip(xcells, primitive):
@@ -84,29 +94,26 @@ def initial_condition(setup, num_zones):
 
 
 def main(args):
-    import numpy as np
-    import pickle
-    import logging
-
     from time import perf_counter
+    from logging import getLogger
     from sailfish.solvers import srhd_1d
     from sailfish.setup import Setup
     from sailfish import system
 
-    logger = logging.getLogger("driver")
+    logger = getLogger("driver")
     setup_or_checkpoint, parameter_list = first_rest(args.command.split(":"))
 
     if setup_or_checkpoint.endswith(".pk"):
-        logger.info("load checkpoint")
+        chkpt_name = setup_or_checkpoint
+        logger.info(f"load checkpoint {chkpt_name}")
 
-        with open(setup_or_checkpoint, "rb") as file:
-            chkpt = pickle.load(file)
-        update_namespace(args, chkpt["args"], frozen=["resolution"])
-
+        chkpt = load_checkpoint(chkpt_name)
         chkpt["parameters"].update(parse_parameters(parameter_list))
+        update_namespace(args, chkpt["args"], frozen=["resolution"])
 
         setup_name = chkpt["setup_name"]
         parameters = chkpt["parameters"]
+        setup = Setup.find_setup(setup_name)(**parameters)
         iteration = chkpt["iteration"]
         time = chkpt["time"]
         checkpoint_task = RecurringTask(chkpt["tasks"]["checkpoint"])
@@ -120,16 +127,11 @@ def main(args):
 
         setup_name = setup_or_checkpoint
         parameters = parse_parameters(parameter_list)
+        setup = Setup.find_setup(setup_name)(**parameters)
         iteration = 0
         time = 0.0
         checkpoint_task = RecurringTask("checkpoint")
-        setup = Setup.find_setup(setup_name)(**parameters)
-        initial = initial_condition(setup, args.resolution)
-
-        # try:
-        #     initial = initial_condition(args.resolution, **parameters)
-        # except TypeError as e:
-        #     raise ConfigurationError(e)
+        initial = initial_condition(setup, args.resolution, setup.domain)
 
     num_zones = args.resolution
     mode = args.mode or "cpu"
@@ -142,10 +144,11 @@ def main(args):
     system.configure_build()
 
     solver = srhd_1d.Solver(
-        initial,
-        time,
+        initial=initial,
+        time=time,
+        domain=setup.domain,
         num_patches=4,
-        boundary_condition="outflow",
+        boundary_condition=setup.boundary_condition,
         mode=mode,
     )
     logger.info("start simulation")
@@ -153,8 +156,9 @@ def main(args):
     end_time = args.end_time if args.end_time is not None else 0.4
 
     def checkpoint():
+        checkpoint_task.next(solver.time)
         write_checkpoint(
-            checkpoint_task.number,
+            checkpoint_task.number - 1,
             logger=logger,
             time=solver.time,
             iteration=iteration,
@@ -163,12 +167,13 @@ def main(args):
             tasks=dict(checkpoint=vars(checkpoint_task)),
             parameters=parameters,
             setup_name=setup_name,
+            domain=setup.domain,
         )
 
     while end_time is None or end_time > solver.time:
         if checkpoint_task.is_due(solver.time):
             checkpoint()
-            checkpoint_task.next(solver.time)
+
         start = perf_counter()
         for _ in range(fold):
             solver.new_timestep()

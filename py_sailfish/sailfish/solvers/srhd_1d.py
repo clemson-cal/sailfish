@@ -16,6 +16,7 @@ class Patch:
     def __init__(
         self,
         index_range,
+        grid_start,
         grid_spacing,
         primitive,
         time,
@@ -27,7 +28,9 @@ class Patch:
         self.lib = lib
         self.xp = xp
         self.num_zones = primitive.shape[0]
-        self.faces = self.xp.array([i * grid_spacing for i in range(i0, i1 + 1)])
+        self.faces = self.xp.array(
+            [grid_start + i * grid_spacing for i in range(i0, i1 + 1)]
+        )
         self.coordinates = dict(cartesian=0, spherical=1)[coordinates]
         self.scale_factor_initial = 1.0
         self.scale_factor_derivative = 0.0
@@ -108,22 +111,26 @@ Adapter class to drive the srhd_1d C extension module.
 class Solver:
     def __init__(
         self,
-        primitive,
-        time,
+        initial=None,
+        time=0.0,
+        domain=[0.0, 1.0],
         num_patches=1,
         mode="cpu",
         boundary_condition="outflow",
         coordinates="cartesian",
     ):
+        primitive = initial
         num_zones = primitive.shape[0]
         xp = get_array_module(mode)
-        dx = 1.0 / num_zones
+        x0, x1 = domain
+        dx = (x1 - x0) / num_zones
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
         lib = Library(__file__, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
+        logger.info(f"domain range is {domain}")
         logger.info(f"use {boundary_condition} boundary condition")
         logger.info(f"use {coordinates} coordinates")
 
@@ -138,7 +145,7 @@ class Solver:
             prim = xp.zeros([b - a + 2 * ng, nq])
             prim[ng:-ng] = primitive[a:b]
             self.patches.append(
-                Patch((a - ng, b + ng), dx, prim, time, lib, xp, coordinates)
+                Patch((a - ng, b + ng), x0, dx, prim, time, lib, xp, coordinates)
             )
 
     def advance_rk(self, rk_param, dt):
@@ -172,7 +179,9 @@ class Solver:
             else:
                 a0[-ng:] = ar[+ng : +2 * ng]
         else:
-            raise ValueError("boundary condition must be 'periodic | outflow'")
+            raise ValueError(
+                f"boundary condition must be 'periodic' | 'outflow' (got {bc})"
+            )
 
     def new_timestep(self):
         for patch in self.patches:

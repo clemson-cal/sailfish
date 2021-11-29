@@ -22,7 +22,7 @@ class Shocktube(Setup):
 
     @property
     def boundary_condition(self):
-        pass
+        return "outflow"
 
 
 class DensityWave(Setup):
@@ -49,4 +49,4 @@ class DensityWave(Setup):
 
     @property
     def boundary_condition(self):
-        pass
+        return "periodic"
