@@ -64,3 +64,7 @@ class Setup(ABC):
     @abstractmethod
     def boundary_condition(self):
         pass
+
+    @property
+    def end_time(self):
+        return None

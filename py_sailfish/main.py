@@ -6,17 +6,19 @@ class ConfigurationError(Exception):
 
 
 class RecurringTask:
-    def __init__(self, name_or_dict):
-        if type(name_or_dict) is dict:
-            self.name = name_or_dict["name"]
-            self.interval = name_or_dict["interval"]
-            self.last_time = name_or_dict["last_time"]
-            self.number = name_or_dict["number"]
-        else:
-            self.name = name_or_dict
-            self.interval = None
-            self.last_time = None
-            self.number = 0
+    def __init__(self, name):
+        self.name = name
+        self.interval = None
+        self.last_time = None
+        self.number = 0
+
+    @classmethod
+    def from_dict(cls, state):
+        task = RecurringTask(state["name"])
+        task.interval = state["interval"]
+        task.last_time = state["last_time"]
+        task.number = state["number"]
+        return task
 
     def next_time(self, time):
         if self.last_time is None:
@@ -37,6 +39,12 @@ def first_rest(a):
         return a[0], a[1:]
     else:
         return a[0], []
+
+
+def first_not_none(*args):
+    for arg in args:
+        if arg is not None:
+            return arg
 
 
 def update_namespace(new_args, old_args, frozen=[]):
@@ -100,10 +108,24 @@ def main(args):
     from sailfish.setup import Setup
     from sailfish import system
 
+    # Initialize and log state in the the system module. The build system
+    # influences JIT-compiled module code. Currently the build parameters are
+    # inferred from the platform (Linux or MacOS), but in the future these
+    # should also be extensible by a system-specific rc-style configuration
+    # file.
+    system.configure_build()
+    system.log_system_info(args.mode or "cpu")
+
     logger = getLogger("driver")
     setup_or_checkpoint, parameter_list = first_rest(args.command.split(":"))
 
     if setup_or_checkpoint.endswith(".pk"):
+        # Load driver state from a checkpoint file. The setup model parameters
+        # are updated with any items given on the command line after the setup
+        # name. All command line arguments are also restorted from the
+        # previous session, but are updated with the `args` variable (command
+        # line argument given for this session), except for "frozen"
+        # arguments.
         chkpt_name = setup_or_checkpoint
         logger.info(f"load checkpoint {chkpt_name}")
 
@@ -116,10 +138,14 @@ def main(args):
         setup = Setup.find_setup(setup_name)(**parameters)
         iteration = chkpt["iteration"]
         time = chkpt["time"]
-        checkpoint_task = RecurringTask(chkpt["tasks"]["checkpoint"])
+        checkpoint_task = RecurringTask.from_dict(chkpt["tasks"]["checkpoint"])
         initial = chkpt["primitive"]
 
     else:
+        """
+        Generate an initial driver state from command line arguments, model
+        parametrs, and a setup instance.
+        """
         if args.resolution is None:
             args.resolution = 10000
 
@@ -136,24 +162,25 @@ def main(args):
     num_zones = args.resolution
     mode = args.mode or "cpu"
     fold = args.fold or 10
-    cfl_number = 0.6
-    dt = 1.0 / num_zones * cfl_number
+    cfl_number = args.cfl_number or 0.6
+    dx = (setup.domain[1] - setup.domain[0]) / num_zones
+    dt = dx * cfl_number
     checkpoint_task.interval = args.checkpoint or 0.1
+    end_time = first_not_none(args.end_time, setup.end_time, 0.4)
 
-    system.log_system_info(mode)
-    system.configure_build()
-
+    # Construct a solver instance. TODO: the solver should be obtained from
+    # the setup instance.
     solver = srhd_1d.Solver(
         initial=initial,
         time=time,
         domain=setup.domain,
-        num_patches=4,
+        num_patches=1,
         boundary_condition=setup.boundary_condition,
         mode=mode,
     )
-    logger.info("start simulation")
-
-    end_time = args.end_time if args.end_time is not None else 0.4
+    logger.info(f"run until t={end_time}")
+    logger.info(f"CFL number is {cfl_number}")
+    logger.info(f"timestep is {dt}")
 
     def checkpoint():
         checkpoint_task.next(solver.time)
@@ -171,6 +198,10 @@ def main(args):
         )
 
     while end_time is None or end_time > solver.time:
+        # Run the main simulation loop. Iterations are grouped according the
+        # the fold parameter. Side effects including the iteration message are
+        # performed between fold boundaries.
+
         if checkpoint_task.is_due(solver.time):
             checkpoint()
 
@@ -217,6 +248,13 @@ if __name__ == "__main__":
         metavar="N",
         type=int,
         help="grid resolution",
+    )
+    parser.add_argument(
+        "--cfl",
+        dest="cfl_number",
+        metavar="C",
+        type=float,
+        help="CFL parameter",
     )
     parser.add_argument(
         "--fold",
