@@ -292,11 +292,11 @@ PRIVATE void geometric_source_terms(int coords, double x0, double x1, const doub
  */
 PUBLIC void srhd_1d_primitive_to_conserved(
     int num_zones,
-    double *face_positions,
-    double *primitive,
-    double *conserved,
-    double scale_factor,
-    int coords)
+    double *face_positions,  // :: $.shape == (num_zones + 1,)
+    double *primitive,       // :: $.shape == (num_zones, 4)
+    double *conserved,       // :: $.shape == (num_zones, 4)
+    double scale_factor,     // :: $ > 0.0
+    int coords)              // :: $ in [0, 1]
 {
     #if (EXEC_MODE == EXEC_CPU)
     for (int i = 0; i < num_zones; ++i)
@@ -326,11 +326,11 @@ PUBLIC void srhd_1d_primitive_to_conserved(
  */
 PUBLIC void srhd_1d_conserved_to_primitive(
     int num_zones,
-    double *face_positions,
-    double *conserved,
-    double *primitive,
-    double scale_factor,
-    int coords)
+    double *face_positions, // :: $.shape == (num_zones + 1,)
+    double *conserved,      // :: $.shape == (num_zones, 4)
+    double *primitive,      // :: $.shape == (num_zones, 4)
+    double scale_factor,    // :: $ > 0.0
+    int coords)             // :: $ in [0, 1]
 {
     #if (EXEC_MODE == EXEC_CPU)
     for (int i = 0; i < num_zones; ++i)
@@ -371,8 +371,7 @@ PUBLIC void srhd_1d_advance_rk(
     double time,            // current time
     double rk_param,        // runge-kutta parameter
     double dt,              // timestep size
-    int coords,             // :: $ in [0, 1]
-    int bc)                 // :: $ in [0, 1]
+    int coords)             // :: $ in [0, 1]
 {
     #if (EXEC_MODE == EXEC_CPU)
     for (int i = 0; i < num_zones; ++i)
@@ -384,7 +383,6 @@ PUBLIC void srhd_1d_advance_rk(
     if (i >= num_zones) return;
     #endif
 
-    if (!(bc == BC_INFLOW && i == 0))
     {
         int ni = num_zones;
         double yl = face_positions[i];

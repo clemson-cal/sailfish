@@ -89,7 +89,6 @@ def load_checkpoint(chkpt_name):
 
 
 def initial_condition(setup, num_zones, domain):
-    import math
     import numpy as np
 
     xcells = np.linspace(domain[0], domain[1], num_zones)

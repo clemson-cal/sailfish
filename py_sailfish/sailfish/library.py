@@ -1,6 +1,7 @@
-import tempfile
 import logging
 import os
+import tempfile
+import time
 from ctypes import c_double, c_int, POINTER, CDLL
 from sailfish.system import build_config
 from sailfish.parse_api import parse_api
@@ -43,6 +44,8 @@ class Library:
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
         logger.info(f"load module {module} for {mode} execution")
 
+        start = time.perf_counter()
+
         filename = f"{abs_path}.c"
         self.debug = debug
         self.cpu_mode = mode != "gpu"
@@ -75,6 +78,9 @@ class Library:
             module.compile()
             self.module = module
             self.xp = cupy
+
+        stop = time.perf_counter()
+        logger.info(f"module compilation took {stop - start:0.3}s")
 
         for symbol in self.api:
             logger.info(f"  +-- {symbol}")
