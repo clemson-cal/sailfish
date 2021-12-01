@@ -195,7 +195,7 @@ def main(**kwargs):
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt}")
 
-    setup.print_model_parameters()
+    setup.print_model_parameters(newlines=True)
 
     def checkpoint():
         checkpoint_task.next(solver.time)

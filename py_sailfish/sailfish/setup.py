@@ -81,10 +81,8 @@ class Setup(ABC):
         The output will include a normlized version of the class doc string,
         and the model parameter names, default values, and about message.
         """
-        print()
         print(f"setup: {cls.dash_case_class_name}")
-        print()
-        print(dedent(cls.__doc__).strip())
+        print(dedent(cls.__doc__))
         cls().print_model_parameters()
 
     @classmethod
@@ -124,15 +122,17 @@ class Setup(ABC):
             return True
         return False
 
-    def print_model_parameters(self):
+    def print_model_parameters(self, newlines=False):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
-        if self.has_model_parameters:
+        if newlines:
             print()
-            print("model parameters:")
+        if self.has_model_parameters:
+            print("model parameters:\n")
             for name, default, about in self.model_parameters:
                 print(f"{name:.<16s} {default:<5} {about}")
+        if newlines:
             print()
 
     @property
