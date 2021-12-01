@@ -47,13 +47,17 @@ def first_not_none(*args):
             return arg
 
 
-def update_namespace(new_args, old_args, frozen=[]):
-    for key in vars(new_args):
-        new_val = getattr(new_args, key)
-        old_val = getattr(old_args, key)
+def update_if_none(new_dict, old_dict, frozen=[]):
+    """
+    Like `dict.update`, except key-value pairs in `old_dict` are only used to
+    add / overwrite values in `new_dict` if they are `None` or missing.
+    """
+    for key in old_dict:
+        old_val = old_dict.get(key)
+        new_val = new_dict.get(key)
         if old_val is not None:
             if new_val is None:
-                setattr(new_args, key, old_val)
+                new_dict[key] = old_val
             elif key in frozen and new_val != old_val:
                 raise ConfigurationError(f"{key} cannot be changed")
 
@@ -100,7 +104,7 @@ def initial_condition(setup, num_zones, domain):
     return primitive
 
 
-def main(args):
+def main(**kwargs):
     from time import perf_counter
     from logging import getLogger
     from sailfish.solvers import srhd_1d
@@ -113,28 +117,31 @@ def main(args):
     # should also be extensible by a system-specific rc-style configuration
     # file.
     system.configure_build()
-    system.log_system_info(args.mode or "cpu")
+    system.log_system_info(kwargs["mode"] or "cpu")
 
     logger = getLogger("driver")
-    setup_or_checkpoint, parameter_list = first_rest(args.command.split(":"))
+    setup_or_checkpoint, parameter_list = first_rest(kwargs["command"].split(":"))
 
     if setup_or_checkpoint.endswith(".pk"):
         # Load driver state from a checkpoint file. The setup model parameters
         # are updated with any items given on the command line after the setup
         # name. All command line arguments are also restorted from the
-        # previous session, but are updated with the `args` variable (command
+        # previous session, but are updated with the `kwargs` variable (command
         # line argument given for this session), except for "frozen"
         # arguments.
         chkpt_name = setup_or_checkpoint
         logger.info(f"load checkpoint {chkpt_name}")
 
         chkpt = load_checkpoint(chkpt_name)
-        chkpt["parameters"].update(parse_parameters(parameter_list))
-        update_namespace(args, chkpt["args"], frozen=["resolution"])
-
         setup_name = chkpt["setup_name"]
-        parameters = chkpt["parameters"]
-        setup = Setup.find_setup(setup_name)(**parameters)
+        parameters = parse_parameters(parameter_list)
+
+        SetupCls = Setup.find_setup_class(setup_name)
+        frozen_params = SetupCls.immutable_parameter_keys()
+        update_if_none(parameters, chkpt["parameters"], frozen=frozen_params)
+        update_if_none(kwargs, chkpt["driver_args"], frozen=["resolution"])
+
+        setup = SetupCls(**parameters)
         iteration = chkpt["iteration"]
         time = chkpt["time"]
         checkpoint_task = RecurringTask.from_dict(chkpt["tasks"]["checkpoint"])
@@ -145,27 +152,27 @@ def main(args):
         Generate an initial driver state from command line arguments, model
         parametrs, and a setup instance.
         """
-        if args.resolution is None:
-            args.resolution = 10000
+        if kwargs["resolution"] is None:
+            kwargs["resolution"] = 10000
 
         logger.info(f"generate initial data for setup {setup_or_checkpoint}")
 
         setup_name = setup_or_checkpoint
         parameters = parse_parameters(parameter_list)
-        setup = Setup.find_setup(setup_name)(**parameters)
+        setup = Setup.find_setup_class(setup_name)(**parameters)
         iteration = 0
         time = 0.0
         checkpoint_task = RecurringTask("checkpoint")
-        initial = initial_condition(setup, args.resolution, setup.domain)
+        initial = initial_condition(setup, kwargs["resolution"], setup.domain)
 
-    num_zones = args.resolution
-    mode = args.mode or "cpu"
-    fold = args.fold or 10
-    cfl_number = args.cfl_number or 0.6
+    num_zones = kwargs["resolution"]
+    mode = kwargs["mode"] or "cpu"
+    fold = kwargs["fold"] or 10
+    cfl_number = kwargs["cfl_number"] or 0.6
     dx = (setup.domain[1] - setup.domain[0]) / num_zones
     dt = dx * cfl_number
-    checkpoint_task.interval = args.checkpoint or 0.1
-    end_time = first_not_none(args.end_time, setup.end_time, 0.4)
+    checkpoint_task.interval = kwargs["checkpoint"] or 0.1
+    end_time = first_not_none(kwargs["end_time"], setup.end_time, float("inf"))
 
     # Construct a solver instance. TODO: the solver should be obtained from
     # the setup instance.
@@ -181,6 +188,8 @@ def main(args):
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt}")
 
+    setup.print_model_parameters()
+
     def checkpoint():
         checkpoint_task.next(solver.time)
         write_checkpoint(
@@ -189,7 +198,7 @@ def main(args):
             time=solver.time,
             iteration=iteration,
             primitive=solver.primitive,
-            args=args,
+            driver_args=kwargs,
             tasks=dict(checkpoint=vars(checkpoint_task)),
             parameters=parameters,
             setup_name=setup_name,
@@ -221,7 +230,6 @@ def main(args):
 if __name__ == "__main__":
     import argparse
     import logging
-    import textwrap
     from sailfish.setup import Setup, SetupError
 
     logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
@@ -303,16 +311,8 @@ if __name__ == "__main__":
         args = parser.parse_args()
 
         if args.describe and args.command is not None:
-            setup_name = args.command
-            setup = Setup.find_setup(setup_name)
-            print(f"setup: {setup_name}")
-            print()
-            print(textwrap.dedent(setup.__doc__).strip())
-            print()
-            print("model parameters:")
-            for name, default, about in setup.model_parameters():
-                print(f"{name:.<16s} {default:<5} {about}")
-            print()
+            setup_name = args.command.split(":")[0]
+            Setup.find_setup_class(setup_name).describe_class()
 
         elif args.command is None:
             print("specify setup:")
@@ -320,7 +320,7 @@ if __name__ == "__main__":
                 print(f"    {setup.dash_case_class_name()}")
 
         else:
-            main(args)
+            main(**vars(args))
 
     except ConfigurationError as e:
         print(f"bad configuration: {e}")

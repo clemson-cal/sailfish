@@ -43,6 +43,7 @@ class Patch:
             self.conserved2 = self.conserved0.copy()
 
     def execution_context(self):
+        """TODO: return a CUDA context for execution on the assigned device"""
         return nullcontext()
 
     def primitive_to_conserved(self, primitive):

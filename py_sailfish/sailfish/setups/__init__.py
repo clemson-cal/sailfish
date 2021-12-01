@@ -50,3 +50,7 @@ class DensityWave(Setup):
     @property
     def boundary_condition(self):
         return "periodic"
+
+    @property
+    def end_time(self):
+        return 1.0
