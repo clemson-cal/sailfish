@@ -103,12 +103,11 @@ class Patch:
         return self.primitive1
 
 
-"""
-Adapter class to drive the srhd_1d C extension module.
-"""
-
-
 class Solver:
+    """
+    Adapter class to drive the srhd_1d C extension module.
+    """
+
     def __init__(
         self,
         initial=None,
@@ -148,21 +147,27 @@ class Solver:
                 Patch((a - ng, b + ng), x0, dx, prim, time, lib, xp, coordinates)
             )
 
-    def advance_rk(self, rk_param, dt):
-        ng = self.num_guard
-        patches = self.patches
-        num_patches = len(patches)
-        for i in range(num_patches):
-            pl = self.patches[(i + num_patches - 1) % num_patches]
-            p0 = self.patches[i]
-            pr = self.patches[(i + num_patches + 1) % num_patches]
-            self.set_bc(pl.primitive1, p0.primitive1, pr.primitive1, i)
-            self.set_bc(pl.conserved1, p0.conserved1, pr.conserved1, i)
+        self.set_bc("primitive1")
+        self.set_bc("conserved1")
 
+    def advance_rk(self, rk_param, dt):
+        self.set_bc("conserved1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
 
-    def set_bc(self, al, a0, ar, index):
+    def set_bc(self, array):
+        ng = self.num_guard
+        patches = self.patches
+        num_patches = len(patches)
+        for i0 in range(num_patches):
+            il = (i0 + num_patches - 1) % num_patches
+            ir = (i0 + num_patches + 1) % num_patches
+            pl = getattr(self.patches[il], array)
+            p0 = getattr(self.patches[i0], array)
+            pr = getattr(self.patches[ir], array)
+            self.set_bc_patch(pl, p0, pr, i0)
+
+    def set_bc_patch(self, al, a0, ar, index):
         ng = self.num_guard
         bc = self.boundary_condition
 
