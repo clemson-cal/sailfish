@@ -1,5 +1,6 @@
 import logging
 import os
+import hashlib
 import tempfile
 import time
 from ctypes import c_double, c_int, POINTER, CDLL
@@ -42,7 +43,7 @@ class Library:
         module = os.path.basename(abs_path)
 
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
-        logger.info(f"load module {module} for {mode} execution")
+        logger.info(f"prepare module {module} for {mode} execution")
 
         start = time.perf_counter()
 
@@ -66,9 +67,21 @@ class Library:
                 extra_compile_args=build_config["extra_compile_args"],
                 extra_link_args=build_config["extra_link_args"],
             )
-            with tempfile.TemporaryDirectory() as tmpdir:
-                target = ffi.compile(tmpdir=tmpdir)
+            libname = hashlib.sha256(code.encode("utf-8")).hexdigest()
+            cache_dir = os.path.join(".sailfish", libname)
+
+            # with tempfile.TemporaryDirectory() as tmpdir:
+            try:
+                so_name = os.path.join(
+                    cache_dir,
+                    next(filter(lambda f: f.endswith(".so"), os.listdir(cache_dir))),
+                )
+                self.module = CDLL(so_name)
+                logger.info(f"load cached library")
+            except (FileNotFoundError, StopIteration) as e:
+                target = ffi.compile(cache_dir)
                 self.module = CDLL(target)
+                logger.info(f"recompile library")
 
             self.xp = numpy
         else:
@@ -80,10 +93,10 @@ class Library:
             self.xp = cupy
 
         stop = time.perf_counter()
-        logger.info(f"module compilation took {stop - start:0.3}s")
+        logger.info(f"module preparation took {stop - start:0.3}s")
 
         for symbol in self.api:
-            logger.info(f"  +-- {symbol}")
+            logger.info(f"+-- {symbol}")
 
     def __getattr__(self, symbol):
         arg_format = self.api[symbol]

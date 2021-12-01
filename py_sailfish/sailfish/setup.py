@@ -92,15 +92,22 @@ class Setup(ABC):
         except StopIteration:
             raise SetupError(f"no setup named {name}")
 
+    @classmethod
+    def has_model_parameters(cls):
+        for _ in cls.default_model_parameters():
+            return True
+        return False
+
     def print_model_parameters(self):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
-        print()
-        print("model parameters:")
-        for name, default, about in self.model_parameters():
-            print(f"{name:.<16s} {default:<5} {about}")
-        print()
+        if self.has_model_parameters():
+            print()
+            print("model parameters:")
+            for name, default, about in self.model_parameters():
+                print(f"{name:.<16s} {default:<5} {about}")
+            print()
 
     def model_parameters(self):
         """

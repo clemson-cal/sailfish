@@ -1,5 +1,5 @@
 from math import pi, sin
-from sailfish.setup import Setup, parameter
+from sailfish.setup import Setup, SetupError, parameter
 
 
 class Shocktube(Setup):
@@ -54,3 +54,7 @@ class DensityWave(Setup):
     @property
     def end_time(self):
         return 1.0
+
+    def validate(self):
+        if self.amplitude >= 1.0:
+            raise SetupError("amplitude must be less than 1.0")
