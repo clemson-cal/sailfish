@@ -36,7 +36,7 @@ class Setup(ABC):
     """
 
     def __init__(self, **kwargs):
-        for key, val, about in type(self).default_model_parameters():
+        for key, val, about in type(self).default_model_parameters:
             if key in kwargs:
                 if type(kwargs[key]) != type(val):
                     raise SetupError(
@@ -54,6 +54,7 @@ class Setup(ABC):
         self.validate()
 
     @classmethod
+    @property
     def default_model_parameters(cls):
         """
         Return an iterator over the default model parameters for this class.
@@ -63,6 +64,7 @@ class Setup(ABC):
                 yield key, val.default, val.about
 
     @classmethod
+    @property
     def immutable_parameter_keys(cls):
         """
         Return an iterator over the immutable model parameter keys.
@@ -73,28 +75,52 @@ class Setup(ABC):
 
     @classmethod
     def describe_class(cls):
+        """
+        Print formatted text describing the setup.
+
+        The output will include a normlized version of the class doc string,
+        and the model parameter names, default values, and about message.
+        """
         print()
-        print(f"setup: {cls.dash_case_class_name()}")
+        print(f"setup: {cls.dash_case_class_name}")
         print()
         print(dedent(cls.__doc__).strip())
         cls().print_model_parameters()
 
     @classmethod
+    @property
     def dash_case_class_name(cls):
-        n = cls.__name__
-        return "".join(["-" + c.lower() if c.isupper() else c for c in n]).lstrip("-")
+        """
+        Return a `dash-case` name of this setup class.
+
+        Dash case is used in configuration, including the setup name passed to
+        the driver, and written in checkpoint files.
+        """
+        return "".join(
+            ["-" + c.lower() if c.isupper() else c for c in cls.__name__]
+        ).lstrip("-")
 
     @classmethod
     def find_setup_class(cls, name):
-        match = lambda s: s.dash_case_class_name() == name
+        """
+        Finds a setup class with the given name.
+
+        The class name is expected in dash-case format. If no setup is found,
+        a `SetupError` exception is raised.
+        """
+        match = lambda s: s.dash_case_class_name == name
         try:
             return next(filter(match, cls.__subclasses__()))
         except StopIteration:
             raise SetupError(f"no setup named {name}")
 
     @classmethod
+    @property
     def has_model_parameters(cls):
-        for _ in cls.default_model_parameters():
+        """
+        Determine if this class has any model parameters.
+        """
+        for _ in cls.default_model_parameters:
             return True
         return False
 
@@ -102,19 +128,27 @@ class Setup(ABC):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
-        if self.has_model_parameters():
+        if self.has_model_parameters:
             print()
             print("model parameters:")
-            for name, default, about in self.model_parameters():
+            for name, default, about in self.model_parameters:
                 print(f"{name:.<16s} {default:<5} {about}")
             print()
 
+    @property
     def model_parameters(self):
         """
         Return an iterator over the model parameters chosen for this setup.
         """
-        for key, val, about in self.default_model_parameters():
+        for key, val, about in self.default_model_parameters:
             yield key, getattr(self, key), about
+
+    @property
+    def model_parameter_dict(self):
+        """
+        Return a dictionary of the model parameters.
+        """
+        return {key: val for key, val, _ in self.model_parameters}
 
     @abstractmethod
     def initial_primitive(self, coordinate, primitive):

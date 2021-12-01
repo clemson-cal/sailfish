@@ -35,6 +35,10 @@ class RecurringTask:
 
 
 def first_rest(a):
+    """
+    Return the first element of a list or tuple, followed by the rest as a
+    possibly empty list.
+    """
     if len(a) > 1:
         return a[0], a[1:]
     else:
@@ -137,7 +141,8 @@ def main(**kwargs):
         parameters = parse_parameters(parameter_list)
 
         SetupCls = Setup.find_setup_class(setup_name)
-        frozen_params = SetupCls.immutable_parameter_keys()
+        frozen_params = list(SetupCls.immutable_parameter_keys())
+
         update_if_none(parameters, chkpt["parameters"], frozen=frozen_params)
         update_if_none(kwargs, chkpt["driver_args"], frozen=["resolution"])
 
@@ -146,6 +151,7 @@ def main(**kwargs):
         time = chkpt["time"]
         checkpoint_task = RecurringTask.from_dict(chkpt["tasks"]["checkpoint"])
         initial = chkpt["primitive"]
+        del parameters
 
     else:
         """
@@ -164,6 +170,7 @@ def main(**kwargs):
         time = 0.0
         checkpoint_task = RecurringTask("checkpoint")
         initial = initial_condition(setup, kwargs["resolution"], setup.domain)
+        del parameters
 
     num_zones = kwargs["resolution"]
     mode = kwargs["mode"] or "cpu"
@@ -200,7 +207,7 @@ def main(**kwargs):
             primitive=solver.primitive,
             driver_args=kwargs,
             tasks=dict(checkpoint=vars(checkpoint_task)),
-            parameters=parameters,
+            parameters=setup.model_parameter_dict,
             setup_name=setup_name,
             domain=setup.domain,
         )
@@ -317,7 +324,7 @@ if __name__ == "__main__":
         elif args.command is None:
             print("specify setup:")
             for setup in Setup.__subclasses__():
-                print(f"    {setup.dash_case_class_name()}")
+                print(f"    {setup.dash_case_class_name}")
 
         else:
             main(**vars(args))
