@@ -1,37 +1,10 @@
 #!/usr/bin/env python3
 
+import os, pickle, pathlib
+
 
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
-
-
-class RecurringTask:
-    def __init__(self, name):
-        self.name = name
-        self.interval = None
-        self.last_time = None
-        self.number = 0
-
-    @classmethod
-    def from_dict(cls, state):
-        task = RecurringTask(state["name"])
-        task.interval = state["interval"]
-        task.last_time = state["last_time"]
-        task.number = state["number"]
-        return task
-
-    def next_time(self, time):
-        if self.last_time is None:
-            return time
-        else:
-            return self.last_time + self.interval
-
-    def is_due(self, time):
-        return time >= self.next_time(time)
-
-    def next(self, time):
-        self.last_time = self.next_time(time)
-        self.number += 1
 
 
 def first_rest(a):
@@ -53,8 +26,8 @@ def first_not_none(*args):
 
 def update_if_none(new_dict, old_dict, frozen=[]):
     """
-    Like `dict.update`, except key-value pairs in `old_dict` are only used to
-    add / overwrite values in `new_dict` if they are `None` or missing.
+    Like `dict.update`, except `key=value` pairs in `old_dict` are only used
+    to add / overwrite values in `new_dict` if they are `None` or missing.
     """
     for key in old_dict:
         old_val = old_dict.get(key)
@@ -77,18 +50,20 @@ def parse_parameters(item_list):
     return parameters
 
 
-def write_checkpoint(number, logger=None, **kwargs):
-    import pickle
+def write_checkpoint(number, outdir=None, logger=None, **kwargs):
+    filename = f"chkpt.{number:04d}.pk"
 
-    with open(f"chkpt.{number:04d}.pk", "wb") as chkpt:
+    if outdir is not None:
+        pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
+        filename = os.path.join(outdir, filename)
+
+    with open(filename, "wb") as chkpt:
         if logger is not None:
             logger.info(f"write checkpoint {chkpt.name}")
         pickle.dump(kwargs, chkpt)
 
 
 def load_checkpoint(chkpt_name):
-    import pickle
-
     try:
         with open(chkpt_name, "rb") as file:
             return pickle.load(file)
@@ -113,6 +88,7 @@ def main(**kwargs):
     from logging import getLogger
     from sailfish.solvers import srhd_1d
     from sailfish.setup import Setup
+    from sailfish.task import RecurringTask
     from sailfish import system
 
     # Initialize and log state in the the system module. The build system
@@ -149,9 +125,8 @@ def main(**kwargs):
         setup = SetupCls(**parameters)
         iteration = chkpt["iteration"]
         time = chkpt["time"]
-        checkpoint_task = RecurringTask.from_dict(chkpt["tasks"]["checkpoint"])
+        checkpoint_task = chkpt["tasks"]["checkpoint"]
         initial = chkpt["primitive"]
-        del parameters
 
     else:
         """
@@ -161,6 +136,9 @@ def main(**kwargs):
         if kwargs["resolution"] is None:
             kwargs["resolution"] = 10000
 
+        if kwargs["checkpoint_recurrence"] is None:
+            kwargs["checkpoint_recurrence"] = Recurrence.from_str("0.1")
+
         logger.info(f"generate initial data for setup {setup_or_checkpoint}")
 
         setup_name = setup_or_checkpoint
@@ -168,9 +146,11 @@ def main(**kwargs):
         setup = Setup.find_setup_class(setup_name)(**parameters)
         iteration = 0
         time = 0.0
-        checkpoint_task = RecurringTask("checkpoint")
+        checkpoint_task = RecurringTask(
+            name="checkpoint",
+            recurrence=kwargs["checkpoint_recurrence"],
+        )
         initial = initial_condition(setup, kwargs["resolution"], setup.domain)
-        del parameters
 
     num_zones = kwargs["resolution"]
     mode = kwargs["mode"] or "cpu"
@@ -178,7 +158,6 @@ def main(**kwargs):
     cfl_number = kwargs["cfl_number"] or 0.6
     dx = (setup.domain[1] - setup.domain[0]) / num_zones
     dt = dx * cfl_number
-    checkpoint_task.interval = kwargs["checkpoint"] or 0.1
     end_time = first_not_none(kwargs["end_time"], setup.end_time, float("inf"))
 
     # Construct a solver instance. TODO: the solver should be obtained from
@@ -191,26 +170,28 @@ def main(**kwargs):
         boundary_condition=setup.boundary_condition,
         mode=mode,
     )
+    logger.info(f"checkpoint task recurrence is {checkpoint_task.recurrence}")
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt}")
-
     setup.print_model_parameters(newlines=True)
 
     def checkpoint():
-        checkpoint_task.next(solver.time)
+        next_checkpoint_task = checkpoint_task.next(solver.time)
         write_checkpoint(
-            checkpoint_task.number - 1,
+            checkpoint_task.number,
+            outdir=kwargs["outdir"],
             logger=logger,
             time=solver.time,
             iteration=iteration,
             primitive=solver.primitive,
             driver_args=kwargs,
-            tasks=dict(checkpoint=vars(checkpoint_task)),
+            tasks=dict(checkpoint=next_checkpoint_task),
             parameters=setup.model_parameter_dict,
             setup_name=setup_name,
             domain=setup.domain,
         )
+        return next_checkpoint_task
 
     while end_time is None or end_time > solver.time:
         # Run the main simulation loop. Iterations are grouped according the
@@ -218,7 +199,7 @@ def main(**kwargs):
         # performed between fold boundaries.
 
         if checkpoint_task.is_due(solver.time):
-            checkpoint()
+            checkpoint_task = checkpoint()
 
         with system.measure_time() as fold_time:
             for _ in range(fold):
@@ -229,13 +210,15 @@ def main(**kwargs):
             Mzps = num_zones / fold_time() * 1e-6 * fold
             print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
-    checkpoint()
+    if checkpoint_task.is_due(float("inf")):
+        checkpoint()
 
 
 if __name__ == "__main__":
     import argparse
     import logging
     from sailfish.setup import Setup, SetupError
+    from sailfish.task import Recurrence, ParseRecurrenceError
 
     logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
 
@@ -279,8 +262,16 @@ if __name__ == "__main__":
         "--checkpoint",
         "-c",
         metavar="C",
-        type=float,
-        help="how often to write a checkpoint file",
+        type=Recurrence.from_str,
+        dest="checkpoint_recurrence",
+        help="recurrence rule for writing checkpoints [never|once|twice|<interval>|<log:interval>] ",
+    )
+    parser.add_argument(
+        "--outdir",
+        "-o",
+        metavar="D",
+        type=str,
+        help="directory where checkpoints are written",
     )
     parser.add_argument(
         "--end-time",
@@ -330,11 +321,17 @@ if __name__ == "__main__":
     except ConfigurationError as e:
         print(f"bad configuration: {e}")
 
+    except SetupError as e:
+        print(f"setup error: {e}")
+
+    except ParseRecurrenceError as e:
+        print(f"parse error: {e}")
+
+    except OSError as e:
+        print(f"file system error: {e}")
+
     except ModuleNotFoundError as e:
         print(f"unsatisfied dependency: {e}")
-
-    except SetupError as e:
-        print(f"error: {e}")
 
     except KeyboardInterrupt:
         print("")

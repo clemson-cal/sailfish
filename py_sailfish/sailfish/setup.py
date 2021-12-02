@@ -126,14 +126,14 @@ class Setup(ABC):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
-        if newlines:
-            print()
         if self.has_model_parameters:
-            print("model parameters:\n")
-            for name, default, about in self.model_parameters:
-                print(f"{name:.<16s} {default:<5} {about}")
-        if newlines:
-            print()
+            if newlines:
+                print()
+                print("model parameters:\n")
+                for name, default, about in self.model_parameters:
+                    print(f"{name:.<16s} {default:<5} {about}")
+            if newlines:
+                print()
 
     @property
     def model_parameters(self):
