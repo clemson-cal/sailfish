@@ -1,53 +1,40 @@
 #!/usr/bin/env python3
 
 import os, pickle, pathlib
+from typing import NamedTuple
+from sailfish.task import Recurrence, RecurringTask, ParseRecurrenceError
+from sailfish.setup import Setup, SetupError
 
 
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
 
 
-def first_rest(a):
-    """
-    Return the first element of a list or tuple, followed by the rest as a
-    possibly empty list.
-    """
-    if len(a) > 1:
-        return a[0], a[1:]
-    else:
-        return a[0], []
-
-
-def first_not_none(*args):
-    for arg in args:
-        if arg is not None:
-            return arg
-
-
-def update_if_none(new_dict, old_dict, frozen=[]):
+def update_dict_if_none(new_dict, old_dict, frozen=[]):
     """
     Like `dict.update`, except `key=value` pairs in `old_dict` are only used
     to add / overwrite values in `new_dict` if they are `None` or missing.
     """
-    for key in old_dict:
-        old_val = old_dict.get(key)
-        new_val = new_dict.get(key)
-        if old_val is not None:
-            if new_val is None:
-                new_dict[key] = old_val
-            elif key in frozen and new_val != old_val:
-                raise ConfigurationError(f"{key} cannot be changed")
+    if type(new_dict) is dict and type(old_dict) is dict:
+        for key in old_dict:
+            old_val = old_dict.get(key)
+            new_val = new_dict.get(key)
+            if old_val is not None:
+                if new_val is None:
+                    new_dict[key] = old_val
+                elif key in frozen and new_val != old_val:
+                    raise ConfigurationError(f"{key} cannot be changed")
 
 
-def parse_parameters(item_list):
-    parameters = dict()
-    for item in item_list:
-        try:
-            key, val = item.split("=")
-            parameters[key] = eval(val)
-        except NameError:
-            raise ConfigurationError(f"badly formed model parameter {item}")
-    return parameters
+def update_if_none(new, old, frozen=[]):
+    """
+    Same as `update_dict_if_none`, except operates on (immutable) named tuple
+    instances and returns a new named tuple.
+    """
+    new_dict = new._asdict()
+    old_dict = old._asdict()
+    update_dict_if_none(new_dict, old_dict, frozen)
+    return type(new)(**new_dict)
 
 
 def write_checkpoint(number, outdir=None, logger=None, **kwargs):
@@ -63,12 +50,12 @@ def write_checkpoint(number, outdir=None, logger=None, **kwargs):
         pickle.dump(kwargs, chkpt)
 
 
-def load_checkpoint(chkpt_name):
+def load_checkpoint(chkpt_file):
     try:
-        with open(chkpt_name, "rb") as file:
+        with open(chkpt_file, "rb") as file:
             return pickle.load(file)
     except FileNotFoundError:
-        raise ConfigurationError(f"could not open checkpoint file {chkpt_name}")
+        raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
 
 
 def initial_condition(setup, num_zones, domain):
@@ -83,7 +70,76 @@ def initial_condition(setup, num_zones, domain):
     return primitive
 
 
-def main(**kwargs):
+class DriverArgs(NamedTuple):
+    """
+    Contains data used by the driver.
+    """
+
+    setup_name: str = None
+    chkpt_file: str = None
+    parameter_dict: dict = None
+    cfl_number: float = None
+    checkpoint_recurrence: Recurrence = None
+    end_time: float = None
+    execution_mode: str = None
+    fold: int = None
+    output_directory: str = None
+    resolution: int = None
+
+    def from_namespace(args):
+        """
+        Construct an instance from an argparse-type namespace object.
+        """
+
+        def parse_item(item):
+            try:
+                key, val = item.split("=")
+                return key, eval(val)
+            except (NameError, ValueError):
+                raise ConfigurationError(f"badly formed model parameter {item}")
+
+        driver = DriverArgs(
+            **{k: w for k, w in vars(args).items() if k in DriverArgs._fields}
+        )
+        parts = args.command.split(":")
+
+        if not parts[0].endswith(".pk"):
+            setup_name = parts[0]
+            chkpt_file = None
+        else:
+            setup_name = None
+            chkpt_file = parts[0]
+
+        try:
+            parameter_dict = dict(parse_item(a) for a in parts[1:])
+        except IndexError:
+            parameter_dict = dict()
+
+        return driver._replace(
+            setup_name=setup_name, chkpt_file=chkpt_file, parameter_dict=parameter_dict
+        )
+
+    def updated_parameter_dict(self, old, setup_cls):
+        """
+        Return an updated parameter dict.
+
+        The old parameter dict is expected to be read from a checkpoint file.
+        The setup class is used to determine which of the parameter entries in
+        the new and old parameter files need to match, or not be superseded.
+        """
+        new = self.parameter_dict
+        update_dict_if_none(new, old, frozen=list(setup_cls.immutable_parameter_keys))
+        return new
+
+    @property
+    def fresh_setup(self):
+        """
+        Return true if this is not a restart.
+        """
+        return self.setup_name is not None
+
+
+def main(driver):
     from time import perf_counter
     from logging import getLogger
     from sailfish.solvers import srhd_1d
@@ -91,74 +147,59 @@ def main(**kwargs):
     from sailfish.task import RecurringTask
     from sailfish import system
 
-    # Initialize and log state in the the system module. The build system
-    # influences JIT-compiled module code. Currently the build parameters are
-    # inferred from the platform (Linux or MacOS), but in the future these
-    # should also be extensible by a system-specific rc-style configuration
-    # file.
+    """
+    Initialize and log state in the the system module. The build system
+    influences JIT-compiled module code. Currently the build parameters are
+    inferred from the platform (Linux or MacOS), but in the future these
+    should also be extensible by a system-specific rc-style configuration
+    file.
+    """
     system.configure_build()
-    system.log_system_info(kwargs["mode"] or "cpu")
+    system.log_system_info(driver.execution_mode or "cpu")
 
     logger = getLogger("driver")
-    setup_or_checkpoint, parameter_list = first_rest(kwargs["command"].split(":"))
 
-    if setup_or_checkpoint.endswith(".pk"):
-        # Load driver state from a checkpoint file. The setup model parameters
-        # are updated with any items given on the command line after the setup
-        # name. All command line arguments are also restorted from the
-        # previous session, but are updated with the `kwargs` variable (command
-        # line argument given for this session), except for "frozen"
-        # arguments.
-        chkpt_name = setup_or_checkpoint
-        logger.info(f"load checkpoint {chkpt_name}")
+    if driver.fresh_setup:
+        """
+        Generate an initial driver state from command line arguments, model
+        parametrs, and a setup instance.
+        """
+        logger.info(f"generate initial data for setup {driver.setup_name}")
+        setup = Setup.find_setup_class(driver.setup_name)(**driver.parameter_dict)
+        driver = driver._replace(
+            resolution=driver.resolution or setup.default_resolution
+        )
 
-        chkpt = load_checkpoint(chkpt_name)
-        setup_name = chkpt["setup_name"]
-        parameters = parse_parameters(parameter_list)
+        iteration = 0
+        time = 0.0
+        checkpoint_task = RecurringTask(name="checkpoint")
+        initial = initial_condition(setup, driver.resolution, setup.domain)
+    else:
+        """
+        Load driver state from a checkpoint file. The setup model parameters
+        are updated with any items given on the command line after the setup
+        name. All command line arguments are also restorted from the
+        previous session, but are updated with the command line argument
+        given for this session, except for "frozen" arguments.
+        """
+        logger.info(f"load checkpoint {driver.chkpt_file}")
+        chkpt = load_checkpoint(driver.chkpt_file)
+        setup_cls = Setup.find_setup_class(chkpt["setup_name"])
+        driver = update_if_none(driver, chkpt["driver_args"], frozen=["resolution"])
+        params = driver.updated_parameter_dict(chkpt["parameters"], setup_cls)
+        setup = setup_cls(**params)
 
-        SetupCls = Setup.find_setup_class(setup_name)
-        frozen_params = list(SetupCls.immutable_parameter_keys())
-
-        update_if_none(parameters, chkpt["parameters"], frozen=frozen_params)
-        update_if_none(kwargs, chkpt["driver_args"], frozen=["resolution"])
-
-        setup = SetupCls(**parameters)
         iteration = chkpt["iteration"]
         time = chkpt["time"]
         checkpoint_task = chkpt["tasks"]["checkpoint"]
         initial = chkpt["primitive"]
 
-    else:
-        """
-        Generate an initial driver state from command line arguments, model
-        parametrs, and a setup instance.
-        """
-        if kwargs["resolution"] is None:
-            kwargs["resolution"] = 10000
-
-        if kwargs["checkpoint_recurrence"] is None:
-            kwargs["checkpoint_recurrence"] = Recurrence.from_str("0.1")
-
-        logger.info(f"generate initial data for setup {setup_or_checkpoint}")
-
-        setup_name = setup_or_checkpoint
-        parameters = parse_parameters(parameter_list)
-        setup = Setup.find_setup_class(setup_name)(**parameters)
-        iteration = 0
-        time = 0.0
-        checkpoint_task = RecurringTask(
-            name="checkpoint",
-            recurrence=kwargs["checkpoint_recurrence"],
-        )
-        initial = initial_condition(setup, kwargs["resolution"], setup.domain)
-
-    num_zones = kwargs["resolution"]
-    mode = kwargs["mode"] or "cpu"
-    fold = kwargs["fold"] or 10
-    cfl_number = kwargs["cfl_number"] or 0.6
-    dx = (setup.domain[1] - setup.domain[0]) / num_zones
+    mode = driver.execution_mode or "cpu"
+    fold = driver.fold or 10
+    cfl_number = driver.cfl_number or 0.6
+    dx = (setup.domain[1] - setup.domain[0]) / driver.resolution
     dt = dx * cfl_number
-    end_time = first_not_none(kwargs["end_time"], setup.end_time, float("inf"))
+    end_time = driver.end_time or setup.default_end_time or float("inf")
 
     # Construct a solver instance. TODO: the solver should be obtained from
     # the setup instance.
@@ -170,35 +211,44 @@ def main(**kwargs):
         boundary_condition=setup.boundary_condition,
         mode=mode,
     )
-    logger.info(f"checkpoint task recurrence is {checkpoint_task.recurrence}")
+    logger.info(f"checkpoint task recurrence is {driver.checkpoint_recurrence}")
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt}")
     setup.print_model_parameters(newlines=True)
 
     def checkpoint():
-        next_checkpoint_task = checkpoint_task.next(solver.time)
+        """
+        Write a checkpoint file.
+
+        This function has no side effects on the driver state, but it returns
+        an updated checkpoint task.
+        """
+        next_checkpoint_task = checkpoint_task.next(
+            solver.time, driver.checkpoint_recurrence
+        )
         write_checkpoint(
             checkpoint_task.number,
-            outdir=kwargs["outdir"],
+            outdir=driver.output_directory,
             logger=logger,
             time=solver.time,
             iteration=iteration,
             primitive=solver.primitive,
-            driver_args=kwargs,
+            driver_args=driver,
             tasks=dict(checkpoint=next_checkpoint_task),
             parameters=setup.model_parameter_dict,
-            setup_name=setup_name,
+            setup_name=setup.dash_case_class_name,
             domain=setup.domain,
         )
         return next_checkpoint_task
 
     while end_time is None or end_time > solver.time:
-        # Run the main simulation loop. Iterations are grouped according the
-        # the fold parameter. Side effects including the iteration message are
-        # performed between fold boundaries.
-
-        if checkpoint_task.is_due(solver.time):
+        """
+        Run the main simulation loop. Iterations are grouped according the
+        the fold parameter. Side effects including the iteration message are
+        performed between fold boundaries.
+        """
+        if checkpoint_task.is_due(solver.time, driver.checkpoint_recurrence):
             checkpoint_task = checkpoint()
 
         with system.measure_time() as fold_time:
@@ -207,18 +257,17 @@ def main(**kwargs):
                 solver.advance_rk(0.0, dt)
                 solver.advance_rk(0.5, dt)
                 iteration += 1
-            Mzps = num_zones / fold_time() * 1e-6 * fold
-            print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
-    if checkpoint_task.is_due(float("inf")):
+        Mzps = driver.resolution / fold_time() * 1e-6 * fold
+        print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+
+    if checkpoint_task.is_due(float("inf"), driver.checkpoint_recurrence):
         checkpoint()
 
 
 if __name__ == "__main__":
     import argparse
     import logging
-    from sailfish.setup import Setup, SetupError
-    from sailfish.task import Recurrence, ParseRecurrenceError
 
     logging.basicConfig(level=logging.INFO, format="-> %(name)s: %(message)s")
 
@@ -264,13 +313,14 @@ if __name__ == "__main__":
         metavar="C",
         type=Recurrence.from_str,
         dest="checkpoint_recurrence",
-        help="recurrence rule for writing checkpoints [never|once|twice|<interval>|<log:interval>] ",
+        help="checkpoint recurrence [never|once|twice|<delta>|<log:mul>] ",
     )
     parser.add_argument(
         "--outdir",
         "-o",
         metavar="D",
         type=str,
+        dest="output_directory",
         help="directory where checkpoints are written",
     )
     parser.add_argument(
@@ -283,13 +333,14 @@ if __name__ == "__main__":
     exec_group = parser.add_mutually_exclusive_group()
     exec_group.add_argument(
         "--mode",
-        help="execution mode",
+        dest="execution_mode",
         choices=["cpu", "omp", "gpu"],
+        help="execution mode",
     )
     exec_group.add_argument(
         "--use-omp",
         "-p",
-        dest="mode",
+        dest="execution_mode",
         action="store_const",
         const="omp",
         help="multi-core with OpenMP",
@@ -297,7 +348,7 @@ if __name__ == "__main__":
     exec_group.add_argument(
         "--use-gpu",
         "-g",
-        dest="mode",
+        dest="execution_mode",
         action="store_const",
         const="gpu",
         help="gpu acceleration",
@@ -316,7 +367,7 @@ if __name__ == "__main__":
                 print(f"    {setup.dash_case_class_name}")
 
         else:
-            main(**vars(args))
+            main(DriverArgs.from_namespace(args))
 
     except ConfigurationError as e:
         print(f"bad configuration: {e}")

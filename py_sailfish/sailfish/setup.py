@@ -180,7 +180,7 @@ class Setup(ABC):
         pass
 
     @property
-    def end_time(self):
+    def default_end_time(self):
         """
         Provide a default end-time to the simulation driven.
 
@@ -189,6 +189,20 @@ class Setup(ABC):
         the simulation runs until it's killed.
         """
         return None
+
+    @property
+    def default_checkpoint_recurrence(self):
+        """
+        Provide a default checkpoint recurrence rule.
+        """
+        return "0.1"
+
+    @property
+    def default_resolution(self):
+        """
+        Provide a default grid resolution.
+        """
+        return 10000
 
     def validate(self):
         """

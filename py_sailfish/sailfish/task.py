@@ -15,6 +15,18 @@ class RecurrenceKind(Enum):
 
 
 class Recurrence(NamedTuple):
+    """
+    Rule for how a task can recur throughout a simulation.
+
+    The avilable rules are:
+
+    - never: the task must never happen
+    - once: it happens once, at the start of the simulation
+    - twice: once at the start, and again at the end
+    - linear: at evenly spaced time intervals
+    - log: at multiplicative time intervals; `next = time * (1 + delta)`
+    """
+
     kind: RecurrenceKind = RecurrenceKind.NEVER
     interval: float = None
 
@@ -59,46 +71,49 @@ class Recurrence(NamedTuple):
 
 
 class RecurringTask(NamedTuple):
+    """
+    State of a recurring side effect that occurs during a simulation.
+
+    Side effects include writing checkpoints, collecting time series data, and
+    other post-processing tasks.
+    """
+
     name: str
-    recurrence: Recurrence = None
     last_time: float = None
     number: int = 0
 
-    def next_time(self, time):
-        if self.recurrence.kind == RecurrenceKind.NEVER:
+    def next_time(self, time, recurrence):
+        if recurrence.kind == RecurrenceKind.NEVER:
             return None
-        if self.recurrence.kind == RecurrenceKind.ONCE:
+        if recurrence.kind == RecurrenceKind.ONCE:
             if self.number == 0:
                 return time
             return None
-        if self.recurrence.kind == RecurrenceKind.TWICE:
+        if recurrence.kind == RecurrenceKind.TWICE:
             if self.number == 0:
                 return time
             if self.number == 1:
                 return float("inf")
             return None
-        if self.recurrence.kind == RecurrenceKind.LINEAR:
+        if recurrence.kind == RecurrenceKind.LINEAR:
             if self.number == 0:
                 return time
             else:
-                return self.last_time + self.recurrence.interval
-        if self.recurrence.kind == RecurrenceKind.LOG:
+                return self.last_time + recurrence.interval
+        if recurrence.kind == RecurrenceKind.LOG:
             if self.number == 0:
                 return time
             else:
                 return self.last_time * (1.0 + self.recurrence.interval)
 
-    def is_due(self, time):
-        next_time = self.next_time(time)
+    def is_due(self, time, recurrence):
+        next_time = self.next_time(time, recurrence)
         if next_time is None:
             return False
         else:
             return time >= next_time
 
-    def next(self, time):
-        return RecurringTask(
-            name=self.name,
-            recurrence=self.recurrence,
-            last_time=self.next_time(time),
-            number=self.number + 1,
+    def next(self, time, recurrence):
+        return self._replace(
+            last_time=self.next_time(time, recurrence), number=self.number + 1
         )

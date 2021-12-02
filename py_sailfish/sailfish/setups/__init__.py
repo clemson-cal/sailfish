@@ -52,7 +52,7 @@ class DensityWave(Setup):
         return "periodic"
 
     @property
-    def end_time(self):
+    def default_end_time(self):
         return 1.0
 
     def validate(self):
