@@ -4,7 +4,7 @@ import hashlib
 import tempfile
 import time
 from ctypes import c_double, c_int, POINTER, CDLL
-from sailfish.system import build_config
+from sailfish.system import build_config, measure_time
 from sailfish.parse_api import parse_api
 
 logger = logging.getLogger(__name__)
@@ -45,55 +45,55 @@ class Library:
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
         logger.info(f"prepare module {module} for {mode} execution")
 
-        start = time.perf_counter()
+        with measure_time() as prep_time:
+            filename = f"{abs_path}.c"
+            self.debug = debug
+            self.cpu_mode = mode != "gpu"
+            self.api = parse_api(filename)
 
-        filename = f"{abs_path}.c"
-        self.debug = debug
-        self.cpu_mode = mode != "gpu"
-        self.api = parse_api(filename)
+            with open(filename, "r") as srcfile:
+                code = srcfile.read()
 
-        with open(filename, "r") as srcfile:
-            code = srcfile.read()
+            if self.cpu_mode:
+                import cffi
+                import numpy
 
-        if self.cpu_mode:
-            import cffi
-            import numpy
-
-            ffi = cffi.FFI()
-            ffi.set_source(
-                module,
-                code,
-                define_macros=[("EXEC_MODE", dict(cpu=0, omp=1)[mode])],
-                extra_compile_args=build_config["extra_compile_args"],
-                extra_link_args=build_config["extra_link_args"],
-            )
-            libname = hashlib.sha256(code.encode("utf-8")).hexdigest()
-            cache_dir = os.path.join(".sailfish", libname)
-
-            # with tempfile.TemporaryDirectory() as tmpdir:
-            try:
-                so_name = os.path.join(
-                    cache_dir,
-                    next(filter(lambda f: f.endswith(".so"), os.listdir(cache_dir))),
+                ffi = cffi.FFI()
+                ffi.set_source(
+                    module,
+                    code,
+                    define_macros=[("EXEC_MODE", dict(cpu=0, omp=1)[mode])],
+                    extra_compile_args=build_config["extra_compile_args"],
+                    extra_link_args=build_config["extra_link_args"],
                 )
-                self.module = CDLL(so_name)
-                logger.info(f"load cached library")
-            except (FileNotFoundError, StopIteration) as e:
-                target = ffi.compile(cache_dir)
-                self.module = CDLL(target)
-                logger.info(f"recompile library")
+                libname = hashlib.sha256(code.encode("utf-8")).hexdigest()
+                cache_dir = os.path.join(".sailfish", libname)
 
-            self.xp = numpy
-        else:
-            import cupy
+                # with tempfile.TemporaryDirectory() as tmpdir:
+                try:
+                    so_name = os.path.join(
+                        cache_dir,
+                        next(
+                            filter(lambda f: f.endswith(".so"), os.listdir(cache_dir))
+                        ),
+                    )
+                    self.module = CDLL(so_name)
+                    logger.info(f"load cached library")
+                except (FileNotFoundError, StopIteration) as e:
+                    target = ffi.compile(cache_dir)
+                    self.module = CDLL(target)
+                    logger.info(f"recompile library")
 
-            module = cupy.RawModule(code=code, options=("-D EXEC_MODE=2",))
-            module.compile()
-            self.module = module
-            self.xp = cupy
+                self.xp = numpy
+            else:
+                import cupy
 
-        stop = time.perf_counter()
-        logger.info(f"module preparation took {stop - start:0.3}s")
+                module = cupy.RawModule(code=code, options=("-D EXEC_MODE=2",))
+                module.compile()
+                self.module = module
+                self.xp = cupy
+
+            logger.info(f"module preparation took {prep_time():0.3}s")
 
         for symbol in self.api:
             logger.info(f"+-- {symbol}")

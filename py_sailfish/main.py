@@ -220,16 +220,14 @@ def main(**kwargs):
         if checkpoint_task.is_due(solver.time):
             checkpoint()
 
-        start = perf_counter()
-        for _ in range(fold):
-            solver.new_timestep()
-            solver.advance_rk(0.0, dt)
-            solver.advance_rk(0.5, dt)
-            iteration += 1
-        stop = perf_counter()
-        Mzps = num_zones / (stop - start) * 1e-6 * fold
-
-        print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+        with system.measure_time() as fold_time:
+            for _ in range(fold):
+                solver.new_timestep()
+                solver.advance_rk(0.0, dt)
+                solver.advance_rk(0.5, dt)
+                iteration += 1
+            Mzps = num_zones / fold_time() * 1e-6 * fold
+            print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
     checkpoint()
 
@@ -243,7 +241,7 @@ if __name__ == "__main__":
 
     parser = argparse.ArgumentParser(
         prog="sailfish",
-        usage="%(prog)s <command> [options]",
+        # usage="%(prog)s <command> [options]",
         description="gpu-accelerated astrophysical gasdynamics code",
     )
     parser.add_argument(

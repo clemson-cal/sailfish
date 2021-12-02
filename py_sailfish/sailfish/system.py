@@ -1,6 +1,8 @@
+import contextlib
 import logging
 import multiprocessing
 import platform
+import time
 
 logger = logging.getLogger(__name__)
 
@@ -47,3 +49,9 @@ def log_system_info(mode):
         )
         logger.info(f"gpu devices: {num_devices}x {gpu_devices}")
     logger.info(f"compute cores: {multiprocessing.cpu_count()}")
+
+
+@contextlib.contextmanager
+def measure_time() -> float:
+    start = time.perf_counter()
+    yield lambda: time.perf_counter() - start
