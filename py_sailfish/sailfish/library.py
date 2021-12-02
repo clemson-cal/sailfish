@@ -1,7 +1,6 @@
 import logging
 import os
 import hashlib
-import tempfile
 import time
 from ctypes import c_double, c_int, POINTER, CDLL
 from sailfish.system import build_config, measure_time
@@ -58,18 +57,24 @@ class Library:
                 import cffi
                 import numpy
 
+                define_macros = [("EXEC_MODE", dict(cpu=0, omp=1)[mode])]
                 ffi = cffi.FFI()
                 ffi.set_source(
                     module,
                     code,
-                    define_macros=[("EXEC_MODE", dict(cpu=0, omp=1)[mode])],
+                    define_macros=define_macros,
                     extra_compile_args=build_config["extra_compile_args"],
                     extra_link_args=build_config["extra_link_args"],
                 )
-                libname = hashlib.sha256(code.encode("utf-8")).hexdigest()
-                cache_dir = os.path.join(".sailfish", libname)
 
-                # with tempfile.TemporaryDirectory() as tmpdir:
+                # Build a hash for the compiled library based on code, define
+                # macros, and build args.
+                sha = hashlib.sha256()
+                sha.update(code.encode("utf-8"))
+                sha.update(str(define_macros).encode("utf-8"))
+                sha.update(str(build_config).encode("utf-8"))
+                cache_dir = os.path.join(".sailfish", sha.hexdigest())
+
                 try:
                     so_name = os.path.join(
                         cache_dir,

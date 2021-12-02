@@ -1,3 +1,26 @@
+/*
+MODULE: srhd_1d
+
+AUTHOR: Jonathan Zrake
+
+DESCRIPTION:
+  Solves relativistic hydrodynamics in 1D cartesian or spherical
+  coordinates.
+
+PARAMETERS:
+  plm_theta:
+    default: 1.5
+    range: [1.0, 2.0]
+  coordinates:
+    default: spherical
+    choices: [cartesian, spherical]
+  num_scalars:
+    default: 0
+    validate: 0 <= $ <= 5
+  adiabatic_gamma: (4.0 / 3.0)
+*/
+
+
 // ============================ MODES =========================================
 // ============================================================================
 #define EXEC_CPU 0
