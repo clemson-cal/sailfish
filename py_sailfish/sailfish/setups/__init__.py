@@ -24,6 +24,10 @@ class Shocktube(Setup):
     def boundary_condition(self):
         return "outflow"
 
+    @property
+    def default_end_time(self):
+        return 0.25
+
 
 class DensityWave(Setup):
     """
