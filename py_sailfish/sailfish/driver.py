@@ -149,18 +149,17 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     """
     Entry point for running simulations.
 
-    Either a driver or
+    If this function is invoked with a `DriverArgs` instance in `driver`, the
+    other arguments are ignored. Otherwise, the driver is created from the
+    setup name, model paramters, and keyword arguments.
     """
 
     from time import perf_counter
-    from logging import getLogger, basicConfig, INFO
+    from logging import getLogger, basicConfig, INFO, StreamHandler, Formatter
     from sailfish import system
     from sailfish.setup import Setup
     from sailfish.solvers import srhd_1d
     from sailfish.task import RecurringTask
-
-    # Configure the logger. All messages are written at the INFO level.
-    basicConfig(level=INFO, format="-> %(name)s: %(message)s")
 
     # If driver is None, then other arguments are ignored
     if driver is None:
@@ -174,9 +173,11 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     should also be extensible by a system-specific rc-style configuration
     file.
     """
+
     system.configure_build()
     system.log_system_info(driver.execution_mode or "cpu")
-    logger = getLogger("driver")
+    logger = getLogger(__name__)
+    loop_logger = getLogger("loop_message")
 
     if driver.fresh_setup:
         """
@@ -288,7 +289,7 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
                 iteration += 1
 
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
-        print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+        loop_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
     if checkpoint_task.is_due(float("inf"), chkpt_recurrence):
         checkpoint()
@@ -296,9 +297,28 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     return grab_state()
 
 
+def enable_logging():
+    from logging import StreamHandler, Formatter, getLogger, INFO
+
+    class RunFormatter(Formatter):
+        def format(self, record):
+            if record.name == "loop_message":
+                return f"{record.msg}"
+            else:
+                return f"[{record.name.replace('sailfish.', '')}] {record.msg}"
+
+    handler = StreamHandler()
+    handler.setFormatter(RunFormatter())
+
+    root_logger = getLogger()
+    root_logger.addHandler(handler)
+    root_logger.setLevel(INFO)
+
+
 def main():
     import argparse
-    import logging
+
+    enable_logging()
 
     parser = argparse.ArgumentParser(
         prog="sailfish",

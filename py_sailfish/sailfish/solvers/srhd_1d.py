@@ -25,12 +25,11 @@ class Patch:
         coordinates="cartesian",
     ):
         i0, i1 = index_range
+        x0, dx = grid_spacing, grid_spacing
         self.lib = lib
         self.xp = xp
         self.num_zones = primitive.shape[0]
-        self.faces = self.xp.array(
-            [grid_start + i * grid_spacing for i in range(i0, i1 + 1)]
-        )
+        self.faces = self.xp.array([x0 + i * dx for i in range(i0, i1 + 1)])
         self.coordinates = dict(cartesian=0, spherical=1)[coordinates]
         self.scale_factor_initial = 1.0
         self.scale_factor_derivative = 0.0
