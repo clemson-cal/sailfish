@@ -1,11 +1,19 @@
-import os, pickle, pathlib
-from typing import NamedTuple
-from sailfish.task import Recurrence, ParseRecurrenceError
+import os, pickle, pathlib, logging
+from typing import NamedTuple, Dict
+from sailfish.task import Recurrence, RecurringTask, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
+
+logger = logging.getLogger(__name__)
 
 
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
+
+
+def first_not_none(*args):
+    for arg in args:
+        if arg is not None:
+            return arg
 
 
 def update_dict_if_none(new_dict, old_dict, frozen=[]):
@@ -13,21 +21,18 @@ def update_dict_if_none(new_dict, old_dict, frozen=[]):
     Like `dict.update`, except `key=value` pairs in `old_dict` are only used
     to add / overwrite values in `new_dict` if they are `None` or missing.
     """
-    if type(new_dict) is dict and type(old_dict) is dict:
-        for key in old_dict:
-            old_val = old_dict.get(key)
-            new_val = new_dict.get(key)
-            if old_val is not None:
-                if new_val is None:
-                    new_dict[key] = old_val
-                elif key in frozen and new_val != old_val:
-                    raise ConfigurationError(f"{key} cannot be changed")
+    for key in old_dict:
+        old_val = old_dict.get(key)
+        new_val = new_dict.get(key)
 
+        if type(new_val) is dict and type(old_val) is dict:
+            update_dict_if_none(new_val, old_val)
 
-def first_not_none(*args):
-    for arg in args:
-        if arg is not None:
-            return arg
+        elif old_val is not None:
+            if new_val is None:
+                new_dict[key] = old_val
+            elif key in frozen and new_val != old_val:
+                raise ConfigurationError(f"{key} cannot be changed")
 
 
 def update_if_none(new, old, frozen=[]):
@@ -41,8 +46,11 @@ def update_if_none(new, old, frozen=[]):
     return type(new)(**new_dict)
 
 
-def write_checkpoint(number, outdir, logger, **kwargs):
-    filename = f"chkpt.{number:04d}.pk"
+def write_checkpoint(number, outdir, state):
+    if type(number) is int:
+        filename = f"chkpt.{number:04d}.pk"
+    else:
+        filename = f"chkpt.final.pk"
 
     if outdir is not None:
         pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
@@ -51,7 +59,7 @@ def write_checkpoint(number, outdir, logger, **kwargs):
     with open(filename, "wb") as chkpt:
         if logger is not None:
             logger.info(f"write checkpoint {chkpt.name}")
-        pickle.dump(kwargs, chkpt)
+        pickle.dump(state, chkpt)
 
 
 def load_checkpoint(chkpt_file):
@@ -83,12 +91,11 @@ class DriverArgs(NamedTuple):
     chkpt_file: str = None
     model_parameters: dict = None
     cfl_number: float = None
-    checkpoint_recurrence: Recurrence = None
     end_time: float = None
     execution_mode: str = None
     fold: int = None
-    output_directory: str = None
     resolution: int = None
+    events: Dict[str, Recurrence] = dict()
 
     def from_namespace(args):
         """
@@ -145,13 +152,16 @@ class DriverArgs(NamedTuple):
         return self.setup_name is not None
 
 
-def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
+def simulate(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     """
-    Entry point for running simulations.
+    Main denerator for running simulations.
 
-    If this function is invoked with a `DriverArgs` instance in `driver`, the
-    other arguments are ignored. Otherwise, the driver is created from the
-    setup name, model paramters, and keyword arguments.
+    If invoked with a `DriverArgs` instance in `driver`, the other arguments
+    are ignored. Otherwise, the driver is created from the setup name, model
+    paramters, and keyword arguments.
+
+    This function is a generator: it yields its state at a sequence of
+    pause points, defined by the `events` dictionary.
     """
 
     from time import perf_counter
@@ -159,7 +169,7 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     from sailfish import system
     from sailfish.setup import Setup
     from sailfish.solvers import srhd_1d
-    from sailfish.task import RecurringTask
+    from sailfish.task import Recurrence
 
     # If driver is None, then other arguments are ignored
     if driver is None:
@@ -173,10 +183,8 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     should also be extensible by a system-specific rc-style configuration
     file.
     """
-
     system.configure_build()
     system.log_system_info(driver.execution_mode or "cpu")
-    logger = getLogger(__name__)
     loop_logger = getLogger("loop_message")
 
     if driver.fresh_setup:
@@ -187,12 +195,12 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
         logger.info(f"generate initial data for setup {driver.setup_name}")
         setup = Setup.find_setup_class(driver.setup_name)(**driver.model_parameters)
         driver = driver._replace(
-            resolution=driver.resolution or setup.default_resolution
+            resolution=driver.resolution or setup.default_resolution,
         )
 
         iteration = 0
         time = 0.0
-        checkpoint_task = RecurringTask(name="checkpoint")
+        tasks = {name: RecurringTask() for name in driver.events}
         initial = initial_condition(setup, driver.resolution, setup.domain)
     else:
         """
@@ -211,12 +219,13 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
 
         iteration = chkpt["iteration"]
         time = chkpt["time"]
-        checkpoint_task = chkpt["tasks"]["checkpoint"]
+        tasks = chkpt["tasks"]
         initial = chkpt["primitive"]
 
-    chkpt_recurrence = driver.checkpoint_recurrence or Recurrence.from_str(
-        setup.default_checkpoint_recurrence
-    )
+        for event in driver.events:
+            if event not in tasks:
+                tasks[event] = RecurringTask()
+
     mode = driver.execution_mode or "cpu"
     fold = driver.fold or 10
     cfl_number = driver.cfl_number or 0.6
@@ -234,13 +243,16 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
         boundary_condition=setup.boundary_condition,
         mode=mode,
     )
-    logger.info(f"checkpoint task recurrence is {chkpt_recurrence}")
+
+    for name, event in driver.events.items():
+        logger.info(f"recurrence for {name} event is {event}")
+
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt}")
     setup.print_model_parameters(newlines=True)
 
-    def grab_state(tasks=dict()):
+    def grab_state():
         """
         Collect items from the driver and solver state, as well as run
         details, sufficient for restarts and post processing.
@@ -256,30 +268,18 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
             domain=setup.domain,
         )
 
-    def checkpoint():
-        """
-        Write a checkpoint file.
-
-        This function has no side effects on the driver state, but it returns
-        an updated checkpoint task.
-        """
-        next_checkpoint_task = checkpoint_task.next(solver.time, chkpt_recurrence)
-        write_checkpoint(
-            checkpoint_task.number,
-            driver.output_directory,
-            logger,
-            **grab_state(tasks=dict(checkpoint=next_checkpoint_task)),
-        )
-        return next_checkpoint_task
-
     while end_time is None or end_time > solver.time:
         """
         Run the main simulation loop. Iterations are grouped according the
         the fold parameter. Side effects including the iteration message are
         performed between fold boundaries.
         """
-        if checkpoint_task.is_due(solver.time, chkpt_recurrence):
-            checkpoint_task = checkpoint()
+
+        for name, event in driver.events.items():
+            task = tasks[name]
+            if tasks[name].is_due(solver.time, event):
+                tasks[name] = task.next(solver.time, event)
+                yield name, task.number, grab_state()
 
         with system.measure_time() as fold_time:
             for _ in range(fold):
@@ -291,21 +291,40 @@ def run(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
         loop_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
-    if checkpoint_task.is_due(float("inf"), chkpt_recurrence):
-        checkpoint()
-
-    return grab_state()
+    yield "end", None, grab_state()
 
 
-def enable_logging():
+def run(*args, quiet=True, **kwargs):
+    """
+    Run a simulation with no side-effects, and return the final state.
+
+    This function is intended for use by scripts that run a simulation and
+    inspect the output in-memory, or otherwise handle archiving the final
+    result themselves. Event monitoring is not supported. If `quiet=True`
+    (default) then logging is suppressed.
+    """
+    if "events" in kwargs:
+        raise ValueError("events are not supported")
+
+    if not quiet:
+        init_logging()
+
+    return next(simulate(*args, **kwargs))[2]
+
+
+def init_logging():
     from logging import StreamHandler, Formatter, getLogger, INFO
 
     class RunFormatter(Formatter):
         def format(self, record):
-            if record.name == "loop_message":
+            name = record.name.replace("sailfish.", "")
+
+            if name == "loop_message":
                 return f"{record.msg}"
+            if record.levelno <= 20:
+                return f"[{name}] {record.msg}"
             else:
-                return f"[{record.name.replace('sailfish.', '')}] {record.msg}"
+                return f"[{name}:{record.levelname.lower()}] {record.msg}"
 
     handler = StreamHandler()
     handler.setFormatter(RunFormatter())
@@ -318,11 +337,25 @@ def enable_logging():
 def main():
     import argparse
 
-    enable_logging()
+    init_logging()
+
+    def keyed_event(item):
+        key, val = item.split("=")
+        return key, Recurrence.from_str(val)
+
+    class MakeDict(argparse.Action):
+        def __call__(self, parser, namespace, values, option_string=None):
+            setattr(namespace, self.dest, dict(values))
+
+    def add_dict_entry(key):
+        class AddDictEntry(argparse.Action):
+            def __call__(self, parser, namespace, values, option_string=None):
+                getattr(namespace, self.dest)[key] = values
+
+        return AddDictEntry
 
     parser = argparse.ArgumentParser(
         prog="sailfish",
-        # usage="%(prog)s <command> [options]",
         description="gpu-accelerated astrophysical gasdynamics code",
     )
     parser.add_argument(
@@ -357,12 +390,31 @@ def main():
         help="iterations between messages and side effects",
     )
     parser.add_argument(
+        "--events",
+        nargs="*",
+        metavar="E1 E2",
+        type=keyed_event,
+        action=MakeDict,
+        default=dict(),
+        help="a sequence of events and recurrence rules to be emitted",
+    )
+    parser.add_argument(
         "--checkpoint",
         "-c",
         metavar="C",
         type=Recurrence.from_str,
-        dest="checkpoint_recurrence",
-        help="checkpoint recurrence [never|once|twice|<delta>|<log:mul>] ",
+        action=add_dict_entry("checkpoint"),
+        dest="events",
+        help="checkpoint recurrence [<delta>|<log:mul>]",
+    )
+    parser.add_argument(
+        "--timeseries",
+        "-t",
+        metavar="T",
+        type=Recurrence.from_str,
+        action=add_dict_entry("timeseries"),
+        dest="events",
+        help="timeseries recurrence [<delta>|<log:mul>]",
     )
     parser.add_argument(
         "--outdir",
@@ -416,7 +468,15 @@ def main():
                 print(f"    {setup.dash_case_class_name}")
 
         else:
-            run(driver=DriverArgs.from_namespace(args))
+            driver = DriverArgs.from_namespace(args)
+
+            for name, number, state in simulate(driver=driver):
+                if name == "checkpoint":
+                    write_checkpoint(number, args.output_directory, state)
+                elif name == "end":
+                    write_checkpoint("final", args.output_directory, state)
+                else:
+                    logger.warning(f"unrecognized event {name}")
 
     except ConfigurationError as e:
         print(f"bad configuration: {e}")

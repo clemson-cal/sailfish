@@ -7,11 +7,8 @@ class ParseRecurrenceError(Exception):
 
 
 class RecurrenceKind(Enum):
-    NEVER = 0
-    ONCE = 1
-    TWICE = 2
-    LINEAR = 3
-    LOG = 4
+    LINEAR = 0
+    LOG = 1
 
 
 class Recurrence(NamedTuple):
@@ -20,25 +17,15 @@ class Recurrence(NamedTuple):
 
     The available rules are:
 
-    - never: the task must never happen
-    - once: it happens once, at the start of the simulation
-    - twice: once at the start, and again at the end
     - linear: at evenly spaced time intervals
     - log: at multiplicative time intervals; `next = time * (1 + delta)`
     """
 
-    kind: RecurrenceKind = RecurrenceKind.NEVER
+    kind: RecurrenceKind = None
     interval: float = None
 
     @classmethod
     def from_str(cls, string=None):
-        if string is None or string == "never":
-            return Recurrence()
-        if string == "once":
-            return Recurrence(kind=RecurrenceKind.ONCE)
-        if string == "twice":
-            return Recurrence(kind=RecurrenceKind.TWICE)
-
         try:
             return Recurrence(kind=RecurrenceKind.LINEAR, interval=float(string))
         except ValueError:  # parse float failed
@@ -58,12 +45,6 @@ class Recurrence(NamedTuple):
     def __str__(self):
         kind_str = str(self.kind).split(".")[1].lower()
 
-        if self.kind == RecurrenceKind.NEVER:
-            return kind_str
-        if self.kind == RecurrenceKind.ONCE:
-            return kind_str
-        if self.kind == RecurrenceKind.TWICE:
-            return kind_str
         if self.kind == RecurrenceKind.LINEAR:
             return f"{kind_str} with interval {self.interval}"
         if self.kind == RecurrenceKind.LOG:
@@ -78,23 +59,10 @@ class RecurringTask(NamedTuple):
     other post-processing tasks.
     """
 
-    name: str
     last_time: float = None
     number: int = 0
 
     def next_time(self, time, recurrence):
-        if recurrence.kind == RecurrenceKind.NEVER:
-            return None
-        if recurrence.kind == RecurrenceKind.ONCE:
-            if self.number == 0:
-                return time
-            return None
-        if recurrence.kind == RecurrenceKind.TWICE:
-            if self.number == 0:
-                return time
-            if self.number == 1:
-                return float("inf")
-            return None
         if recurrence.kind == RecurrenceKind.LINEAR:
             if self.number == 0:
                 return time
@@ -104,7 +72,7 @@ class RecurringTask(NamedTuple):
             if self.number == 0:
                 return time
             else:
-                return self.last_time * (1.0 + self.recurrence.interval)
+                return self.last_time * (1.0 + recurrence.interval)
 
     def is_due(self, time, recurrence):
         next_time = self.next_time(time, recurrence)
