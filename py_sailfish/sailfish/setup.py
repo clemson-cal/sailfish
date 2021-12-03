@@ -191,13 +191,6 @@ class Setup(ABC):
         return None
 
     @property
-    def default_checkpoint_recurrence(self):
-        """
-        Provide a default checkpoint recurrence rule.
-        """
-        return "0.1"
-
-    @property
     def default_resolution(self):
         """
         Provide a default grid resolution.

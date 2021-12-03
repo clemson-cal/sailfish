@@ -152,7 +152,7 @@ class DriverArgs(NamedTuple):
         return self.setup_name is not None
 
 
-def simulate(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
+def simulate(driver):
     """
     Main denerator for running simulations.
 
@@ -171,11 +171,6 @@ def simulate(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     from sailfish.solvers import srhd_1d
     from sailfish.task import Recurrence
 
-    # If driver is None, then other arguments are ignored
-    if driver is None:
-        kwargs.update(dict(setup_name=setup_name, model_parameters=model_parameters))
-        driver = DriverArgs(**kwargs)
-
     """
     Initialize and log state in the the system module. The build system
     influences JIT-compiled module code. Currently the build parameters are
@@ -193,7 +188,9 @@ def simulate(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
         parametrs, and a setup instance.
         """
         logger.info(f"generate initial data for setup {driver.setup_name}")
-        setup = Setup.find_setup_class(driver.setup_name)(**driver.model_parameters)
+        setup = Setup.find_setup_class(driver.setup_name)(
+            **driver.model_parameters or dict()
+        )
         driver = driver._replace(
             resolution=driver.resolution or setup.default_resolution,
         )
@@ -213,7 +210,7 @@ def simulate(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
         logger.info(f"load checkpoint {driver.chkpt_file}")
         chkpt = load_checkpoint(driver.chkpt_file)
         setup_cls = Setup.find_setup_class(chkpt["setup_name"])
-        driver = update_if_none(driver, chkpt["driver_args"], frozen=["resolution"])
+        driver = update_if_none(driver, chkpt["driver"], frozen=["resolution"])
         params = driver.updated_parameter_dict(chkpt["parameters"], setup_cls)
         setup = setup_cls(**params)
 
@@ -262,7 +259,7 @@ def simulate(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
             time=solver.time,
             primitive=solver.primitive,
             tasks=tasks,
-            driver_args=driver,
+            driver=driver,
             parameters=setup.model_parameter_dict,
             setup_name=setup.dash_case_class_name,
             domain=setup.domain,
@@ -294,7 +291,7 @@ def simulate(setup_name=None, model_parameters=dict(), driver=None, **kwargs):
     yield "end", None, grab_state()
 
 
-def run(*args, quiet=True, **kwargs):
+def run(setup_name, quiet=True, **kwargs):
     """
     Run a simulation with no side-effects, and return the final state.
 
@@ -306,10 +303,12 @@ def run(*args, quiet=True, **kwargs):
     if "events" in kwargs:
         raise ValueError("events are not supported")
 
+    driver = DriverArgs(setup_name=setup_name, **kwargs)
+
     if not quiet:
         init_logging()
 
-    return next(simulate(*args, **kwargs))[2]
+    return next(simulate(driver))[2]
 
 
 def init_logging():
@@ -470,13 +469,13 @@ def main():
         else:
             driver = DriverArgs.from_namespace(args)
 
-            for name, number, state in simulate(driver=driver):
+            for name, number, state in simulate(driver):
                 if name == "checkpoint":
                     write_checkpoint(number, args.output_directory, state)
                 elif name == "end":
                     write_checkpoint("final", args.output_directory, state)
                 else:
-                    logger.warning(f"unrecognized event {name}")
+                    logger.warning(f"unrecognized event {name}")
 
     except ConfigurationError as e:
         print(f"bad configuration: {e}")
