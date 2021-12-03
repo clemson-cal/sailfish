@@ -2,7 +2,7 @@
 
 import os, pickle, pathlib
 from typing import NamedTuple
-from sailfish.task import Recurrence, RecurringTask, ParseRecurrenceError
+from sailfish.task import Recurrence, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
 
 
@@ -37,7 +37,7 @@ def update_if_none(new, old, frozen=[]):
     return type(new)(**new_dict)
 
 
-def write_checkpoint(number, outdir=None, logger=None, **kwargs):
+def write_checkpoint(number, outdir, logger, **kwargs):
     filename = f"chkpt.{number:04d}.pk"
 
     if outdir is not None:
@@ -142,10 +142,10 @@ class DriverArgs(NamedTuple):
 def main(driver):
     from time import perf_counter
     from logging import getLogger
-    from sailfish.solvers import srhd_1d
-    from sailfish.setup import Setup
-    from sailfish.task import RecurringTask
     from sailfish import system
+    from sailfish.setup import Setup
+    from sailfish.solvers import srhd_1d
+    from sailfish.task import RecurringTask
 
     """
     Initialize and log state in the the system module. The build system
@@ -194,6 +194,9 @@ def main(driver):
         checkpoint_task = chkpt["tasks"]["checkpoint"]
         initial = chkpt["primitive"]
 
+    chkpt_recurrence = driver.checkpoint_recurrence or Recurrence.from_str(
+        setup.default_checkpoint_recurrence
+    )
     mode = driver.execution_mode or "cpu"
     fold = driver.fold or 10
     cfl_number = driver.cfl_number or 0.6
@@ -211,11 +214,27 @@ def main(driver):
         boundary_condition=setup.boundary_condition,
         mode=mode,
     )
-    logger.info(f"checkpoint task recurrence is {driver.checkpoint_recurrence}")
+    logger.info(f"checkpoint task recurrence is {chkpt_recurrence}")
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt}")
     setup.print_model_parameters(newlines=True)
+
+    def grab_state(tasks=dict()):
+        """
+        Collect items from the driver and solver state, as well as run
+        details, sufficient for restarts and post processing.
+        """
+        return dict(
+            iteration=iteration,
+            time=solver.time,
+            primitive=solver.primitive,
+            tasks=tasks,
+            driver_args=driver,
+            parameters=setup.model_parameter_dict,
+            setup_name=setup.dash_case_class_name,
+            domain=setup.domain,
+        )
 
     def checkpoint():
         """
@@ -224,21 +243,12 @@ def main(driver):
         This function has no side effects on the driver state, but it returns
         an updated checkpoint task.
         """
-        next_checkpoint_task = checkpoint_task.next(
-            solver.time, driver.checkpoint_recurrence
-        )
+        next_checkpoint_task = checkpoint_task.next(solver.time, chkpt_recurrence)
         write_checkpoint(
             checkpoint_task.number,
-            outdir=driver.output_directory,
-            logger=logger,
-            time=solver.time,
-            iteration=iteration,
-            primitive=solver.primitive,
-            driver_args=driver,
-            tasks=dict(checkpoint=next_checkpoint_task),
-            parameters=setup.model_parameter_dict,
-            setup_name=setup.dash_case_class_name,
-            domain=setup.domain,
+            driver.output_directory,
+            logger,
+            **grab_state(tasks=dict(checkpoint=next_checkpoint_task)),
         )
         return next_checkpoint_task
 
@@ -248,7 +258,7 @@ def main(driver):
         the fold parameter. Side effects including the iteration message are
         performed between fold boundaries.
         """
-        if checkpoint_task.is_due(solver.time, driver.checkpoint_recurrence):
+        if checkpoint_task.is_due(solver.time, chkpt_recurrence):
             checkpoint_task = checkpoint()
 
         with system.measure_time() as fold_time:
@@ -261,7 +271,7 @@ def main(driver):
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
         print(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
-    if checkpoint_task.is_due(float("inf"), driver.checkpoint_recurrence):
+    if checkpoint_task.is_due(float("inf"), chkpt_recurrence):
         checkpoint()
 
 

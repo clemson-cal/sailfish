@@ -18,7 +18,7 @@ class Recurrence(NamedTuple):
     """
     Rule for how a task can recur throughout a simulation.
 
-    The avilable rules are:
+    The available rules are:
 
     - never: the task must never happen
     - once: it happens once, at the start of the simulation
