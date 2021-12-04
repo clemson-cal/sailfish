@@ -1,3 +1,5 @@
+#!/usr/bin/env python3
+
 from sailfish.driver import run
 from matplotlib import pyplot as plt
 
