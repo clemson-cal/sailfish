@@ -1,0 +1,32 @@
+sailfish.setup.param
+====================
+
+.. currentmodule:: sailfish.setup
+
+.. autoclass:: param
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~param.__init__
+      ~param.count
+      ~param.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~param.about
+      ~param.default
+      ~param.mutable
+   
+   

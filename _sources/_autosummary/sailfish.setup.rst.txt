@@ -9,13 +9,6 @@ sailfish.setup
 
    
    
-   .. rubric:: Functions
-
-   .. autosummary::
-      :toctree:
-   
-      parameter
-   
    
 
    
@@ -27,6 +20,7 @@ sailfish.setup
    
       Parameter
       Setup
+      param
    
    
 
