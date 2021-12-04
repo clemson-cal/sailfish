@@ -1,6 +1,9 @@
-/target
-/data
-/palmetto
 *.bin
 *.sf
 *.png
+*.pk
+__pycache__
+/target
+/data
+/doc/source/_autosummary
+/doc/build
