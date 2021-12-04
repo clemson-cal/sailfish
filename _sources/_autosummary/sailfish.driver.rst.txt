@@ -1,4 +1,4 @@
-﻿sailfish.driver
+sailfish.driver
 ===============
 
 .. automodule:: sailfish.driver
