@@ -46,7 +46,48 @@ def update_if_none(new, old, frozen=[]):
     return type(new)(**new_dict)
 
 
+def asdict(t):
+    """
+    Convert named tuple instances to dictionaries.
+
+    This function operates recursively on the data members of a dictionary or
+    named tuple. Each object that is a named tuple is mapped to its dictionary
+    representation, with an additional `_type` key to indicate the named tuple
+    subclass. This mapping is applied to the simulation state before pickling,
+    so that `sailfish` module is not required to unpickle the checkpoint
+    files.
+    """
+    if type(t) is dict:
+        return {k: asdict(v) for k, v in t.items()}
+    if isinstance(t, tuple):
+        d = {k: asdict(v) for k, v in t._asdict().items()}
+        d["_type"] = type(t).__name__
+        return d
+    return t
+
+
+def fromdict(d):
+    """
+    Convert from dictionaries to named tuples.
+
+    This function performs the inverse of the `asdict` method, and is applied
+    to pickled simulation states.
+    """
+    if type(d) is dict:
+        if "_type" in d:
+            cls = eval(d["_type"])
+            del d["_type"]
+            return cls(**d)
+        else:
+            return {k: fromdict(v) for k, v in d.items()}
+    else:
+        return d
+
+
 def write_checkpoint(number, outdir, state):
+    """
+    Write the simulation state to a file, as a pickle.
+    """
     if type(number) is int:
         filename = f"chkpt.{number:04d}.pk"
     else:
@@ -59,13 +100,16 @@ def write_checkpoint(number, outdir, state):
     with open(filename, "wb") as chkpt:
         if logger is not None:
             logger.info(f"write checkpoint {chkpt.name}")
-        pickle.dump(state, chkpt)
+        pickle.dump(asdict(state), chkpt)
 
 
 def load_checkpoint(chkpt_file):
+    """
+    Load the simulation state from a pickle file.
+    """
     try:
         with open(chkpt_file, "rb") as file:
-            return pickle.load(file)
+            return fromdict(pickle.load(file))
     except FileNotFoundError:
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
 

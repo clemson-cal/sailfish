@@ -6,8 +6,8 @@ Sailfish is a GPU-accelerated astrophysical gasdynamics code.
 Quick-start
 ===========
 
-Basic use from the command line is like this: :code:`sailfish shocktube
---end-time=0.2 --resolution=1000`. This command will run a built-in setup
+Basic use from the command line is like this: ``sailfish shocktube
+--end-time=0.2 --resolution=1000``. This command will run a built-in setup
 called `shocktube` to a simulation time of 0.04 seconds, on a 1d grid with
 1000 zones. The command line tool will print messages to the terminal, and
 write a file called `chkpt.final.pk` to the disk in the current working
@@ -28,11 +28,10 @@ code below:
    plt.plot(rho)
    plt.show()
 
-The :code:`run` function takes a sequence of arguments to control the driver
-and problem setup, and then returns the simulation final state. However no
-side-effects are performed by :code:`run` and the terminal output is
-suppressed (you can re-enable it with the keyword argument
-:code:`quiet=False`).
+The `run` function takes a sequence of arguments to control the driver and
+problem setup, and then returns the simulation final state. However no
+side-effects are performed by `run` and the terminal output is suppressed (you
+can re-enable it with the keyword argument ``quiet=False``).
 
 
 API documentation
