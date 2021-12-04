@@ -1,32 +1,33 @@
-from textwrap import dedent
 from abc import ABC, abstractmethod
+from textwrap import dedent
+from typing import NamedTuple, Any
 
 
 class SetupError(Exception):
     """Something went wrong during setup configuration"""
 
 
-class Parameter:
-    def __init__(self, default, about, mutable=False):
-        self.default = default
-        self.about = about
-        self.mutable = mutable
-
-
-def parameter(default, about, mutable=False):
+class Parameter(NamedTuple):
     """
-    Return a `Parameter` instance.
+    A model parameter: enables runtime configuring of a setup.
 
-    `Parameter` instances should be set as a class variable on sub-classes of
-    `Setup`. Set the `mutable` flag to `True` if that parameter should be
-    adjustable in restarted runs.
+    `Parameter` instances are assigned as class variables to `Setup`
+    sub-classes. The `mutable` flag should be set to to `True` if the
+    parameter is logically adjustable either during the run, or can be
+    superseded when a run is restarted.
     """
-    return Parameter(default, about, mutable=mutable)
+
+    default: Any
+    about: str
+    mutable: bool = False
+
+
+param = Parameter
 
 
 class Setup(ABC):
     """
-    An abstract base class to describe a simulation model setup.
+    Abstract base class to describe a simulation model setup.
 
     Subclasses are used by the driver to define initial and boundary
     conditions, select a hydrodynamics solver and parameters, and describe

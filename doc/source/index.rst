@@ -3,6 +3,8 @@ Sailfish
 
 Sailfish is a GPU-accelerated astrophysical gasdynamics code.
 
+The main repository is hosted here: `github.com/clemson-cal <https://github.com/clemson-cal/sailfish>`_.
+
 Quick-start
 ===========
 
@@ -51,3 +53,4 @@ API documentation
    sailfish.subdivide
    sailfish.system
    sailfish.task
+
