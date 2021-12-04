@@ -1,5 +1,5 @@
 from math import pi, sin
-from sailfish.setup import Setup, SetupError, parameter
+from sailfish.setup import Setup, SetupError, param
 
 
 class Shocktube(Setup):
@@ -35,9 +35,9 @@ class DensityWave(Setup):
     translation. The gas pressure is uniform.
     """
 
-    wavenumber = parameter(1, "wavenumber of the sinusoid")
-    amplitude = parameter(0.1, "amplitude of the density variation")
-    velocity = parameter(0.0, "speed of the wave")
+    wavenumber = param(1, "wavenumber of the sinusoid")
+    amplitude = param(0.1, "amplitude of the density variation")
+    velocity = param(0.0, "speed of the wave")
 
     def initial_primitive(self, x, primitive):
         k = self.wavenumber * 2 * pi
