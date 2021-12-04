@@ -1,4 +1,12 @@
+"""
+This module analyzes C code intended for JIT-compilation to a kernel library.
+"""
+
+
 def scan(lines):
+    """
+    Generator to emit events encountered parsing kernel library code.
+    """
     import re
 
     function_name = re.compile(r"\s*PUBLIC\s+void\s+(?P<symbol>\w+)")
@@ -25,6 +33,17 @@ def scan(lines):
 
 
 def parse_api(filename):
+    """
+    Parse a C-like source file to extract a public API.
+
+    The C code needs to conform to a set of conventions, which are still
+    evolving but will be documented soon. This function returns a dictionary
+    whose keys are the names of the public functions (or kernels) in the code,
+    and the values are lists of the (positional) arguments describing the
+    function signature. Each function argument is (currently) a tuple of the
+    data type, the argument name, and an optional constraint which could be
+    validated at runtime.
+    """
     api = dict()
     with open(filename, "r") as f:
         for event, value in scan(f):
