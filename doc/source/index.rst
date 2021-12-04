@@ -1,12 +1,20 @@
 Sailfish
-========
+~~~~~~~~
+
+.. toctree::
+   :hidden:
+
+   setups
+   workflow
+   kernel_libraries
+   api
 
 Sailfish is a GPU-accelerated astrophysical gasdynamics code.
 
 The main repository is hosted here: `github.com/clemson-cal <https://github.com/clemson-cal/sailfish>`_.
 
 Quick-start
-===========
+~~~~~~~~~~~
 
 Basic use from the command line is like this: ``sailfish shocktube
 --end-time=0.2 --resolution=1000``. This command will run a built-in setup
@@ -35,17 +43,15 @@ problem setup, and then returns the simulation final state. However no
 side-effects are performed by `run` and the terminal output is suppressed (you
 can re-enable it with the keyword argument ``quiet=False``).
 
-
 API documentation
-=================
+~~~~~~~~~~~~~~~~~
 
 .. autosummary::
-   :toctree: _autosummary
    :recursive:
 
-   sailfish
    sailfish.driver
    sailfish.library
+   sailfish.mesh
    sailfish.parse_api
    sailfish.setup
    sailfish.setups
@@ -53,4 +59,3 @@ API documentation
    sailfish.subdivide
    sailfish.system
    sailfish.task
-
