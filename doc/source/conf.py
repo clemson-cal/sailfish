@@ -36,7 +36,7 @@ extensions = [
     # "sphinx.ext.intersphinx",
     # "sphinx.ext.ifconfig",
     # "sphinx.ext.todo",
-    # "sphinx.ext.viewcode",
+    "sphinx.ext.viewcode",
     "sphinx.ext.autosummary",
 ]
 autosummary_generate = True
