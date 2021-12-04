@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.driver.DriverArgs &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.driver.ConfigurationError" href="sailfish.driver.ConfigurationError.html" />
+    <link rel="prev" title="sailfish.driver.write_checkpoint" href="sailfish.driver.write_checkpoint.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="sailfish.html">sailfish</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.asdict.html">sailfish.driver.asdict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.first_not_none.html">sailfish.driver.first_not_none</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.fromdict.html">sailfish.driver.fromdict</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.init_logging.html">sailfish.driver.init_logging</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.initial_condition.html">sailfish.driver.initial_condition</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.load_checkpoint.html">sailfish.driver.load_checkpoint</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.main.html">sailfish.driver.main</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.run.html">sailfish.driver.run</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.simulate.html">sailfish.driver.simulate</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.update_dict_if_none.html">sailfish.driver.update_dict_if_none</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.update_if_none.html">sailfish.driver.update_if_none</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.write_checkpoint.html">sailfish.driver.write_checkpoint</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.driver.DriverArgs</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.ConfigurationError.html">sailfish.driver.ConfigurationError</a></li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.library.html">sailfish.library</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.parse_api.html">sailfish.parse_api</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.system.html">sailfish.system</a></li>
+<li class="toctree-l1"><a class="reference internal" href="sailfish.task.html">sailfish.task</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="sailfish.html">sailfish</a> &raquo;</li>
+          <li><a href="sailfish.driver.html">sailfish.driver</a> &raquo;</li>
+      <li>sailfish.driver.DriverArgs</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.driver.DriverArgs.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sailfish-driver-driverargs">
+<h1>sailfish.driver.DriverArgs<a class="headerlink" href="#sailfish-driver-driverargs" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="sailfish.driver.DriverArgs">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.driver.</span></span><span class="sig-name descname"><span class="pre">DriverArgs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chkpt_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cfl_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execution_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="sailfish.task.Recurrence.html#sailfish.task.Recurrence" title="sailfish.task.Recurrence"><span class="pre">sailfish.task.Recurrence</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.driver.DriverArgs" title="Permalink to this definition"></a></dt>
+<dd><p>Contains data used by the driver.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.driver.DriverArgs.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.driver.DriverArgs.__init__" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.__init__" title="sailfish.driver.DriverArgs.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code>(value, /)</p></td>
+<td><p>Return number of occurrences of value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_namespace</span></code>()</p></td>
+<td><p>Construct an instance from an argparse-type namespace object.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code>(value[, start, stop])</p></td>
+<td><p>Return first index of value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">updated_parameter_dict</span></code>(old, setup_cls)</p></td>
+<td><p>Return an updated parameter dict.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">cfl_number</span></code></p></td>
+<td><p>Alias for field number 3</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">chkpt_file</span></code></p></td>
+<td><p>Alias for field number 1</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">end_time</span></code></p></td>
+<td><p>Alias for field number 4</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">events</span></code></p></td>
+<td><p>Alias for field number 8</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">execution_mode</span></code></p></td>
+<td><p>Alias for field number 5</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fold</span></code></p></td>
+<td><p>Alias for field number 6</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">fresh_setup</span></code></p></td>
+<td><p>Return true if this is not a restart.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameters</span></code></p></td>
+<td><p>Alias for field number 2</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">resolution</span></code></p></td>
+<td><p>Alias for field number 7</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup_name</span></code></p></td>
+<td><p>Alias for field number 0</p></td>
+</tr>
+</tbody>
+</table>
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.driver.write_checkpoint.html" class="btn btn-neutral float-left" title="sailfish.driver.write_checkpoint" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.driver.ConfigurationError.html" class="btn btn-neutral float-right" title="sailfish.driver.ConfigurationError" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

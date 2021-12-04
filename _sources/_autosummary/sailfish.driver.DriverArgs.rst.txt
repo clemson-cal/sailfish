@@ -1,0 +1,41 @@
+sailfish.driver.DriverArgs
+==========================
+
+.. currentmodule:: sailfish.driver
+
+.. autoclass:: DriverArgs
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~DriverArgs.__init__
+      ~DriverArgs.count
+      ~DriverArgs.from_namespace
+      ~DriverArgs.index
+      ~DriverArgs.updated_parameter_dict
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~DriverArgs.cfl_number
+      ~DriverArgs.chkpt_file
+      ~DriverArgs.end_time
+      ~DriverArgs.events
+      ~DriverArgs.execution_mode
+      ~DriverArgs.fold
+      ~DriverArgs.fresh_setup
+      ~DriverArgs.model_parameters
+      ~DriverArgs.resolution
+      ~DriverArgs.setup_name
+   
+   

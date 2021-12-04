@@ -1,0 +1,39 @@
+﻿sailfish
+========
+
+.. automodule:: sailfish
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   sailfish.driver
+   sailfish.library
+   sailfish.parse_api
+   sailfish.setup
+   sailfish.setups
+   sailfish.solvers
+   sailfish.subdivide
+   sailfish.system
+   sailfish.task
+

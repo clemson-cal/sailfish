@@ -1,0 +1,6 @@
+sailfish.parse\_api.parse\_api
+==============================
+
+.. currentmodule:: sailfish.parse_api
+
+.. autofunction:: parse_api

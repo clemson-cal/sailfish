@@ -1,0 +1,6 @@
+sailfish.driver.ConfigurationError
+==================================
+
+.. currentmodule:: sailfish.driver
+
+.. autoexception:: ConfigurationError

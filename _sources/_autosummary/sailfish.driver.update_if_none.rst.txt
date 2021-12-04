@@ -1,0 +1,6 @@
+sailfish.driver.update\_if\_none
+================================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: update_if_none

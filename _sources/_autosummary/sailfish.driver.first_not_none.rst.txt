@@ -1,0 +1,6 @@
+sailfish.driver.first\_not\_none
+================================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: first_not_none

@@ -1,0 +1,6 @@
+sailfish.driver.init\_logging
+=============================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: init_logging

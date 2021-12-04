@@ -1,0 +1,45 @@
+sailfish.setups.DensityWave
+===========================
+
+.. currentmodule:: sailfish.setups
+
+.. autoclass:: DensityWave
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~DensityWave.__init__
+      ~DensityWave.describe_class
+      ~DensityWave.find_setup_class
+      ~DensityWave.initial_primitive
+      ~DensityWave.print_model_parameters
+      ~DensityWave.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~DensityWave.amplitude
+      ~DensityWave.boundary_condition
+      ~DensityWave.dash_case_class_name
+      ~DensityWave.default_end_time
+      ~DensityWave.default_model_parameters
+      ~DensityWave.default_resolution
+      ~DensityWave.domain
+      ~DensityWave.has_model_parameters
+      ~DensityWave.immutable_parameter_keys
+      ~DensityWave.model_parameter_dict
+      ~DensityWave.model_parameters
+      ~DensityWave.velocity
+      ~DensityWave.wavenumber
+   
+   

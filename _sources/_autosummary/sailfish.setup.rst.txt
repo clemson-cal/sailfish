@@ -1,0 +1,45 @@
+sailfish.setup
+==============
+
+.. automodule:: sailfish.setup
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      parameter
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Parameter
+      Setup
+   
+   
+
+   
+   
+   .. rubric:: Exceptions
+
+   .. autosummary::
+      :toctree:
+   
+      SetupError
+   
+   
+
+
+

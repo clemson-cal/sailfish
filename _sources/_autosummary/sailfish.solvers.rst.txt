@@ -1,0 +1,31 @@
+sailfish.solvers
+================
+
+.. automodule:: sailfish.solvers
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   sailfish.solvers.srhd_1d
+

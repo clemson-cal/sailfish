@@ -1,0 +1,6 @@
+sailfish.driver.write\_checkpoint
+=================================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: write_checkpoint

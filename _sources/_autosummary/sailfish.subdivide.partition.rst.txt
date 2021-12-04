@@ -1,0 +1,6 @@
+sailfish.subdivide.partition
+============================
+
+.. currentmodule:: sailfish.subdivide
+
+.. autofunction:: partition

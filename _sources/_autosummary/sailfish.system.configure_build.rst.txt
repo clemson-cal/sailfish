@@ -1,0 +1,6 @@
+sailfish.system.configure\_build
+================================
+
+.. currentmodule:: sailfish.system
+
+.. autofunction:: configure_build

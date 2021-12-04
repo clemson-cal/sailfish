@@ -1,0 +1,6 @@
+﻿sailfish.setup.parameter
+========================
+
+.. currentmodule:: sailfish.setup
+
+.. autofunction:: parameter

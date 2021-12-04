@@ -1,0 +1,6 @@
+sailfish.driver.main
+====================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: main

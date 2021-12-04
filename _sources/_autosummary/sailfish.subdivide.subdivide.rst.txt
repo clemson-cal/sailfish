@@ -1,0 +1,6 @@
+sailfish.subdivide.subdivide
+============================
+
+.. currentmodule:: sailfish.subdivide
+
+.. autofunction:: subdivide

@@ -1,0 +1,6 @@
+sailfish.driver.simulate
+========================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: simulate

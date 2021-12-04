@@ -1,0 +1,42 @@
+sailfish.setup.Setup
+====================
+
+.. currentmodule:: sailfish.setup
+
+.. autoclass:: Setup
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Setup.__init__
+      ~Setup.describe_class
+      ~Setup.find_setup_class
+      ~Setup.initial_primitive
+      ~Setup.print_model_parameters
+      ~Setup.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Setup.boundary_condition
+      ~Setup.dash_case_class_name
+      ~Setup.default_end_time
+      ~Setup.default_model_parameters
+      ~Setup.default_resolution
+      ~Setup.domain
+      ~Setup.has_model_parameters
+      ~Setup.immutable_parameter_keys
+      ~Setup.model_parameter_dict
+      ~Setup.model_parameters
+   
+   
