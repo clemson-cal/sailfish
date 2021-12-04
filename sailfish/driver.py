@@ -209,9 +209,8 @@ def simulate(driver):
     """
 
     from time import perf_counter
-    from logging import getLogger, basicConfig, INFO, StreamHandler, Formatter
-    from sailfish import system
-    from sailfish.setup import Setup
+    from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
+    from sailfish.system import configure_build, log_system_info, measure_time
     from sailfish.solvers import srhd_1d
     from sailfish.task import Recurrence
 
@@ -222,8 +221,8 @@ def simulate(driver):
     should also be extensible by a system-specific rc-style configuration
     file.
     """
-    system.configure_build()
-    system.log_system_info(driver.execution_mode or "cpu")
+    configure_build()
+    log_system_info(driver.execution_mode or "cpu")
     loop_logger = getLogger("loop_message")
 
     if driver.fresh_setup:
@@ -322,7 +321,7 @@ def simulate(driver):
                 tasks[name] = task.next(solver.time, event)
                 yield name, task.number, grab_state()
 
-        with system.measure_time() as fold_time:
+        with measure_time() as fold_time:
             for _ in range(fold):
                 solver.new_timestep()
                 solver.advance_rk(0.0, dt)
