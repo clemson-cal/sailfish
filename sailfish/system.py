@@ -1,3 +1,7 @@
+"""
+Functions for querying compute capabilities and configuring JIT builds.
+"""
+
 import contextlib
 import logging
 import multiprocessing

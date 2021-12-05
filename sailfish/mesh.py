@@ -1,3 +1,7 @@
+"""
+Contains classes for different mesh geometries and dimensionalities.
+"""
+
 from typing import NamedTuple
 from math import log10
 

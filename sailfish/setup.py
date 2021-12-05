@@ -1,3 +1,7 @@
+"""
+The `Setup` class dictates physics and solver choices to the driver.
+"""
+
 from abc import ABC, abstractmethod
 from textwrap import dedent
 from typing import NamedTuple, Any

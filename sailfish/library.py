@@ -1,3 +1,7 @@
+"""
+Defines a `Library` utility class to encapulsate CPU/GPU compiled kernels.
+"""
+
 import logging
 import hashlib
 import time

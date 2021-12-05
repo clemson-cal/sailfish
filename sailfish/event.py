@@ -13,7 +13,7 @@ class RecurrenceKind(Enum):
 
 class Recurrence(NamedTuple):
     """
-    Rule for how a task can recur throughout a simulation.
+    Rule for how an event can recur throughout a simulation.
 
     The available rules are:
 
@@ -51,12 +51,13 @@ class Recurrence(NamedTuple):
             return f"{kind_str} with multiplier {self.interval}"
 
 
-class RecurringTask(NamedTuple):
+class RecurringEvent(NamedTuple):
     """
-    State of a recurring side effect that occurs during a simulation.
+    State of a recurring event that occurs during a simulation.
 
-    Side effects include writing checkpoints, collecting time series data, and
-    other post-processing tasks.
+    Events signal side effects to a loop which monitors simulation progress,
+    include writing checkpoints, collecting time series data, and other
+    post-processing tasks.
     """
 
     last_time: float = None
