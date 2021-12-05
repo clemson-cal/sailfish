@@ -52,7 +52,7 @@ class LogSphericalMesh(NamedTuple):
         factor and its derivative are taken into account. Otherwise if no time
         is provided the result is the minimum comoving grid spacing.
         """
-        r0, r1 = self.faces(0, 0)
+        r0, r1 = self.faces(0, 1)
         return (r1 - r0) * self.scale_factor(time)
 
     def scale_factor(self, time):

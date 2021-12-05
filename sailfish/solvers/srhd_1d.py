@@ -16,10 +16,10 @@ class Patch:
 
     def __init__(
         self,
-        index_range,
-        mesh,
-        primitive,
         time,
+        primitive,
+        mesh,
+        index_range,
         lib,
         xp,
     ):
@@ -139,7 +139,7 @@ class Solver:
         for (a, b) in subdivide(mesh.shape[0], num_patches):
             prim = xp.zeros([b - a + 2 * ng, nq])
             prim[ng:-ng] = primitive[a:b]
-            self.patches.append(Patch((a - ng, b + ng), mesh, prim, time, lib, xp))
+            self.patches.append(Patch(time, prim, mesh, (a - ng, b + ng), lib, xp))
 
         self.set_bc("primitive1")
         self.set_bc("conserved1")

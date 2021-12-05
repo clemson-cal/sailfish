@@ -177,6 +177,7 @@ class DriverArgs(NamedTuple):
         except IndexError:
             model_parameters = dict()
 
+        model_parameters.update(args.model_parameters)
         return driver._replace(
             setup_name=setup_name,
             chkpt_file=chkpt_file,
@@ -246,7 +247,7 @@ def simulate(driver):
         update_dict_where_none(
             driver.model_parameters,
             chkpt["parameters"],
-            frozen=list(setup_cls.immutable_parameter_keys),
+            frozen=list(setup_cls.immutable_parameter_keys()),
         )
         setup = setup_cls(**driver.model_parameters)
 
@@ -286,7 +287,7 @@ def simulate(driver):
 
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
-    logger.info(f"timestep is {dt}")
+    logger.info(f"timestep is {dt:0.2e}")
     setup.print_model_parameters(newlines=True)
 
     def grab_state():
@@ -398,6 +399,10 @@ def main():
         key, val = item.split("=")
         return key, Recurrence.from_str(val)
 
+    def keyed_string(item):
+        key, val = item.split("=")
+        return key, eval(val)
+
     class MakeDict(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             setattr(namespace, self.dest, dict(values))
@@ -447,7 +452,7 @@ def main():
     parser.add_argument(
         "--events",
         nargs="*",
-        metavar="E1 E2",
+        metavar="E=V",
         type=keyed_event,
         action=MakeDict,
         default=dict(),
@@ -472,6 +477,16 @@ def main():
         help="timeseries recurrence [<delta>|<log:mul>]",
     )
     parser.add_argument(
+        "--model",
+        nargs="*",
+        metavar="K=V",
+        type=keyed_string,
+        action=MakeDict,
+        default=dict(),
+        dest="model_parameters",
+        help="key-value pairs given as models parameters to the setup",
+    )
+    parser.add_argument(
         "--outdir",
         "-o",
         metavar="D",
@@ -482,7 +497,7 @@ def main():
     parser.add_argument(
         "--end-time",
         "-e",
-        metavar="E",
+        metavar="T",
         type=float,
         help="when to end the simulation",
     )
@@ -520,7 +535,7 @@ def main():
         elif args.command is None:
             print("specify setup:")
             for setup in Setup.__subclasses__():
-                print(f"    {setup.dash_case_class_name}")
+                print(f"    {setup.dash_case_class_name()}")
 
         else:
             driver = DriverArgs.from_namespace(args)
