@@ -209,9 +209,8 @@ def simulate(driver):
     """
 
     from time import perf_counter
-    from logging import getLogger, basicConfig, INFO, StreamHandler, Formatter
-    from sailfish import system
-    from sailfish.setup import Setup
+    from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
+    from sailfish.system import configure_build, log_system_info, measure_time
     from sailfish.solvers import srhd_1d
     from sailfish.task import Recurrence
 
@@ -222,8 +221,8 @@ def simulate(driver):
     should also be extensible by a system-specific rc-style configuration
     file.
     """
-    system.configure_build()
-    system.log_system_info(driver.execution_mode or "cpu")
+    configure_build()
+    log_system_info(driver.execution_mode or "cpu")
     loop_logger = getLogger("loop_message")
 
     if driver.fresh_setup:
@@ -322,7 +321,7 @@ def simulate(driver):
                 tasks[name] = task.next(solver.time, event)
                 yield name, task.number, grab_state()
 
-        with system.measure_time() as fold_time:
+        with measure_time() as fold_time:
             for _ in range(fold):
                 solver.new_timestep()
                 solver.advance_rk(0.0, dt)
@@ -356,6 +355,19 @@ def run(setup_name, quiet=True, **kwargs):
 
 
 def init_logging():
+    """
+    Convenience method to enable logging to standard output.
+
+    This function is called from the `main` entry point (i.e. when sailfish is
+    used as a command line tool). However when sailfish is used as a library,
+    logging is not enabled by default (Python's `logging` module recommends
+    that libraries should not install any event handlers on the root logger).
+    This function enables a sensible logging configuration, so if the calling
+    application or script is not particular about how logging should take
+    place, but it doesn't want the driver to be silent, then invoking this
+    function will do it for you. Note this function is also invoked by the
+    `run` function if :code:`quiet=False` is passed to it.
+    """
     from logging import StreamHandler, Formatter, getLogger, INFO
 
     class RunFormatter(Formatter):
@@ -378,6 +390,9 @@ def init_logging():
 
 
 def main():
+    """
+    General-purpose command line interface.
+    """
     import argparse
 
     init_logging()

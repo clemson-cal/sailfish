@@ -14,6 +14,15 @@ build_config = {
 
 
 def configure_build():
+    """
+    Initiate the `build_config` module-level variable.
+
+    The build configuration is presently inferred from a crude check to see
+    whether we're on Linux or MacOS. This procedure can be easily generalized
+    to accommodate other or more specific platforms, check for hardware or
+    software availability, or read a bulid configuration from a user or
+    site-specified machine file.
+    """
     if platform.system() == "Darwin":
         logger.info("configure JIT build for MacOS")
         build_config["extra_compile_args"] = ["-Xpreprocessor", "-fopenmp"]
@@ -27,6 +36,16 @@ def configure_build():
 
 
 def get_array_module(mode):
+    """
+    Return either the numpy or cupy module, depending on the value of mode.
+
+    If mode is "cpu" or "omp", then the `numpy` module is returned. Otherwise
+    if mode is "gpu" then `cupy` is returned. The `cupy` documentation
+    recommends assigning whichever module is returned to a variable called
+    `xp`, and using that variable to access functions that are common to both,
+    for example use :code:`xp.zeros(100)`. This pattern facilitates writing
+    CPU-GPU agnostic code.
+    """
     if mode in ["cpu", "omp"]:
         import numpy
 
@@ -40,6 +59,9 @@ def get_array_module(mode):
 
 
 def log_system_info(mode):
+    """
+    Log relevant details of the system's compute capabilities.
+    """
     if mode == "gpu":
         from cupy.cuda.runtime import getDeviceCount, getDeviceProperties
 
@@ -53,5 +75,16 @@ def log_system_info(mode):
 
 @contextlib.contextmanager
 def measure_time() -> float:
+    """
+    A context manager to measure the execution time of a piece of code.
+
+    Example:
+
+    .. code-block:: python
+
+        with measure_time() as duration:
+            expensive_function()
+        print(f"execution took {duration()} seconds")
+    """
     start = time.perf_counter()
     yield lambda: time.perf_counter() - start
