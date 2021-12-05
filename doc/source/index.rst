@@ -50,6 +50,7 @@ API documentation
    :recursive:
 
    sailfish.driver
+   sailfish.event
    sailfish.library
    sailfish.mesh
    sailfish.parse_api
@@ -58,4 +59,3 @@ API documentation
    sailfish.solvers
    sailfish.subdivide
    sailfish.system
-   sailfish.task

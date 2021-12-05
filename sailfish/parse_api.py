@@ -1,5 +1,5 @@
 """
-This module analyzes C code intended for JIT-compilation to a kernel library.
+Analyzes C code intended for JIT-compilation to a kernel library.
 """
 
 

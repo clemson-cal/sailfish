@@ -1,6 +1,10 @@
+"""
+Library functions and command-line access to the simulation driver.
+"""
+
 import os, pickle, pathlib, logging
 from typing import NamedTuple, Dict
-from sailfish.task import Recurrence, RecurringTask, ParseRecurrenceError
+from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
 
 logger = logging.getLogger(__name__)
@@ -77,7 +81,7 @@ def fromdict(d):
         if "_type" in d:
             cls = eval(d["_type"])
             del d["_type"]
-            return cls(**d)
+            return cls(**{k: fromdict(v) for k, v in d.items()})
         else:
             return {k: fromdict(v) for k, v in d.items()}
     else:
@@ -212,7 +216,7 @@ def simulate(driver):
     from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
     from sailfish.system import configure_build, log_system_info, measure_time
     from sailfish.solvers import srhd_1d
-    from sailfish.task import Recurrence
+    from sailfish.event import Recurrence
 
     """
     Initialize and log state in the the system module. The build system
@@ -240,7 +244,7 @@ def simulate(driver):
 
         iteration = 0
         time = 0.0
-        tasks = {name: RecurringTask() for name in driver.events}
+        event_states = {name: RecurringEvent() for name in driver.events}
         initial = initial_condition(setup, driver.resolution, setup.domain)
     else:
         """
@@ -259,12 +263,12 @@ def simulate(driver):
 
         iteration = chkpt["iteration"]
         time = chkpt["time"]
-        tasks = chkpt["tasks"]
+        event_states = chkpt["event_states"]
         initial = chkpt["primitive"]
 
         for event in driver.events:
-            if event not in tasks:
-                tasks[event] = RecurringTask()
+            if event not in event_states:
+                event_states[event] = RecurringEvent()
 
     mode = driver.execution_mode or "cpu"
     fold = driver.fold or 10
@@ -301,7 +305,7 @@ def simulate(driver):
             iteration=iteration,
             time=solver.time,
             primitive=solver.primitive,
-            tasks=tasks,
+            event_states=event_states,
             driver=driver,
             parameters=setup.model_parameter_dict,
             setup_name=setup.dash_case_class_name,
@@ -316,10 +320,10 @@ def simulate(driver):
         """
 
         for name, event in driver.events.items():
-            task = tasks[name]
-            if tasks[name].is_due(solver.time, event):
-                tasks[name] = task.next(solver.time, event)
-                yield name, task.number, grab_state()
+            state = event_states[name]
+            if event_states[name].is_due(solver.time, event):
+                event_states[name] = state.next(solver.time, event)
+                yield name, state.number, grab_state()
 
         with measure_time() as fold_time:
             for _ in range(fold):
