@@ -27,6 +27,7 @@ class PlanarCartesianMesh(NamedTuple):
         return (self.num_zones,)
 
     def faces(self, i0, i1):
+        x0, dx = self.x0, self.dx
         return [x0 + i * dx for i in range(i0, i1 + 1)]
 
 
@@ -35,8 +36,7 @@ class LogSphericalMesh(NamedTuple):
     A 1D mesh with logarithmic radial binning and homologous expansion.
 
     The comoving coordinates are time-independent; proper distances are
-    affected by the scale factor derivative. The scale factor is `a=1` at
-    `t=1`.
+    affected by the scale factor derivative.
     """
 
     r0: float = 1.0
@@ -53,19 +53,19 @@ class LogSphericalMesh(NamedTuple):
         is provided the result is the minimum comoving grid spacing.
         """
         r0, r1 = self.faces(0, 0)
-
-        if time is None:
-            return (r1 - r0) * 1.0
-        else:
-            return (r1 - r0) * self.scale_factor(time)
+        return (r1 - r0) * self.scale_factor(time)
 
     def scale_factor(self, time):
         """
         Returns the scale factor at a given time.
 
-        The scale factor is `a=1` at `t=1`.
+        If the scale factor is not changing, it's always equal to one.
+        Otherwise, it's assumed that `a=0` at `t=0`.
         """
-        return self.scale_factor_derivative * time
+        if self.scale_factor_derivative is None:
+            return 1.0
+        else:
+            return self.scale_factor_derivative * time
 
     @property
     def shape(self):
@@ -79,6 +79,5 @@ class LogSphericalMesh(NamedTuple):
         time-independent. The number of faces `i1 - i0 + 1` is one more than
         the number of zones `i1 - i0` in the index range.
         """
-        k = 1.0 / self.num_zones_per_decade
-        r = self.r0
-        return [r * 10 ** (i * k) for i in range(i0, i1 + 1)]
+        r0, k = self.r0, 1.0 / self.num_zones_per_decade
+        return [r0 * 10 ** (i * k) for i in range(i0, i1 + 1)]

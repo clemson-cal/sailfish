@@ -1,5 +1,6 @@
 from math import pi, sin
 from sailfish.setup import Setup, SetupError, param
+from sailfish.mesh import PlanarCartesianMesh
 
 
 class Shocktube(Setup):
@@ -16,9 +17,8 @@ class Shocktube(Setup):
             primitive[0] = 0.1
             primitive[2] = 0.125
 
-    @property
-    def domain(self):
-        return [0.0, 1.0]
+    def mesh(self, num_zones):
+        return PlanarCartesianMesh(0.0, 1.0, num_zones)
 
     @property
     def boundary_condition(self):
@@ -47,9 +47,8 @@ class DensityWave(Setup):
         primitive[1] = v
         primitive[2] = 1.0
 
-    @property
-    def domain(self):
-        return [0.0, 1.0]
+    def mesh(self, num_zones):
+        return PlanarCartesianMesh(0.0, 1.0, num_zones)
 
     @property
     def boundary_condition(self):

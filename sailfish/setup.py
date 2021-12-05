@@ -169,9 +169,14 @@ class Setup(ABC):
         """
         pass
 
-    @property
     @abstractmethod
-    def domain(self):
+    def mesh(self, resolution: int):
+        """
+        Return a mesh instance describing the problem domain.
+
+        This method must be overridden, and the domain type must be supported
+        by the solver. A resolution parameter is passed here from the driver.
+        """
         pass
 
     @property
@@ -180,7 +185,8 @@ class Setup(ABC):
         """
         Return a boundary condition mode.
 
-        This mode must be supported by the solver.
+        This method must be overridden, and the mode must be supported by the
+        solver.
         """
         pass
 
