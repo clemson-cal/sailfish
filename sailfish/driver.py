@@ -20,7 +20,7 @@ def first_not_none(*args):
             return arg
 
 
-def update_dict_if_none(new_dict, old_dict, frozen=[]):
+def update_dict_where_none(new_dict, old_dict, frozen=[]):
     """
     Like `dict.update`, except `key=value` pairs in `old_dict` are only used
     to add / overwrite values in `new_dict` if they are `None` or missing.
@@ -30,7 +30,7 @@ def update_dict_if_none(new_dict, old_dict, frozen=[]):
         new_val = new_dict.get(key)
 
         if type(new_val) is dict and type(old_val) is dict:
-            update_dict_if_none(new_val, old_val)
+            update_dict_where_none(new_val, old_val)
 
         elif old_val is not None:
             if new_val is None:
@@ -39,14 +39,14 @@ def update_dict_if_none(new_dict, old_dict, frozen=[]):
                 raise ConfigurationError(f"{key} cannot be changed")
 
 
-def update_if_none(new, old, frozen=[]):
+def update_where_none(new, old, frozen=[]):
     """
-    Same as `update_dict_if_none`, except operates on (immutable) named tuple
+    Same as `update_dict_where_none`, except operates on (immutable) named tuple
     instances and returns a new named tuple.
     """
     new_dict = new._asdict()
     old_dict = old._asdict()
-    update_dict_if_none(new_dict, old_dict, frozen)
+    update_dict_where_none(new_dict, old_dict, frozen)
     return type(new)(**new_dict)
 
 
@@ -65,7 +65,7 @@ def asdict(t):
         return {k: asdict(v) for k, v in t.items()}
     if isinstance(t, tuple):
         d = {k: asdict(v) for k, v in t._asdict().items()}
-        d["_type"] = type(t).__name__
+        d["_type"] = ".".join([type(t).__module__, type(t).__name__])
         return d
     return t
 
@@ -77,6 +77,8 @@ def fromdict(d):
     This function performs the inverse of the `asdict` method, and is applied
     to pickled simulation states.
     """
+    import sailfish
+
     if type(d) is dict:
         if "_type" in d:
             cls = eval(d["_type"])
@@ -118,13 +120,14 @@ def load_checkpoint(chkpt_file):
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
 
 
-def initial_condition(setup, num_zones, domain):
+def initial_condition(setup, mesh):
     import numpy as np
 
-    xcells = np.linspace(domain[0], domain[1], num_zones)
-    primitive = np.zeros([num_zones, 4])
+    faces = np.array(mesh.faces(0, mesh.shape[0]))
+    zones = 0.5 * (faces[:-1] + faces[1:])
+    primitive = np.zeros([len(zones), 4])
 
-    for x, p in zip(xcells, primitive):
+    for x, p in zip(zones, primitive):
         setup.initial_primitive(x, p)
 
     return primitive
@@ -180,25 +183,6 @@ class DriverArgs(NamedTuple):
             model_parameters=model_parameters,
         )
 
-    def updated_parameter_dict(self, old, setup_cls):
-        """
-        Return an updated parameter dict.
-
-        The old parameter dict is expected to be read from a checkpoint file.
-        The setup class is used to determine which of the parameter entries in
-        the new and old parameter files need to match, or not be superseded.
-        """
-        new = self.model_parameters
-        update_dict_if_none(new, old, frozen=list(setup_cls.immutable_parameter_keys))
-        return new
-
-    @property
-    def fresh_setup(self):
-        """
-        Return true if this is not a restart.
-        """
-        return self.setup_name is not None
-
 
 def simulate(driver):
     """
@@ -229,7 +213,7 @@ def simulate(driver):
     log_system_info(driver.execution_mode or "cpu")
     loop_logger = getLogger("loop_message")
 
-    if driver.fresh_setup:
+    if driver.setup_name:
         """
         Generate an initial driver state from command line arguments, model
         parametrs, and a setup instance.
@@ -245,8 +229,9 @@ def simulate(driver):
         iteration = 0
         time = 0.0
         event_states = {name: RecurringEvent() for name in driver.events}
-        initial = initial_condition(setup, driver.resolution, setup.domain)
-    else:
+        initial = initial_condition(setup, setup.mesh(driver.resolution))
+
+    elif driver.chkpt_file:
         """
         Load driver state from a checkpoint file. The setup model parameters
         are updated with any items given on the command line after the setup
@@ -257,9 +242,13 @@ def simulate(driver):
         logger.info(f"load checkpoint {driver.chkpt_file}")
         chkpt = load_checkpoint(driver.chkpt_file)
         setup_cls = Setup.find_setup_class(chkpt["setup_name"])
-        driver = update_if_none(driver, chkpt["driver"], frozen=["resolution"])
-        params = driver.updated_parameter_dict(chkpt["parameters"], setup_cls)
-        setup = setup_cls(**params)
+        driver = update_where_none(driver, chkpt["driver"], frozen=["resolution"])
+        update_dict_where_none(
+            driver.model_parameters,
+            chkpt["parameters"],
+            frozen=list(setup_cls.immutable_parameter_keys),
+        )
+        setup = setup_cls(**driver.model_parameters)
 
         iteration = chkpt["iteration"]
         time = chkpt["time"]
@@ -270,19 +259,23 @@ def simulate(driver):
             if event not in event_states:
                 event_states[event] = RecurringEvent()
 
+    else:
+        raise ConfigurationError("driver args must specify setup_name or chkpt_file")
+
     mode = driver.execution_mode or "cpu"
     fold = driver.fold or 10
+    mesh = setup.mesh(driver.resolution)
     cfl_number = driver.cfl_number or 0.6
-    dx = (setup.domain[1] - setup.domain[0]) / driver.resolution
+    dx = mesh.min_spacing(time)
     dt = dx * cfl_number
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
 
     # Construct a solver instance. TODO: the solver should be obtained from
     # the setup instance.
     solver = srhd_1d.Solver(
-        initial=initial,
         time=time,
-        domain=setup.domain,
+        hydro_data=initial,
+        mesh=mesh,
         num_patches=1,
         boundary_condition=setup.boundary_condition,
         mode=mode,
@@ -309,7 +302,7 @@ def simulate(driver):
             driver=driver,
             parameters=setup.model_parameter_dict,
             setup_name=setup.dash_case_class_name,
-            domain=setup.domain,
+            mesh=mesh,
         )
 
     while end_time is None or end_time > solver.time:

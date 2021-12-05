@@ -3,6 +3,7 @@ from contextlib import nullcontext
 from sailfish.library import Library
 from sailfish.system import get_array_module
 from sailfish.subdivide import subdivide
+from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 
 logger = getLogger(__name__)
 
@@ -16,21 +17,18 @@ class Patch:
     def __init__(
         self,
         index_range,
-        grid_start,
-        grid_spacing,
+        mesh,
         primitive,
         time,
         lib,
         xp,
-        coordinates="cartesian",
     ):
         i0, i1 = index_range
-        x0, dx = grid_spacing, grid_spacing
         self.lib = lib
         self.xp = xp
         self.num_zones = primitive.shape[0]
-        self.faces = self.xp.array([x0 + i * dx for i in range(i0, i1 + 1)])
-        self.coordinates = dict(cartesian=0, spherical=1)[coordinates]
+        self.faces = self.xp.array(mesh.faces(*index_range))
+        self.coordinates = {PlanarCartesianMesh: 0, LogSphericalMesh: 1}[type(mesh)]
         self.scale_factor_initial = 1.0
         self.scale_factor_derivative = 0.0
         self.time = self.time0 = time
@@ -110,42 +108,38 @@ class Solver:
 
     def __init__(
         self,
-        initial=None,
         time=0.0,
-        domain=[0.0, 1.0],
+        hydro_data=None,
+        mesh=None,
         num_patches=1,
         mode="cpu",
         boundary_condition="outflow",
-        coordinates="cartesian",
     ):
-        primitive = initial
-        num_zones = primitive.shape[0]
+        if hydro_data.shape[0] != mesh.shape[0]:
+            raise ValueError("hydro data array shape incompatible with mesh")
+
+        primitive = hydro_data
         xp = get_array_module(mode)
-        x0, x1 = domain
-        dx = (x1 - x0) / num_zones
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
         lib = Library(__file__, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
-        logger.info(f"domain range is {domain}")
+        logger.info(f"mesh is {mesh}")
         logger.info(f"use {boundary_condition} boundary condition")
-        logger.info(f"use {coordinates} coordinates")
 
+        self.mesh = mesh
         self.boundary_condition = boundary_condition
         self.num_guard = ng
         self.num_cons = nq
-        self.num_zones = num_zones
         self.xp = xp
         self.patches = []
 
-        for (a, b) in subdivide(self.num_zones, num_patches):
+        for (a, b) in subdivide(mesh.shape[0], num_patches):
             prim = xp.zeros([b - a + 2 * ng, nq])
             prim[ng:-ng] = primitive[a:b]
-            self.patches.append(
-                Patch((a - ng, b + ng), x0, dx, prim, time, lib, xp, coordinates)
-            )
+            self.patches.append(Patch((a - ng, b + ng), mesh, prim, time, lib, xp))
 
         self.set_bc("primitive1")
         self.set_bc("conserved1")
@@ -194,11 +188,11 @@ class Solver:
 
     @property
     def primitive(self):
-        nz = self.num_zones
+        nz = self.mesh.shape[0]
         ng = self.num_guard
         nq = self.num_cons
         np = len(self.patches)
-        primitive = self.xp.zeros([self.num_zones, nq])
+        primitive = self.xp.zeros([nz, nq])
         for (a, b), patch in zip(subdivide(nz, np), self.patches):
             primitive[a:b] = patch.primitive[ng:-ng]
         return primitive
