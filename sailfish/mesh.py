@@ -48,7 +48,7 @@ class LogSphericalMesh(NamedTuple):
         factor and its derivative are taken into account. Otherwise if no time
         is provided the result is the minimum comoving grid spacing.
         """
-        r0, r1 = self.faces(0, 1)
+        r0, r1 = self.faces(0, 0)
 
         if time is None:
             return (r1 - r0) * 1.0
@@ -69,7 +69,11 @@ class LogSphericalMesh(NamedTuple):
 
     def faces(self, i0, i1):
         """
-        Returns radial face positions in the comoving coordinates.
+        Returns radial face positions for zone indexes in the given range.
+
+        The positions are given in comoving coordinates, i.e. are
+        time-independent. The number of faces `i1 - i0 + 1` is one more than
+        the number of zones `i1 - i0` in the index range.
         """
         k = 1.0 / self.num_zones_per_decade
         r = self.r0

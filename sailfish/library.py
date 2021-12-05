@@ -181,8 +181,8 @@ def validate_constraints(args, arg_format, symbol):
     """
     Validate kernel argument constraints for a symbol.
 
-    Constraints are (optionally defined in C code and extracted in the
-    `parse_api` module).
+    Constraints are optionally defined in C code and extracted in the
+    `parse_api` module.
     """
     scope = dict(zip([a[1] for a in arg_format], args))
     for arg, (_, name, constraint) in zip(args, arg_format):

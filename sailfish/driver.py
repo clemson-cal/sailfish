@@ -355,6 +355,19 @@ def run(setup_name, quiet=True, **kwargs):
 
 
 def init_logging():
+    """
+    Convenience method to enable logging to standard output.
+
+    This function is called from the `main` entry point (i.e. when sailfish is
+    used as a command line tool). However when sailfish is used as a library,
+    logging is not enabled by default (Python's `logging` module recommends
+    that libraries should not install any event handlers on the root logger).
+    This function enables a sensible logging configuration, so if the calling
+    application or script is not particular about how logging should take
+    place, but it doesn't want the driver to be silent, then invoking this
+    function will do it for you. Note this function is also invoked by the
+    `run` function if :code:`quiet=False` is passed to it.
+    """
     from logging import StreamHandler, Formatter, getLogger, INFO
 
     class RunFormatter(Formatter):
@@ -377,6 +390,9 @@ def init_logging():
 
 
 def main():
+    """
+    General-purpose command line interface.
+    """
     import argparse
 
     init_logging()
