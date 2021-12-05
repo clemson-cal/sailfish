@@ -41,7 +41,7 @@ class Setup(ABC):
     """
 
     def __init__(self, **kwargs):
-        for key, val, about in type(self).default_model_parameters:
+        for key, val, about in type(self).default_model_parameters():
             if key in kwargs:
                 if type(kwargs[key]) != type(val):
                     raise SetupError(
@@ -59,7 +59,6 @@ class Setup(ABC):
         self.validate()
 
     @classmethod
-    @property
     def default_model_parameters(cls):
         """
         Return an iterator over the default model parameters for this class.
@@ -69,7 +68,6 @@ class Setup(ABC):
                 yield key, val.default, val.about
 
     @classmethod
-    @property
     def immutable_parameter_keys(cls):
         """
         Return an iterator over the immutable model parameter keys.
@@ -86,12 +84,11 @@ class Setup(ABC):
         The output will include a normlized version of the class doc string,
         and the model parameter names, default values, and about message.
         """
-        print(f"setup: {cls.dash_case_class_name}")
+        print(f"setup: {cls.dash_case_class_name()}")
         print(dedent(cls.__doc__))
         cls().print_model_parameters()
 
     @classmethod
-    @property
     def dash_case_class_name(cls):
         """
         Return a `dash-case` name of this setup class.
@@ -111,19 +108,18 @@ class Setup(ABC):
         The class name is expected in dash-case format. If no setup is found,
         a `SetupError` exception is raised.
         """
-        match = lambda s: s.dash_case_class_name == name
+        match = lambda s: s.dash_case_class_name() == name
         try:
             return next(filter(match, cls.__subclasses__()))
         except StopIteration:
             raise SetupError(f"no setup named {name}")
 
     @classmethod
-    @property
     def has_model_parameters(cls):
         """
         Determine if this class has any model parameters.
         """
-        for _ in cls.default_model_parameters:
+        for _ in cls.default_model_parameters():
             return True
         return False
 
@@ -131,7 +127,7 @@ class Setup(ABC):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
-        if self.has_model_parameters:
+        if self.has_model_parameters():
             if newlines:
                 print()
                 print("model parameters:\n")
@@ -145,7 +141,7 @@ class Setup(ABC):
         """
         Return an iterator over the model parameters chosen for this setup.
         """
-        for key, val, about in self.default_model_parameters:
+        for key, val, about in self.default_model_parameters():
             yield key, getattr(self, key), about
 
     @property
