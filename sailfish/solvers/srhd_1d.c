@@ -70,19 +70,9 @@ PRIVATE double plm_gradient_scalar(double yl, double y0, double yr)
 
 PRIVATE void plm_gradient(double *yl, double *y0, double *yr, double *g)
 {
-    if (yl && y0 && yr)
+    for (int q = 0; q < NCONS; ++q)
     {
-        for (int q = 0; q < NCONS; ++q)
-        {
-            g[q] = plm_gradient_scalar(yl[q], y0[q], yr[q]);
-        }
-    }
-    else
-    {
-        for (int q = 0; q < NCONS; ++q)
-        {
-            g[q] = 0.0;
-        }
+        g[q] = plm_gradient_scalar(yl[q], y0[q], yr[q]);
     }
 }
 
@@ -397,17 +387,16 @@ PUBLIC void srhd_1d_advance_rk(
     int coords)             // :: $ in [0, 1]
 {
     #if (EXEC_MODE == EXEC_CPU)
-    for (int i = 0; i < num_zones; ++i)
+    for (int i = 2; i < num_zones - 2; ++i)
     #elif (EXEC_MODE == EXEC_OMP)
     #pragma omp parallel for
-    for (int i = 0; i < num_zones; ++i)
+    for (int i = 2; i < num_zones - 2; ++i)
     #elif (EXEC_MODE == EXEC_GPU)
     int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= num_zones) return;
+    if (i < 2 || i >= num_zones) return;
     #endif
 
     {
-        int ni = num_zones;
         double yl = face_positions[i];
         double yr = face_positions[i + 1];
         double xl = yl * (a0 + adot * time);
@@ -417,10 +406,10 @@ PUBLIC void srhd_1d_advance_rk(
         double *prd = &primitive_rd[NCONS * i];
         double *urd = &conserved_rd[NCONS * i];
         double *uwr = &conserved_wr[NCONS * i];
-        double *pli = i >= 0 + 1 ? &primitive_rd[NCONS * (i - 1)] : NULL;
-        double *pri = i < ni - 1 ? &primitive_rd[NCONS * (i + 1)] : NULL;
-        double *pki = i >= 0 + 2 ? &primitive_rd[NCONS * (i - 2)] : NULL;
-        double *pti = i < ni - 2 ? &primitive_rd[NCONS * (i + 2)] : NULL;
+        double *pli = &primitive_rd[NCONS * (i - 1)];
+        double *pri = &primitive_rd[NCONS * (i + 1)];
+        double *pki = &primitive_rd[NCONS * (i - 2)];
+        double *pti = &primitive_rd[NCONS * (i + 2)];
 
         double plip[NCONS];
         double plim[NCONS];
@@ -430,19 +419,16 @@ PUBLIC void srhd_1d_advance_rk(
         double gxri[NCONS];
         double gxcc[NCONS];
 
-        // NOTE: the gradient calculation here assumes smoothly varying face
-        // separations. Also note plm_gradient initializes the gradients to zero
-        // if any of the inputs are NULL.
         plm_gradient(pki, pli, prd, gxli);
         plm_gradient(pli, prd, pri, gxcc);
         plm_gradient(prd, pri, pti, gxri);
 
         for (int q = 0; q < NCONS; ++q)
         {
-            plim[q] = pli ? pli[q] + 0.5 * gxli[q] : prd[q];
+            plim[q] = pli[q] + 0.5 * gxli[q];
             plip[q] = prd[q] - 0.5 * gxcc[q];
             prim[q] = prd[q] + 0.5 * gxcc[q];
-            prip[q] = pri ? pri[q] - 0.5 * gxri[q] : prd[q];
+            prip[q] = pri[q] - 0.5 * gxri[q];
         }
 
         double fli[NCONS];

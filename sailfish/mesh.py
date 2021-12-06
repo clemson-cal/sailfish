@@ -26,6 +26,10 @@ class PlanarCartesianMesh(NamedTuple):
     def shape(self):
         return (self.num_zones,)
 
+    def zone_center(self, i):
+        x0, dx = self.x0, self.dx
+        return x0 + (i + 0.5) * dx
+
     def faces(self, i0, i1):
         x0, dx = self.x0, self.dx
         return [x0 + i * dx for i in range(i0, i1 + 1)]
@@ -70,6 +74,10 @@ class LogSphericalMesh(NamedTuple):
     @property
     def shape(self):
         return (int(log10(self.r1 / self.r0) * self.num_zones_per_decade),)
+
+    def zone_center(self, i):
+        r0, k = self.r0, 1.0 / self.num_zones_per_decade
+        return r0 * 10 ** ((i + 0.5) * k)
 
     def faces(self, i0, i1):
         """

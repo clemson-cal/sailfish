@@ -150,16 +150,19 @@ class Setup(ABC):
         return {key: val for key, val, _ in self.model_parameters()}
 
     @abstractmethod
-    def initial_primitive(self, coordinate, primitive):
+    def primitive(self, time, coordinate, primitive):
         """
-        Set hydrodynamic data at a point.
+        Set initial or boundary data at a point.
 
-        This method must be overridden to set the initial primitive
-        hydrodynamic variables at a single point (given by `coordinate`). The
+        This method must be overridden to set the primitive hydrodynamic
+        variables at a single point (given by `coordinate`) and time. The
         meaning of the coordinate is influenced by the type of mesh being
         used. Data is written to the output variable `primitive` for
         efficiency, since otherwise a tiny allocation is made for each zone in
         the simulation grid.
+
+        The time coordinate enables the use of a time-dependent boundary
+        condition.
         """
         pass
 
@@ -180,7 +183,9 @@ class Setup(ABC):
         Return a boundary condition mode.
 
         This method must be overridden, and the mode must be supported by the
-        solver.
+        solver. 1D solvers should accept either a single return value
+        specifying the BC mode at both the domain edges, or a pair of modes,
+        one for each edge.
         """
         pass
 

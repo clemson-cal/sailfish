@@ -11,7 +11,7 @@ class Shocktube(Setup):
     side of the discontintuity at x=0.5.
     """
 
-    def initial_primitive(self, x, primitive):
+    def primitive(self, t, x, primitive):
         if x < 0.5:
             primitive[0] = 1.0
             primitive[2] = 1.0
@@ -39,14 +39,14 @@ class DensityWave(Setup):
 
     wavenumber = param(1, "wavenumber of the sinusoid")
     amplitude = param(0.1, "amplitude of the density variation")
-    velocity = param(0.0, "speed of the wave")
+    velocity = param(0.0, "speed of the wave (gamma-beta if relativistic)")
 
-    def initial_primitive(self, x, primitive):
+    def primitive(self, t, x, primitive):
         k = self.wavenumber * 2 * pi
         a = self.amplitude
-        v = self.velocity
+        u = self.velocity
         primitive[0] = 1.0 + a * sin(k * x)
-        primitive[1] = v
+        primitive[1] = u
         primitive[2] = 1.0
 
     def mesh(self, num_zones):
@@ -70,24 +70,24 @@ class Wind(Setup):
     A cold, spherically symmetric relativistic wind.
     """
 
-    gamma_beta = param(1.0, "four-velocity of the wind")
+    velocity = param(1.0, "velocity of the wind (gamma-beta if relativistic)")
 
-    def initial_primitive(self, r, primitive):
+    def primitive(self, t, r, primitive):
         primitive[0] = 1.0 / r ** 2
-        primitive[1] = self.gamma_beta
-        primitive[2] = 1e-4
+        primitive[1] = self.velocity
+        primitive[2] = 1e-4 * primitive[0] ** (4 / 3)
 
     def mesh(self, num_zones_per_decade):
         return LogSphericalMesh(1.0, 10.0, num_zones_per_decade)
 
     @property
     def boundary_condition(self):
-        return "outflow"
+        return "inflow", "outflow"
 
     @property
     def default_end_time(self):
         return 1.0
 
     def validate(self):
-        if self.gamma_beta < 0.0:
-            raise SetupError("gamma_beta must be non-negative")
+        if self.velocity < 0.0:
+            raise SetupError("velocity must be non-negative")

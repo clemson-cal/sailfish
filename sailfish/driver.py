@@ -128,7 +128,7 @@ def initial_condition(setup, mesh):
     primitive = np.zeros([len(zones), 4])
 
     for x, p in zip(zones, primitive):
-        setup.initial_primitive(x, p)
+        setup.primitive(0.0, x, p)
 
     return primitive
 
@@ -146,6 +146,7 @@ class DriverArgs(NamedTuple):
     execution_mode: str = None
     fold: int = None
     resolution: int = None
+    num_patches: int = None
     events: Dict[str, Recurrence] = dict()
 
     def from_namespace(args):
@@ -274,11 +275,11 @@ def simulate(driver):
     # Construct a solver instance. TODO: the solver should be obtained from
     # the setup instance.
     solver = srhd_1d.Solver(
+        setup=setup,
+        mesh=mesh,
         time=time,
         hydro_data=initial,
-        mesh=mesh,
-        num_patches=1,
-        boundary_condition=setup.boundary_condition,
+        num_patches=driver.num_patches or 1,
         mode=mode,
     )
 
@@ -434,6 +435,13 @@ def main():
         metavar="N",
         type=int,
         help="grid resolution",
+    )
+    parser.add_argument(
+        "--patches",
+        metavar="N",
+        type=int,
+        dest="num_patches",
+        help="number of patches for domain decomposition",
     )
     parser.add_argument(
         "--cfl",
