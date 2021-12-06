@@ -212,7 +212,7 @@ def simulate(driver):
     """
     configure_build()
     log_system_info(driver.execution_mode or "cpu")
-    loop_logger = getLogger("loop_message")
+    main_logger = getLogger("main_logger")
 
     if driver.setup_name:
         """
@@ -288,7 +288,7 @@ def simulate(driver):
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt:0.2e}")
-    setup.print_model_parameters(newlines=True)
+    setup.print_model_parameters(newlines=True, logger=main_logger)
 
     def grab_state():
         """
@@ -301,8 +301,8 @@ def simulate(driver):
             primitive=solver.primitive,
             event_states=event_states,
             driver=driver,
-            parameters=setup.model_parameter_dict,
-            setup_name=setup.dash_case_class_name,
+            parameters=setup.model_parameter_dict(),
+            setup_name=setup.dash_case_class_name(),
             mesh=mesh,
         )
 
@@ -327,7 +327,7 @@ def simulate(driver):
                 iteration += 1
 
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
-        loop_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+        main_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
     yield "end", None, grab_state()
 
@@ -372,7 +372,7 @@ def init_logging():
         def format(self, record):
             name = record.name.replace("sailfish.", "")
 
-            if name == "loop_message":
+            if name == "main_logger":
                 return f"{record.msg}"
             if record.levelno <= 20:
                 return f"[{name}] {record.msg}"

@@ -123,20 +123,19 @@ class Setup(ABC):
             return True
         return False
 
-    def print_model_parameters(self, newlines=False):
+    def print_model_parameters(self, logger=None, newlines=False):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
         if self.has_model_parameters():
             if newlines:
-                print()
-                print("model parameters:\n")
-                for name, default, about in self.model_parameters:
-                    print(f"{name:.<16s} {default:<5} {about}")
+                logger.info("")
+                logger.info("model parameters:\n")
+                for name, default, about in self.model_parameters():
+                    logger.info(f"{name:.<16s} {default:<5} {about}")
             if newlines:
-                print()
+                logger.info("")
 
-    @property
     def model_parameters(self):
         """
         Return an iterator over the model parameters chosen for this setup.
@@ -144,12 +143,11 @@ class Setup(ABC):
         for key, val, about in self.default_model_parameters():
             yield key, getattr(self, key), about
 
-    @property
     def model_parameter_dict(self):
         """
         Return a dictionary of the model parameters.
         """
-        return {key: val for key, val, _ in self.model_parameters}
+        return {key: val for key, val, _ in self.model_parameters()}
 
     @abstractmethod
     def initial_primitive(self, coordinate, primitive):
