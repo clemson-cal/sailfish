@@ -18,7 +18,7 @@ Quick-start
 
 Basic use from the command line is like this: ``sailfish shocktube
 --end-time=0.2 --resolution=1000``. This command will run a built-in setup
-called `shocktube` to a simulation time of 0.04 seconds, on a 1d grid with
+called `shocktube` to a simulation time of 0.2 seconds, on a 1d grid with
 1000 zones. The command line tool will print messages to the terminal, and
 write a file called `chkpt.final.pk` to the disk in the current working
 directory when the simulation finishes. This file is a Python pickle,
