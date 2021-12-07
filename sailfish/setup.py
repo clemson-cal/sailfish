@@ -127,14 +127,16 @@ class Setup(ABC):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
-        if self.has_model_parameters():
-            if newlines:
-                logger.info("")
+        if newlines:
+            logger.info("")
+            if self.has_model_parameters():
                 logger.info("model parameters:\n")
                 for name, default, about in self.model_parameters():
                     logger.info(f"{name:.<16s} {default:<5} {about}")
-            if newlines:
-                logger.info("")
+            else:
+                logger.info("setup has no model parameters")
+        if newlines:
+            logger.info("")
 
     def model_parameters(self):
         """
@@ -188,6 +190,13 @@ class Setup(ABC):
         one for each edge.
         """
         pass
+
+    @property
+    def start_time(self):
+        """
+        Provide a start time for the simulation. This is 0.0 by default.
+        """
+        return 0.0
 
     @property
     def default_end_time(self):

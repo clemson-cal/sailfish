@@ -200,9 +200,13 @@ def simulate(driver):
 
     from time import perf_counter
     from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
+    from sailfish import __version__ as version
     from sailfish.kernel.system import configure_build, log_system_info, measure_time
     from sailfish.solvers import srhd_1d
     from sailfish.event import Recurrence
+
+    main_logger = getLogger("main_logger")
+    main_logger.info(f"\nsailfish {version}\n")
 
     """
     Initialize and log state in the the system module. The build system
@@ -213,7 +217,6 @@ def simulate(driver):
     """
     configure_build()
     log_system_info(driver.execution_mode or "cpu")
-    main_logger = getLogger("main_logger")
 
     if driver.setup_name:
         """
@@ -229,7 +232,7 @@ def simulate(driver):
         )
 
         iteration = 0
-        time = 0.0
+        time = setup.start_time
         event_states = {name: RecurringEvent() for name in driver.events}
         initial = initial_condition(setup, setup.mesh(driver.resolution))
 
@@ -402,7 +405,7 @@ def main():
 
     def keyed_string(item):
         key, val = item.split("=")
-        return key, eval(val)
+        return key, eval(val, None, dict(yes=True, true=True, no=False, false=False))
 
     class MakeDict(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):

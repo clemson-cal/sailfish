@@ -41,8 +41,14 @@ class Patch:
         self.num_zones = index_range[1] - index_range[0]
         self.faces = self.xp.array(mesh.faces(*index_range))
         self.coordinates = COORDINATES_DICT[type(mesh)]
-        self.scale_factor_initial = 1.0
-        self.scale_factor_derivative = 0.0
+        try:
+            adot = float(mesh.scale_factor_derivative)
+            self.scale_factor_initial = 0.0
+            self.scale_factor_derivative = adot
+        except (TypeError, AttributeError):
+            self.scale_factor_initial = 1.0
+            self.scale_factor_derivative = 0.0
+
         self.time = self.time0 = time
 
         with self.execution_context():

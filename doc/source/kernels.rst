@@ -42,7 +42,7 @@ from an inline Python string:
     library.my_kernel[data.shape](data)
 
 In this example, a 2D numpy array of double-precision zeros was created, and
-then populated by the JIT-compiled kernel. The execution mode is "cpu"
+then populated by the JIT-compiled kernel. The execution mode is "cpu", which
 indicates sequential processing, as opposed to parallelized OpenMP or GPU
 processing. Several conventions are assumed for the C code, including the
 :py:obj:`PUBLIC` and :py:obj:`FOR_EACH_2D` macros, and the end-of-line
@@ -53,13 +53,16 @@ Invoking the kernel
 ~~~~~~~~~~~~~~~~~~~
 
 Let's start with how to use a kernel that's already been compiled
-successfully. The library object (:py:obj:`lib` in the example above) has one
-attribute per :py:obj:`PUBLIC` function defined in the kernel source. Since
-kernels can in general operate on several arrays at once, and these arrays can
-have distinct shapes, there's no way (in general) for the range of array
-indexes to be inferred from the array arguments. For this reason, the kernel
-object needs to be provided with the index space of the array to be traversed.
-The code below shows the object types involved in the kernel invocation:
+successfully. The library object (:py:obj:`library` in the example above) has
+one attribute per :py:obj:`PUBLIC` function defined in the kernel source.
+Since kernels can in general operate on several arrays at once, and these
+arrays can have distinct shapes, there's no way (in general) for the range of
+array indexes to be inferred from the array arguments. For this reason, the
+kernel object needs to be provided with a `traversal` index space. For the
+simple example above, the traversal index space is the same as the array
+argument. However this is not always the case, for example if the array has
+guard zones, or if there are many fields per spatial array index. The code
+below shows the object types involved in the kernel invocation:
 
 .. code-block:: python
 
@@ -141,6 +144,8 @@ function names, signatures, and the argument constraints. For this reason, the
 C code needs to follow several conventions for the parser to understand it:
 
 - Kernel functions must start with :py:obj:`PUBLIC void`
+- Helper functions must start with :py:obj:`PRIVATE`; they are not accessible
+  to Python code
 - Arguments must go on separate lines
 - The number of leading `int` arguments is used to infer the kernel rank, and
   this must be 1, 2, or 3. If the kernel needs additional `int` arguments
