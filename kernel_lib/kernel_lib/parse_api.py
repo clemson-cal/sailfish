@@ -2,6 +2,29 @@
 Analyzes C code intended for JIT-compilation to a kernel library.
 """
 
+from typing import NamedTuple, List
+
+
+class Argument(NamedTuple):
+    dtype: str
+    name: str
+    constraint: str
+
+
+class Symbol(NamedTuple):
+    name: str
+    args: List[Argument]
+
+    @property
+    def rank(self):
+        r = 0
+        for arg in self.args:
+            if arg.dtype == "int":
+                r += 1
+            else:
+                break
+        return r
+
 
 def scan(lines):
     """
@@ -50,7 +73,31 @@ def parse_api(code):
             args = []
             name = value
         elif event == "argument":
-            args.append(value)
+            args.append(Argument(*value))
         elif event == "end_symbol":
-            api[name] = args
+            api[name] = Symbol(name=name, args=args)
+
+    for symbol in api.values():
+        if not 1 <= symbol.rank <= 3:
+            raise ValueError(
+                f"kernel {symbol} has rank {symbol.rank}, must be 1, 2, or 3"
+            )
     return api
+
+
+def main():
+    import argparse, pprint
+
+    args = argparse.ArgumentParser()
+    args.add_argument("filename", type=str)
+    with open(args.parse_args().filename) as f:
+        api = parse_api(f.read())
+
+    for symbol in api.values():
+        print(
+            f"{symbol.name} (rank {symbol.rank}) ({', '.join(f'{a.name}: {a.dtype}' for a in symbol.args)})"
+        )
+
+
+if __name__ == "__main__":
+    main()

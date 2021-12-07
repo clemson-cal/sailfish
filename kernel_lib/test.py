@@ -15,26 +15,11 @@ from kernel_lib.library import Library
 #
 # - Function arguments can only be int, double, and double*.
 
-code = """
-PRIVATE double twice(double x)
-{
-    return x * 2.0;
-}
-
-PUBLIC void my_kernel(
-    int ni,
-    double *data) // :: $.shape == (ni,)
-{
-    FOR_EACH_1D(ni)
-    {
-        data[i] = twice(i);
-    }
-}
-"""
-
+code = open("example.c").read()
 library = Library(code, mode="cpu", name="my_module")
 data = np.zeros(10)
-library.my_kernel(len(data), data)
+
+library.my_1d_kernel([len(data)], data)
 
 for i in data:
     print(i)

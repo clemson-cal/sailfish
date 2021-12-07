@@ -33,33 +33,46 @@ KERNEL_LIB_HEADER = r"""
 #define FOR_EACH_1D(NI) \
 for (int i = 0; i < NI; ++i) \
 
+#define FOR_EACH_2D(NI, NJ) \
+for (int i = 0; i < NI; ++i) \
+for (int j = 0; j < NJ; ++j) \
+
+#define FOR_EACH_3D(NI, NJ, NK) \
+for (int i = 0; i < NI; ++i) \
+for (int j = 0; j < NJ; ++j) \
+for (int k = 0; k < NK; ++k) \
+
 #elif (EXEC_MODE == EXEC_OMP)
 #define FOR_EACH_1D(NI) \
 _Pragma("omp parallel for") \
 for (int i = 0; i < NI; ++i) \
+
+#define FOR_EACH_2D(NI, NJ) \
+_Pragma("omp parallel for") \
+for (int i = 0; i < NI; ++i) \
+for (int j = 0; j < NJ; ++j) \
+
+#define FOR_EACH_3D(NI, NJ, NK) \
+_Pragma("omp parallel for") \
+for (int i = 0; i < NI; ++i) \
+for (int j = 0; j < NJ; ++j) \
+for (int k = 0; k < NK; ++k) \
 
 #elif (EXEC_MODE == EXEC_GPU)
 #define FOR_EACH_1D(NI) \
 int i = threadIdx.x + blockIdx.x * blockDim.x; \
 if (i >= NI) return; \
 
-#endif
-
-#if (EXEC_MODE == EXEC_CPU)
-#define FOR_EACH_2D(NI, NJ) \
-for (int i = 0; i < NI; ++i) \
-for (int j = 0; j < NJ; ++j) \
-
-#elif (EXEC_MODE == EXEC_OMP)
-#define FOR_EACH_2D(NI, NJ) \
-_Pragma("omp parallel for") \
-for (int i = 0; i < NI; ++i) \
-for (int j = 0; j < NJ; ++j) \
-
-#elif (EXEC_MODE == EXEC_GPU)
 #define FOR_EACH_2D(NI, NJ) \
 int i = threadIdx.x + blockIdx.x * blockDim.x; \
-if (i >= NI) return; \
+int j = threadIdx.y + blockIdx.y * blockDim.y; \
+if (i >= NI || j >= NJ) return; \
+
+#define FOR_EACH_3D(NI, NJ, NK) \
+int i = threadIdx.x + blockIdx.x * blockDim.x; \
+int j = threadIdx.y + blockIdx.y * blockDim.y; \
+int k = threadIdx.z + blockIdx.z * blockDim.z; \
+if (i >= NI || j >= NJ || k >= NK) return; \
 
 #endif
 """
@@ -157,7 +170,7 @@ class Library:
         self.xp = cupy
 
     def __getattr__(self, symbol):
-        arg_format = self.api[symbol]
+        arg_format = tuple(self.api[symbol].args)
 
         if self.cpu_mode:
             kernel = getattr(self.module, symbol)
