@@ -56,7 +56,7 @@ PUBLIC void my_3d_kernel(
 }
 """
 
-library = Library(code, mode="cpu", name="my_module")
+library = Library(code, mode="cpu")
 data_1d = np.zeros([10])
 data_2d = np.zeros([10, 20])
 data_3d = np.zeros([10, 20, 30])

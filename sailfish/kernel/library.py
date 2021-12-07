@@ -88,7 +88,7 @@ if (i >= NI || j >= NJ || k >= NK) return; \
 
 class KernelInvocation:
     """
-    Builds and maintains (in memory) a CPU or GPU dynamically compiled module.
+    A kernel whose execution shape is specified and is ready to be invoked.
     """
 
     def __init__(self, kernel, shape):
@@ -135,6 +135,11 @@ class KernelInvocation:
 
 
 class Kernel:
+    """
+    An object that uses `__getitem__` syntax to return a
+    :py:class:`KernelInvocation` instance.
+    """
+
     def __init__(self, lib, symbol):
         self.lib = lib
         self.symbol = symbol
@@ -153,7 +158,7 @@ class Kernel:
 
 class Library:
     """
-    The
+    Builds and maintains (in memory) a CPU or GPU dynamically compiled module.
     """
 
     def __init__(self, code=None, mode="cpu", name="module", debug=True):

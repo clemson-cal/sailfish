@@ -6,7 +6,7 @@ Sailfish
 
    setups
    workflow
-   kernel_libraries
+   kernels
    api
 
 Sailfish is a GPU-accelerated astrophysical gasdynamics code.
@@ -30,13 +30,13 @@ code below:
 
 .. code-block:: python
 
-   from sailfish.driver import run
-   from matplotlib import pyplot as plt
-
-   state = run("shocktube", end_time=0.2, resolution=1000)
-   rho = state["primitive"][:, 0]
-   plt.plot(rho)
-   plt.show()
+    from sailfish.driver import run
+    from matplotlib import pyplot as plt
+ 
+    state = run("shocktube", end_time=0.2, resolution=1000)
+    rho = state["primitive"][:, 0]
+    plt.plot(rho)
+    plt.show()
 
 The `run` function takes a sequence of arguments to control the driver and
 problem setup, and then returns the simulation final state. However no
@@ -51,11 +51,9 @@ API documentation
 
    sailfish.driver
    sailfish.event
-   sailfish.library
+   sailfish.kernel
    sailfish.mesh
-   sailfish.parse_api
    sailfish.setup
    sailfish.setups
    sailfish.solvers
    sailfish.subdivide
-   sailfish.system

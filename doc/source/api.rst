@@ -7,11 +7,9 @@ API documentation
 
    sailfish.driver
    sailfish.event
-   sailfish.library
+   sailfish.kernel
    sailfish.mesh
-   sailfish.parse_api
    sailfish.setup
    sailfish.setups
    sailfish.solvers
    sailfish.subdivide
-   sailfish.system
