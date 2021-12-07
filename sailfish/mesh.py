@@ -15,6 +15,9 @@ class PlanarCartesianMesh(NamedTuple):
     x1: float = 1.0
     num_zones: int = 1000
 
+    def __str__(self):
+        return f"planar cartesian ({self.x0} -> {self.x1})"
+
     @property
     def dx(self):
         return (self.x1 - self.x0) / self.num_zones
@@ -25,6 +28,10 @@ class PlanarCartesianMesh(NamedTuple):
     @property
     def shape(self):
         return (self.num_zones,)
+
+    def zone_center(self, i):
+        x0, dx = self.x0, self.dx
+        return x0 + (i + 0.5) * dx
 
     def faces(self, i0, i1):
         x0, dx = self.x0, self.dx
@@ -43,6 +50,14 @@ class LogSphericalMesh(NamedTuple):
     r1: float = 10.0
     num_zones_per_decade: int = 1000
     scale_factor_derivative: float = None
+
+    def __str__(self):
+        if self.scale_factor_derivative is None:
+            motion = f"fixed mesh"
+        else:
+            motion = f"homologous with a-dot = {self.scale_factor_derivative:0.2f}"
+
+        return f"log spherical ({self.r0} -> {self.r1}) {motion}"
 
     def min_spacing(self, time=None):
         """
@@ -70,6 +85,10 @@ class LogSphericalMesh(NamedTuple):
     @property
     def shape(self):
         return (int(log10(self.r1 / self.r0) * self.num_zones_per_decade),)
+
+    def zone_center(self, i):
+        r0, k = self.r0, 1.0 / self.num_zones_per_decade
+        return r0 * 10 ** ((i + 0.5) * k)
 
     def faces(self, i0, i1):
         """

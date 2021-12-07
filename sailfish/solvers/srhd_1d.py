@@ -1,11 +1,23 @@
 from logging import getLogger
 from contextlib import nullcontext
-from sailfish.library import Library
-from sailfish.system import get_array_module
+from sailfish.kernel.library import Library
+from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 
 logger = getLogger(__name__)
+BC_PERIODIC = 0
+BC_OUTFLOW = 1
+BC_INFLOW = 2
+BC_DICT = {
+    "periodic": BC_PERIODIC,
+    "outflow": BC_OUTFLOW,
+    "inflow": BC_INFLOW,
+}
+COORDINATES_DICT = {
+    PlanarCartesianMesh: 0,
+    LogSphericalMesh: 1,
+}
 
 
 class Patch:
@@ -26,11 +38,17 @@ class Patch:
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
-        self.num_zones = primitive.shape[0]
+        self.num_zones = index_range[1] - index_range[0]
         self.faces = self.xp.array(mesh.faces(*index_range))
-        self.coordinates = {PlanarCartesianMesh: 0, LogSphericalMesh: 1}[type(mesh)]
-        self.scale_factor_initial = 1.0
-        self.scale_factor_derivative = 0.0
+        self.coordinates = COORDINATES_DICT[type(mesh)]
+        try:
+            adot = float(mesh.scale_factor_derivative)
+            self.scale_factor_initial = 0.0
+            self.scale_factor_derivative = adot
+        except (TypeError, AttributeError):
+            self.scale_factor_initial = 1.0
+            self.scale_factor_derivative = 0.0
+
         self.time = self.time0 = time
 
         with self.execution_context():
@@ -46,8 +64,7 @@ class Patch:
     def primitive_to_conserved(self, primitive):
         with self.execution_context():
             conserved = self.xp.zeros_like(primitive)
-            self.lib.srhd_1d_primitive_to_conserved(
-                self.num_zones,
+            self.lib.srhd_1d_primitive_to_conserved[self.num_zones](
                 self.faces,
                 primitive,
                 conserved,
@@ -58,8 +75,7 @@ class Patch:
 
     def recompute_primitive(self):
         with self.execution_context():
-            self.lib.srhd_1d_conserved_to_primitive(
-                self.num_zones,
+            self.lib.srhd_1d_conserved_to_primitive[self.num_zones](
                 self.faces,
                 self.conserved1,
                 self.primitive1,
@@ -68,11 +84,8 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
-        self.recompute_primitive()
-
         with self.execution_context():
-            self.lib.srhd_1d_advance_rk(
-                self.num_zones,
+            self.lib.srhd_1d_advance_rk[self.num_zones](
                 self.faces,
                 self.conserved0,
                 self.primitive1,
@@ -87,6 +100,7 @@ class Patch:
             )
         self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
+        self.recompute_primitive()
 
     def scale_factor(self):
         return self.scale_factor_initial + self.scale_factor_derivative * self.time
@@ -108,29 +122,41 @@ class Solver:
 
     def __init__(
         self,
+        setup=None,
+        mesh=None,
         time=0.0,
         hydro_data=None,
-        mesh=None,
         num_patches=1,
         mode="cpu",
-        boundary_condition="outflow",
     ):
         if hydro_data.shape[0] != mesh.shape[0]:
             raise ValueError("hydro data array shape incompatible with mesh")
+
+        try:
+            try:
+                bcl, bcr = setup.boundary_condition
+            except ValueError:
+                bcl = setup.boundary_condition
+                bcr = setup.boundary_condition
+            self.boundary_condition = BC_DICT[bcl], BC_DICT[bcr]
+        except KeyError:
+            raise ValueError(f"bad boundary condition {bcl}/{bcr}")
 
         primitive = hydro_data
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
-        lib = Library(__file__, mode=mode, debug=False)
+        with open(__file__.replace(".py", ".c")) as f:
+            code = f.read()
+        lib = Library(code, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
         logger.info(f"mesh is {mesh}")
-        logger.info(f"use {boundary_condition} boundary condition")
+        logger.info(f"boundary condition is {bcl}/{bcr}")
 
         self.mesh = mesh
-        self.boundary_condition = boundary_condition
+        self.setup = setup
         self.num_guard = ng
         self.num_cons = nq
         self.xp = xp
@@ -139,20 +165,18 @@ class Solver:
         for (a, b) in subdivide(mesh.shape[0], num_patches):
             prim = xp.zeros([b - a + 2 * ng, nq])
             prim[ng:-ng] = primitive[a:b]
-            self.patches.append(Patch(time, prim, mesh, (a - ng, b + ng), lib, xp))
+            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
 
         self.set_bc("primitive1")
-        self.set_bc("conserved1")
 
     def advance_rk(self, rk_param, dt):
-        self.set_bc("conserved1")
+        self.set_bc("primitive1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
 
     def set_bc(self, array):
         ng = self.num_guard
-        patches = self.patches
-        num_patches = len(patches)
+        num_patches = len(self.patches)
         for i0 in range(num_patches):
             il = (i0 + num_patches - 1) % num_patches
             ir = (i0 + num_patches + 1) % num_patches
@@ -161,26 +185,30 @@ class Solver:
             pr = getattr(self.patches[ir], array)
             self.set_bc_patch(pl, p0, pr, i0)
 
-    def set_bc_patch(self, al, a0, ar, index):
+    def set_bc_patch(self, al, a0, ar, patch_index):
         ng = self.num_guard
-        bc = self.boundary_condition
+        nz = self.mesh.shape[0]
+        bcl, bcr = self.boundary_condition
+        t = self.patches[patch_index].time
 
-        if bc == "periodic":
-            a0[:+ng] = al[-2 * ng : -ng]
-            a0[-ng:] = ar[+ng : +2 * ng]
-        elif bc == "outflow":
-            if index == 0:
+        a0[:+ng] = al[-2 * ng : -ng]
+        a0[-ng:] = ar[+ng : +2 * ng]
+
+        if patch_index == 0:
+            if bcl == BC_OUTFLOW:
                 a0[:+ng] = a0[+ng : +2 * ng]
-            else:
-                a0[:+ng] = al[-2 * ng : -ng]
-            if index == len(self.patches) - 1:
+            elif bcl == BC_INFLOW:
+                for i in range(-ng, 0):
+                    x = self.mesh.zone_center(i)
+                    self.setup.primitive(t, x, a0[i + ng])
+
+        if patch_index == len(self.patches) - 1:
+            if bcr == BC_OUTFLOW:
                 a0[-ng:] = a0[-2 * ng : -ng]
-            else:
-                a0[-ng:] = ar[+ng : +2 * ng]
-        else:
-            raise ValueError(
-                f"boundary condition must be 'periodic' | 'outflow' (got {bc})"
-            )
+            elif bcr == BC_INFLOW:
+                for i in range(nz, nz + ng):
+                    x = self.mesh.zone_center(i)
+                    self.setup.primitive(t, x, a0[i + ng])
 
     def new_timestep(self):
         for patch in self.patches:

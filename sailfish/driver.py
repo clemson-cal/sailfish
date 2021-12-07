@@ -128,7 +128,7 @@ def initial_condition(setup, mesh):
     primitive = np.zeros([len(zones), 4])
 
     for x, p in zip(zones, primitive):
-        setup.initial_primitive(x, p)
+        setup.primitive(0.0, x, p)
 
     return primitive
 
@@ -146,6 +146,7 @@ class DriverArgs(NamedTuple):
     execution_mode: str = None
     fold: int = None
     resolution: int = None
+    num_patches: int = None
     events: Dict[str, Recurrence] = dict()
 
     def from_namespace(args):
@@ -199,9 +200,13 @@ def simulate(driver):
 
     from time import perf_counter
     from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
-    from sailfish.system import configure_build, log_system_info, measure_time
+    from sailfish import __version__ as version
+    from sailfish.kernel.system import configure_build, log_system_info, measure_time
     from sailfish.solvers import srhd_1d
     from sailfish.event import Recurrence
+
+    main_logger = getLogger("main_logger")
+    main_logger.info(f"\nsailfish {version}\n")
 
     """
     Initialize and log state in the the system module. The build system
@@ -212,7 +217,6 @@ def simulate(driver):
     """
     configure_build()
     log_system_info(driver.execution_mode or "cpu")
-    loop_logger = getLogger("loop_message")
 
     if driver.setup_name:
         """
@@ -228,7 +232,7 @@ def simulate(driver):
         )
 
         iteration = 0
-        time = 0.0
+        time = setup.start_time
         event_states = {name: RecurringEvent() for name in driver.events}
         initial = initial_condition(setup, setup.mesh(driver.resolution))
 
@@ -274,11 +278,11 @@ def simulate(driver):
     # Construct a solver instance. TODO: the solver should be obtained from
     # the setup instance.
     solver = srhd_1d.Solver(
+        setup=setup,
+        mesh=mesh,
         time=time,
         hydro_data=initial,
-        mesh=mesh,
-        num_patches=1,
-        boundary_condition=setup.boundary_condition,
+        num_patches=driver.num_patches or 1,
         mode=mode,
     )
 
@@ -288,7 +292,7 @@ def simulate(driver):
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
     logger.info(f"timestep is {dt:0.2e}")
-    setup.print_model_parameters(newlines=True)
+    setup.print_model_parameters(newlines=True, logger=main_logger)
 
     def grab_state():
         """
@@ -301,8 +305,8 @@ def simulate(driver):
             primitive=solver.primitive,
             event_states=event_states,
             driver=driver,
-            parameters=setup.model_parameter_dict,
-            setup_name=setup.dash_case_class_name,
+            parameters=setup.model_parameter_dict(),
+            setup_name=setup.dash_case_class_name(),
             mesh=mesh,
         )
 
@@ -327,7 +331,7 @@ def simulate(driver):
                 iteration += 1
 
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
-        loop_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+        main_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
 
     yield "end", None, grab_state()
 
@@ -372,7 +376,7 @@ def init_logging():
         def format(self, record):
             name = record.name.replace("sailfish.", "")
 
-            if name == "loop_message":
+            if name == "main_logger":
                 return f"{record.msg}"
             if record.levelno <= 20:
                 return f"[{name}] {record.msg}"
@@ -401,7 +405,7 @@ def main():
 
     def keyed_string(item):
         key, val = item.split("=")
-        return key, eval(val)
+        return key, eval(val, None, dict(yes=True, true=True, no=False, false=False))
 
     class MakeDict(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
@@ -434,6 +438,13 @@ def main():
         metavar="N",
         type=int,
         help="grid resolution",
+    )
+    parser.add_argument(
+        "--patches",
+        metavar="N",
+        type=int,
+        dest="num_patches",
+        help="number of patches for domain decomposition",
     )
     parser.add_argument(
         "--cfl",

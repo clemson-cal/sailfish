@@ -15,6 +15,7 @@ import sys
 
 sys.path.insert(0, os.path.abspath("../.."))
 
+import sailfish
 
 # -- Project information -----------------------------------------------------
 
@@ -23,7 +24,7 @@ copyright = "2021, Jonathan Zrake"
 author = "Jonathan Zrake"
 
 # The full version, including alpha/beta/rc tags
-release = "0.4.0"
+release = sailfish.__version__
 
 
 # -- General configuration ---------------------------------------------------
