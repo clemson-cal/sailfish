@@ -14,6 +14,26 @@ class ConfigurationError(Exception):
     """An invalid runtime configuration"""
 
 
+def keyed_event(item):
+    key, val = item.split("=")
+    return key, Recurrence.from_str(val)
+
+
+def keyed_value(item):
+    try:
+        key, val = item.split("=")
+        return key, eval(val)
+
+    except NameError:
+        return key, val
+
+    except SyntaxError:
+        raise ConfigurationError(f"badly formed model parameter value {val} in {item}")
+
+    except ValueError:
+        raise ConfigurationError(f"badly formed model parameter {item}")
+
+
 def first_not_none(*args):
     for arg in args:
         if arg is not None:
@@ -120,19 +140,6 @@ def load_checkpoint(chkpt_file):
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
 
 
-def initial_condition(setup, mesh):
-    import numpy as np
-
-    faces = np.array(mesh.faces(0, mesh.shape[0]))
-    zones = 0.5 * (faces[:-1] + faces[1:])
-    primitive = np.zeros([len(zones), 4])
-
-    for x, p in zip(zones, primitive):
-        setup.primitive(0.0, x, p)
-
-    return primitive
-
-
 class DriverArgs(NamedTuple):
     """
     Contains data used by the driver.
@@ -153,14 +160,6 @@ class DriverArgs(NamedTuple):
         """
         Construct an instance from an argparse-type namespace object.
         """
-
-        def parse_item(item):
-            try:
-                key, val = item.split("=")
-                return key, eval(val)
-            except (NameError, ValueError):
-                raise ConfigurationError(f"badly formed model parameter {item}")
-
         driver = DriverArgs(
             **{k: w for k, w in vars(args).items() if k in DriverArgs._fields}
         )
@@ -174,7 +173,7 @@ class DriverArgs(NamedTuple):
             chkpt_file = parts[0]
 
         try:
-            model_parameters = dict(parse_item(a) for a in parts[1:])
+            model_parameters = dict(keyed_value(a) for a in parts[1:])
         except IndexError:
             model_parameters = dict()
 
@@ -223,7 +222,7 @@ def simulate(driver):
         Generate an initial driver state from command line arguments, model
         parametrs, and a setup instance.
         """
-        logger.info(f"generate initial data for setup {driver.setup_name}")
+        logger.info(f"start new simulation with setup {driver.setup_name}")
         setup = Setup.find_setup_class(driver.setup_name)(
             **driver.model_parameters or dict()
         )
@@ -234,7 +233,7 @@ def simulate(driver):
         iteration = 0
         time = setup.start_time
         event_states = {name: RecurringEvent() for name in driver.events}
-        initial = initial_condition(setup, setup.mesh(driver.resolution))
+        solution = None
 
     elif driver.chkpt_file:
         """
@@ -258,7 +257,7 @@ def simulate(driver):
         iteration = chkpt["iteration"]
         time = chkpt["time"]
         event_states = chkpt["event_states"]
-        initial = chkpt["primitive"]
+        solution = chkpt["solution"]
 
         for event in driver.events:
             if event not in event_states:
@@ -275,13 +274,11 @@ def simulate(driver):
     dt = dx * cfl_number
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
 
-    # Construct a solver instance. TODO: the solver should be obtained from
-    # the setup instance.
-    solver = srhd_1d.Solver(
+    solver = setup.solver_class(
         setup=setup,
         mesh=mesh,
         time=time,
-        hydro_data=initial,
+        solution=solution,
         num_patches=driver.num_patches or 1,
         mode=mode,
     )
@@ -302,6 +299,7 @@ def simulate(driver):
         return dict(
             iteration=iteration,
             time=solver.time,
+            solution=solver.solution,
             primitive=solver.primitive,
             event_states=event_states,
             driver=driver,
@@ -325,9 +323,7 @@ def simulate(driver):
 
         with measure_time() as fold_time:
             for _ in range(fold):
-                solver.new_timestep()
-                solver.advance_rk(0.0, dt)
-                solver.advance_rk(0.5, dt)
+                solver.advance(dt)
                 iteration += 1
 
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
@@ -397,16 +393,6 @@ def main():
     """
     import argparse
 
-    init_logging()
-
-    def keyed_event(item):
-        key, val = item.split("=")
-        return key, Recurrence.from_str(val)
-
-    def keyed_string(item):
-        key, val = item.split("=")
-        return key, eval(val, None, dict(yes=True, true=True, no=False, false=False))
-
     class MakeDict(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
             setattr(namespace, self.dest, dict(values))
@@ -417,6 +403,8 @@ def main():
                 getattr(namespace, self.dest)[key] = values
 
         return AddDictEntry
+
+    init_logging()
 
     parser = argparse.ArgumentParser(
         prog="sailfish",
@@ -491,7 +479,7 @@ def main():
         "--model",
         nargs="*",
         metavar="K=V",
-        type=keyed_string,
+        type=keyed_value,
         action=MakeDict,
         default=dict(),
         dest="model_parameters",

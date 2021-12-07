@@ -1,8 +1,38 @@
 from math import pi, sin
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
+from sailfish.solvers import srhd_1d, scad_dg1d
 
-__all__ = ["Shocktube", "DensityWave", "Wind"]
+__all__ = ["Scalar", "DensityWave", "Shocktube", "Wind"]
+
+
+class Scalar(Setup):
+    """
+    Scalar advection with a smooth wave, using the DG solver.
+    """
+
+    def primitive(self, t, x, primitive):
+        a = 0.1
+        k = 2.0 * pi
+        primitive[0] = 1.0 + a * sin(k * x)
+
+    def mesh(self, num_zones):
+        return PlanarCartesianMesh(0.0, 1.0, num_zones)
+
+    @property
+    def solver_class(self):
+        return scad_dg1d.Solver
+
+    @property
+    def boundary_condition(self):
+        return "periodic"
+
+    @property
+    def default_end_time(self):
+        return 1.0
+
+    def validate(self):
+        pass
 
 
 class Shocktube(Setup):
@@ -21,6 +51,10 @@ class Shocktube(Setup):
 
     def mesh(self, num_zones):
         return PlanarCartesianMesh(0.0, 1.0, num_zones)
+
+    @property
+    def solver_class(self):
+        return srhd_1d.Solver
 
     @property
     def boundary_condition(self):
@@ -42,15 +76,20 @@ class DensityWave(Setup):
     velocity = param(0.0, "speed of the wave (gamma-beta if relativistic)")
 
     def primitive(self, t, x, primitive):
-        k = self.wavenumber * 2 * pi
+        k = self.wavenumber * 2.0 * pi
         a = self.amplitude
         u = self.velocity
+
         primitive[0] = 1.0 + a * sin(k * x)
         primitive[1] = u
         primitive[2] = 1.0
 
     def mesh(self, num_zones):
         return PlanarCartesianMesh(0.0, 1.0, num_zones)
+
+    @property
+    def solver_class(self):
+        return srhd_1d.Solver
 
     @property
     def boundary_condition(self):
@@ -79,6 +118,10 @@ class Wind(Setup):
 
     def mesh(self, num_zones_per_decade):
         return LogSphericalMesh(1.0, 10.0, num_zones_per_decade)
+
+    @property
+    def solver_class(self):
+        return srhd_1d.Solver
 
     @property
     def boundary_condition(self):

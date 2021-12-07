@@ -54,7 +54,9 @@ class Setup(ABC):
 
         for key, val in kwargs.items():
             if not hasattr(self, key):
-                raise SetupError(f"setup has no parameter '{key}'")
+                raise SetupError(
+                    f"'{self.dash_case_class_name()}' has no parameter '{key}'"
+                )
 
         self.validate()
 
@@ -131,8 +133,8 @@ class Setup(ABC):
             logger.info("")
             if self.has_model_parameters():
                 logger.info("model parameters:\n")
-                for name, default, about in self.model_parameters():
-                    logger.info(f"{name:.<16s} {default:<5} {about}")
+                for name, val, about in self.model_parameters():
+                    logger.info(f"{name:.<16s} {val:<8} {about}")
             else:
                 logger.info("setup has no model parameters")
         if newlines:
@@ -175,6 +177,14 @@ class Setup(ABC):
 
         This method must be overridden, and the domain type must be supported
         by the solver. A resolution parameter is passed here from the driver.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def solver_class(self):
+        """
+        Return the class of the solver to be used.
         """
         pass
 

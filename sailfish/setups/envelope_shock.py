@@ -1,6 +1,7 @@
 # from math import pi, sin
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
+from sailfish.solvers import srhd_1d
 
 __all__ = ["EnvelopeShock"]
 
@@ -33,6 +34,10 @@ class EnvelopeShock(Setup):
             num_zones_per_decade=num_zones_per_decade,
             scale_factor_derivative=1.0 / self.t_start if self.expand else None,
         )
+
+    @property
+    def solver_class(self):
+        return srhd_1d.Solver
 
     @property
     def start_time(self):
