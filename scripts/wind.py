@@ -7,7 +7,7 @@ import matplotlib.pyplot as plt
 sys.path.insert(1, ".")
 from sailfish.driver import run
 
-state = run("wind", end_time=6e-2, fold=1, quiet=False, resolution=500)
+state = run("wind", end_time=6e-2, num_patches=4, fold=10, quiet=False, resolution=500)
 
 mesh = state["mesh"]
 faces = np.array(mesh.faces(0, mesh.shape[0]))

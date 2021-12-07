@@ -280,15 +280,17 @@ PRIVATE void geometric_source_terms(int coords, double x0, double x1, const doub
 PUBLIC void srhd_1d_primitive_to_conserved(
     int num_zones,
     double *face_positions,  // :: $.shape == (num_zones + 1,)
-    double *primitive,       // :: $.shape == (num_zones, 4)
-    double *conserved,       // :: $.shape == (num_zones, 4)
+    double *primitive,       // :: $.shape == (num_zones + 4, 4)
+    double *conserved,       // :: $.shape == (num_zones + 4, 4)
     double scale_factor,     // :: $ > 0.0
     int coords)              // :: $ in [0, 1]
 {
+    int ng = 2; // number of guard zones
+
     FOR_EACH_1D(num_zones)
     {
-        double *p = &primitive[NCONS * i];
-        double *u = &conserved[NCONS * i];
+        double *p = &primitive[NCONS * (i + ng)];
+        double *u = &conserved[NCONS * (i + ng)];
         double yl = face_positions[i];
         double yr = face_positions[i + 1];
         double xl = yl * scale_factor;
@@ -305,15 +307,17 @@ PUBLIC void srhd_1d_primitive_to_conserved(
 PUBLIC void srhd_1d_conserved_to_primitive(
     int num_zones,
     double *face_positions, // :: $.shape == (num_zones + 1,)
-    double *conserved,      // :: $.shape == (num_zones, 4)
-    double *primitive,      // :: $.shape == (num_zones, 4)
+    double *conserved,      // :: $.shape == (num_zones + 4, 4)
+    double *primitive,      // :: $.shape == (num_zones + 4, 4)
     double scale_factor,    // :: $ > 0.0
     int coords)             // :: $ in [0, 1]
 {
+    int ng = 2; // number of guard zones
+
     FOR_EACH_1D(num_zones)
     {
-        double *p = &primitive[NCONS * i];
-        double *u = &conserved[NCONS * i];
+        double *p = &primitive[NCONS * (i + ng)];
+        double *u = &conserved[NCONS * (i + ng)];
         double yl = face_positions[i];
         double yr = face_positions[i + 1];
         double xl = yl * scale_factor;
@@ -329,12 +333,12 @@ PUBLIC void srhd_1d_conserved_to_primitive(
  * step.
  */
 PUBLIC void srhd_1d_advance_rk(
-    int num_zones,          // number of zones in the grid
+    int num_zones,          // number of zones, not including guard zones
     double *face_positions, // :: $.shape == (num_zones + 1,)
-    double *conserved_rk,   // :: $.shape == (num_zones, 4)
-    double *primitive_rd,   // :: $.shape == (num_zones, 4)
-    double *conserved_rd,   // :: $.shape == (num_zones, 4)
-    double *conserved_wr,   // :: $.shape == (num_zones, 4)
+    double *conserved_rk,   // :: $.shape == (num_zones + 4, 4)
+    double *primitive_rd,   // :: $.shape == (num_zones + 4, 4)
+    double *conserved_rd,   // :: $.shape == (num_zones + 4, 4)
+    double *conserved_wr,   // :: $.shape == (num_zones + 4, 4)
     double a0,              // scale factor at t=0
     double adot,            // scale factor derivative
     double time,            // current time
@@ -342,6 +346,8 @@ PUBLIC void srhd_1d_advance_rk(
     double dt,              // timestep size
     int coords)             // :: $ in [0, 1]
 {
+    int ng = 2; // number of guard zones
+
     FOR_EACH_1D(num_zones)
     {
         double yl = face_positions[i];
@@ -349,14 +355,14 @@ PUBLIC void srhd_1d_advance_rk(
         double xl = yl * (a0 + adot * time);
         double xr = yr * (a0 + adot * time);
 
-        double *urk = &conserved_rk[NCONS * i];
-        double *prd = &primitive_rd[NCONS * i];
-        double *urd = &conserved_rd[NCONS * i];
-        double *uwr = &conserved_wr[NCONS * i];
-        double *pli = &primitive_rd[NCONS * (i - 1)];
-        double *pri = &primitive_rd[NCONS * (i + 1)];
-        double *pki = &primitive_rd[NCONS * (i - 2)];
-        double *pti = &primitive_rd[NCONS * (i + 2)];
+        double *urk = &conserved_rk[NCONS * (i + ng)];
+        double *prd = &primitive_rd[NCONS * (i + ng)];
+        double *urd = &conserved_rd[NCONS * (i + ng)];
+        double *uwr = &conserved_wr[NCONS * (i + ng)];
+        double *pli = &primitive_rd[NCONS * (i + ng - 1)];
+        double *pri = &primitive_rd[NCONS * (i + ng + 1)];
+        double *pki = &primitive_rd[NCONS * (i + ng - 2)];
+        double *pti = &primitive_rd[NCONS * (i + ng + 2)];
 
         double plip[NCONS];
         double plim[NCONS];

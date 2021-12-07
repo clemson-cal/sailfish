@@ -38,7 +38,7 @@ class Patch:
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
-        self.num_zones = primitive.shape[0]
+        self.num_zones = index_range[1] - index_range[0]
         self.faces = self.xp.array(mesh.faces(*index_range))
         self.coordinates = COORDINATES_DICT[type(mesh)]
         self.scale_factor_initial = 1.0
@@ -159,7 +159,7 @@ class Solver:
         for (a, b) in subdivide(mesh.shape[0], num_patches):
             prim = xp.zeros([b - a + 2 * ng, nq])
             prim[ng:-ng] = primitive[a:b]
-            self.patches.append(Patch(time, prim, mesh, (a - ng, b + ng), lib, xp))
+            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
 
         self.set_bc("primitive1")
 
