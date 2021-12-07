@@ -1,5 +1,11 @@
+#!/usr/bin/env python3
+
+import sys
+
+sys.path.insert(1, ".")
+
 import numpy as np
-from kernel_lib.library import Library
+from sailfish.kernel.library import Library
 
 # Several implicit things:
 #
