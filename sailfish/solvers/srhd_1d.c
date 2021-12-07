@@ -6,37 +6,11 @@ AUTHOR: Jonathan Zrake
 DESCRIPTION:
   Solves relativistic hydrodynamics in 1D cartesian or spherical
   coordinates.
-
-PARAMETERS:
-  plm_theta:
-    default: 1.5
-    range: [1.0, 2.0]
-  coordinates:
-    default: spherical
-    choices: [cartesian, spherical]
-  num_scalars:
-    default: 0
-    validate: 0 <= $ <= 5
-  adiabatic_gamma: (4.0 / 3.0)
 */
 
 
 // ============================ MODES =========================================
 // ============================================================================
-#define EXEC_CPU 0
-#define EXEC_OMP 1
-#define EXEC_GPU 2
-
-#if (EXEC_MODE != EXEC_GPU)
-#include <math.h>
-#include <stddef.h>
-#define PRIVATE static
-#define PUBLIC
-#else
-#define PRIVATE static __device__
-#define PUBLIC extern "C" __global__
-#endif
-
 
 #define BC_INFLOW 0
 #define BC_ZEROFLUX 1
@@ -311,16 +285,7 @@ PUBLIC void srhd_1d_primitive_to_conserved(
     double scale_factor,     // :: $ > 0.0
     int coords)              // :: $ in [0, 1]
 {
-    #if (EXEC_MODE == EXEC_CPU)
-    for (int i = 0; i < num_zones; ++i)
-    #elif (EXEC_MODE == EXEC_OMP)
-    #pragma omp parallel for
-    for (int i = 0; i < num_zones; ++i)
-    #elif (EXEC_MODE == EXEC_GPU)
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= num_zones) return;
-    #endif
-
+    FOR_EACH_1D(num_zones)
     {
         double *p = &primitive[NCONS * i];
         double *u = &conserved[NCONS * i];
@@ -345,16 +310,7 @@ PUBLIC void srhd_1d_conserved_to_primitive(
     double scale_factor,    // :: $ > 0.0
     int coords)             // :: $ in [0, 1]
 {
-    #if (EXEC_MODE == EXEC_CPU)
-    for (int i = 0; i < num_zones; ++i)
-    #elif (EXEC_MODE == EXEC_OMP)
-    #pragma omp parallel for
-    for (int i = 0; i < num_zones; ++i)
-    #elif (EXEC_MODE == EXEC_GPU)
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i >= num_zones) return;
-    #endif
-
+    FOR_EACH_1D(num_zones)
     {
         double *p = &primitive[NCONS * i];
         double *u = &conserved[NCONS * i];
@@ -386,16 +342,7 @@ PUBLIC void srhd_1d_advance_rk(
     double dt,              // timestep size
     int coords)             // :: $ in [0, 1]
 {
-    #if (EXEC_MODE == EXEC_CPU)
-    for (int i = 2; i < num_zones - 2; ++i)
-    #elif (EXEC_MODE == EXEC_OMP)
-    #pragma omp parallel for
-    for (int i = 2; i < num_zones - 2; ++i)
-    #elif (EXEC_MODE == EXEC_GPU)
-    int i = threadIdx.x + blockIdx.x * blockDim.x;
-    if (i < 2 || i >= num_zones) return;
-    #endif
-
+    FOR_EACH_1D(num_zones)
     {
         double yl = face_positions[i];
         double yr = face_positions[i + 1];

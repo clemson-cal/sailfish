@@ -11,7 +11,7 @@ PUBLIC void my_1d_kernel(
 PUBLIC void my_2d_kernel(
     int ni,
     int nj,
-    double *data)
+    double *data) // :: $.shape == (ni, nj)
 {
     FOR_EACH_2D(ni, nj)
     {
@@ -23,7 +23,7 @@ PUBLIC void my_3d_kernel(
     int ni,
     int nj,
     int nk,
-    double *data)
+    double *data) // :: $.shape == (ni, nj, nk)
 {
     FOR_EACH_3D(ni, nj, nk)
     {

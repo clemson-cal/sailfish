@@ -1,27 +1,11 @@
 """
 Defines a `Library` utility class to encapulsate CPU/GPU compiled kernels.
 
-CPU modules are built with the cffi module. Build products including the
-.so file itself are placed in a temporary directory, and removed as soon
-as the module is loaded in memory. GPU modules are compiled with cupy.
-
-The C source code must adhere to several conventions:
-
-1. Be on the filesystem alongside `module_file`, with .c extension
-   replacing the .py extension
-2. Define a set of public API methods, or kernels
-3. Kernel functions are implemented in one of three modes: cpu=0, omp=1,
-   or gpu=2, specified to the C code as `EXEC_MODE`
-
-The kernel functions are configured by preprocessor macros to:
-
-- In CPU mode: wrap the function body in a serialized for-loop
-- In OMP mode: wrap the function body in an OpenMP-parallelized for-loop
-- In GPU mode: discover the kernel index and execute the function body
-  once
-
-Supported arguments to kernel functions are int, double, or
-pointer-to-double.
+CPU modules are built with the cffi module. Build products including the .so
+file itself are placed in this module's __pycache__ directory, and stored for
+reuse based on the SHA value of the source code and #define macros. GPU
+modules are JIT-compiled with cupy. No caching is presently done for the GPU
+modules.
 """
 
 from ctypes import c_double, c_int, POINTER, CDLL
@@ -30,8 +14,8 @@ from logging import getLogger
 from os import listdir
 from os.path import join, dirname
 
-from kernel_lib.parse_api import parse_api
-from kernel_lib.system import build_config, measure_time
+from .parse_api import parse_api
+from .system import build_config, measure_time
 
 logger = getLogger(__name__)
 THREAD_BLOCK_SIZE_1D = (64,)

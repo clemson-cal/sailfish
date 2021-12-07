@@ -200,7 +200,7 @@ def simulate(driver):
 
     from time import perf_counter
     from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
-    from sailfish.system import configure_build, log_system_info, measure_time
+    from sailfish.kernel.system import configure_build, log_system_info, measure_time
     from sailfish.solvers import srhd_1d
     from sailfish.event import Recurrence
 

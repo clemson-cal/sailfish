@@ -1,7 +1,7 @@
 from logging import getLogger
 from contextlib import nullcontext
-from sailfish.library import Library
-from sailfish.system import get_array_module
+from sailfish.kernel.library import Library
+from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 
@@ -58,8 +58,7 @@ class Patch:
     def primitive_to_conserved(self, primitive):
         with self.execution_context():
             conserved = self.xp.zeros_like(primitive)
-            self.lib.srhd_1d_primitive_to_conserved(
-                self.num_zones,
+            self.lib.srhd_1d_primitive_to_conserved[self.num_zones](
                 self.faces,
                 primitive,
                 conserved,
@@ -70,8 +69,7 @@ class Patch:
 
     def recompute_primitive(self):
         with self.execution_context():
-            self.lib.srhd_1d_conserved_to_primitive(
-                self.num_zones,
+            self.lib.srhd_1d_conserved_to_primitive[self.num_zones](
                 self.faces,
                 self.conserved1,
                 self.primitive1,
@@ -81,8 +79,7 @@ class Patch:
 
     def advance_rk(self, rk_param, dt):
         with self.execution_context():
-            self.lib.srhd_1d_advance_rk(
-                self.num_zones,
+            self.lib.srhd_1d_advance_rk[self.num_zones](
                 self.faces,
                 self.conserved0,
                 self.primitive1,
@@ -143,7 +140,9 @@ class Solver:
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
-        lib = Library(__file__, mode=mode, debug=False)
+        with open(__file__.replace(".py", ".c")) as f:
+            code = f.read()
+        lib = Library(code, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")

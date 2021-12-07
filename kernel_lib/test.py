@@ -15,11 +15,55 @@ from kernel_lib.library import Library
 #
 # - Function arguments can only be int, double, and double*.
 
-code = open("example.c").read()
+code = """
+PUBLIC void my_1d_kernel(
+    int ni,
+    double *data) // :: $.shape == (ni,)
+{
+    FOR_EACH_1D(ni)
+    {
+        data[i] = i;
+    }
+}
+
+PUBLIC void my_2d_kernel(
+    int ni,
+    int nj,
+    double *data) // :: $.shape == (ni, nj)
+{
+    FOR_EACH_2D(ni, nj)
+    {
+        data[i * nj + j] = i + j;
+    }
+}
+
+PUBLIC void my_3d_kernel(
+    int ni,
+    int nj,
+    int nk,
+    double *data) // :: $.shape == (ni, nj, nk)
+{
+    FOR_EACH_3D(ni, nj, nk)
+    {
+        data[i * nj * nk + j * nk + k] = i + j + k;
+    }
+}
+"""
+
 library = Library(code, mode="cpu", name="my_module")
-data = np.zeros(10)
+data_1d = np.zeros([10])
+data_2d = np.zeros([10, 20])
+data_3d = np.zeros([10, 20, 30])
 
-library.my_1d_kernel([len(data)], data)
+library.my_1d_kernel[data_1d.shape](data_1d)
+library.my_2d_kernel[data_2d.shape](data_2d)
+library.my_3d_kernel[data_3d.shape](data_3d)
 
-for i in data:
-    print(i)
+for (i,), x in np.ndenumerate(data_1d):
+    assert i == x
+
+for (i, j), x in np.ndenumerate(data_2d):
+    assert i + j == x
+
+for (i, j, k), x in np.ndenumerate(data_3d):
+    assert i + j + k == x
