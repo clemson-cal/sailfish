@@ -5,17 +5,23 @@ An n-th order discontinuous Galerkin solver for 1D scalar advection.
 import numpy as np
 from numpy.polynomial.legendre import leggauss, Legendre
 from sailfish.mesh import PlanarCartesianMesh
-
-
-def leg(x, n, m=0):
-    c = [(2 * n + 1) ** 0.5 if i is n else 0.0 for i in range(n + 1)]
-    return Legendre(c).deriv(m)(x)
+from sailfish.solver import SolverBase
 
 
 class CellData:
+    """
+    Gauss weights, quadrature points, and tabulated Legendre polonomials.
+
+    This class works for n-th order Gaussian quadrature in 1D.
+    """
+
     def __init__(self, order=1):
         if order <= 0:
             raise ValueError("cell order must be at least 1")
+
+        def leg(x, n, m=0):
+            c = [(2 * n + 1) ** 0.5 if i is n else 0.0 for i in range(n + 1)]
+            return Legendre(c).deriv(m)(x)
 
         f = [-1.0, 1.0]  # xsi-coordinate of faces
         g, w = leggauss(order)
@@ -40,15 +46,14 @@ class CellData:
         return self.order
 
 
-def flux(wavespeed, ux):
-    return wavespeed * ux
-
-
 def dot(u, p):
     return sum(u[i] * p[i] for i in range(u.shape[0]))
 
 
 def update(wavespeed, uw, cell, dx, dt):
+    def flux(ux):
+        return wavespeed * ux
+
     nz = uw.shape[0]
     pv = cell.phi_value
     pf = cell.phi_faces
@@ -61,10 +66,10 @@ def update(wavespeed, uw, cell, dx, dt):
         ip1 = (i + 1 + nz) % nz
 
         # surface fluxes
-        fimh_l = flux(wavespeed, dot(uw[im1], pf[1]))
-        fimh_r = flux(wavespeed, dot(uw[i], pf[0]))
-        fiph_l = flux(wavespeed, dot(uw[i], pf[1]))
-        fiph_r = flux(wavespeed, dot(uw[ip1], pf[0]))
+        fimh_l = flux(dot(uw[im1], pf[1]))
+        fimh_r = flux(dot(uw[i], pf[0]))
+        fiph_l = flux(dot(uw[i], pf[1]))
+        fiph_r = flux(dot(uw[ip1], pf[0]))
 
         if wavespeed > 0.0:
             fimh = fimh_l
@@ -75,7 +80,7 @@ def update(wavespeed, uw, cell, dx, dt):
 
         fs = [fimh, fiph]
         ux = [cell.sample(uw[i], j) for j in range(cell.order)]
-        fx = [flux(wavespeed, u) for u in ux]
+        fx = [flux(u) for u in ux]
 
         for n in range(cell.order):
             udot_s = -sum(fs[j] * pf[j][n] * h[j] for j in range(2)) / dx
@@ -83,7 +88,11 @@ def update(wavespeed, uw, cell, dx, dt):
             uw[i, n] += (udot_s + udot_v) * dt
 
 
-class Solver:
+class Solver(SolverBase):
+    """
+    An n-th order, discontinuous Galerkin solver for 1D scalar advection.
+    """
+
     def __init__(
         self,
         setup=None,
@@ -129,14 +138,10 @@ class Solver:
         else:
             self.conserved_w = solution
 
-        self.time = time
+        self.t = time
         self.cell = cell
         self.mesh = mesh
         self.wavespeed = 1.0
-
-    def advance(self, dt):
-        update(self.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
-        self.time += dt
 
     @property
     def solution(self):
@@ -145,3 +150,15 @@ class Solver:
     @property
     def primitive(self):
         return self.conserved_w[:, 0]
+
+    @property
+    def time(self):
+        return self.t
+
+    @property
+    def maximum_cfl(self):
+        return 0.05
+
+    def advance(self, dt):
+        update(self.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
+        self.t += dt

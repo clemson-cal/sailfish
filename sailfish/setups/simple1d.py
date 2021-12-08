@@ -1,7 +1,6 @@
 from math import pi, sin
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
-from sailfish.solvers import srhd_1d, scad_dg1d
 
 __all__ = ["Scalar", "DensityWave", "Shocktube", "Wind"]
 
@@ -20,8 +19,8 @@ class Scalar(Setup):
         return PlanarCartesianMesh(0.0, 1.0, num_zones)
 
     @property
-    def solver_class(self):
-        return scad_dg1d.Solver
+    def solver(self):
+        return "scdg_1d"
 
     @property
     def boundary_condition(self):
@@ -53,8 +52,8 @@ class Shocktube(Setup):
         return PlanarCartesianMesh(0.0, 1.0, num_zones)
 
     @property
-    def solver_class(self):
-        return srhd_1d.Solver
+    def solver(self):
+        return "srhd_1d"
 
     @property
     def boundary_condition(self):
@@ -88,8 +87,8 @@ class DensityWave(Setup):
         return PlanarCartesianMesh(0.0, 1.0, num_zones)
 
     @property
-    def solver_class(self):
-        return srhd_1d.Solver
+    def solver(self):
+        return "srhd_1d"
 
     @property
     def boundary_condition(self):
@@ -120,8 +119,8 @@ class Wind(Setup):
         return LogSphericalMesh(1.0, 10.0, num_zones_per_decade)
 
     @property
-    def solver_class(self):
-        return srhd_1d.Solver
+    def solver(self):
+        return "srhd_1d"
 
     @property
     def boundary_condition(self):
