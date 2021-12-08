@@ -184,7 +184,7 @@ class Setup(ABC):
     @abstractmethod
     def solver(self):
         """
-        Return the name of the setup class, and an optional parameter dict.
+        Return the name of the setup class.
         """
         pass
 
