@@ -182,9 +182,9 @@ class Setup(ABC):
 
     @property
     @abstractmethod
-    def solver_class(self):
+    def solver(self):
         """
-        Return the class of the solver to be used.
+        Return the name of the setup class, and an optional parameter dict.
         """
         pass
 

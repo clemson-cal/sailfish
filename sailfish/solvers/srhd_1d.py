@@ -4,6 +4,7 @@ from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
+from sailfish.solver import SolverBase
 
 logger = getLogger(__name__)
 BC_PERIODIC = 0
@@ -128,7 +129,7 @@ class Patch:
         return self.primitive1
 
 
-class Solver:
+class Solver(SolverBase):
     """
     Adapter class to drive the srhd_1d C extension module.
     """
@@ -183,6 +184,29 @@ class Solver:
 
         self.set_bc("primitive1")
 
+    @property
+    def solution(self):
+        return self.primitive
+
+    @property
+    def primitive(self):
+        nz = self.mesh.shape[0]
+        ng = self.num_guard
+        nq = self.num_cons
+        np = len(self.patches)
+        primitive = self.xp.zeros([nz, nq])
+        for (a, b), patch in zip(subdivide(nz, np), self.patches):
+            primitive[a:b] = patch.primitive[ng:-ng]
+        return primitive
+
+    @property
+    def time(self):
+        return self.patches[0].time
+
+    @property
+    def maximum_cfl(self):
+        return 0.05
+
     def advance(self, dt):
         self.new_iteration()
         self.advance_rk(0.0, dt)
@@ -232,22 +256,3 @@ class Solver:
     def new_iteration(self):
         for patch in self.patches:
             patch.new_iteration()
-
-    @property
-    def solution(self):
-        return self.primitive
-
-    @property
-    def primitive(self):
-        nz = self.mesh.shape[0]
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        primitive = self.xp.zeros([nz, nq])
-        for (a, b), patch in zip(subdivide(nz, np), self.patches):
-            primitive[a:b] = patch.primitive[ng:-ng]
-        return primitive
-
-    @property
-    def time(self):
-        return self.patches[0].time

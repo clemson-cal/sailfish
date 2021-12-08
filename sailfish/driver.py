@@ -4,6 +4,7 @@ Library functions and command-line access to the simulation driver.
 
 import os, pickle, pathlib, logging
 from typing import NamedTuple, Dict
+from sailfish import solvers
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
 
@@ -245,14 +246,14 @@ def simulate(driver):
         """
         logger.info(f"load checkpoint {driver.chkpt_file}")
         chkpt = load_checkpoint(driver.chkpt_file)
-        setup_cls = Setup.find_setup_class(chkpt["setup_name"])
+        setup_class = Setup.find_setup_class(chkpt["setup_name"])
         driver = update_where_none(driver, chkpt["driver"], frozen=["resolution"])
         update_dict_where_none(
             driver.model_parameters,
             chkpt["parameters"],
-            frozen=list(setup_cls.immutable_parameter_keys()),
+            frozen=list(setup_class.immutable_parameter_keys()),
         )
-        setup = setup_cls(**driver.model_parameters)
+        setup = setup_class(**driver.model_parameters)
 
         iteration = chkpt["iteration"]
         time = chkpt["time"]
@@ -269,12 +270,10 @@ def simulate(driver):
     mode = driver.execution_mode or "cpu"
     fold = driver.fold or 10
     mesh = setup.mesh(driver.resolution)
-    cfl_number = driver.cfl_number or 0.6
-    dx = mesh.min_spacing(time)
-    dt = dx * cfl_number
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
 
-    solver = setup.solver_class(
+    solver = solvers.make_solver(
+        setup.solver,
         setup=setup,
         mesh=mesh,
         time=time,
@@ -282,6 +281,17 @@ def simulate(driver):
         num_patches=driver.num_patches or 1,
         mode=mode,
     )
+
+    if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
+        raise ConfigurationError(
+            f"cfl number {driver.cfl_number} "
+            f"is greater than {solver.maximum_cfl}, "
+            f"max allowed by solver {setup.solver}"
+        )
+
+    cfl_number = driver.cfl_number or solver.maximum_cfl
+    dx = mesh.min_spacing(time)
+    dt = dx * cfl_number
 
     for name, event in driver.events.items():
         logger.info(f"recurrence for {name} event is {event}")

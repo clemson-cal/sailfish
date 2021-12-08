@@ -1,7 +1,6 @@
 # from math import pi, sin
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
-from sailfish.solvers import srhd_1d
 
 __all__ = ["EnvelopeShock"]
 
@@ -36,8 +35,8 @@ class EnvelopeShock(Setup):
         )
 
     @property
-    def solver_class(self):
-        return srhd_1d.Solver
+    def solver(self):
+        return "srhd_1d"
 
     @property
     def start_time(self):
