@@ -41,6 +41,7 @@ sailfish.setups.simple1d.Wind
       ~Wind.boundary_condition
       ~Wind.default_end_time
       ~Wind.default_resolution
+      ~Wind.physics
       ~Wind.solver
       ~Wind.start_time
       ~Wind.velocity

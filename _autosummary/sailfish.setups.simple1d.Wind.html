@@ -168,13 +168,16 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.simple1d.Wind.default_resolution" title="sailfish.setups.simple1d.Wind.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
 <td><p>Provide a default grid resolution.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.simple1d.Wind.solver" title="sailfish.setups.simple1d.Wind.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.simple1d.Wind.physics" title="sailfish.setups.simple1d.Wind.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<td><p>Return physics parameters used by the solver: EOS, gravity, etc.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.simple1d.Wind.solver" title="sailfish.setups.simple1d.Wind.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
 <td><p>Return the name of the setup class.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.simple1d.Wind.start_time" title="sailfish.setups.simple1d.Wind.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.simple1d.Wind.start_time" title="sailfish.setups.simple1d.Wind.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
 <td><p>Provide a start time for the simulation.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">velocity</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">velocity</span></code></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -264,6 +267,14 @@ by the solver. A resolution parameter is passed here from the driver.</p>
 <dt class="sig sig-object py" id="sailfish.setups.simple1d.Wind.model_parameters">
 <span class="sig-name descname"><span class="pre">model_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.simple1d.Wind.model_parameters" title="Permalink to this definition"></a></dt>
 <dd><p>Return an iterator over the model parameters chosen for this setup.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.simple1d.Wind.physics">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">physics</span></span><a class="headerlink" href="#sailfish.setups.simple1d.Wind.physics" title="Permalink to this definition"></a></dt>
+<dd><p>Return physics parameters used by the solver: EOS, gravity, etc.</p>
+<p>Physics parameters should be distinct from the solver options, such as
+PLM theta value, RK integration type, or DG order.</p>
 </dd></dl>
 
 <dl class="py method">

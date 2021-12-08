@@ -121,6 +121,12 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.maximum_cfl" title="sailfish.solver.SolverBase.maximum_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_cfl</span></code></a></p></td>
 <td><p>Return the largest CFL number that should be used for this solver.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.options" title="sailfish.solver.SolverBase.options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">options</span></code></a></p></td>
+<td><p>A dictionary that reflects the solver solution scheme.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.physics" title="sailfish.solver.SolverBase.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<td><p>A dictionary describing the physics parameters of the system.</p></td>
+</tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.primitive" title="sailfish.solver.SolverBase.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
 <td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
 </tr>
@@ -142,6 +148,33 @@
 <dt class="sig sig-object py" id="sailfish.solver.SolverBase.maximum_cfl">
 <em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">maximum_cfl</span></span><a class="headerlink" href="#sailfish.solver.SolverBase.maximum_cfl" title="Permalink to this definition"></a></dt>
 <dd><p>Return the largest CFL number that should be used for this solver.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solver.SolverBase.options">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">options</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span></em><a class="headerlink" href="#sailfish.solver.SolverBase.options" title="Permalink to this definition"></a></dt>
+<dd><p>A dictionary that reflects the solver solution scheme.</p>
+<p>An example of an options object would be <code class="xref py py-obj docutils literal notranslate"><span class="pre">dict(plm=1.5,</span>
+<span class="pre">rk=2)</span></code>. The items should describe the solver algorithm, not the
+parameters of the physical system being solved, such as an equation of
+state or cooling prescription.</p>
+<p>Solver options and physics parameters are kept logically separate
+because their configuration comes from different places: the physics
+parameters come from the <a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code></a> class instance
+(which can in turn be set from model parameters), whereas the solver
+options come directly from the driver instance (i.e. command line
+<code class="code docutils literal notranslate"><span class="pre">--solver</span> <span class="pre">key=val</span></code> if sailfish is invoked as an executable).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solver.SolverBase.physics">
+<em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">physics</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">dict</span></em><a class="headerlink" href="#sailfish.solver.SolverBase.physics" title="Permalink to this definition"></a></dt>
+<dd><p>A dictionary describing the physics parameters of the system.</p>
+<p>The physics parameters are supplied by the setup. They can include
+things like an equation of state, a cooling prescription, external
+gravity, a wavespeed in the case of passive scalar advection, fluid
+viscocity model, etc. These items can still be influenced at runtime
+through the setup’s model parameters.</p>
 </dd></dl>
 
 <dl class="py property">

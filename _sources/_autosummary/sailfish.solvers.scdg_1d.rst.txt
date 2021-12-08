@@ -27,6 +27,8 @@ sailfish.solvers.scdg\_1d
       :toctree:
    
       CellData
+      Options
+      Physics
       Solver
    
    

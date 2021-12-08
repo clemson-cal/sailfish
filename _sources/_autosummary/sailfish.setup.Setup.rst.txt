@@ -41,6 +41,7 @@ sailfish.setup.Setup
       ~Setup.boundary_condition
       ~Setup.default_end_time
       ~Setup.default_resolution
+      ~Setup.physics
       ~Setup.solver
       ~Setup.start_time
    

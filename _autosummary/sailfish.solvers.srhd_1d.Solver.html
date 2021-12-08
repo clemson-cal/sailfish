@@ -96,12 +96,12 @@
 <h1>sailfish.solvers.srhd_1d.Solver<a class="headerlink" href="#sailfish-solvers-srhd-1d-solver" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_1d.</span></span><span class="sig-name descname"><span class="pre">Solver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_1d.</span></span><span class="sig-name descname"><span class="pre">Solver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="sailfish.solver.SolverBase.html#sailfish.solver.SolverBase" title="sailfish.solver.SolverBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.solver.SolverBase</span></code></a></p>
 <p>Adapter class to drive the srhd_1d C extension module.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.__init__" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.__init__" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
@@ -141,6 +141,12 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.maximum_cfl" title="sailfish.solvers.srhd_1d.Solver.maximum_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_cfl</span></code></a></p></td>
 <td><p>Return the largest CFL number that should be used for this solver.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.options" title="sailfish.solvers.srhd_1d.Solver.options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">options</span></code></a></p></td>
+<td><p>A dictionary that reflects the solver solution scheme.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.physics" title="sailfish.solvers.srhd_1d.Solver.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<td><p>A dictionary describing the physics parameters of the system.</p></td>
+</tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.primitive" title="sailfish.solvers.srhd_1d.Solver.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
 <td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
 </tr>
@@ -162,6 +168,34 @@
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.maximum_cfl">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">maximum_cfl</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.maximum_cfl" title="Permalink to this definition"></a></dt>
 <dd><p>Return the largest CFL number that should be used for this solver.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.options">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">options</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.options" title="Permalink to this definition"></a></dt>
+<dd><p>A dictionary that reflects the solver solution scheme.</p>
+<p>An example of an options object would be <code class="xref py py-obj docutils literal notranslate"><span class="pre">dict(plm=1.5,</span>
+<span class="pre">rk=2)</span></code>, or a named tuple with the same attributes. The items should
+describe the solver algorithm, not the parameters of the physical
+system being solved, such as an equation of state or cooling
+prescription.</p>
+<p>Solver options and physics parameters are kept logically separate
+because their configuration comes from different places: the physics
+parameters come from the <a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code></a> class instance
+(which can in turn be set from model parameters), whereas the solver
+options come directly from the driver instance (i.e. command line
+<code class="code docutils literal notranslate"><span class="pre">--solver</span> <span class="pre">key=val</span></code> if sailfish is invoked as an executable).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.physics">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">physics</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.physics" title="Permalink to this definition"></a></dt>
+<dd><p>A dictionary describing the physics parameters of the system.</p>
+<p>The physics parameters are supplied by the setup. They can include
+things like an equation of state, a cooling prescription, external
+gravity, a wavespeed in the case of passive scalar advection, fluid
+viscocity model, etc. These items can still be influenced at runtime
+through the setup’s model parameters.</p>
 </dd></dl>
 
 <dl class="py property">

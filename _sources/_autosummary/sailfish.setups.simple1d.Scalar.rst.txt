@@ -41,6 +41,7 @@ sailfish.setups.simple1d.Scalar
       ~Scalar.boundary_condition
       ~Scalar.default_end_time
       ~Scalar.default_resolution
+      ~Scalar.physics
       ~Scalar.solver
       ~Scalar.start_time
    

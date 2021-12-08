@@ -1,0 +1,33 @@
+sailfish.solvers.scdg\_1d.Physics
+=================================
+
+.. currentmodule:: sailfish.solvers.scdg_1d
+
+.. autoclass:: Physics
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Physics.__init__
+      ~Physics.count
+      ~Physics.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Physics.wavespeed
+   
+   

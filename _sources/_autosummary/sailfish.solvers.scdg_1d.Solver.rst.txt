@@ -28,6 +28,8 @@ sailfish.solvers.scdg\_1d.Solver
    .. autosummary::
    
       ~Solver.maximum_cfl
+      ~Solver.options
+      ~Solver.physics
       ~Solver.primitive
       ~Solver.solution
       ~Solver.time

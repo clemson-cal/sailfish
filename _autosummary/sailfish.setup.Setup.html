@@ -168,10 +168,13 @@ below have stub default implementations.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setup.Setup.default_resolution" title="sailfish.setup.Setup.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
 <td><p>Provide a default grid resolution.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setup.Setup.solver" title="sailfish.setup.Setup.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setup.Setup.physics" title="sailfish.setup.Setup.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<td><p>Return physics parameters used by the solver: EOS, gravity, etc.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setup.Setup.solver" title="sailfish.setup.Setup.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
 <td><p>Return the name of the setup class.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setup.Setup.start_time" title="sailfish.setup.Setup.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setup.Setup.start_time" title="sailfish.setup.Setup.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
 <td><p>Provide a start time for the simulation.</p></td>
 </tr>
 </tbody>
@@ -261,6 +264,14 @@ by the solver. A resolution parameter is passed here from the driver.</p>
 <dt class="sig sig-object py" id="sailfish.setup.Setup.model_parameters">
 <span class="sig-name descname"><span class="pre">model_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setup.html#Setup.model_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setup.Setup.model_parameters" title="Permalink to this definition"></a></dt>
 <dd><p>Return an iterator over the model parameters chosen for this setup.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setup.Setup.physics">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">physics</span></span><a class="headerlink" href="#sailfish.setup.Setup.physics" title="Permalink to this definition"></a></dt>
+<dd><p>Return physics parameters used by the solver: EOS, gravity, etc.</p>
+<p>Physics parameters should be distinct from the solver options, such as
+PLM theta value, RK integration type, or DG order.</p>
 </dd></dl>
 
 <dl class="py method">

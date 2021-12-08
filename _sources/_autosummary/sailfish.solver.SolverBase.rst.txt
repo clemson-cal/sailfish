@@ -28,6 +28,8 @@ sailfish.solver.SolverBase
    .. autosummary::
    
       ~SolverBase.maximum_cfl
+      ~SolverBase.options
+      ~SolverBase.physics
       ~SolverBase.primitive
       ~SolverBase.solution
       ~SolverBase.time

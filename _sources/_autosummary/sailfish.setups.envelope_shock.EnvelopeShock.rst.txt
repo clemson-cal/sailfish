@@ -43,6 +43,7 @@ sailfish.setups.envelope\_shock.EnvelopeShock
       ~EnvelopeShock.default_resolution
       ~EnvelopeShock.expand
       ~EnvelopeShock.m_shell
+      ~EnvelopeShock.physics
       ~EnvelopeShock.r_inner
       ~EnvelopeShock.r_outer
       ~EnvelopeShock.solver

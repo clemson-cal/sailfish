@@ -1,0 +1,33 @@
+sailfish.solvers.scdg\_1d.Options
+=================================
+
+.. currentmodule:: sailfish.solvers.scdg_1d
+
+.. autoclass:: Options
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Options.__init__
+      ~Options.count
+      ~Options.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Options.order
+   
+   

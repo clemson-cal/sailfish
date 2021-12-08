@@ -41,6 +41,7 @@ sailfish.setups.simple1d.Shocktube
       ~Shocktube.boundary_condition
       ~Shocktube.default_end_time
       ~Shocktube.default_resolution
+      ~Shocktube.physics
       ~Shocktube.solver
       ~Shocktube.start_time
    

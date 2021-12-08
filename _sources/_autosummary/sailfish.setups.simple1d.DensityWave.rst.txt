@@ -42,6 +42,7 @@ sailfish.setups.simple1d.DensityWave
       ~DensityWave.boundary_condition
       ~DensityWave.default_end_time
       ~DensityWave.default_resolution
+      ~DensityWave.physics
       ~DensityWave.solver
       ~DensityWave.start_time
       ~DensityWave.velocity
