@@ -149,6 +149,7 @@ class DriverArgs(NamedTuple):
     setup_name: str = None
     chkpt_file: str = None
     model_parameters: dict = None
+    solver_options: dict = None
     cfl_number: float = None
     end_time: float = None
     execution_mode: str = None
@@ -274,6 +275,7 @@ def simulate(driver):
 
     solver = solvers.make_solver(
         setup.solver,
+        driver.solver_options,
         setup=setup,
         mesh=mesh,
         time=time,
@@ -494,6 +496,16 @@ def main():
         default=dict(),
         dest="model_parameters",
         help="key-value pairs given as models parameters to the setup",
+    )
+    parser.add_argument(
+        "--solver",
+        nargs="*",
+        metavar="K=V",
+        type=keyed_value,
+        action=MakeDict,
+        default=dict(),
+        dest="solver_options",
+        help="key-value pairs passed as options to the solver",
     )
     parser.add_argument(
         "--outdir",

@@ -101,6 +101,7 @@ class Solver(SolverBase):
         solution=None,
         num_patches=1,
         mode="cpu",
+        order=1,
     ):
         if num_patches != 1:
             raise ValueError("only works on one patch")
@@ -114,7 +115,7 @@ class Solver(SolverBase):
         if setup.boundary_condition != "periodic":
             raise ValueError("only periodic boundaries are supported")
 
-        cell = CellData(order=2)
+        cell = CellData(order=order)
 
         if solution is None:
             num_zones = mesh.shape[0]
