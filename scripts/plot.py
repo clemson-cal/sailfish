@@ -11,7 +11,11 @@ def main(args):
         with open(checkpoint, "rb") as f:
             chkpt = pickle.load(f)
 
-        rho = chkpt["primitive"][:, 0]
+        try:
+            rho = chkpt["primitive"][:, 0]
+        except TypeError:
+            rho = chkpt["solution"][:, 0]
+
         plt.plot(rho)
     plt.show()
 

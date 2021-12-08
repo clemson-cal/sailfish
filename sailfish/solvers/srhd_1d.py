@@ -20,6 +20,19 @@ COORDINATES_DICT = {
 }
 
 
+def initial_condition(setup, mesh):
+    import numpy as np
+
+    faces = np.array(mesh.faces(0, mesh.shape[0]))
+    zones = 0.5 * (faces[:-1] + faces[1:])
+    primitive = np.zeros([len(zones), 4])
+
+    for x, p in zip(zones, primitive):
+        setup.primitive(0.0, x, p)
+
+    return primitive
+
+
 class Patch:
     """
     Holds the array buffer state for the solution on a subset of the
@@ -105,7 +118,7 @@ class Patch:
     def scale_factor(self):
         return self.scale_factor_initial + self.scale_factor_derivative * self.time
 
-    def new_timestep(self):
+    def new_iteration(self):
         self.time0 = self.time
         self.conserved0[...] = self.conserved1[...]
 
@@ -125,13 +138,10 @@ class Solver:
         setup=None,
         mesh=None,
         time=0.0,
-        hydro_data=None,
+        solution=None,
         num_patches=1,
         mode="cpu",
     ):
-        if hydro_data.shape[0] != mesh.shape[0]:
-            raise ValueError("hydro data array shape incompatible with mesh")
-
         try:
             try:
                 bcl, bcr = setup.boundary_condition
@@ -142,7 +152,6 @@ class Solver:
         except KeyError:
             raise ValueError(f"bad boundary condition {bcl}/{bcr}")
 
-        primitive = hydro_data
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
@@ -162,12 +171,22 @@ class Solver:
         self.xp = xp
         self.patches = []
 
+        if solution is None:
+            primitive = initial_condition(setup, mesh)
+        else:
+            primitive = solution
+
         for (a, b) in subdivide(mesh.shape[0], num_patches):
             prim = xp.zeros([b - a + 2 * ng, nq])
             prim[ng:-ng] = primitive[a:b]
             self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
 
         self.set_bc("primitive1")
+
+    def advance(self, dt):
+        self.new_iteration()
+        self.advance_rk(0.0, dt)
+        self.advance_rk(0.5, dt)
 
     def advance_rk(self, rk_param, dt):
         self.set_bc("primitive1")
@@ -210,9 +229,13 @@ class Solver:
                     x = self.mesh.zone_center(i)
                     self.setup.primitive(t, x, a0[i + ng])
 
-    def new_timestep(self):
+    def new_iteration(self):
         for patch in self.patches:
-            patch.new_timestep()
+            patch.new_iteration()
+
+    @property
+    def solution(self):
+        return self.primitive
 
     @property
     def primitive(self):
