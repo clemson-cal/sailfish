@@ -55,5 +55,6 @@ API documentation
    sailfish.mesh
    sailfish.setup
    sailfish.setups
+   sailfish.solver
    sailfish.solvers
    sailfish.subdivide

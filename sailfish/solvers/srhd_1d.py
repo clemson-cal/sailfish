@@ -1,3 +1,7 @@
+"""
+One-dimensional relativistic hydro solver supporting homologous mesh motion.
+"""
+
 from logging import getLogger
 from contextlib import nullcontext
 from sailfish.kernel.library import Library
