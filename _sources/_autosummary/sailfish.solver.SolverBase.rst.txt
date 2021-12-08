@@ -1,0 +1,35 @@
+sailfish.solver.SolverBase
+==========================
+
+.. currentmodule:: sailfish.solver
+
+.. autoclass:: SolverBase
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SolverBase.__init__
+      ~SolverBase.advance
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SolverBase.maximum_cfl
+      ~SolverBase.primitive
+      ~SolverBase.solution
+      ~SolverBase.time
+   
+   

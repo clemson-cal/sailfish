@@ -1,0 +1,6 @@
+sailfish.kernel.parse\_api.scan
+===============================
+
+.. currentmodule:: sailfish.kernel.parse_api
+
+.. autofunction:: scan

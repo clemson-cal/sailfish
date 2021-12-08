@@ -1,0 +1,6 @@
+sailfish.solvers.srhd\_1d.initial\_condition
+============================================
+
+.. currentmodule:: sailfish.solvers.srhd_1d
+
+.. autofunction:: initial_condition

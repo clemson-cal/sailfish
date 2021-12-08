@@ -1,0 +1,25 @@
+sailfish.kernel.library.KernelInvocation
+========================================
+
+.. currentmodule:: sailfish.kernel.library
+
+.. autoclass:: KernelInvocation
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~KernelInvocation.__init__
+   
+   
+
+   
+   
+   

@@ -1,0 +1,40 @@
+sailfish.mesh.PlanarCartesianMesh
+=================================
+
+.. currentmodule:: sailfish.mesh
+
+.. autoclass:: PlanarCartesianMesh
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PlanarCartesianMesh.__init__
+      ~PlanarCartesianMesh.count
+      ~PlanarCartesianMesh.faces
+      ~PlanarCartesianMesh.index
+      ~PlanarCartesianMesh.min_spacing
+      ~PlanarCartesianMesh.zone_center
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PlanarCartesianMesh.dx
+      ~PlanarCartesianMesh.num_zones
+      ~PlanarCartesianMesh.shape
+      ~PlanarCartesianMesh.x0
+      ~PlanarCartesianMesh.x1
+   
+   

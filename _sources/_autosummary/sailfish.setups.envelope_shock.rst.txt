@@ -1,0 +1,30 @@
+sailfish.setups.envelope\_shock
+===============================
+
+.. automodule:: sailfish.setups.envelope_shock
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      EnvelopeShock
+   
+   
+
+   
+   
+   
+
+
+

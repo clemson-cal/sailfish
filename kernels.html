@@ -1,0 +1,293 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Kernel libraries &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
+        <script src="_static/jquery.js"></script>
+        <script src="_static/underscore.js"></script>
+        <script src="_static/doctools.js"></script>
+    <script src="_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="genindex.html" />
+    <link rel="search" title="Search" href="search.html" />
+    <link rel="next" title="API documentation" href="api.html" />
+    <link rel="prev" title="Workflow patterns" href="workflow.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1 current"><a class="current reference internal" href="#">Kernel libraries</a><ul>
+<li class="toctree-l2"><a class="reference internal" href="#quick-example">Quick example</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#invoking-the-kernel">Invoking the kernel</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#kernel-rank">Kernel rank</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#type-and-bounds-checking">Type and bounds checking</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="#building-a-kernel">Building a kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#kernel-source-code">Kernel source code</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="#source-conventions">Source conventions</a></li>
+<li class="toctree-l3"><a class="reference internal" href="#argument-constraints">Argument constraints</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="index.html" class="icon icon-home"></a> &raquo;</li>
+      <li>Kernel libraries</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="_sources/kernels.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="kernel-libraries">
+<h1>Kernel libraries<a class="headerlink" href="#kernel-libraries" title="Permalink to this headline"></a></h1>
+<p>Sailfish has a module dedicated to generating CPU-GPU agnostic compute
+kernels. A compute kernel is a function that operates on one or more arrays of
+floating point data, and may be parallelized using OpenMP, CUDA, or ROCm.
+Kernels are written in C, and the source code is provided to the <cite>kernel</cite>
+module as a string. That means the source can be loaded from a file, embedded
+in Python code as a string literal, or even generated programmatically. The
+source code is compiled just-in-time (JIT) when the program starts, yielding a
+<a class="reference internal" href="_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library" title="sailfish.kernel.library.Library"><code class="xref py py-class docutils literal notranslate"><span class="pre">Library</span></code></a> object. Kernels are invoked using attribute access on the
+library object.</p>
+<section id="quick-example">
+<h2>Quick example<a class="headerlink" href="#quick-example" title="Permalink to this headline"></a></h2>
+<p>Below is a minimal working example of compiling and executing a custom kernel
+from an inline Python string:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">sailfish.kernel.library</span> <span class="kn">import</span> <span class="n">Library</span>
+
+<span class="n">code</span> <span class="o">=</span> <span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">PUBLIC void my_kernel(</span>
+<span class="s2">    int ni,</span>
+<span class="s2">    int nj,</span>
+<span class="s2">    double *data) // :: $.shape == (ni, nj)</span>
+<span class="s2">{</span>
+<span class="s2">    FOR_EACH_2D(ni, nj)</span>
+<span class="s2">    {</span>
+<span class="s2">        data[i * nj + j] = i + j;</span>
+<span class="s2">    }</span>
+<span class="s2">}</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+<span class="n">library</span> <span class="o">=</span> <span class="n">Library</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+<span class="n">data</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">])</span>
+<span class="n">library</span><span class="o">.</span><span class="n">my_kernel</span><span class="p">[</span><span class="n">data</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span><span class="n">data</span><span class="p">)</span>
+</pre></div>
+</div>
+<p>In this example, a 2D numpy array of double-precision zeros was created, and
+then populated by the JIT-compiled kernel. The execution mode is “cpu”, which
+indicates sequential processing, as opposed to parallelized OpenMP or GPU
+processing. Several conventions are assumed for the C code, including the
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">PUBLIC</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">FOR_EACH_2D</span></code> macros, and the end-of-line
+comments on the function signature. These things are explained in more detail
+below.</p>
+</section>
+<section id="invoking-the-kernel">
+<h2>Invoking the kernel<a class="headerlink" href="#invoking-the-kernel" title="Permalink to this headline"></a></h2>
+<p>Let’s start with how to use a kernel that’s already been compiled
+successfully. The library object (<code class="xref py py-obj docutils literal notranslate"><span class="pre">library</span></code> in the example above) has
+one attribute per <code class="xref py py-obj docutils literal notranslate"><span class="pre">PUBLIC</span></code> function defined in the kernel source.
+Since kernels can in general operate on several arrays at once, and these
+arrays can have distinct shapes, there’s no way (in general) for the range of
+array indexes to be inferred from the array arguments. For this reason, the
+kernel object needs to be provided with a <cite>traversal</cite> index space. For the
+simple example above, the traversal index space is the same as the array
+argument. However this is not always the case, for example if the array has
+guard zones, or if there are many fields per spatial array index. The code
+below shows the object types involved in the kernel invocation:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="n">library</span>                           <span class="c1"># Library</span>
+<span class="n">library</span><span class="o">.</span><span class="n">my_kernel</span>                 <span class="c1"># Kernel</span>
+<span class="n">library</span><span class="o">.</span><span class="n">my_kernel</span><span class="p">[(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">)]</span>       <span class="c1"># KernelInvocation</span>
+<span class="n">library</span><span class="o">.</span><span class="n">my_kernel</span><span class="p">[(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">)](</span><span class="n">data</span><span class="p">)</span> <span class="c1"># None (kernel modifies data array)</span>
+</pre></div>
+</div>
+<section id="kernel-rank">
+<h3>Kernel rank<a class="headerlink" href="#kernel-rank" title="Permalink to this headline"></a></h3>
+<p>Kernels of rank 1, 2, and 3 are supported, corresponding to 1D, 2D, or 3D
+array traversals. The arrays supplied as arguments to the kernel can have
+different dimensionality than the rank of the index space to be traversed. For
+example, a triple-nested loop (rank-3 index space) to operate on a 4D array,
+where multiple fields are stored at each <cite>(i,j,k)</cite> index.</p>
+</section>
+<section id="type-and-bounds-checking">
+<h3>Type and bounds checking<a class="headerlink" href="#type-and-bounds-checking" title="Permalink to this headline"></a></h3>
+<p>Kernel arguments are type-checked at runtime to match the signature of the
+compute kernel. The kernel source code is also allowed to specify additional
+constraints on the shape of the array arguments, and even the values of
+non-array arguments. It’s highly recommended to at least specify the expected
+array shapes in the kernel code, because this is the only protection you have
+against memory corruption errors due to passing arrays with unexpected shape
+to the kernel. Type and bounds checking does incur a small overhead, and that
+can become significant if the array size is relatively small. For this reason,
+you might want to disable it once your kernel and the Python code invoking it
+are stabilized. To disable the argument validation, pass <code class="code docutils literal notranslate"><span class="pre">debug=False</span></code>
+to the <a class="reference internal" href="_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library" title="sailfish.kernel.library.Library"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Library</span></code></a> constructor. Just remember that when checking is
+disabled, all kinds of memory corruption errors can be caused by invoking a
+kernel with the wrong numer or type of arguments, or with arrays of unexpected
+shape.</p>
+<p>At present, only the data types <cite>int</cite>, <cite>double</cite>, and <cite>double*</cite> are permitted
+to be kernel arguments. More native data types can be supported as needed, but
+I don’t plan on enabling arbitrary data structures as kernel arguments. Just
+keep your kernel signatures very simple.</p>
+</section>
+</section>
+<section id="building-a-kernel">
+<h2>Building a kernel<a class="headerlink" href="#building-a-kernel" title="Permalink to this headline"></a></h2>
+<p>Kernel compilation takes place when the <a class="reference internal" href="_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library" title="sailfish.kernel.library.Library"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Library</span></code></a> object is
+instantiated. The constructor is given a string of source code, and a
+compilation mode, which is a string with one of the following values:</p>
+<ul class="simple">
+<li><p><code class="code docutils literal notranslate"><span class="pre">cpu</span></code> kernel body is embedded in a sequential for-loop; compiled with <cite>CFFI</cite></p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">omp</span></code> kernel body is embedded in an OpenMP-annotated for-loop; compiled with <cite>CFFI</cite></p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">gpu</span></code> kernel body is executed once per GPU thread; compiled with <cite>cupy</cite></p></li>
+</ul>
+<p>These execution modes are facilitated by the 1D, 2D, and 3D versions of the
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">FOR_EACH</span></code> preprocessor directives. Those directives take on different
+values depending on the execution mode (see the <code class="file docutils literal notranslate"><span class="pre">library.py</span></code> source-code
+to see how this works).</p>
+<p><strong>Implementation note</strong>: When compiling kernels for CPU execution, the <cite>CFFI</cite>
+module leaves behind files on the disk, including a generated C file and the
+build product, which is a shared library (<cite>.so</cite>) file. The shared library is
+loaded using <code class="xref py py-obj docutils literal notranslate"><span class="pre">ctypes.CDLL</span></code>, but after it’s loaded it would be fine to
+remove the build products from the file system. However, the <cite>kernel</cite> module
+caches the shared library files to reduce program startup time from the JIT
+compilation. The cached libraries are kept in the
+<cite>sailfish/kernel/__pycache__</cite> directory, and identified by the SHA hash of the
+source code itself, combined with any preprocessor directives. For this
+reason, your cache directory will accumulate many stale build products if you
+are modifying the kernel sources frequently. It’s always safe to delete a
+<cite>__pycache__</cite> directory. No caching is done for GPU builds.</p>
+</section>
+<section id="kernel-source-code">
+<h2>Kernel source code<a class="headerlink" href="#kernel-source-code" title="Permalink to this headline"></a></h2>
+<section id="source-conventions">
+<h3>Source conventions<a class="headerlink" href="#source-conventions" title="Permalink to this headline"></a></h3>
+<p>The sailfish <cite>kernel</cite> module doesn’t use a general-purpose tool for parsing C
+code, it’s just based on a few regular expressions to crudely extract the
+function names, signatures, and the argument constraints. For this reason, the
+C code needs to follow several conventions for the parser to understand it:</p>
+<ul class="simple">
+<li><p>Kernel functions must start with <code class="xref py py-obj docutils literal notranslate"><span class="pre">PUBLIC</span> <span class="pre">void</span></code></p></li>
+<li><p>Helper functions must start with <code class="xref py py-obj docutils literal notranslate"><span class="pre">PRIVATE</span></code>; they are not accessible
+to Python code</p></li>
+<li><p>Arguments must go on separate lines</p></li>
+<li><p>The number of leading <cite>int</cite> arguments is used to infer the kernel rank, and
+this must be 1, 2, or 3. If the kernel needs additional <cite>int</cite> arguments
+aside from those specifying the index space to be traversed, then put those
+arguments later in the signature.</p></li>
+<li><p>The <code class="xref py py-obj docutils literal notranslate"><span class="pre">FOR_EACH_1D</span></code> macro (and 2D/3D counterparts) must be used to
+start the scope of the function body to be applied to each array element.
+This macro defines the loop variables <cite>i, j, k</cite> as appropriate for the
+execution strategy.</p></li>
+</ul>
+</section>
+<section id="argument-constraints">
+<h3>Argument constraints<a class="headerlink" href="#argument-constraints" title="Permalink to this headline"></a></h3>
+<p>Argument contraints are Python expressions, embedded in the C code, and
+associated with a kernel function argument. The Python expression must go on
+the same line as the kernel argument (another reason the parser requires one
+argument per line in the function signature), on a new-line comment, and
+double-colon, like this:</p>
+<div class="highlight-C notranslate"><div class="highlight"><pre><span></span><span class="n">PUBLIC</span> <span class="kt">void</span> <span class="n">constrained_kernel</span><span class="p">(</span>
+    <span class="kt">int</span> <span class="n">ni</span><span class="p">,</span>
+    <span class="kt">int</span> <span class="n">nj</span><span class="p">,</span>
+    <span class="kt">double</span> <span class="o">*</span><span class="n">coordinates</span><span class="p">,</span> <span class="c1">// :: $.shape == (ni, nj, 2)</span>
+    <span class="kt">double</span> <span class="o">*</span><span class="n">fields</span><span class="p">,</span>      <span class="c1">// :: $.shape == (ni, nj, num_fields)</span>
+    <span class="kt">double</span> <span class="n">time</span><span class="p">,</span>         <span class="c1">// :: $ &gt; 1.0</span>
+    <span class="kt">int</span> <span class="n">num_fields</span><span class="p">)</span>      <span class="c1">// :: $ &gt; 0</span>
+<span class="p">{</span>
+    <span class="c1">// kernel body here</span>
+<span class="p">}</span>
+</pre></div>
+</div>
+<p>This example is a rank-2 kernel, and the shape of the traversed index space is
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">(ni,</span> <span class="pre">nj)</span></code>. Two arrays are passed in: an array of coordinates to be
+read from, and an array of fields to be written to. The shapes of the two
+arrays are constrained, and an exception would be raised if the shapes did not
+match (unless debug mode was disabled). Constraint expressions are evaluated
+in a Python scope that contains the values of the other arguments, so the
+constraints can be relative to other arguments provided.</p>
+<p>Keep in mind that argument constraints are optional, but that including them
+on the array arguments is the only way to ensure any level of memory safety.
+Including them is also good because it documents your C code with the array
+shapes expected by the kernel.</p>
+</section>
+</section>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="workflow.html" class="btn btn-neutral float-left" title="Workflow patterns" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="api.html" class="btn btn-neutral float-right" title="API documentation" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+sailfish.kernel.library.arglen\_error
+=====================================
+
+.. currentmodule:: sailfish.kernel.library
+
+.. autofunction:: arglen_error

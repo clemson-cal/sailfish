@@ -1,0 +1,35 @@
+sailfish.kernel.parse\_api.Symbol
+=================================
+
+.. currentmodule:: sailfish.kernel.parse_api
+
+.. autoclass:: Symbol
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Symbol.__init__
+      ~Symbol.count
+      ~Symbol.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Symbol.args
+      ~Symbol.name
+      ~Symbol.rank
+   
+   

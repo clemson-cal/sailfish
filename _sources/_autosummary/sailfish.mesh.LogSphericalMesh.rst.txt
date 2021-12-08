@@ -1,0 +1,41 @@
+sailfish.mesh.LogSphericalMesh
+==============================
+
+.. currentmodule:: sailfish.mesh
+
+.. autoclass:: LogSphericalMesh
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~LogSphericalMesh.__init__
+      ~LogSphericalMesh.count
+      ~LogSphericalMesh.faces
+      ~LogSphericalMesh.index
+      ~LogSphericalMesh.min_spacing
+      ~LogSphericalMesh.scale_factor
+      ~LogSphericalMesh.zone_center
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~LogSphericalMesh.num_zones_per_decade
+      ~LogSphericalMesh.r0
+      ~LogSphericalMesh.r1
+      ~LogSphericalMesh.scale_factor_derivative
+      ~LogSphericalMesh.shape
+   
+   

@@ -1,0 +1,47 @@
+sailfish.setups.simple1d.Shocktube
+==================================
+
+.. currentmodule:: sailfish.setups.simple1d
+
+.. autoclass:: Shocktube
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Shocktube.__init__
+      ~Shocktube.dash_case_class_name
+      ~Shocktube.default_model_parameters
+      ~Shocktube.describe_class
+      ~Shocktube.find_setup_class
+      ~Shocktube.has_model_parameters
+      ~Shocktube.immutable_parameter_keys
+      ~Shocktube.mesh
+      ~Shocktube.model_parameter_dict
+      ~Shocktube.model_parameters
+      ~Shocktube.primitive
+      ~Shocktube.print_model_parameters
+      ~Shocktube.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Shocktube.boundary_condition
+      ~Shocktube.default_end_time
+      ~Shocktube.default_resolution
+      ~Shocktube.solver
+      ~Shocktube.start_time
+   
+   

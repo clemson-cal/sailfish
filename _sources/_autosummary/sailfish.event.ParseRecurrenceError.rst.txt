@@ -1,0 +1,6 @@
+sailfish.event.ParseRecurrenceError
+===================================
+
+.. currentmodule:: sailfish.event
+
+.. autoexception:: ParseRecurrenceError

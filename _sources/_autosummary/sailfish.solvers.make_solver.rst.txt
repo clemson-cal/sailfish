@@ -1,0 +1,6 @@
+sailfish.solvers.make\_solver
+=============================
+
+.. currentmodule:: sailfish.solvers
+
+.. autofunction:: make_solver

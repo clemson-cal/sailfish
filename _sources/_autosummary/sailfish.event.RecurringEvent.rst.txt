@@ -1,0 +1,37 @@
+sailfish.event.RecurringEvent
+=============================
+
+.. currentmodule:: sailfish.event
+
+.. autoclass:: RecurringEvent
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~RecurringEvent.__init__
+      ~RecurringEvent.count
+      ~RecurringEvent.index
+      ~RecurringEvent.is_due
+      ~RecurringEvent.next
+      ~RecurringEvent.next_time
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~RecurringEvent.last_time
+      ~RecurringEvent.number
+   
+   

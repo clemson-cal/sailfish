@@ -1,0 +1,39 @@
+sailfish.solvers.scdg\_1d
+=========================
+
+.. automodule:: sailfish.solvers.scdg_1d
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      dot
+      update
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      CellData
+      Solver
+   
+   
+
+   
+   
+   
+
+
+

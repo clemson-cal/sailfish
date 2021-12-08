@@ -1,0 +1,6 @@
+sailfish.kernel.library.validate\_constraints
+=============================================
+
+.. currentmodule:: sailfish.kernel.library
+
+.. autofunction:: validate_constraints

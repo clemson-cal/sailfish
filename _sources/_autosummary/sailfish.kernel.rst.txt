@@ -1,0 +1,33 @@
+﻿sailfish.kernel
+===============
+
+.. automodule:: sailfish.kernel
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   sailfish.kernel.library
+   sailfish.kernel.parse_api
+   sailfish.kernel.system
+

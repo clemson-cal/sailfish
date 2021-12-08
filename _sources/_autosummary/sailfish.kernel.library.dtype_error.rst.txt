@@ -1,0 +1,6 @@
+sailfish.kernel.library.dtype\_error
+====================================
+
+.. currentmodule:: sailfish.kernel.library
+
+.. autofunction:: dtype_error

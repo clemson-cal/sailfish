@@ -1,0 +1,6 @@
+sailfish.kernel.system.get\_array\_module
+=========================================
+
+.. currentmodule:: sailfish.kernel.system
+
+.. autofunction:: get_array_module

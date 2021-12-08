@@ -1,0 +1,6 @@
+sailfish.driver.keyed\_event
+============================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: keyed_event

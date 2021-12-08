@@ -1,0 +1,45 @@
+sailfish.kernel.library
+=======================
+
+.. automodule:: sailfish.kernel.library
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      arglen_error
+      dtype_error
+      layout_error
+      to_ctypes
+      type_error
+      validate_constraints
+      validate_types
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Kernel
+      KernelInvocation
+      Library
+   
+   
+
+   
+   
+   
+
+
+

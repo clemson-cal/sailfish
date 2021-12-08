@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.kernel.library &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.kernel.library.arglen_error" href="sailfish.kernel.library.arglen_error.html" />
+    <link rel="prev" title="sailfish.kernel" href="sailfish.kernel.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.kernel.library</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.arglen_error.html">sailfish.kernel.library.arglen_error</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.dtype_error.html">sailfish.kernel.library.dtype_error</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.layout_error.html">sailfish.kernel.library.layout_error</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.to_ctypes.html">sailfish.kernel.library.to_ctypes</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.type_error.html">sailfish.kernel.library.type_error</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.validate_constraints.html">sailfish.kernel.library.validate_constraints</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.validate_types.html">sailfish.kernel.library.validate_types</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.Kernel.html">sailfish.kernel.library.Kernel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.KernelInvocation.html">sailfish.kernel.library.KernelInvocation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.library.Library.html">sailfish.kernel.library.Library</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.kernel.parse_api.html">sailfish.kernel.parse_api</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.kernel.system.html">sailfish.kernel.system</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
+          <li><a href="sailfish.kernel.html">sailfish.kernel</a> &raquo;</li>
+      <li>sailfish.kernel.library</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.kernel.library.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="module-sailfish.kernel.library">
+<span id="sailfish-kernel-library"></span><h1>sailfish.kernel.library<a class="headerlink" href="#module-sailfish.kernel.library" title="Permalink to this headline"></a></h1>
+<p>Defines a <cite>Library</cite> utility class to encapulsate CPU/GPU compiled kernels.</p>
+<p>CPU modules are built with the cffi module. Build products including the .so
+file itself are placed in this module’s __pycache__ directory, and stored for
+reuse based on the SHA value of the source code and #define macros. GPU
+modules are JIT-compiled with cupy. No caching is presently done for the GPU
+modules.</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.library.arglen_error.html#sailfish.kernel.library.arglen_error" title="sailfish.kernel.library.arglen_error"><code class="xref py py-obj docutils literal notranslate"><span class="pre">arglen_error</span></code></a>(sym, a, b)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.library.dtype_error.html#sailfish.kernel.library.dtype_error" title="sailfish.kernel.library.dtype_error"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dtype_error</span></code></a>(sym, n, a, b)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.library.layout_error.html#sailfish.kernel.library.layout_error" title="sailfish.kernel.library.layout_error"><code class="xref py py-obj docutils literal notranslate"><span class="pre">layout_error</span></code></a>(sym, n)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.library.to_ctypes.html#sailfish.kernel.library.to_ctypes" title="sailfish.kernel.library.to_ctypes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_ctypes</span></code></a>(args, spec)</p></td>
+<td><p>Coerce a sequence of values to their appropriate ctype.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.library.type_error.html#sailfish.kernel.library.type_error" title="sailfish.kernel.library.type_error"><code class="xref py py-obj docutils literal notranslate"><span class="pre">type_error</span></code></a>(sym, n, a, b)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.library.validate_constraints.html#sailfish.kernel.library.validate_constraints" title="sailfish.kernel.library.validate_constraints"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate_constraints</span></code></a>(args, spec, symbol)</p></td>
+<td><p>Validate kernel argument constraints for a symbol.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.library.validate_types.html#sailfish.kernel.library.validate_types" title="sailfish.kernel.library.validate_types"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate_types</span></code></a>(args, spec, symbol, xp)</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Classes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.library.Kernel.html#sailfish.kernel.library.Kernel" title="sailfish.kernel.library.Kernel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Kernel</span></code></a>(lib, symbol)</p></td>
+<td><p>An object that uses <cite>__getitem__</cite> syntax to return a <a class="reference internal" href="sailfish.kernel.library.KernelInvocation.html#sailfish.kernel.library.KernelInvocation" title="sailfish.kernel.library.KernelInvocation"><code class="xref py py-class docutils literal notranslate"><span class="pre">KernelInvocation</span></code></a> instance.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.library.KernelInvocation.html#sailfish.kernel.library.KernelInvocation" title="sailfish.kernel.library.KernelInvocation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">KernelInvocation</span></code></a>(kernel, shape)</p></td>
+<td><p>A kernel whose execution shape is specified and is ready to be invoked.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.library.Library.html#sailfish.kernel.library.Library" title="sailfish.kernel.library.Library"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Library</span></code></a>([code, mode, name, debug])</p></td>
+<td><p>Builds and maintains (in memory) a CPU or GPU dynamically compiled module.</p></td>
+</tr>
+</tbody>
+</table>
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.kernel.html" class="btn btn-neutral float-left" title="sailfish.kernel" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.kernel.library.arglen_error.html" class="btn btn-neutral float-right" title="sailfish.kernel.library.arglen_error" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,0 +1,6 @@
+sailfish.kernel.system.configure\_build
+=======================================
+
+.. currentmodule:: sailfish.kernel.system
+
+.. autofunction:: configure_build

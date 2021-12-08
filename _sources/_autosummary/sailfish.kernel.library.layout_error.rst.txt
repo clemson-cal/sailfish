@@ -1,0 +1,6 @@
+sailfish.kernel.library.layout\_error
+=====================================
+
+.. currentmodule:: sailfish.kernel.library
+
+.. autofunction:: layout_error

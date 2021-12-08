@@ -1,0 +1,54 @@
+sailfish.setups.envelope\_shock.EnvelopeShock
+=============================================
+
+.. currentmodule:: sailfish.setups.envelope_shock
+
+.. autoclass:: EnvelopeShock
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~EnvelopeShock.__init__
+      ~EnvelopeShock.dash_case_class_name
+      ~EnvelopeShock.default_model_parameters
+      ~EnvelopeShock.describe_class
+      ~EnvelopeShock.find_setup_class
+      ~EnvelopeShock.has_model_parameters
+      ~EnvelopeShock.immutable_parameter_keys
+      ~EnvelopeShock.mesh
+      ~EnvelopeShock.model_parameter_dict
+      ~EnvelopeShock.model_parameters
+      ~EnvelopeShock.primitive
+      ~EnvelopeShock.print_model_parameters
+      ~EnvelopeShock.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~EnvelopeShock.boundary_condition
+      ~EnvelopeShock.default_end_time
+      ~EnvelopeShock.default_resolution
+      ~EnvelopeShock.expand
+      ~EnvelopeShock.m_shell
+      ~EnvelopeShock.r_inner
+      ~EnvelopeShock.r_outer
+      ~EnvelopeShock.solver
+      ~EnvelopeShock.start_time
+      ~EnvelopeShock.t_start
+      ~EnvelopeShock.u_shell
+      ~EnvelopeShock.w_shell
+   
+   

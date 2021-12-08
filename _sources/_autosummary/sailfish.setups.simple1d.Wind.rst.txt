@@ -1,0 +1,48 @@
+sailfish.setups.simple1d.Wind
+=============================
+
+.. currentmodule:: sailfish.setups.simple1d
+
+.. autoclass:: Wind
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Wind.__init__
+      ~Wind.dash_case_class_name
+      ~Wind.default_model_parameters
+      ~Wind.describe_class
+      ~Wind.find_setup_class
+      ~Wind.has_model_parameters
+      ~Wind.immutable_parameter_keys
+      ~Wind.mesh
+      ~Wind.model_parameter_dict
+      ~Wind.model_parameters
+      ~Wind.primitive
+      ~Wind.print_model_parameters
+      ~Wind.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Wind.boundary_condition
+      ~Wind.default_end_time
+      ~Wind.default_resolution
+      ~Wind.solver
+      ~Wind.start_time
+      ~Wind.velocity
+   
+   

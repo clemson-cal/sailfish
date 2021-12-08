@@ -1,0 +1,6 @@
+sailfish.driver.update\_dict\_where\_none
+=========================================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: update_dict_where_none

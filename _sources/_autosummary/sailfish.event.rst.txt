@@ -1,0 +1,38 @@
+﻿sailfish.event
+==============
+
+.. automodule:: sailfish.event
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Recurrence
+      RecurringEvent
+   
+   
+
+   
+   
+   .. rubric:: Exceptions
+
+   .. autosummary::
+      :toctree:
+   
+      ParseRecurrenceError
+   
+   
+
+
+

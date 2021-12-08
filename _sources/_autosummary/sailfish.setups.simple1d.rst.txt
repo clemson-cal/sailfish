@@ -1,0 +1,33 @@
+sailfish.setups.simple1d
+========================
+
+.. automodule:: sailfish.setups.simple1d
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      DensityWave
+      Scalar
+      Shocktube
+      Wind
+   
+   
+
+   
+   
+   
+
+
+

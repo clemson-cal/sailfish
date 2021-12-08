@@ -1,0 +1,35 @@
+sailfish.solvers.scdg\_1d.Solver
+================================
+
+.. currentmodule:: sailfish.solvers.scdg_1d
+
+.. autoclass:: Solver
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Solver.__init__
+      ~Solver.advance
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Solver.maximum_cfl
+      ~Solver.primitive
+      ~Solver.solution
+      ~Solver.time
+   
+   

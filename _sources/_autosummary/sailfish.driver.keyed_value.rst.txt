@@ -1,0 +1,6 @@
+sailfish.driver.keyed\_value
+============================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: keyed_value

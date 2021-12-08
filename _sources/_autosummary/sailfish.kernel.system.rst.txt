@@ -1,0 +1,33 @@
+sailfish.kernel.system
+======================
+
+.. automodule:: sailfish.kernel.system
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      configure_build
+      get_array_module
+      log_system_info
+      measure_time
+   
+   
+
+   
+   
+   
+
+   
+   
+   
+
+
+

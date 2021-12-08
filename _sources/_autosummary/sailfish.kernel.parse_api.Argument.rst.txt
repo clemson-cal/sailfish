@@ -1,0 +1,35 @@
+sailfish.kernel.parse\_api.Argument
+===================================
+
+.. currentmodule:: sailfish.kernel.parse_api
+
+.. autoclass:: Argument
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Argument.__init__
+      ~Argument.count
+      ~Argument.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Argument.constraint
+      ~Argument.dtype
+      ~Argument.name
+   
+   
