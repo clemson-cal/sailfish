@@ -2,7 +2,7 @@
 An n-th order discontinuous Galerkin solver for 1D scalar advection.
 """
 
-import numpy as np
+from typing import NamedTuple
 from numpy.polynomial.legendre import leggauss, Legendre
 from sailfish.mesh import PlanarCartesianMesh
 from sailfish.solver import SolverBase
@@ -16,6 +16,8 @@ class CellData:
     """
 
     def __init__(self, order=1):
+        import numpy as np
+
         if order <= 0:
             raise ValueError("cell order must be at least 1")
 
@@ -88,6 +90,14 @@ def update(wavespeed, uw, cell, dx, dt):
             uw[i, n] += (udot_s + udot_v) * dt
 
 
+class Options(NamedTuple):
+    order: int = 1
+
+
+class Physics(NamedTuple):
+    wavespeed: float = 1.0
+
+
 class Solver(SolverBase):
     """
     An n-th order, discontinuous Galerkin solver for 1D scalar advection.
@@ -101,8 +111,11 @@ class Solver(SolverBase):
         solution=None,
         num_patches=1,
         mode="cpu",
-        order=1,
+        physics=dict(),
+        options=dict(),
     ):
+        import numpy as np
+
         if num_patches != 1:
             raise ValueError("only works on one patch")
 
@@ -115,7 +128,9 @@ class Solver(SolverBase):
         if setup.boundary_condition != "periodic":
             raise ValueError("only periodic boundaries are supported")
 
-        cell = CellData(order=order)
+        options = Options(**options)
+        physics = Physics(**physics)
+        cell = CellData(order=options.order)
 
         if solution is None:
             num_zones = mesh.shape[0]
@@ -140,9 +155,10 @@ class Solver(SolverBase):
             self.conserved_w = solution
 
         self.t = time
-        self.cell = cell
         self.mesh = mesh
-        self.wavespeed = 1.0
+        self.cell = cell
+        self._options = options
+        self._physics = physics
 
     @property
     def solution(self):
@@ -160,6 +176,14 @@ class Solver(SolverBase):
     def maximum_cfl(self):
         return 0.05
 
+    @property
+    def options(self):
+        return self._options._asdict()
+
+    @property
+    def physics(self):
+        return self._physics._asdict()
+
     def advance(self, dt):
-        update(self.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
+        update(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
         self.t += dt

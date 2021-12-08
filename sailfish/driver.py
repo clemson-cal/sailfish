@@ -249,11 +249,18 @@ def simulate(driver):
         chkpt = load_checkpoint(driver.chkpt_file)
         setup_class = Setup.find_setup_class(chkpt["setup_name"])
         driver = update_where_none(driver, chkpt["driver"], frozen=["resolution"])
+
         update_dict_where_none(
             driver.model_parameters,
-            chkpt["parameters"],
+            chkpt["model_parameters"],
             frozen=list(setup_class.immutable_parameter_keys()),
         )
+
+        update_dict_where_none(
+            driver.solver_options,
+            chkpt["solver_options"],
+        )
+
         setup = setup_class(**driver.model_parameters)
 
         iteration = chkpt["iteration"]
@@ -275,6 +282,7 @@ def simulate(driver):
 
     solver = solvers.make_solver(
         setup.solver,
+        setup.physics,
         driver.solver_options,
         setup=setup,
         mesh=mesh,
@@ -313,9 +321,10 @@ def simulate(driver):
             time=solver.time,
             solution=solver.solution,
             primitive=solver.primitive,
+            solver_options=solver.options,
             event_states=event_states,
             driver=driver,
-            parameters=setup.model_parameter_dict(),
+            model_parameters=setup.model_parameter_dict(),
             setup_name=setup.dash_case_class_name(),
             mesh=mesh,
         )

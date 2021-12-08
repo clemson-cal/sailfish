@@ -59,6 +59,40 @@ class SolverBase(ABC):
         """
         pass
 
+    @property
+    @abstractmethod
+    def options(self) -> dict:
+        """
+        A dictionary that reflects the solver solution scheme.
+
+        An example of an options object would be :py:obj:`dict(plm=1.5,
+        rk=2)`. The items should describe the solver algorithm, not the
+        parameters of the physical system being solved, such as an equation of
+        state or cooling prescription.
+
+        Solver options and physics parameters are kept logically separate
+        because their configuration comes from different places: the physics
+        parameters come from the :py:obj:`sailfish.setup.Setup` class instance
+        (which can in turn be set from model parameters), whereas the solver
+        options come directly from the driver instance (i.e. command line
+        :code:`--solver key=val` if sailfish is invoked as an executable).
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def physics(self) -> dict:
+        """
+        A dictionary describing the physics parameters of the system.
+
+        The physics parameters are supplied by the setup. They can include
+        things like an equation of state, a cooling prescription, external
+        gravity, a wavespeed in the case of passive scalar advection, fluid
+        viscocity model, etc. These items can still be influenced at runtime
+        through the setup's model parameters.
+        """
+        pass
+
     @abstractmethod
     def advance(self, dt):
         """

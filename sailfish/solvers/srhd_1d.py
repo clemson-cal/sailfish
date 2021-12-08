@@ -146,6 +146,8 @@ class Solver(SolverBase):
         solution=None,
         num_patches=1,
         mode="cpu",
+        physics=dict(),
+        options=dict(),
     ):
         try:
             try:
@@ -210,6 +212,14 @@ class Solver(SolverBase):
     @property
     def maximum_cfl(self):
         return 0.05
+
+    @property
+    def options(self):
+        return dict()
+
+    @property
+    def physics(self):
+        return dict()
 
     def advance(self, dt):
         self.new_iteration()

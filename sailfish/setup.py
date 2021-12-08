@@ -189,6 +189,16 @@ class Setup(ABC):
         pass
 
     @property
+    def physics(self):
+        """
+        Return physics parameters used by the solver: EOS, gravity, etc.
+
+        Physics parameters should be distinct from the solver options, such as
+        PLM theta value, RK integration type, or DG order.
+        """
+        return dict()
+
+    @property
     @abstractmethod
     def boundary_condition(self):
         """
