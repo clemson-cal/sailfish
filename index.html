@@ -18,7 +18,7 @@
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
-    <link rel="next" title="sailfish" href="_autosummary/sailfish.html" /> 
+    <link rel="next" title="Problem setups" href="setups.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -37,16 +37,10 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.setup.html">sailfish.setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.solvers.html">sailfish.solvers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.subdivide.html">sailfish.subdivide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.task.html">sailfish.task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API documentation</a></li>
 </ul>
 
         </div>
@@ -75,6 +69,8 @@
              
   <section id="sailfish">
 <h1>Sailfish<a class="headerlink" href="#sailfish" title="Permalink to this headline"></a></h1>
+<div class="toctree-wrapper compound">
+</div>
 <p>Sailfish is a GPU-accelerated astrophysical gasdynamics code.</p>
 <p>The main repository is hosted here: <a class="reference external" href="https://github.com/clemson-cal/sailfish">github.com/clemson-cal</a>.</p>
 </section>
@@ -82,7 +78,7 @@
 <h1>Quick-start<a class="headerlink" href="#quick-start" title="Permalink to this headline"></a></h1>
 <p>Basic use from the command line is like this: <code class="docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">shocktube</span>
 <span class="pre">--end-time=0.2</span> <span class="pre">--resolution=1000</span></code>. This command will run a built-in setup
-called <cite>shocktube</cite> to a simulation time of 0.04 seconds, on a 1d grid with
+called <cite>shocktube</cite> to a simulation time of 0.2 seconds, on a 1d grid with
 1000 zones. The command line tool will print messages to the terminal, and
 write a file called <cite>chkpt.final.pk</cite> to the disk in the current working
 directory when the simulation finishes. This file is a Python pickle,
@@ -112,35 +108,32 @@ can re-enable it with the keyword argument <code class="docutils literal notrans
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.html#module-sailfish" title="sailfish"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.driver.html#module-sailfish.driver" title="sailfish.driver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.driver</span></code></a></p></td>
+<td><p>Library functions and command-line access to the simulation driver.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.event.html#module-sailfish.event" title="sailfish.event"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.event</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.driver.html#module-sailfish.driver" title="sailfish.driver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.driver</span></code></a></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.kernel.html#module-sailfish.kernel" title="sailfish.kernel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.kernel</span></code></a></p></td>
+<td><p>A Python module to facilitate JIT-compiled CPU-GPU agnostic compute kernels.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.library.html#module-sailfish.library" title="sailfish.library"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.library</span></code></a></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.parse_api.html#module-sailfish.parse_api" title="sailfish.parse_api"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.parse_api</span></code></a></p></td>
-<td><p></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.mesh.html#module-sailfish.mesh" title="sailfish.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.mesh</span></code></a></p></td>
+<td><p>Contains classes for different mesh geometries and dimensionalities.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.setup.html#module-sailfish.setup" title="sailfish.setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup</span></code></a></p></td>
-<td><p></p></td>
+<td><p>The <cite>Setup</cite> class dictates physics and solver choices to the driver.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.setups.html#module-sailfish.setups" title="sailfish.setups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.solvers.html#module-sailfish.solvers" title="sailfish.solvers"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers</span></code></a></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.solver.html#module-sailfish.solver" title="sailfish.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solver</span></code></a></p></td>
+<td><p>The <cite>Solver</cite> class maintains physics state and implements a solution scheme.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.subdivide.html#module-sailfish.subdivide" title="sailfish.subdivide"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.subdivide</span></code></a></p></td>
-<td><p></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.solvers.html#module-sailfish.solvers" title="sailfish.solvers"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers</span></code></a></p></td>
+<td><p>Physics solvers and solution schemes.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.system.html#module-sailfish.system" title="sailfish.system"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.system</span></code></a></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.task.html#module-sailfish.task" title="sailfish.task"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.task</span></code></a></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.subdivide.html#module-sailfish.subdivide" title="sailfish.subdivide"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.subdivide</span></code></a></p></td>
+<td><p>Utility functions for domain decomposition.</p></td>
 </tr>
 </tbody>
 </table>
@@ -150,7 +143,7 @@ can re-enable it with the keyword argument <code class="docutils literal notrans
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="_autosummary/sailfish.html" class="btn btn-neutral float-right" title="sailfish" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="setups.html" class="btn btn-neutral float-right" title="Problem setups" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

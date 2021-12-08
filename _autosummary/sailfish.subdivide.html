@@ -38,20 +38,25 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">sailfish.subdivide</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.partition.html">sailfish.subdivide.partition</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.subdivide.html">sailfish.subdivide.subdivide</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.subdivide</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.subdivide.partition.html">sailfish.subdivide.partition</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.subdivide.subdivide.html">sailfish.subdivide.subdivide</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.task.html">sailfish.task</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -68,7 +73,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="sailfish.html">sailfish</a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
       <li>sailfish.subdivide</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/_autosummary/sailfish.subdivide.rst.txt" rel="nofollow"> View page source</a>
@@ -81,6 +86,7 @@
              
   <section id="module-sailfish.subdivide">
 <span id="sailfish-subdivide"></span><h1>sailfish.subdivide<a class="headerlink" href="#module-sailfish.subdivide" title="Permalink to this headline"></a></h1>
+<p>Utility functions for domain decomposition.</p>
 <p class="rubric">Functions</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -89,10 +95,10 @@
 </colgroup>
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.subdivide.partition.html#sailfish.subdivide.partition" title="sailfish.subdivide.partition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">partition</span></code></a>(elements, num_parts)</p></td>
-<td><p>Equitably divide the given number of elements (<cite>elements</cite>) into <cite>num_parts</cite> partitions, so that the sum of the partitions is <cite>elements</cite>.</p></td>
+<td><p>Equitably divide the given number of elements into <cite>num_parts</cite> partitions.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.subdivide.subdivide.html#sailfish.subdivide.subdivide" title="sailfish.subdivide.subdivide"><code class="xref py py-obj docutils literal notranslate"><span class="pre">subdivide</span></code></a>(interval, num_parts)</p></td>
-<td><p>Equitably subdivide an interval into a sequence of non-overlapping contiguous intervals.</p></td>
+<td><p>Divide an interval into non-overlapping contiguous sub-intervals.</p></td>
 </tr>
 </tbody>
 </table>

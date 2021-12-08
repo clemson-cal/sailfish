@@ -1,4 +1,4 @@
-sailfish.setups
+﻿sailfish.setups
 ===============
 
 .. automodule:: sailfish.setups
@@ -13,14 +13,6 @@ sailfish.setups
 
    
    
-   .. rubric:: Classes
-
-   .. autosummary::
-      :toctree:
-   
-      DensityWave
-      Shocktube
-   
    
 
    
@@ -28,4 +20,13 @@ sailfish.setups
    
 
 
+
+.. rubric:: Modules
+
+.. autosummary::
+   :toctree:
+   :recursive:
+
+   sailfish.setups.envelope_shock
+   sailfish.setups.simple1d
 

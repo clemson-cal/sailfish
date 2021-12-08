@@ -1,4 +1,4 @@
-sailfish.setup
+﻿sailfish.setup
 ==============
 
 .. automodule:: sailfish.setup

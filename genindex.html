@@ -35,16 +35,10 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.setup.html">sailfish.setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.solvers.html">sailfish.solvers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.subdivide.html">sailfish.subdivide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="_autosummary/sailfish.task.html">sailfish.task</a></li>
+<li class="toctree-l1"><a class="reference internal" href="setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="api.html">API documentation</a></li>
 </ul>
 
         </div>
@@ -76,13 +70,18 @@
 <div class="genindex-jumpbox">
  <a href="#_"><strong>_</strong></a>
  | <a href="#A"><strong>A</strong></a>
+ | <a href="#B"><strong>B</strong></a>
  | <a href="#C"><strong>C</strong></a>
  | <a href="#D"><strong>D</strong></a>
+ | <a href="#E"><strong>E</strong></a>
  | <a href="#F"><strong>F</strong></a>
  | <a href="#G"><strong>G</strong></a>
+ | <a href="#H"><strong>H</strong></a>
  | <a href="#I"><strong>I</strong></a>
+ | <a href="#K"><strong>K</strong></a>
  | <a href="#L"><strong>L</strong></a>
  | <a href="#M"><strong>M</strong></a>
+ | <a href="#N"><strong>N</strong></a>
  | <a href="#P"><strong>P</strong></a>
  | <a href="#R"><strong>R</strong></a>
  | <a href="#S"><strong>S</strong></a>
@@ -90,6 +89,7 @@
  | <a href="#U"><strong>U</strong></a>
  | <a href="#V"><strong>V</strong></a>
  | <a href="#W"><strong>W</strong></a>
+ | <a href="#X"><strong>X</strong></a>
  
 </div>
 <h2 id="_">_</h2>
@@ -98,25 +98,47 @@
       <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.__init__">__init__() (sailfish.driver.DriverArgs method)</a>
 
       <ul>
-        <li><a href="_autosummary/sailfish.library.Library.html#sailfish.library.Library.__init__">(sailfish.library.Library method)</a>
+        <li><a href="_autosummary/sailfish.event.Recurrence.html#sailfish.event.Recurrence.__init__">(sailfish.event.Recurrence method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.event.RecurringEvent.html#sailfish.event.RecurringEvent.__init__">(sailfish.event.RecurringEvent method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.library.Kernel.html#sailfish.kernel.library.Kernel.__init__">(sailfish.kernel.library.Kernel method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.library.KernelInvocation.html#sailfish.kernel.library.KernelInvocation.__init__">(sailfish.kernel.library.KernelInvocation method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library.__init__">(sailfish.kernel.library.Library method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.Argument.html#sailfish.kernel.parse_api.Argument.__init__">(sailfish.kernel.parse_api.Argument method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.Symbol.html#sailfish.kernel.parse_api.Symbol.__init__">(sailfish.kernel.parse_api.Symbol method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.__init__">(sailfish.mesh.LogSphericalMesh method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh.__init__">(sailfish.mesh.PlanarCartesianMesh method)</a>
 </li>
         <li><a href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter.__init__">(sailfish.setup.Parameter method)</a>
 </li>
         <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.__init__">(sailfish.setup.Setup method)</a>
 </li>
-        <li><a href="_autosummary/sailfish.setups.DensityWave.html#sailfish.setups.DensityWave.__init__">(sailfish.setups.DensityWave method)</a>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.__init__">(sailfish.setups.envelope_shock.EnvelopeShock method)</a>
 </li>
-        <li><a href="_autosummary/sailfish.setups.Shocktube.html#sailfish.setups.Shocktube.__init__">(sailfish.setups.Shocktube method)</a>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.__init__">(sailfish.setups.simple1d.DensityWave method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.__init__">(sailfish.setups.simple1d.Scalar method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.__init__">(sailfish.setups.simple1d.Shocktube method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.__init__">(sailfish.setups.simple1d.Wind method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.__init__">(sailfish.solver.SolverBase method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.CellData.html#sailfish.solvers.scdg_1d.CellData.__init__">(sailfish.solvers.scdg_1d.CellData method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.__init__">(sailfish.solvers.scdg_1d.Solver method)</a>
 </li>
         <li><a href="_autosummary/sailfish.solvers.srhd_1d.Patch.html#sailfish.solvers.srhd_1d.Patch.__init__">(sailfish.solvers.srhd_1d.Patch method)</a>
 </li>
         <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.__init__">(sailfish.solvers.srhd_1d.Solver method)</a>
-</li>
-        <li><a href="_autosummary/sailfish.task.Recurrence.html#sailfish.task.Recurrence.__init__">(sailfish.task.Recurrence method)</a>
-</li>
-        <li><a href="_autosummary/sailfish.task.RecurrenceKind.html#sailfish.task.RecurrenceKind.__init__">(sailfish.task.RecurrenceKind method)</a>
-</li>
-        <li><a href="_autosummary/sailfish.task.RecurringTask.html#sailfish.task.RecurringTask.__init__">(sailfish.task.RecurringTask method)</a>
 </li>
       </ul></li>
   </ul></td>
@@ -125,37 +147,189 @@
 <h2 id="A">A</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.library.arglen_error.html#sailfish.library.arglen_error">arglen_error() (in module sailfish.library)</a>
+      <li><a href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter.about">about (sailfish.setup.Parameter attribute)</a>
 </li>
+      <li><a href="_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.advance">advance() (sailfish.solver.SolverBase method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.advance">(sailfish.solvers.scdg_1d.Solver method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.advance">(sailfish.solvers.srhd_1d.Solver method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.kernel.library.arglen_error.html#sailfish.kernel.library.arglen_error">arglen_error() (in module sailfish.kernel.library)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.Symbol.html#sailfish.kernel.parse_api.Symbol.args">args (sailfish.kernel.parse_api.Symbol attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.Argument.html#sailfish.kernel.parse_api.Argument">Argument (class in sailfish.kernel.parse_api)</a>
+</li>
       <li><a href="_autosummary/sailfish.driver.asdict.html#sailfish.driver.asdict">asdict() (in module sailfish.driver)</a>
 </li>
+  </ul></td>
+</tr></table>
+
+<h2 id="B">B</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.boundary_condition">boundary_condition (sailfish.setup.Setup property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.boundary_condition">(sailfish.setups.envelope_shock.EnvelopeShock property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.boundary_condition">(sailfish.setups.simple1d.DensityWave property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.boundary_condition">(sailfish.setups.simple1d.Scalar property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.boundary_condition">(sailfish.setups.simple1d.Shocktube property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.boundary_condition">(sailfish.setups.simple1d.Wind property)</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
 <h2 id="C">C</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.solvers.scdg_1d.CellData.html#sailfish.solvers.scdg_1d.CellData">CellData (class in sailfish.solvers.scdg_1d)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.cfl_number">cfl_number (sailfish.driver.DriverArgs attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.chkpt_file">chkpt_file (sailfish.driver.DriverArgs attribute)</a>
+</li>
       <li><a href="_autosummary/sailfish.driver.ConfigurationError.html#sailfish.driver.ConfigurationError">ConfigurationError</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.system.configure_build.html#sailfish.system.configure_build">configure_build() (in module sailfish.system)</a>
+      <li><a href="_autosummary/sailfish.kernel.system.configure_build.html#sailfish.kernel.system.configure_build">configure_build() (in module sailfish.kernel.system)</a>
 </li>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.Argument.html#sailfish.kernel.parse_api.Argument.constraint">constraint (sailfish.kernel.parse_api.Argument attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.count">count() (sailfish.driver.DriverArgs method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.event.Recurrence.html#sailfish.event.Recurrence.count">(sailfish.event.Recurrence method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.event.RecurringEvent.html#sailfish.event.RecurringEvent.count">(sailfish.event.RecurringEvent method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.Argument.html#sailfish.kernel.parse_api.Argument.count">(sailfish.kernel.parse_api.Argument method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.Symbol.html#sailfish.kernel.parse_api.Symbol.count">(sailfish.kernel.parse_api.Symbol method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.count">(sailfish.mesh.LogSphericalMesh method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh.count">(sailfish.mesh.PlanarCartesianMesh method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter.count">(sailfish.setup.Parameter method)</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
 <h2 id="D">D</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.setups.DensityWave.html#sailfish.setups.DensityWave">DensityWave (class in sailfish.setups)</a>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.dash_case_class_name">dash_case_class_name() (sailfish.setup.Setup class method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.dash_case_class_name">(sailfish.setups.envelope_shock.EnvelopeShock class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.dash_case_class_name">(sailfish.setups.simple1d.DensityWave class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.dash_case_class_name">(sailfish.setups.simple1d.Scalar class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.dash_case_class_name">(sailfish.setups.simple1d.Shocktube class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.dash_case_class_name">(sailfish.setups.simple1d.Wind class method)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter.default">default (sailfish.setup.Parameter attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.default_end_time">default_end_time (sailfish.setup.Setup property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.default_end_time">(sailfish.setups.envelope_shock.EnvelopeShock property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.default_end_time">(sailfish.setups.simple1d.DensityWave property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.default_end_time">(sailfish.setups.simple1d.Scalar property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.default_end_time">(sailfish.setups.simple1d.Shocktube property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.default_end_time">(sailfish.setups.simple1d.Wind property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.default_model_parameters">default_model_parameters() (sailfish.setup.Setup class method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.default_model_parameters">(sailfish.setups.envelope_shock.EnvelopeShock class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.default_model_parameters">(sailfish.setups.simple1d.DensityWave class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.default_model_parameters">(sailfish.setups.simple1d.Scalar class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.default_model_parameters">(sailfish.setups.simple1d.Shocktube class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.default_model_parameters">(sailfish.setups.simple1d.Wind class method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.default_resolution">default_resolution (sailfish.setup.Setup property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.default_resolution">(sailfish.setups.envelope_shock.EnvelopeShock property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.default_resolution">(sailfish.setups.simple1d.DensityWave property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.default_resolution">(sailfish.setups.simple1d.Scalar property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.default_resolution">(sailfish.setups.simple1d.Shocktube property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.default_resolution">(sailfish.setups.simple1d.Wind property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave">DensityWave (class in sailfish.setups.simple1d)</a>
+</li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.describe_class">describe_class() (sailfish.setup.Setup class method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.describe_class">(sailfish.setups.envelope_shock.EnvelopeShock class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.describe_class">(sailfish.setups.simple1d.DensityWave class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.describe_class">(sailfish.setups.simple1d.Scalar class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.describe_class">(sailfish.setups.simple1d.Shocktube class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.describe_class">(sailfish.setups.simple1d.Wind class method)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.solvers.scdg_1d.dot.html#sailfish.solvers.scdg_1d.dot">dot() (in module sailfish.solvers.scdg_1d)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs">DriverArgs (class in sailfish.driver)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.Argument.html#sailfish.kernel.parse_api.Argument.dtype">dtype (sailfish.kernel.parse_api.Argument attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.library.dtype_error.html#sailfish.kernel.library.dtype_error">dtype_error() (in module sailfish.kernel.library)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="E">E</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.end_time">end_time (sailfish.driver.DriverArgs attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock">EnvelopeShock (class in sailfish.setups.envelope_shock)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs">DriverArgs (class in sailfish.driver)</a>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.events">events (sailfish.driver.DriverArgs attribute)</a>
 </li>
-      <li><a href="_autosummary/sailfish.library.dtype_error.html#sailfish.library.dtype_error">dtype_error() (in module sailfish.library)</a>
+      <li><a href="_autosummary/sailfish.solvers.srhd_1d.Patch.html#sailfish.solvers.srhd_1d.Patch.execution_context">execution_context() (sailfish.solvers.srhd_1d.Patch method)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.execution_mode">execution_mode (sailfish.driver.DriverArgs attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -163,10 +337,30 @@
 <h2 id="F">F</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.driver.first_not_none.html#sailfish.driver.first_not_none">first_not_none() (in module sailfish.driver)</a>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.faces">faces() (sailfish.mesh.LogSphericalMesh method)</a>
 </li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.find_setup_class">find_setup_class() (sailfish.setup.Setup class method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.find_setup_class">(sailfish.setups.envelope_shock.EnvelopeShock class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.find_setup_class">(sailfish.setups.simple1d.DensityWave class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.find_setup_class">(sailfish.setups.simple1d.Scalar class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.find_setup_class">(sailfish.setups.simple1d.Shocktube class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.find_setup_class">(sailfish.setups.simple1d.Wind class method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.driver.first_not_none.html#sailfish.driver.first_not_none">first_not_none() (in module sailfish.driver)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.fold">fold (sailfish.driver.DriverArgs attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.from_namespace">from_namespace() (sailfish.driver.DriverArgs method)</a>
+</li>
       <li><a href="_autosummary/sailfish.driver.fromdict.html#sailfish.driver.fromdict">fromdict() (in module sailfish.driver)</a>
 </li>
   </ul></td>
@@ -175,19 +369,91 @@
 <h2 id="G">G</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.system.get_array_module.html#sailfish.system.get_array_module">get_array_module() (in module sailfish.system)</a>
+      <li><a href="_autosummary/sailfish.kernel.system.get_array_module.html#sailfish.kernel.system.get_array_module">get_array_module() (in module sailfish.kernel.system)</a>
 </li>
+  </ul></td>
+</tr></table>
+
+<h2 id="H">H</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.has_model_parameters">has_model_parameters() (sailfish.setup.Setup class method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.has_model_parameters">(sailfish.setups.envelope_shock.EnvelopeShock class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.has_model_parameters">(sailfish.setups.simple1d.DensityWave class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.has_model_parameters">(sailfish.setups.simple1d.Scalar class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.has_model_parameters">(sailfish.setups.simple1d.Shocktube class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.has_model_parameters">(sailfish.setups.simple1d.Wind class method)</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
 <h2 id="I">I</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.immutable_parameter_keys">immutable_parameter_keys() (sailfish.setup.Setup class method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.immutable_parameter_keys">(sailfish.setups.envelope_shock.EnvelopeShock class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.immutable_parameter_keys">(sailfish.setups.simple1d.DensityWave class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.immutable_parameter_keys">(sailfish.setups.simple1d.Scalar class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.immutable_parameter_keys">(sailfish.setups.simple1d.Shocktube class method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.immutable_parameter_keys">(sailfish.setups.simple1d.Wind class method)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.index">index() (sailfish.driver.DriverArgs method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.event.Recurrence.html#sailfish.event.Recurrence.index">(sailfish.event.Recurrence method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.event.RecurringEvent.html#sailfish.event.RecurringEvent.index">(sailfish.event.RecurringEvent method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.Argument.html#sailfish.kernel.parse_api.Argument.index">(sailfish.kernel.parse_api.Argument method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.Symbol.html#sailfish.kernel.parse_api.Symbol.index">(sailfish.kernel.parse_api.Symbol method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.index">(sailfish.mesh.LogSphericalMesh method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh.index">(sailfish.mesh.PlanarCartesianMesh method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter.index">(sailfish.setup.Parameter method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/sailfish.driver.init_logging.html#sailfish.driver.init_logging">init_logging() (in module sailfish.driver)</a>
+</li>
+      <li><a href="_autosummary/sailfish.solvers.srhd_1d.initial_condition.html#sailfish.solvers.srhd_1d.initial_condition">initial_condition() (in module sailfish.solvers.srhd_1d)</a>
+</li>
+      <li><a href="_autosummary/sailfish.event.Recurrence.html#sailfish.event.Recurrence.interval">interval (sailfish.event.Recurrence attribute)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="K">K</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.kernel.library.Kernel.html#sailfish.kernel.library.Kernel">Kernel (class in sailfish.kernel.library)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.library.KernelInvocation.html#sailfish.kernel.library.KernelInvocation">KernelInvocation (class in sailfish.kernel.library)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.driver.initial_condition.html#sailfish.driver.initial_condition">initial_condition() (in module sailfish.driver)</a>
+      <li><a href="_autosummary/sailfish.driver.keyed_event.html#sailfish.driver.keyed_event">keyed_event() (in module sailfish.driver)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.keyed_value.html#sailfish.driver.keyed_value">keyed_value() (in module sailfish.driver)</a>
+</li>
+      <li><a href="_autosummary/sailfish.event.Recurrence.html#sailfish.event.Recurrence.kind">kind (sailfish.event.Recurrence attribute)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -195,13 +461,19 @@
 <h2 id="L">L</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.library.Library.html#sailfish.library.Library">Library (class in sailfish.library)</a>
+      <li><a href="_autosummary/sailfish.event.RecurringEvent.html#sailfish.event.RecurringEvent.last_time">last_time (sailfish.event.RecurringEvent attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.library.layout_error.html#sailfish.kernel.library.layout_error">layout_error() (in module sailfish.kernel.library)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library">Library (class in sailfish.kernel.library)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/sailfish.driver.load_checkpoint.html#sailfish.driver.load_checkpoint">load_checkpoint() (in module sailfish.driver)</a>
 </li>
-      <li><a href="_autosummary/sailfish.system.log_system_info.html#sailfish.system.log_system_info">log_system_info() (in module sailfish.system)</a>
+      <li><a href="_autosummary/sailfish.kernel.system.log_system_info.html#sailfish.kernel.system.log_system_info">log_system_info() (in module sailfish.kernel.system)</a>
+</li>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh">LogSphericalMesh (class in sailfish.mesh)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -210,36 +482,132 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/sailfish.driver.main.html#sailfish.driver.main">main() (in module sailfish.driver)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.main.html#sailfish.kernel.parse_api.main">(in module sailfish.kernel.parse_api)</a>
 </li>
-      <li><a href="_autosummary/sailfish.system.measure_time.html#sailfish.system.measure_time">measure_time() (in module sailfish.system)</a>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.solvers.make_solver.html#sailfish.solvers.make_solver">make_solver() (in module sailfish.solvers)</a>
 </li>
+      <li><a href="_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.maximum_cfl">maximum_cfl (sailfish.solver.SolverBase property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.maximum_cfl">(sailfish.solvers.scdg_1d.Solver property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.maximum_cfl">(sailfish.solvers.srhd_1d.Solver property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.kernel.system.measure_time.html#sailfish.kernel.system.measure_time">measure_time() (in module sailfish.kernel.system)</a>
+</li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.mesh">mesh() (sailfish.setup.Setup method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.mesh">(sailfish.setups.envelope_shock.EnvelopeShock method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.mesh">(sailfish.setups.simple1d.DensityWave method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.mesh">(sailfish.setups.simple1d.Scalar method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.mesh">(sailfish.setups.simple1d.Shocktube method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.mesh">(sailfish.setups.simple1d.Wind method)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.min_spacing">min_spacing() (sailfish.mesh.LogSphericalMesh method)</a>
+</li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.model_parameter_dict">model_parameter_dict() (sailfish.setup.Setup method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.model_parameter_dict">(sailfish.setups.envelope_shock.EnvelopeShock method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.model_parameter_dict">(sailfish.setups.simple1d.DensityWave method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.model_parameter_dict">(sailfish.setups.simple1d.Scalar method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.model_parameter_dict">(sailfish.setups.simple1d.Shocktube method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.model_parameter_dict">(sailfish.setups.simple1d.Wind method)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.model_parameters">model_parameters (sailfish.driver.DriverArgs attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.model_parameters">model_parameters() (sailfish.setup.Setup method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.model_parameters">(sailfish.setups.envelope_shock.EnvelopeShock method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.model_parameters">(sailfish.setups.simple1d.DensityWave method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.model_parameters">(sailfish.setups.simple1d.Scalar method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.model_parameters">(sailfish.setups.simple1d.Shocktube method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.model_parameters">(sailfish.setups.simple1d.Wind method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li>
     module
 
       <ul>
-        <li><a href="_autosummary/sailfish.html#module-sailfish">sailfish</a>
-</li>
         <li><a href="_autosummary/sailfish.driver.html#module-sailfish.driver">sailfish.driver</a>
 </li>
-        <li><a href="_autosummary/sailfish.library.html#module-sailfish.library">sailfish.library</a>
+        <li><a href="_autosummary/sailfish.event.html#module-sailfish.event">sailfish.event</a>
 </li>
-        <li><a href="_autosummary/sailfish.parse_api.html#module-sailfish.parse_api">sailfish.parse_api</a>
+        <li><a href="_autosummary/sailfish.kernel.html#module-sailfish.kernel">sailfish.kernel</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.library.html#module-sailfish.kernel.library">sailfish.kernel.library</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.html#module-sailfish.kernel.parse_api">sailfish.kernel.parse_api</a>
+</li>
+        <li><a href="_autosummary/sailfish.kernel.system.html#module-sailfish.kernel.system">sailfish.kernel.system</a>
+</li>
+        <li><a href="_autosummary/sailfish.mesh.html#module-sailfish.mesh">sailfish.mesh</a>
 </li>
         <li><a href="_autosummary/sailfish.setup.html#module-sailfish.setup">sailfish.setup</a>
 </li>
         <li><a href="_autosummary/sailfish.setups.html#module-sailfish.setups">sailfish.setups</a>
 </li>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.html#module-sailfish.setups.envelope_shock">sailfish.setups.envelope_shock</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.html#module-sailfish.setups.simple1d">sailfish.setups.simple1d</a>
+</li>
+        <li><a href="_autosummary/sailfish.solver.html#module-sailfish.solver">sailfish.solver</a>
+</li>
         <li><a href="_autosummary/sailfish.solvers.html#module-sailfish.solvers">sailfish.solvers</a>
+</li>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.html#module-sailfish.solvers.scdg_1d">sailfish.solvers.scdg_1d</a>
 </li>
         <li><a href="_autosummary/sailfish.solvers.srhd_1d.html#module-sailfish.solvers.srhd_1d">sailfish.solvers.srhd_1d</a>
 </li>
         <li><a href="_autosummary/sailfish.subdivide.html#module-sailfish.subdivide">sailfish.subdivide</a>
 </li>
-        <li><a href="_autosummary/sailfish.system.html#module-sailfish.system">sailfish.system</a>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter.mutable">mutable (sailfish.setup.Parameter attribute)</a>
 </li>
-        <li><a href="_autosummary/sailfish.task.html#module-sailfish.task">sailfish.task</a>
+  </ul></td>
+</tr></table>
+
+<h2 id="N">N</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.Argument.html#sailfish.kernel.parse_api.Argument.name">name (sailfish.kernel.parse_api.Argument attribute)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.Symbol.html#sailfish.kernel.parse_api.Symbol.name">(sailfish.kernel.parse_api.Symbol attribute)</a>
 </li>
       </ul></li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.num_patches">num_patches (sailfish.driver.DriverArgs attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh.num_zones">num_zones (sailfish.mesh.PlanarCartesianMesh attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.num_zones_per_decade">num_zones_per_decade (sailfish.mesh.LogSphericalMesh attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.event.RecurringEvent.html#sailfish.event.RecurringEvent.number">number (sailfish.event.RecurringEvent attribute)</a>
+</li>
   </ul></td>
 </tr></table>
 
@@ -250,29 +618,71 @@
 </li>
       <li><a href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter">Parameter (class in sailfish.setup)</a>
 </li>
-      <li><a href="_autosummary/sailfish.parse_api.parse_api.html#sailfish.parse_api.parse_api">parse_api() (in module sailfish.parse_api)</a>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.parse_api.html#sailfish.kernel.parse_api.parse_api">parse_api() (in module sailfish.kernel.parse_api)</a>
 </li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.task.ParseRecurrenceError.html#sailfish.task.ParseRecurrenceError">ParseRecurrenceError</a>
+      <li><a href="_autosummary/sailfish.event.ParseRecurrenceError.html#sailfish.event.ParseRecurrenceError">ParseRecurrenceError</a>
 </li>
       <li><a href="_autosummary/sailfish.subdivide.partition.html#sailfish.subdivide.partition">partition() (in module sailfish.subdivide)</a>
 </li>
       <li><a href="_autosummary/sailfish.solvers.srhd_1d.Patch.html#sailfish.solvers.srhd_1d.Patch">Patch (class in sailfish.solvers.srhd_1d)</a>
 </li>
+      <li><a href="_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh">PlanarCartesianMesh (class in sailfish.mesh)</a>
+</li>
+      <li><a href="_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.primitive">primitive (sailfish.solver.SolverBase property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.primitive">(sailfish.solvers.scdg_1d.Solver property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.primitive">(sailfish.solvers.srhd_1d.Solver property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.primitive">primitive() (sailfish.setup.Setup method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.primitive">(sailfish.setups.envelope_shock.EnvelopeShock method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.primitive">(sailfish.setups.simple1d.DensityWave method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.primitive">(sailfish.setups.simple1d.Scalar method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.primitive">(sailfish.setups.simple1d.Shocktube method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.primitive">(sailfish.setups.simple1d.Wind method)</a>
+</li>
+      </ul></li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.print_model_parameters">print_model_parameters() (sailfish.setup.Setup method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.print_model_parameters">(sailfish.setups.envelope_shock.EnvelopeShock method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.print_model_parameters">(sailfish.setups.simple1d.DensityWave method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.print_model_parameters">(sailfish.setups.simple1d.Scalar method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.print_model_parameters">(sailfish.setups.simple1d.Shocktube method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.print_model_parameters">(sailfish.setups.simple1d.Wind method)</a>
+</li>
+      </ul></li>
   </ul></td>
 </tr></table>
 
 <h2 id="R">R</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.task.Recurrence.html#sailfish.task.Recurrence">Recurrence (class in sailfish.task)</a>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.r0">r0 (sailfish.mesh.LogSphericalMesh attribute)</a>
 </li>
-      <li><a href="_autosummary/sailfish.task.RecurrenceKind.html#sailfish.task.RecurrenceKind">RecurrenceKind (class in sailfish.task)</a>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.r1">r1 (sailfish.mesh.LogSphericalMesh attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.event.Recurrence.html#sailfish.event.Recurrence">Recurrence (class in sailfish.event)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.task.RecurringTask.html#sailfish.task.RecurringTask">RecurringTask (class in sailfish.task)</a>
+      <li><a href="_autosummary/sailfish.event.RecurringEvent.html#sailfish.event.RecurringEvent">RecurringEvent (class in sailfish.event)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.resolution">resolution (sailfish.driver.DriverArgs attribute)</a>
 </li>
       <li><a href="_autosummary/sailfish.driver.run.html#sailfish.driver.run">run() (in module sailfish.driver)</a>
 </li>
@@ -283,13 +693,6 @@
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
       <li>
-    sailfish
-
-      <ul>
-        <li><a href="_autosummary/sailfish.html#module-sailfish">module</a>
-</li>
-      </ul></li>
-      <li>
     sailfish.driver
 
       <ul>
@@ -297,17 +700,45 @@
 </li>
       </ul></li>
       <li>
-    sailfish.library
+    sailfish.event
 
       <ul>
-        <li><a href="_autosummary/sailfish.library.html#module-sailfish.library">module</a>
+        <li><a href="_autosummary/sailfish.event.html#module-sailfish.event">module</a>
 </li>
       </ul></li>
       <li>
-    sailfish.parse_api
+    sailfish.kernel
 
       <ul>
-        <li><a href="_autosummary/sailfish.parse_api.html#module-sailfish.parse_api">module</a>
+        <li><a href="_autosummary/sailfish.kernel.html#module-sailfish.kernel">module</a>
+</li>
+      </ul></li>
+      <li>
+    sailfish.kernel.library
+
+      <ul>
+        <li><a href="_autosummary/sailfish.kernel.library.html#module-sailfish.kernel.library">module</a>
+</li>
+      </ul></li>
+      <li>
+    sailfish.kernel.parse_api
+
+      <ul>
+        <li><a href="_autosummary/sailfish.kernel.parse_api.html#module-sailfish.kernel.parse_api">module</a>
+</li>
+      </ul></li>
+      <li>
+    sailfish.kernel.system
+
+      <ul>
+        <li><a href="_autosummary/sailfish.kernel.system.html#module-sailfish.kernel.system">module</a>
+</li>
+      </ul></li>
+      <li>
+    sailfish.mesh
+
+      <ul>
+        <li><a href="_autosummary/sailfish.mesh.html#module-sailfish.mesh">module</a>
 </li>
       </ul></li>
       <li>
@@ -325,14 +756,40 @@
 </li>
       </ul></li>
       <li>
+    sailfish.setups.envelope_shock
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.html#module-sailfish.setups.envelope_shock">module</a>
+</li>
+      </ul></li>
+      <li>
+    sailfish.setups.simple1d
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.simple1d.html#module-sailfish.setups.simple1d">module</a>
+</li>
+      </ul></li>
+      <li>
+    sailfish.solver
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solver.html#module-sailfish.solver">module</a>
+</li>
+      </ul></li>
+      <li>
     sailfish.solvers
 
       <ul>
         <li><a href="_autosummary/sailfish.solvers.html#module-sailfish.solvers">module</a>
 </li>
       </ul></li>
-  </ul></td>
-  <td style="width: 33%; vertical-align: top;"><ul>
+      <li>
+    sailfish.solvers.scdg_1d
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.html#module-sailfish.solvers.scdg_1d">module</a>
+</li>
+      </ul></li>
       <li>
     sailfish.solvers.srhd_1d
 
@@ -347,33 +804,75 @@
         <li><a href="_autosummary/sailfish.subdivide.html#module-sailfish.subdivide">module</a>
 </li>
       </ul></li>
-      <li>
-    sailfish.system
-
-      <ul>
-        <li><a href="_autosummary/sailfish.system.html#module-sailfish.system">module</a>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar">Scalar (class in sailfish.setups.simple1d)</a>
 </li>
-      </ul></li>
-      <li>
-    sailfish.task
-
-      <ul>
-        <li><a href="_autosummary/sailfish.task.html#module-sailfish.task">module</a>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.scale_factor">scale_factor() (sailfish.mesh.LogSphericalMesh method)</a>
 </li>
-      </ul></li>
-      <li><a href="_autosummary/sailfish.parse_api.scan.html#sailfish.parse_api.scan">scan() (in module sailfish.parse_api)</a>
+      <li><a href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.scale_factor_derivative">scale_factor_derivative (sailfish.mesh.LogSphericalMesh attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.scan.html#sailfish.kernel.parse_api.scan">scan() (in module sailfish.kernel.parse_api)</a>
 </li>
       <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup">Setup (class in sailfish.setup)</a>
 </li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.setup_name">setup_name (sailfish.driver.DriverArgs attribute)</a>
+</li>
       <li><a href="_autosummary/sailfish.setup.SetupError.html#sailfish.setup.SetupError">SetupError</a>
 </li>
-      <li><a href="_autosummary/sailfish.setups.Shocktube.html#sailfish.setups.Shocktube">Shocktube (class in sailfish.setups)</a>
+      <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube">Shocktube (class in sailfish.setups.simple1d)</a>
 </li>
       <li><a href="_autosummary/sailfish.driver.simulate.html#sailfish.driver.simulate">simulate() (in module sailfish.driver)</a>
 </li>
-      <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver">Solver (class in sailfish.solvers.srhd_1d)</a>
+      <li><a href="_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.solution">solution (sailfish.solver.SolverBase property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.solution">(sailfish.solvers.scdg_1d.Solver property)</a>
 </li>
+        <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.solution">(sailfish.solvers.srhd_1d.Solver property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver">Solver (class in sailfish.solvers.scdg_1d)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver">(class in sailfish.solvers.srhd_1d)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.solver">solver (sailfish.setup.Setup property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.solver">(sailfish.setups.envelope_shock.EnvelopeShock property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.solver">(sailfish.setups.simple1d.DensityWave property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.solver">(sailfish.setups.simple1d.Scalar property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.solver">(sailfish.setups.simple1d.Shocktube property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.solver">(sailfish.setups.simple1d.Wind property)</a>
+</li>
+      </ul></li>
+      <li><a href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.solver_options">solver_options (sailfish.driver.DriverArgs attribute)</a>
+</li>
+      <li><a href="_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase">SolverBase (class in sailfish.solver)</a>
+</li>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.start_time">start_time (sailfish.setup.Setup property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.start_time">(sailfish.setups.envelope_shock.EnvelopeShock property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.start_time">(sailfish.setups.simple1d.DensityWave property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.start_time">(sailfish.setups.simple1d.Scalar property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.start_time">(sailfish.setups.simple1d.Shocktube property)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.start_time">(sailfish.setups.simple1d.Wind property)</a>
+</li>
+      </ul></li>
       <li><a href="_autosummary/sailfish.subdivide.subdivide.html#sailfish.subdivide.subdivide">subdivide() (in module sailfish.subdivide)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.parse_api.Symbol.html#sailfish.kernel.parse_api.Symbol">Symbol (class in sailfish.kernel.parse_api)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -381,11 +880,19 @@
 <h2 id="T">T</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.library.to_ctypes.html#sailfish.library.to_ctypes">to_ctypes() (in module sailfish.library)</a>
+      <li><a href="_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.time">time (sailfish.solver.SolverBase property)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.time">(sailfish.solvers.scdg_1d.Solver property)</a>
 </li>
+        <li><a href="_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.time">(sailfish.solvers.srhd_1d.Solver property)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.library.type_error.html#sailfish.library.type_error">type_error() (in module sailfish.library)</a>
+      <li><a href="_autosummary/sailfish.kernel.library.to_ctypes.html#sailfish.kernel.library.to_ctypes">to_ctypes() (in module sailfish.kernel.library)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.library.type_error.html#sailfish.kernel.library.type_error">type_error() (in module sailfish.kernel.library)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -393,11 +900,13 @@
 <h2 id="U">U</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.driver.update_dict_if_none.html#sailfish.driver.update_dict_if_none">update_dict_if_none() (in module sailfish.driver)</a>
+      <li><a href="_autosummary/sailfish.solvers.scdg_1d.update.html#sailfish.solvers.scdg_1d.update">update() (in module sailfish.solvers.scdg_1d)</a>
 </li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.driver.update_if_none.html#sailfish.driver.update_if_none">update_if_none() (in module sailfish.driver)</a>
+      <li><a href="_autosummary/sailfish.driver.update_dict_where_none.html#sailfish.driver.update_dict_where_none">update_dict_where_none() (in module sailfish.driver)</a>
+</li>
+      <li><a href="_autosummary/sailfish.driver.update_where_none.html#sailfish.driver.update_where_none">update_where_none() (in module sailfish.driver)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -405,11 +914,25 @@
 <h2 id="V">V</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.library.validate_constraints.html#sailfish.library.validate_constraints">validate_constraints() (in module sailfish.library)</a>
+      <li><a href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.validate">validate() (sailfish.setup.Setup method)</a>
+
+      <ul>
+        <li><a href="_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.validate">(sailfish.setups.envelope_shock.EnvelopeShock method)</a>
 </li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.validate">(sailfish.setups.simple1d.DensityWave method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar.validate">(sailfish.setups.simple1d.Scalar method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.validate">(sailfish.setups.simple1d.Shocktube method)</a>
+</li>
+        <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.validate">(sailfish.setups.simple1d.Wind method)</a>
+</li>
+      </ul></li>
   </ul></td>
   <td style="width: 33%; vertical-align: top;"><ul>
-      <li><a href="_autosummary/sailfish.library.validate_types.html#sailfish.library.validate_types">validate_types() (in module sailfish.library)</a>
+      <li><a href="_autosummary/sailfish.kernel.library.validate_constraints.html#sailfish.kernel.library.validate_constraints">validate_constraints() (in module sailfish.kernel.library)</a>
+</li>
+      <li><a href="_autosummary/sailfish.kernel.library.validate_types.html#sailfish.kernel.library.validate_types">validate_types() (in module sailfish.kernel.library)</a>
 </li>
   </ul></td>
 </tr></table>
@@ -417,7 +940,23 @@
 <h2 id="W">W</h2>
 <table style="width: 100%" class="indextable genindextable"><tr>
   <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind">Wind (class in sailfish.setups.simple1d)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
       <li><a href="_autosummary/sailfish.driver.write_checkpoint.html#sailfish.driver.write_checkpoint">write_checkpoint() (in module sailfish.driver)</a>
+</li>
+  </ul></td>
+</tr></table>
+
+<h2 id="X">X</h2>
+<table style="width: 100%" class="indextable genindextable"><tr>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh.x0">x0 (sailfish.mesh.PlanarCartesianMesh attribute)</a>
+</li>
+  </ul></td>
+  <td style="width: 33%; vertical-align: top;"><ul>
+      <li><a href="_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh.x1">x1 (sailfish.mesh.PlanarCartesianMesh attribute)</a>
 </li>
   </ul></td>
 </tr></table>

@@ -9,6 +9,13 @@ sailfish.solvers.srhd\_1d
 
    
    
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      initial_condition
+   
    
 
    

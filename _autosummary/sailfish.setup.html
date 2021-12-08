@@ -19,7 +19,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="sailfish.setup.Parameter" href="sailfish.setup.Parameter.html" />
-    <link rel="prev" title="sailfish.parse_api.scan" href="sailfish.parse_api.scan.html" /> 
+    <link rel="prev" title="sailfish.mesh.PlanarCartesianMesh" href="sailfish.mesh.PlanarCartesianMesh.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -38,22 +38,27 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">sailfish.setup</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.Parameter.html">sailfish.setup.Parameter</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.Setup.html">sailfish.setup.Setup</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.param.html">sailfish.setup.param</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.SetupError.html">sailfish.setup.SetupError</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.setup</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.Parameter.html">sailfish.setup.Parameter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.Setup.html">sailfish.setup.Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.param.html">sailfish.setup.param</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.SetupError.html">sailfish.setup.SetupError</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.task.html">sailfish.task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -70,7 +75,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="sailfish.html">sailfish</a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
       <li>sailfish.setup</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/_autosummary/sailfish.setup.rst.txt" rel="nofollow"> View page source</a>
@@ -83,6 +88,7 @@
              
   <section id="module-sailfish.setup">
 <span id="sailfish-setup"></span><h1>sailfish.setup<a class="headerlink" href="#module-sailfish.setup" title="Permalink to this headline"></a></h1>
+<p>The <cite>Setup</cite> class dictates physics and solver choices to the driver.</p>
 <p class="rubric">Classes</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -119,7 +125,7 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.parse_api.scan.html" class="btn btn-neutral float-left" title="sailfish.parse_api.scan" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.mesh.PlanarCartesianMesh.html" class="btn btn-neutral float-left" title="sailfish.mesh.PlanarCartesianMesh" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="sailfish.setup.Parameter.html" class="btn btn-neutral float-right" title="sailfish.setup.Parameter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

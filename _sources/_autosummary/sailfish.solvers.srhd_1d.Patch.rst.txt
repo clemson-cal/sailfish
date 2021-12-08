@@ -4,6 +4,9 @@ sailfish.solvers.srhd\_1d.Patch
 .. currentmodule:: sailfish.solvers.srhd_1d
 
 .. autoclass:: Patch
+   :members:
+   :show-inheritance:
+   :inherited-members:
 
    
    .. automethod:: __init__
@@ -16,7 +19,7 @@ sailfish.solvers.srhd\_1d.Patch
       ~Patch.__init__
       ~Patch.advance_rk
       ~Patch.execution_context
-      ~Patch.new_timestep
+      ~Patch.new_iteration
       ~Patch.primitive_to_conserved
       ~Patch.recompute_primitive
       ~Patch.scale_factor

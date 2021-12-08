@@ -4,6 +4,9 @@ sailfish.setup.Setup
 .. currentmodule:: sailfish.setup
 
 .. autoclass:: Setup
+   :members:
+   :show-inheritance:
+   :inherited-members:
 
    
    .. automethod:: __init__
@@ -14,9 +17,16 @@ sailfish.setup.Setup
    .. autosummary::
    
       ~Setup.__init__
+      ~Setup.dash_case_class_name
+      ~Setup.default_model_parameters
       ~Setup.describe_class
       ~Setup.find_setup_class
-      ~Setup.initial_primitive
+      ~Setup.has_model_parameters
+      ~Setup.immutable_parameter_keys
+      ~Setup.mesh
+      ~Setup.model_parameter_dict
+      ~Setup.model_parameters
+      ~Setup.primitive
       ~Setup.print_model_parameters
       ~Setup.validate
    
@@ -29,14 +39,9 @@ sailfish.setup.Setup
    .. autosummary::
    
       ~Setup.boundary_condition
-      ~Setup.dash_case_class_name
       ~Setup.default_end_time
-      ~Setup.default_model_parameters
       ~Setup.default_resolution
-      ~Setup.domain
-      ~Setup.has_model_parameters
-      ~Setup.immutable_parameter_keys
-      ~Setup.model_parameter_dict
-      ~Setup.model_parameters
+      ~Setup.solver
+      ~Setup.start_time
    
    

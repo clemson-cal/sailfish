@@ -1,4 +1,4 @@
-sailfish.subdivide
+﻿sailfish.subdivide
 ==================
 
 .. automodule:: sailfish.subdivide

@@ -38,23 +38,31 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.Patch.html">sailfish.solvers.srhd_1d.Patch</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.solvers.srhd_1d.Solver</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_1d.initial_condition.html">sailfish.solvers.srhd_1d.initial_condition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_1d.Patch.html">sailfish.solvers.srhd_1d.Patch</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.srhd_1d.Solver</a></li>
 </ul>
 </li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.task.html">sailfish.task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -71,7 +79,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="sailfish.html">sailfish</a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
           <li><a href="sailfish.solvers.html">sailfish.solvers</a> &raquo;</li>
           <li><a href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a> &raquo;</li>
       <li>sailfish.solvers.srhd_1d.Solver</li>
@@ -88,11 +96,12 @@
 <h1>sailfish.solvers.srhd_1d.Solver<a class="headerlink" href="#sailfish-solvers-srhd-1d-solver" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_1d.</span></span><span class="sig-name descname"><span class="pre">Solver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[0.0,</span> <span class="pre">1.0]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_condition</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'outflow'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cartesian'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver" title="Permalink to this definition"></a></dt>
-<dd><p>Adapter class to drive the srhd_1d C extension module.</p>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_1d.</span></span><span class="sig-name descname"><span class="pre">Solver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="sailfish.solver.SolverBase.html#sailfish.solver.SolverBase" title="sailfish.solver.SolverBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.solver.SolverBase</span></code></a></p>
+<p>Adapter class to drive the srhd_1d C extension module.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">initial</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">domain</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">[0.0,</span> <span class="pre">1.0]</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">boundary_condition</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'outflow'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coordinates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cartesian'</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.__init__" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.__init__" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
@@ -102,19 +111,22 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.__init__" title="sailfish.solvers.srhd_1d.Solver.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([initial, time, domain, ...])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.__init__" title="sailfish.solvers.srhd_1d.Solver.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([setup, mesh, time, solution, ...])</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance_rk</span></code>(rk_param, dt)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.advance" title="sailfish.solvers.srhd_1d.Solver.advance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance</span></code></a>(dt)</p></td>
+<td><p>Advance the solution state by one iteration.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance_rk</span></code>(rk_param, dt)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_timestep</span></code>()</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc</span></code>(array)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc</span></code>(array)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc_patch</span></code>(al, a0, ar, index)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc_patch</span></code>(al, a0, ar, patch_index)</p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -126,14 +138,64 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.maximum_cfl" title="sailfish.solvers.srhd_1d.Solver.maximum_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_cfl</span></code></a></p></td>
+<td><p>Return the largest CFL number that should be used for this solver.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></p></td>
-<td><p></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.primitive" title="sailfish.solvers.srhd_1d.Solver.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
+<td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.solution" title="sailfish.solvers.srhd_1d.Solver.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
+<td><p>Return an object representing the solution state.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.time" title="sailfish.solvers.srhd_1d.Solver.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
+<td><p>Return the simulation time.</p></td>
 </tr>
 </tbody>
 </table>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.advance">
+<span class="sig-name descname"><span class="pre">advance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver.advance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.advance" title="Permalink to this definition"></a></dt>
+<dd><p>Advance the solution state by one iteration.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.maximum_cfl">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">maximum_cfl</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.maximum_cfl" title="Permalink to this definition"></a></dt>
+<dd><p>Return the largest CFL number that should be used for this solver.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.primitive">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">primitive</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.primitive" title="Permalink to this definition"></a></dt>
+<dd><p>Return primitive hydrodynamic data for use in plotting.</p>
+<p>The primitive variable data returned from this function could be
+written to checkpoint files, but it might also be written to
+non-checkpoint output files for offline analysis, or passed along to
+runtime post-processing routines.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.solution">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">solution</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.solution" title="Permalink to this definition"></a></dt>
+<dd><p>Return an object representing the solution state.</p>
+<p>The solution object is generally going to be either an array of
+primitive hydrodynamic data, or of conserved quantities, depending on
+which the solver considers to be more fundamental. If the solver
+maintains state in addition to the hydrodynamic data, such as a list
+of tracer or star particles, then objects like that should also be
+returned as part of the solution object.</p>
+<p>The solution object will be written to the checkpoint file, read back
+on restarts, and passed to the solver constructor. When the run is not
+a restart, the solver should instead construct its initial solution
+object from the setup and mesh instances.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.time">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">time</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.time" title="Permalink to this definition"></a></dt>
+<dd><p>Return the simulation time.</p>
+</dd></dl>
+
 </dd></dl>
 
 </section>

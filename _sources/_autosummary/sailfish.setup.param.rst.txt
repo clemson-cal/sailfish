@@ -4,6 +4,9 @@ sailfish.setup.param
 .. currentmodule:: sailfish.setup
 
 .. autoclass:: param
+   :members:
+   :show-inheritance:
+   :inherited-members:
 
    
    .. automethod:: __init__

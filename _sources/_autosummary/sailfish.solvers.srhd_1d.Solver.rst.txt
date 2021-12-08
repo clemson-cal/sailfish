@@ -4,6 +4,9 @@ sailfish.solvers.srhd\_1d.Solver
 .. currentmodule:: sailfish.solvers.srhd_1d
 
 .. autoclass:: Solver
+   :members:
+   :show-inheritance:
+   :inherited-members:
 
    
    .. automethod:: __init__
@@ -14,8 +17,9 @@ sailfish.solvers.srhd\_1d.Solver
    .. autosummary::
    
       ~Solver.__init__
+      ~Solver.advance
       ~Solver.advance_rk
-      ~Solver.new_timestep
+      ~Solver.new_iteration
       ~Solver.set_bc
       ~Solver.set_bc_patch
    
@@ -27,7 +31,9 @@ sailfish.solvers.srhd\_1d.Solver
 
    .. autosummary::
    
+      ~Solver.maximum_cfl
       ~Solver.primitive
+      ~Solver.solution
       ~Solver.time
    
    

@@ -18,8 +18,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.srhd_1d" href="sailfish.solvers.srhd_1d.html" />
-    <link rel="prev" title="sailfish.setups.Shocktube" href="sailfish.setups.Shocktube.html" /> 
+    <link rel="next" title="sailfish.solvers.make_solver" href="sailfish.solvers.make_solver.html" />
+    <link rel="prev" title="sailfish.solver.SolverBase" href="sailfish.solver.SolverBase.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -38,19 +38,26 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">sailfish.solvers</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.solvers</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.task.html">sailfish.task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -67,7 +74,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="sailfish.html">sailfish</a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
       <li>sailfish.solvers</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/_autosummary/sailfish.solvers.rst.txt" rel="nofollow"> View page source</a>
@@ -80,6 +87,19 @@
              
   <section id="module-sailfish.solvers">
 <span id="sailfish-solvers"></span><h1>sailfish.solvers<a class="headerlink" href="#module-sailfish.solvers" title="Permalink to this headline"></a></h1>
+<p>Physics solvers and solution schemes.</p>
+<p class="rubric">Functions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.make_solver.html#sailfish.solvers.make_solver" title="sailfish.solvers.make_solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_solver</span></code></a>(name, options, *args, **kwargs)</p></td>
+<td><p>Find a solver with the given name and construct it.</p></td>
+</tr>
+</tbody>
+</table>
 <p class="rubric">Modules</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -87,8 +107,11 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_1d.html#module-sailfish.solvers.srhd_1d" title="sailfish.solvers.srhd_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.srhd_1d</span></code></a></p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.html#module-sailfish.solvers.scdg_1d" title="sailfish.solvers.scdg_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.scdg_1d</span></code></a></p></td>
+<td><p>An n-th order discontinuous Galerkin solver for 1D scalar advection.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.srhd_1d.html#module-sailfish.solvers.srhd_1d" title="sailfish.solvers.srhd_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.srhd_1d</span></code></a></p></td>
+<td><p>One-dimensional relativistic hydro solver supporting homologous mesh motion.</p></td>
 </tr>
 </tbody>
 </table>
@@ -98,8 +121,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.setups.Shocktube.html" class="btn btn-neutral float-left" title="sailfish.setups.Shocktube" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.srhd_1d.html" class="btn btn-neutral float-right" title="sailfish.solvers.srhd_1d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solver.SolverBase.html" class="btn btn-neutral float-left" title="sailfish.solver.SolverBase" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.solvers.make_solver.html" class="btn btn-neutral float-right" title="sailfish.solvers.make_solver" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

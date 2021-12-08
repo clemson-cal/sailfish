@@ -1,4 +1,4 @@
-sailfish.driver
+﻿sailfish.driver
 ===============
 
 .. automodule:: sailfish.driver
@@ -18,13 +18,14 @@ sailfish.driver
       first_not_none
       fromdict
       init_logging
-      initial_condition
+      keyed_event
+      keyed_value
       load_checkpoint
       main
       run
       simulate
-      update_dict_if_none
-      update_if_none
+      update_dict_where_none
+      update_where_none
       write_checkpoint
    
    

@@ -38,22 +38,27 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1 current"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a><ul class="current">
-<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.setup.Parameter</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.Setup.html">sailfish.setup.Setup</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.param.html">sailfish.setup.param</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.SetupError.html">sailfish.setup.SetupError</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.setup.Parameter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.Setup.html">sailfish.setup.Setup</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.param.html">sailfish.setup.param</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.SetupError.html">sailfish.setup.SetupError</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.task.html">sailfish.task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -70,7 +75,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="sailfish.html">sailfish</a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
           <li><a href="sailfish.setup.html">sailfish.setup</a> &raquo;</li>
       <li>sailfish.setup.Parameter</li>
       <li class="wy-breadcrumbs-aside">
@@ -86,8 +91,9 @@
 <h1>sailfish.setup.Parameter<a class="headerlink" href="#sailfish-setup-parameter" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.setup.Parameter">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.setup.</span></span><span class="sig-name descname"><span class="pre">Parameter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">about</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setup.Parameter" title="Permalink to this definition"></a></dt>
-<dd><p>A model parameter: enables runtime configuring of a setup.</p>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.setup.</span></span><span class="sig-name descname"><span class="pre">Parameter</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">default</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Any</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">about</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mutable</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setup.html#Parameter"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setup.Parameter" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
+<p>A model parameter: enables runtime configuring of a setup.</p>
 <p><cite>Parameter</cite> instances are assigned as class variables to <cite>Setup</cite>
 sub-classes. The <cite>mutable</cite> flag should be set to to <cite>True</cite> if the
 parameter is logically adjustable either during the run, or can be
@@ -107,10 +113,10 @@ superseded when a run is restarted.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setup.Parameter.__init__" title="sailfish.setup.Parameter.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>()</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code>(value, /)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setup.Parameter.count" title="sailfish.setup.Parameter.count"><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code></a>(value, /)</p></td>
 <td><p>Return number of occurrences of value.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code>(value[, start, stop])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setup.Parameter.index" title="sailfish.setup.Parameter.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
 <td><p>Return first index of value.</p></td>
 </tr>
 </tbody>
@@ -122,17 +128,48 @@ superseded when a run is restarted.</p>
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">about</span></code></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setup.Parameter.about" title="sailfish.setup.Parameter.about"><code class="xref py py-obj docutils literal notranslate"><span class="pre">about</span></code></a></p></td>
 <td><p>Alias for field number 1</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">default</span></code></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setup.Parameter.default" title="sailfish.setup.Parameter.default"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">mutable</span></code></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setup.Parameter.mutable" title="sailfish.setup.Parameter.mutable"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mutable</span></code></a></p></td>
 <td><p>Alias for field number 2</p></td>
 </tr>
 </tbody>
 </table>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.setup.Parameter.about">
+<span class="sig-name descname"><span class="pre">about</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#sailfish.setup.Parameter.about" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setup.Parameter.count">
+<span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setup.Parameter.count" title="Permalink to this definition"></a></dt>
+<dd><p>Return number of occurrences of value.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.setup.Parameter.default">
+<span class="sig-name descname"><span class="pre">default</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Any</span></em><a class="headerlink" href="#sailfish.setup.Parameter.default" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setup.Parameter.index">
+<span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9223372036854775807</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setup.Parameter.index" title="Permalink to this definition"></a></dt>
+<dd><p>Return first index of value.</p>
+<p>Raises ValueError if the value is not present.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.setup.Parameter.mutable">
+<span class="sig-name descname"><span class="pre">mutable</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#sailfish.setup.Parameter.mutable" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
 </dd></dl>
 
 </section>

@@ -4,6 +4,9 @@ sailfish.driver.DriverArgs
 .. currentmodule:: sailfish.driver
 
 .. autoclass:: DriverArgs
+   :members:
+   :show-inheritance:
+   :inherited-members:
 
    
    .. automethod:: __init__
@@ -17,7 +20,6 @@ sailfish.driver.DriverArgs
       ~DriverArgs.count
       ~DriverArgs.from_namespace
       ~DriverArgs.index
-      ~DriverArgs.updated_parameter_dict
    
    
 
@@ -33,9 +35,10 @@ sailfish.driver.DriverArgs
       ~DriverArgs.events
       ~DriverArgs.execution_mode
       ~DriverArgs.fold
-      ~DriverArgs.fresh_setup
       ~DriverArgs.model_parameters
+      ~DriverArgs.num_patches
       ~DriverArgs.resolution
       ~DriverArgs.setup_name
+      ~DriverArgs.solver_options
    
    

@@ -18,7 +18,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.setups.DensityWave" href="sailfish.setups.DensityWave.html" />
+    <link rel="next" title="sailfish.setups.envelope_shock" href="sailfish.setups.envelope_shock.html" />
     <link rel="prev" title="sailfish.setup.SetupError" href="sailfish.setup.SetupError.html" /> 
 </head>
 
@@ -38,20 +38,25 @@
 </div>
         </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
               <ul class="current">
-<li class="toctree-l1"><a class="reference internal" href="sailfish.html">sailfish</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.library.html">sailfish.library</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.parse_api.html">sailfish.parse_api</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
-<li class="toctree-l1 current"><a class="current reference internal" href="#">sailfish.setups</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.DensityWave.html">sailfish.setups.DensityWave</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.Shocktube.html">sailfish.setups.Shocktube</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.setups</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.envelope_shock.html">sailfish.setups.envelope_shock</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.simple1d.html">sailfish.setups.simple1d</a></li>
 </ul>
 </li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.system.html">sailfish.system</a></li>
-<li class="toctree-l1"><a class="reference internal" href="sailfish.task.html">sailfish.task</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
 </ul>
 
         </div>
@@ -68,7 +73,7 @@
           <div role="navigation" aria-label="Page navigation">
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
-          <li><a href="sailfish.html">sailfish</a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
       <li>sailfish.setups</li>
       <li class="wy-breadcrumbs-aside">
             <a href="../_sources/_autosummary/sailfish.setups.rst.txt" rel="nofollow"> View page source</a>
@@ -81,18 +86,18 @@
              
   <section id="module-sailfish.setups">
 <span id="sailfish-setups"></span><h1>sailfish.setups<a class="headerlink" href="#module-sailfish.setups" title="Permalink to this headline"></a></h1>
-<p class="rubric">Classes</p>
+<p class="rubric">Modules</p>
 <table class="longtable docutils align-default">
 <colgroup>
 <col style="width: 10%" />
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.DensityWave.html#sailfish.setups.DensityWave" title="sailfish.setups.DensityWave"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DensityWave</span></code></a>(**kwargs)</p></td>
-<td><p>A sinusoidal variation of the gas density, with possible uniform translation.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.envelope_shock.html#module-sailfish.setups.envelope_shock" title="sailfish.setups.envelope_shock"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.envelope_shock</span></code></a></p></td>
+<td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.Shocktube.html#sailfish.setups.Shocktube" title="sailfish.setups.Shocktube"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Shocktube</span></code></a>(**kwargs)</p></td>
-<td><p>Discontinuous initial data, with uniform density and pressure to either side of the discontintuity at x=0.5.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.simple1d.html#module-sailfish.setups.simple1d" title="sailfish.setups.simple1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.simple1d</span></code></a></p></td>
+<td><p></p></td>
 </tr>
 </tbody>
 </table>
@@ -103,7 +108,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.setup.SetupError.html" class="btn btn-neutral float-left" title="sailfish.setup.SetupError" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.setups.DensityWave.html" class="btn btn-neutral float-right" title="sailfish.setups.DensityWave" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.setups.envelope_shock.html" class="btn btn-neutral float-right" title="sailfish.setups.envelope_shock" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
