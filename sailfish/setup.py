@@ -134,7 +134,7 @@ class Setup(ABC):
             if self.has_model_parameters():
                 logger.info("model parameters:\n")
                 for name, val, about in self.model_parameters():
-                    logger.info(f"{name:.<16s} {val:<8} {about}")
+                    logger.info(f"{name:.<16s} {str(val):<8} {about}")
             else:
                 logger.info("setup has no model parameters")
         if newlines:
@@ -187,6 +187,16 @@ class Setup(ABC):
         Return the name of the setup class.
         """
         pass
+
+    @property
+    def physics(self):
+        """
+        Return physics parameters used by the solver: EOS, gravity, etc.
+
+        Physics parameters should be distinct from the solver options, such as
+        PLM theta value, RK integration type, or DG order.
+        """
+        return dict()
 
     @property
     @abstractmethod

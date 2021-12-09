@@ -29,7 +29,7 @@ class PlanarCartesianMesh(NamedTuple):
     def shape(self):
         return (self.num_zones,)
 
-    def zone_center(self, i):
+    def zone_center(self, t, i):
         x0, dx = self.x0, self.dx
         return x0 + (i + 0.5) * dx
 
@@ -61,7 +61,7 @@ class LogSphericalMesh(NamedTuple):
 
     def min_spacing(self, time=None):
         """
-        Returns the smallest grid spacing.
+        Return the smallest grid spacing.
 
         If the time is provided, the result is a proper distance and the scale
         factor and its derivative are taken into account. Otherwise if no time
@@ -72,7 +72,7 @@ class LogSphericalMesh(NamedTuple):
 
     def scale_factor(self, time):
         """
-        Returns the scale factor at a given time.
+        Return the scale factor at a given time.
 
         If the scale factor is not changing, it's always equal to one.
         Otherwise, it's assumed that `a=0` at `t=0`.
@@ -86,13 +86,16 @@ class LogSphericalMesh(NamedTuple):
     def shape(self):
         return (int(log10(self.r1 / self.r0) * self.num_zones_per_decade),)
 
-    def zone_center(self, i):
+    def zone_center(self, t, i):
+        """
+        Return the proper radial coordinate of the ith zone center.
+        """
         r0, k = self.r0, 1.0 / self.num_zones_per_decade
-        return r0 * 10 ** ((i + 0.5) * k)
+        return r0 * 10 ** ((i + 0.5) * k) * self.scale_factor(t)
 
     def faces(self, i0, i1):
         """
-        Returns radial face positions for zone indexes in the given range.
+        Return radial face positions for zone indexes in the given range.
 
         The positions are given in comoving coordinates, i.e. are
         time-independent. The number of faces `i1 - i0 + 1` is one more than

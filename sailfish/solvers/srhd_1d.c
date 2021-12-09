@@ -120,7 +120,7 @@ PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
     prim[2] = p;
     prim[3] = cons[3] / cons[0];
 
-    double mach_ceiling = 1000.0;
+    double mach_ceiling = 100.0;
     double u = prim[1];
     double e = prim[2] / prim[0] * 3.0;
     double emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
@@ -129,10 +129,16 @@ PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
         prim[2] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
     }
 
-    // if (prim[2] < 0.0 || prim[2] != prim[2]) {
-    //     printf("[FATAL] srhd_1d got negative pressure p=%e at r=%e\n", prim[2], 0.0);
-    //     exit(1);
-    // }
+    #if (EXEC_MODE != EXEC_GPU)
+    if (iteration == newton_iter_max) {
+        printf("[FATAL] reached max iteration\n");
+        exit(1);
+    }
+    if (prim[2] < 0.0 || prim[2] != prim[2]) {
+        printf("[FATAL] srhd_1d got negative pressure p=%e at r=%e\n", prim[2], 0.0);
+        exit(1);
+    }
+    #endif
 }
 
 PRIVATE void primitive_to_conserved(const double *prim, double *cons, double dv)

@@ -25,7 +25,7 @@ COORDINATES_DICT = {
 }
 
 
-def initial_condition(setup, mesh):
+def initial_condition(setup, mesh, time):
     import numpy as np
 
     faces = np.array(mesh.faces(0, mesh.shape[0]))
@@ -33,7 +33,7 @@ def initial_condition(setup, mesh):
     primitive = np.zeros([len(zones), 4])
 
     for x, p in zip(zones, primitive):
-        setup.primitive(0.0, x, p)
+        setup.primitive(time, x, p)
 
     return primitive
 
@@ -146,13 +146,15 @@ class Solver(SolverBase):
         solution=None,
         num_patches=1,
         mode="cpu",
+        physics=dict(),
+        options=dict(),
     ):
         try:
-            try:
-                bcl, bcr = setup.boundary_condition
-            except ValueError:
-                bcl = setup.boundary_condition
-                bcr = setup.boundary_condition
+            bcl, bcr = setup.boundary_condition
+        except ValueError:
+            bcl = setup.boundary_condition
+            bcr = setup.boundary_condition
+        try:
             self.boundary_condition = BC_DICT[bcl], BC_DICT[bcr]
         except KeyError:
             raise ValueError(f"bad boundary condition {bcl}/{bcr}")
@@ -177,7 +179,7 @@ class Solver(SolverBase):
         self.patches = []
 
         if solution is None:
-            primitive = initial_condition(setup, mesh)
+            primitive = initial_condition(setup, mesh, time)
         else:
             primitive = solution
 
@@ -208,8 +210,19 @@ class Solver(SolverBase):
         return self.patches[0].time
 
     @property
+    def options(self):
+        return dict()
+
+    @property
+    def physics(self):
+        return dict()
+
+    @property
     def maximum_cfl(self):
-        return 0.05
+        return 0.6
+
+    def maximum_wavespeed(self):
+        return 1.0
 
     def advance(self, dt):
         self.new_iteration()
@@ -233,10 +246,10 @@ class Solver(SolverBase):
             self.set_bc_patch(pl, p0, pr, i0)
 
     def set_bc_patch(self, al, a0, ar, patch_index):
-        ng = self.num_guard
+        t = self.time
         nz = self.mesh.shape[0]
+        ng = self.num_guard
         bcl, bcr = self.boundary_condition
-        t = self.patches[patch_index].time
 
         a0[:+ng] = al[-2 * ng : -ng]
         a0[-ng:] = ar[+ng : +2 * ng]
@@ -246,7 +259,7 @@ class Solver(SolverBase):
                 a0[:+ng] = a0[+ng : +2 * ng]
             elif bcl == BC_INFLOW:
                 for i in range(-ng, 0):
-                    x = self.mesh.zone_center(i)
+                    x = self.mesh.zone_center(t, i)
                     self.setup.primitive(t, x, a0[i + ng])
 
         if patch_index == len(self.patches) - 1:
@@ -254,7 +267,7 @@ class Solver(SolverBase):
                 a0[-ng:] = a0[-2 * ng : -ng]
             elif bcr == BC_INFLOW:
                 for i in range(nz, nz + ng):
-                    x = self.mesh.zone_center(i)
+                    x = self.mesh.zone_center(t, i)
                     self.setup.primitive(t, x, a0[i + ng])
 
     def new_iteration(self):

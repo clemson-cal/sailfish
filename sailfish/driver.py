@@ -249,11 +249,18 @@ def simulate(driver):
         chkpt = load_checkpoint(driver.chkpt_file)
         setup_class = Setup.find_setup_class(chkpt["setup_name"])
         driver = update_where_none(driver, chkpt["driver"], frozen=["resolution"])
+
         update_dict_where_none(
             driver.model_parameters,
-            chkpt["parameters"],
+            chkpt["model_parameters"],
             frozen=list(setup_class.immutable_parameter_keys()),
         )
+
+        update_dict_where_none(
+            driver.solver_options,
+            chkpt["solver_options"],
+        )
+
         setup = setup_class(**driver.model_parameters)
 
         iteration = chkpt["iteration"]
@@ -275,6 +282,7 @@ def simulate(driver):
 
     solver = solvers.make_solver(
         setup.solver,
+        setup.physics,
         driver.solver_options,
         setup=setup,
         mesh=mesh,
@@ -284,7 +292,7 @@ def simulate(driver):
         mode=mode,
     )
 
-    if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
+    if (driver.cfl_number or 0.0) > solver.maximum_cfl:
         raise ConfigurationError(
             f"cfl number {driver.cfl_number} "
             f"is greater than {solver.maximum_cfl}, "
@@ -292,15 +300,12 @@ def simulate(driver):
         )
 
     cfl_number = driver.cfl_number or solver.maximum_cfl
-    dx = mesh.min_spacing(time)
-    dt = dx * cfl_number
 
     for name, event in driver.events.items():
         logger.info(f"recurrence for {name} event is {event}")
 
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
-    logger.info(f"timestep is {dt:0.2e}")
     setup.print_model_parameters(newlines=True, logger=main_logger)
 
     def grab_state():
@@ -313,9 +318,10 @@ def simulate(driver):
             time=solver.time,
             solution=solver.solution,
             primitive=solver.primitive,
+            solver_options=solver.options,
             event_states=event_states,
             driver=driver,
-            parameters=setup.model_parameter_dict(),
+            model_parameters=setup.model_parameter_dict(),
             setup_name=setup.dash_case_class_name(),
             mesh=mesh,
         )
@@ -335,11 +341,15 @@ def simulate(driver):
 
         with measure_time() as fold_time:
             for _ in range(fold):
+                dx = mesh.min_spacing(solver.time)
+                dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
 
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
-        main_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+        main_logger.info(
+            f"[{iteration:04d}] t={solver.time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
+        )
 
     yield "end", None, grab_state()
 
