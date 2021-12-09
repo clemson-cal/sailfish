@@ -150,11 +150,11 @@ class Solver(SolverBase):
         options=dict(),
     ):
         try:
-            try:
-                bcl, bcr = setup.boundary_condition
-            except ValueError:
-                bcl = setup.boundary_condition
-                bcr = setup.boundary_condition
+            bcl, bcr = setup.boundary_condition
+        except ValueError:
+            bcl = setup.boundary_condition
+            bcr = setup.boundary_condition
+        try:
             self.boundary_condition = BC_DICT[bcl], BC_DICT[bcr]
         except KeyError:
             raise ValueError(f"bad boundary condition {bcl}/{bcr}")
@@ -246,10 +246,10 @@ class Solver(SolverBase):
             self.set_bc_patch(pl, p0, pr, i0)
 
     def set_bc_patch(self, al, a0, ar, patch_index):
-        ng = self.num_guard
+        t = self.time
         nz = self.mesh.shape[0]
+        ng = self.num_guard
         bcl, bcr = self.boundary_condition
-        t = self.patches[patch_index].time
 
         a0[:+ng] = al[-2 * ng : -ng]
         a0[-ng:] = ar[+ng : +2 * ng]
