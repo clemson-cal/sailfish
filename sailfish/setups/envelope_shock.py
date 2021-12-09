@@ -144,7 +144,7 @@ class EnvelopeShock(Setup):
         return self.t_start * s
 
     @cached_property
-    def ambient(self) -> int:
+    def ambient(self):
         return RelativisticEnvelope(
             envelope_m1=1.0,
             envelope_fastest_beta=0.999,
@@ -158,6 +158,3 @@ class EnvelopeShock(Setup):
 
     def shell_energy(self) -> float:
         return self.w_shell * self.m_shell * (self.gamma_shell() - 1.0)
-
-    def num_decades(self) -> float:
-        return log10(self.r_outer / self.r_inner)
