@@ -68,6 +68,8 @@ class Setup(ABC):
         for key, val in vars(cls).items():
             if type(val) == Parameter:
                 yield key, val.default, val.about
+            elif hasattr(cls, "__annotations__"):
+                print(cls.__annotations__)
 
     @classmethod
     def immutable_parameter_keys(cls):
@@ -129,16 +131,23 @@ class Setup(ABC):
         """
         Print parameter names, values, and about messages to `stdout`.
         """
-        if newlines:
-            logger.info("")
-            if self.has_model_parameters():
-                logger.info("model parameters:\n")
-                for name, val, about in self.model_parameters():
-                    logger.info(f"{name:.<16s} {str(val):<8} {about}")
+
+        def _p(m):
+            if logger is not None:
+                logger.info(m)
             else:
-                logger.info("setup has no model parameters")
+                print(m)
+
         if newlines:
-            logger.info("")
+            _p("")
+        if self.has_model_parameters():
+            _p("model parameters:\n")
+            for name, val, about in self.model_parameters():
+                _p(f"{name:.<16s} {str(val):<8} {about}")
+        else:
+            _p("setup has no model parameters")
+        if newlines:
+            _p("")
 
     def model_parameters(self):
         """
