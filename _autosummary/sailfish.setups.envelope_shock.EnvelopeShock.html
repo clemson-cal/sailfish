@@ -18,7 +18,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.setups.simple1d" href="sailfish.setups.simple1d.html" />
+    <link rel="next" title="sailfish.setups.envelope_shock.RelativisticEnvelope" href="sailfish.setups.envelope_shock.RelativisticEnvelope.html" />
     <link rel="prev" title="sailfish.setups.envelope_shock" href="sailfish.setups.envelope_shock.html" /> 
 </head>
 
@@ -50,6 +50,7 @@
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.setups.envelope_shock.html">sailfish.setups.envelope_shock</a><ul class="current">
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.setups.envelope_shock.EnvelopeShock</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.envelope_shock.RelativisticEnvelope.html">sailfish.setups.envelope_shock.RelativisticEnvelope</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.simple1d.html">sailfish.setups.simple1d</a></li>
@@ -123,26 +124,38 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.find_setup_class" title="sailfish.setups.envelope_shock.EnvelopeShock.find_setup_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">find_setup_class</span></code></a>(name)</p></td>
 <td><p>Finds a setup class with the given name.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.has_model_parameters" title="sailfish.setups.envelope_shock.EnvelopeShock.has_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has_model_parameters</span></code></a>()</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">gamma_shell</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.has_model_parameters" title="sailfish.setups.envelope_shock.EnvelopeShock.has_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has_model_parameters</span></code></a>()</p></td>
 <td><p>Determine if this class has any model parameters.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.immutable_parameter_keys" title="sailfish.setups.envelope_shock.EnvelopeShock.immutable_parameter_keys"><code class="xref py py-obj docutils literal notranslate"><span class="pre">immutable_parameter_keys</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.immutable_parameter_keys" title="sailfish.setups.envelope_shock.EnvelopeShock.immutable_parameter_keys"><code class="xref py py-obj docutils literal notranslate"><span class="pre">immutable_parameter_keys</span></code></a>()</p></td>
 <td><p>Return an iterator over the immutable model parameter keys.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.mesh" title="sailfish.setups.envelope_shock.EnvelopeShock.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a>(num_zones_per_decade)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.mesh" title="sailfish.setups.envelope_shock.EnvelopeShock.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a>(num_zones_per_decade)</p></td>
 <td><p>Return a mesh instance describing the problem domain.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.model_parameter_dict" title="sailfish.setups.envelope_shock.EnvelopeShock.model_parameter_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameter_dict</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.model_parameter_dict" title="sailfish.setups.envelope_shock.EnvelopeShock.model_parameter_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameter_dict</span></code></a>()</p></td>
 <td><p>Return a dictionary of the model parameters.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.model_parameters" title="sailfish.setups.envelope_shock.EnvelopeShock.model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameters</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.model_parameters" title="sailfish.setups.envelope_shock.EnvelopeShock.model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameters</span></code></a>()</p></td>
 <td><p>Return an iterator over the model parameters chosen for this setup.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.primitive" title="sailfish.setups.envelope_shock.EnvelopeShock.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a>(t, x, primitive)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_decades</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.primitive" title="sailfish.setups.envelope_shock.EnvelopeShock.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a>(t, r, primitive)</p></td>
 <td><p>Set initial or boundary data at a point.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.print_model_parameters" title="sailfish.setups.envelope_shock.EnvelopeShock.print_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">print_model_parameters</span></code></a>([logger, newlines])</p></td>
 <td><p>Print parameter names, values, and about messages to <cite>stdout</cite>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_shell</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">shell_energy</span></code>()</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.validate" title="sailfish.setups.envelope_shock.EnvelopeShock.validate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate</span></code></a>()</p></td>
 <td><p>Confirm that the model parameters are physically valid.</p></td>
@@ -156,43 +169,46 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.boundary_condition" title="sailfish.setups.envelope_shock.EnvelopeShock.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">boundary_condition</span></code></a></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ambient</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.boundary_condition" title="sailfish.setups.envelope_shock.EnvelopeShock.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">boundary_condition</span></code></a></p></td>
 <td><p>Return a boundary condition mode.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.default_end_time" title="sailfish.setups.envelope_shock.EnvelopeShock.default_end_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_end_time</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.default_end_time" title="sailfish.setups.envelope_shock.EnvelopeShock.default_end_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_end_time</span></code></a></p></td>
 <td><p>Provide a default end-time to the simulation driven.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.default_resolution" title="sailfish.setups.envelope_shock.EnvelopeShock.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.default_resolution" title="sailfish.setups.envelope_shock.EnvelopeShock.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
 <td><p>Provide a default grid resolution.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">expand</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">expand</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">m_shell</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">m_shell</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.physics" title="sailfish.setups.envelope_shock.EnvelopeShock.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.physics" title="sailfish.setups.envelope_shock.EnvelopeShock.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
 <td><p>Return physics parameters used by the solver: EOS, gravity, etc.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_inner</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_inner</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_outer</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_outer</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.solver" title="sailfish.setups.envelope_shock.EnvelopeShock.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.solver" title="sailfish.setups.envelope_shock.EnvelopeShock.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
 <td><p>Return the name of the setup class.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.start_time" title="sailfish.setups.envelope_shock.EnvelopeShock.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.envelope_shock.EnvelopeShock.start_time" title="sailfish.setups.envelope_shock.EnvelopeShock.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
 <td><p>Provide a start time for the simulation.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">t_start</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">t_start</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">u_shell</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">u_shell</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">w_shell</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">w_shell</span></code></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -294,7 +310,7 @@ PLM theta value, RK integration type, or DG order.</p>
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.setups.envelope_shock.EnvelopeShock.primitive">
-<span class="sig-name descname"><span class="pre">primitive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/envelope_shock.html#EnvelopeShock.primitive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.envelope_shock.EnvelopeShock.primitive" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">primitive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/envelope_shock.html#EnvelopeShock.primitive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.envelope_shock.EnvelopeShock.primitive" title="Permalink to this definition"></a></dt>
 <dd><p>Set initial or boundary data at a point.</p>
 <p>This method must be overridden to set the primitive hydrodynamic
 variables at a single point (given by <cite>coordinate</cite>) and time. The
@@ -341,7 +357,7 @@ condition.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.setups.envelope_shock.html" class="btn btn-neutral float-left" title="sailfish.setups.envelope_shock" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.setups.simple1d.html" class="btn btn-neutral float-right" title="sailfish.setups.simple1d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.setups.envelope_shock.RelativisticEnvelope.html" class="btn btn-neutral float-right" title="sailfish.setups.envelope_shock.RelativisticEnvelope" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

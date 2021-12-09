@@ -113,19 +113,19 @@ affected by the scale factor derivative.</p>
 <td><p>Return number of occurrences of value.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.faces" title="sailfish.mesh.LogSphericalMesh.faces"><code class="xref py py-obj docutils literal notranslate"><span class="pre">faces</span></code></a>(i0, i1)</p></td>
-<td><p>Returns radial face positions for zone indexes in the given range.</p></td>
+<td><p>Return radial face positions for zone indexes in the given range.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.index" title="sailfish.mesh.LogSphericalMesh.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
 <td><p>Return first index of value.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.min_spacing" title="sailfish.mesh.LogSphericalMesh.min_spacing"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_spacing</span></code></a>([time])</p></td>
-<td><p>Returns the smallest grid spacing.</p></td>
+<td><p>Return the smallest grid spacing.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.scale_factor" title="sailfish.mesh.LogSphericalMesh.scale_factor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_factor</span></code></a>(time)</p></td>
-<td><p>Returns the scale factor at a given time.</p></td>
+<td><p>Return the scale factor at a given time.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">zone_center</span></code>(i)</p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.zone_center" title="sailfish.mesh.LogSphericalMesh.zone_center"><code class="xref py py-obj docutils literal notranslate"><span class="pre">zone_center</span></code></a>(t, i)</p></td>
+<td><p>Return the proper radial coordinate of the ith zone center.</p></td>
 </tr>
 </tbody>
 </table>
@@ -162,7 +162,7 @@ affected by the scale factor derivative.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.faces">
 <span class="sig-name descname"><span class="pre">faces</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh.faces"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.faces" title="Permalink to this definition"></a></dt>
-<dd><p>Returns radial face positions for zone indexes in the given range.</p>
+<dd><p>Return radial face positions for zone indexes in the given range.</p>
 <p>The positions are given in comoving coordinates, i.e. are
 time-independent. The number of faces <cite>i1 - i0 + 1</cite> is one more than
 the number of zones <cite>i1 - i0</cite> in the index range.</p>
@@ -178,7 +178,7 @@ the number of zones <cite>i1 - i0</cite> in the index range.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.min_spacing">
 <span class="sig-name descname"><span class="pre">min_spacing</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh.min_spacing"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.min_spacing" title="Permalink to this definition"></a></dt>
-<dd><p>Returns the smallest grid spacing.</p>
+<dd><p>Return the smallest grid spacing.</p>
 <p>If the time is provided, the result is a proper distance and the scale
 factor and its derivative are taken into account. Otherwise if no time
 is provided the result is the minimum comoving grid spacing.</p>
@@ -205,7 +205,7 @@ is provided the result is the minimum comoving grid spacing.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.scale_factor">
 <span class="sig-name descname"><span class="pre">scale_factor</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh.scale_factor"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.scale_factor" title="Permalink to this definition"></a></dt>
-<dd><p>Returns the scale factor at a given time.</p>
+<dd><p>Return the scale factor at a given time.</p>
 <p>If the scale factor is not changing, it’s always equal to one.
 Otherwise, it’s assumed that <cite>a=0</cite> at <cite>t=0</cite>.</p>
 </dd></dl>
@@ -214,6 +214,12 @@ Otherwise, it’s assumed that <cite>a=0</cite> at <cite>t=0</cite>.</p>
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.scale_factor_derivative">
 <span class="sig-name descname"><span class="pre">scale_factor_derivative</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.scale_factor_derivative" title="Permalink to this definition"></a></dt>
 <dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.zone_center">
+<span class="sig-name descname"><span class="pre">zone_center</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh.zone_center"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.zone_center" title="Permalink to this definition"></a></dt>
+<dd><p>Return the proper radial coordinate of the ith zone center.</p>
 </dd></dl>
 
 </dd></dl>

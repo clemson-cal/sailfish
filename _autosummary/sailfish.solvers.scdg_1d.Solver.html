@@ -120,6 +120,9 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.advance" title="sailfish.solvers.scdg_1d.Solver.advance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance</span></code></a>(dt)</p></td>
 <td><p>Advance the solution state by one iteration.</p></td>
 </tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.maximum_wavespeed" title="sailfish.solvers.scdg_1d.Solver.maximum_wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></a>()</p></td>
+<td><p>Return the largest wavespeed on the grid.</p></td>
+</tr>
 </tbody>
 </table>
 <p class="rubric">Attributes</p>
@@ -159,6 +162,14 @@
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Solver.maximum_cfl">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">maximum_cfl</span></span><a class="headerlink" href="#sailfish.solvers.scdg_1d.Solver.maximum_cfl" title="Permalink to this definition"></a></dt>
 <dd><p>Return the largest CFL number that should be used for this solver.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Solver.maximum_wavespeed">
+<span class="sig-name descname"><span class="pre">maximum_wavespeed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#Solver.maximum_wavespeed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.Solver.maximum_wavespeed" title="Permalink to this definition"></a></dt>
+<dd><p>Return the largest wavespeed on the grid.</p>
+<p>This function is not implemented as a property, to emphasize that it
+might be relatively expensive to compute.</p>
 </dd></dl>
 
 <dl class="py property">

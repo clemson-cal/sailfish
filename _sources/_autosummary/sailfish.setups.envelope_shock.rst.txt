@@ -19,6 +19,7 @@ sailfish.setups.envelope\_shock
       :toctree:
    
       EnvelopeShock
+      RelativisticEnvelope
    
    
 

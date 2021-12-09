@@ -120,13 +120,16 @@
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance_rk</span></code>(rk_param, dt)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_1d.Solver.maximum_wavespeed" title="sailfish.solvers.srhd_1d.Solver.maximum_wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></a>()</p></td>
+<td><p>Return the largest wavespeed on the grid.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc</span></code>(array)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc</span></code>(array)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc_patch</span></code>(al, a0, ar, patch_index)</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc_patch</span></code>(al, a0, ar, patch_index)</p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -170,15 +173,22 @@
 <dd><p>Return the largest CFL number that should be used for this solver.</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.maximum_wavespeed">
+<span class="sig-name descname"><span class="pre">maximum_wavespeed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#Solver.maximum_wavespeed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.maximum_wavespeed" title="Permalink to this definition"></a></dt>
+<dd><p>Return the largest wavespeed on the grid.</p>
+<p>This function is not implemented as a property, to emphasize that it
+might be relatively expensive to compute.</p>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.Solver.options">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">options</span></span><a class="headerlink" href="#sailfish.solvers.srhd_1d.Solver.options" title="Permalink to this definition"></a></dt>
 <dd><p>A dictionary that reflects the solver solution scheme.</p>
 <p>An example of an options object would be <code class="xref py py-obj docutils literal notranslate"><span class="pre">dict(plm=1.5,</span>
-<span class="pre">rk=2)</span></code>, or a named tuple with the same attributes. The items should
-describe the solver algorithm, not the parameters of the physical
-system being solved, such as an equation of state or cooling
-prescription.</p>
+<span class="pre">rk=2)</span></code>. The items should describe the solver algorithm, not the
+parameters of the physical system being solved, such as an equation of
+state or cooling prescription.</p>
 <p>Solver options and physics parameters are kept logically separate
 because their configuration comes from different places: the physics
 parameters come from the <a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code></a> class instance
