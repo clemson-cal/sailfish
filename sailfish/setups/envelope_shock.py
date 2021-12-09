@@ -4,9 +4,14 @@ Contains a setup for studying a relativistic type-II shockwave.
 
 from math import pi, exp, log10
 from typing import NamedTuple
-from functools import cached_property
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
+
+try:
+    from functools import cached_property
+except ImportError:
+    # revert to ordinary property on Python < 3.8
+    cached_property = property
 
 __all__ = ["EnvelopeShock", "RelativisticEnvelope"]
 
@@ -59,7 +64,7 @@ class RelativisticEnvelope(NamedTuple):
 
     def mass_rate_per_steradian(self, r: float, t: float) -> float:
         if self.zone(r, t) == ZONE_WIND:
-            return self.wind_mass_rate_per_steradian()
+            return self.wind_mdot
 
         if self.zone(r, t) == ZONE_ENVELOPE:
             y = self.envelope_psi
@@ -69,9 +74,6 @@ class RelativisticEnvelope(NamedTuple):
 
     def comoving_mass_density(self, r: float, t: float) -> float:
         return self.mass_rate_per_steradian(r, t) / (self.gamma_beta(r, t) * r * r)
-
-    def wind_mass_rate_per_steradian(self) -> float:
-        return self.wind_mdot
 
 
 class EnvelopeShock(Setup):

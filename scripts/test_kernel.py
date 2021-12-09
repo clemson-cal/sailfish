@@ -45,6 +45,8 @@ def main():
     import numpy as np
     from sailfish.kernel.library import Library
 
+    logging.basicConfig(level=logging.INFO)
+
     parser = argparse.ArgumentParser()
     parser.add_argument("--mode", default="cpu", choices=["cpu", "omp", "gpu"])
     args = parser.parse_args()
