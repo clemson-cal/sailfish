@@ -134,7 +134,7 @@ class Setup(ABC):
             if self.has_model_parameters():
                 logger.info("model parameters:\n")
                 for name, val, about in self.model_parameters():
-                    logger.info(f"{name:.<16s} {val:<8} {about}")
+                    logger.info(f"{name:.<16s} {str(val):<8} {about}")
             else:
                 logger.info("setup has no model parameters")
         if newlines:

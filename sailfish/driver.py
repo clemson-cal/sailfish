@@ -292,7 +292,7 @@ def simulate(driver):
         mode=mode,
     )
 
-    if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
+    if (driver.cfl_number or 0.0) > solver.maximum_cfl:
         raise ConfigurationError(
             f"cfl number {driver.cfl_number} "
             f"is greater than {solver.maximum_cfl}, "
@@ -300,15 +300,12 @@ def simulate(driver):
         )
 
     cfl_number = driver.cfl_number or solver.maximum_cfl
-    dx = mesh.min_spacing(time)
-    dt = dx * cfl_number
 
     for name, event in driver.events.items():
         logger.info(f"recurrence for {name} event is {event}")
 
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
-    logger.info(f"timestep is {dt:0.2e}")
     setup.print_model_parameters(newlines=True, logger=main_logger)
 
     def grab_state():
@@ -344,11 +341,15 @@ def simulate(driver):
 
         with measure_time() as fold_time:
             for _ in range(fold):
+                dx = mesh.min_spacing(solver.time)
+                dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
 
         Mzps = driver.resolution / fold_time() * 1e-6 * fold
-        main_logger.info(f"[{iteration:04d}] t={solver.time:0.3f} Mzps={Mzps:.3f}")
+        main_logger.info(
+            f"[{iteration:04d}] t={solver.time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
+        )
 
     yield "end", None, grab_state()
 

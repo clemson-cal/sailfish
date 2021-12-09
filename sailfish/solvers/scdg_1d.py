@@ -184,6 +184,13 @@ class Solver(SolverBase):
     def physics(self):
         return self._physics._asdict()
 
+    @property
+    def maximum_cfl(self):
+        return 0.05
+
+    def maximum_wavespeed(self):
+        return abs(self._physics.wavespeed)
+
     def advance(self, dt):
         update(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
         self.t += dt

@@ -211,7 +211,7 @@ class Library:
             self.module = CDLL(so_name)
             logger.info(f"load cached library")
         except (FileNotFoundError, StopIteration) as e:
-            target = ffi.compile(cache_dir)
+            target = ffi.compile(cache_dir, verbose=False)
             self.module = CDLL(target)
             logger.info(f"recompile library")
 

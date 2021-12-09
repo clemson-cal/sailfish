@@ -53,14 +53,6 @@ class SolverBase(ABC):
 
     @property
     @abstractmethod
-    def maximum_cfl(self):
-        """
-        Return the largest CFL number that should be used for this solver.
-        """
-        pass
-
-    @property
-    @abstractmethod
     def options(self) -> dict:
         """
         A dictionary that reflects the solver solution scheme.
@@ -90,6 +82,24 @@ class SolverBase(ABC):
         gravity, a wavespeed in the case of passive scalar advection, fluid
         viscocity model, etc. These items can still be influenced at runtime
         through the setup's model parameters.
+        """
+        pass
+
+    @property
+    @abstractmethod
+    def maximum_cfl(self):
+        """
+        Return the largest CFL number that should be used for this solver.
+        """
+        pass
+
+    @abstractmethod
+    def maximum_wavespeed(self):
+        """
+        Return the largest wavespeed on the grid.
+
+        This function is not implemented as a property, to emphasize that it
+        might be relatively expensive to compute.
         """
         pass
 
