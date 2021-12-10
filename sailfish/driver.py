@@ -127,7 +127,9 @@ def write_checkpoint(number, outdir, state):
     with open(filename, "wb") as chkpt:
         if logger is not None:
             logger.info(f"write checkpoint {chkpt.name}")
-        pickle.dump(asdict(state), chkpt)
+        # TODO: make it an option whether to strip class info from checkpoints
+        # pickle.dump(asdict(state), chkpt)
+        pickle.dump(state, chkpt)
 
 
 def load_checkpoint(chkpt_file):
@@ -136,7 +138,9 @@ def load_checkpoint(chkpt_file):
     """
     try:
         with open(chkpt_file, "rb") as file:
-            return fromdict(pickle.load(file))
+            # TODO: make it an option whether to strip class info from checkpoints
+            # return fromdict(pickle.load(file))
+            return pickle.load(file)
     except FileNotFoundError:
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
 

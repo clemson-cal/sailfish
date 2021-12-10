@@ -2,21 +2,31 @@
 
 import argparse
 import pickle
+import sys
+
+sys.path.insert(1, ".")
 
 
 def main(args):
     import matplotlib.pyplot as plt
+    import sailfish
+
+    fig, ax1 = plt.subplots()
 
     for checkpoint in args.checkpoints:
         with open(checkpoint, "rb") as f:
             chkpt = pickle.load(f)
 
-        try:
-            rho = chkpt["primitive"][:, 0]
-        except TypeError:
-            rho = chkpt["solution"][:, 0]
+        mesh = chkpt["mesh"]
+        x = mesh.zone_centers(chkpt["time"])
+        rho = chkpt["primitive"][:, 0]
+        pre = chkpt["primitive"][:, 2]
+        ax1.plot(x, rho)
+        ax1.plot(x, pre)
 
-        plt.plot(rho)
+    if type(mesh) == sailfish.mesh.LogSphericalMesh:
+        ax1.set_xscale("log")
+        ax1.set_yscale("log")
     plt.show()
 
 

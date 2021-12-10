@@ -33,7 +33,12 @@ class PlanarCartesianMesh(NamedTuple):
         x0, dx = self.x0, self.dx
         return x0 + (i + 0.5) * dx
 
-    def faces(self, i0, i1):
+    def zone_centers(self, t, i0=0, i1=None):
+        return [self.zone_center(t, i) for i in range(i0, i1 or self.shape[0])]
+
+    def faces(self, i0=0, i1=None):
+        if i1 is None:
+            i1 = self.shape[0]
         x0, dx = self.x0, self.dx
         return [x0 + i * dx for i in range(i0, i1 + 1)]
 
@@ -93,7 +98,10 @@ class LogSphericalMesh(NamedTuple):
         r0, k = self.r0, 1.0 / self.num_zones_per_decade
         return r0 * 10 ** ((i + 0.5) * k) * self.scale_factor(t)
 
-    def faces(self, i0, i1):
+    def zone_centers(self, t, i0=0, i1=None):
+        return [self.zone_center(t, i) for i in range(i0, i1 or self.shape[0])]
+
+    def faces(self, i0=0, i1=None):
         """
         Return radial face positions for zone indexes in the given range.
 
@@ -101,5 +109,7 @@ class LogSphericalMesh(NamedTuple):
         time-independent. The number of faces `i1 - i0 + 1` is one more than
         the number of zones `i1 - i0` in the index range.
         """
+        if i1 is None:
+            i1 = self.shape[0]
         r0, k = self.r0, 1.0 / self.num_zones_per_decade
         return [r0 * 10 ** (i * k) for i in range(i0, i1 + 1)]
