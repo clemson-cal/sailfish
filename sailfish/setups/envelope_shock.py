@@ -4,9 +4,14 @@ Contains a setup for studying a relativistic type-II shockwave.
 
 from math import pi, exp, log10
 from typing import NamedTuple
-from functools import cached_property
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
+
+try:
+    from functools import cached_property
+except ImportError:
+    # revert to ordinary property on Python < 3.8
+    cached_property = property
 
 __all__ = ["EnvelopeShock", "RelativisticEnvelope"]
 
@@ -59,7 +64,7 @@ class RelativisticEnvelope(NamedTuple):
 
     def mass_rate_per_steradian(self, r: float, t: float) -> float:
         if self.zone(r, t) == ZONE_WIND:
-            return self.wind_mass_rate_per_steradian()
+            return self.wind_mdot
 
         if self.zone(r, t) == ZONE_ENVELOPE:
             y = self.envelope_psi
@@ -69,9 +74,6 @@ class RelativisticEnvelope(NamedTuple):
 
     def comoving_mass_density(self, r: float, t: float) -> float:
         return self.mass_rate_per_steradian(r, t) / (self.gamma_beta(r, t) * r * r)
-
-    def wind_mass_rate_per_steradian(self) -> float:
-        return self.wind_mdot
 
 
 class EnvelopeShock(Setup):
@@ -142,7 +144,7 @@ class EnvelopeShock(Setup):
         return self.t_start * s
 
     @cached_property
-    def ambient(self) -> int:
+    def ambient(self):
         return RelativisticEnvelope(
             envelope_m1=1.0,
             envelope_fastest_beta=0.999,
@@ -156,6 +158,3 @@ class EnvelopeShock(Setup):
 
     def shell_energy(self) -> float:
         return self.w_shell * self.m_shell * (self.gamma_shell() - 1.0)
-
-    def num_decades(self) -> float:
-        return log10(self.r_outer / self.r_inner)

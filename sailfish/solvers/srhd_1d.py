@@ -3,12 +3,38 @@ One-dimensional relativistic hydro solver supporting homologous mesh motion.
 """
 
 from logging import getLogger
-from contextlib import nullcontext
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
+
+try:
+    from contextlib import nullcontext
+
+except ImportError:
+    from contextlib import AbstractContextManager
+
+    class nullcontext(AbstractContextManager):
+        """
+        Scraped from contextlib source in Python >= 3.7 for backwards compatibility.
+        """
+
+        def __init__(self, enter_result=None):
+            self.enter_result = enter_result
+
+        def __enter__(self):
+            return self.enter_result
+
+        def __exit__(self, *excinfo):
+            pass
+
+        async def __aenter__(self):
+            return self.enter_result
+
+        async def __aexit__(self, *excinfo):
+            pass
+
 
 logger = getLogger(__name__)
 BC_PERIODIC = 0

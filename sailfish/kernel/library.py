@@ -124,7 +124,7 @@ class KernelInvocation:
             elif rank == 2:
                 ti, tj = bs = THREAD_BLOCK_SIZE_2D
                 ni, nj = self.shape
-                nb = ((ni + ti - 1) // t, (nj + tj - 1) // tj)
+                nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj)
                 kernel(nb, bs, args)
 
             elif rank == 3:
