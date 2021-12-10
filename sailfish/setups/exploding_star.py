@@ -14,8 +14,6 @@ class ExplodingStar(Setup):
     Marcus Dupont's setup in Simbi.
     """
 
-    escale = param(1.0, "energy scale, normalized to 10^51 erg")
-    ascale = param(0.1, "ambient medium density, normalized to A* = 1")
     r_inner = param(0.005, "inner radius")
     r_outer = param(10.0, "outer radius")
 
@@ -59,7 +57,7 @@ class ExplodingStar(Setup):
 
     @property
     def boundary_condition(self):
-        return "outflow"
+        return "reflect", "outflow"
 
     @property
     def default_end_time(self):
