@@ -1,7 +1,7 @@
 Problem setups
 ==============
 
-.. py:currentmodule:: sailfish.setup
+.. py:currentmodule:: sailfish
 
 Simulations are configured by an object called a `setup`. The setup specifies
 initial conditions, a mesh, boundary conditions, and a solver class, among
@@ -16,7 +16,7 @@ Minimal example
 ^^^^^^^^^^^^^^^
 
 Here is a minimal setup, which defines a 1D relativistic hydrodynamics problem
-consisting of a periodic density wave:
+consisting of a traveling density wave:
 
 .. code-block:: python
 
@@ -33,8 +33,8 @@ consisting of a periodic density wave:
             p[1] = 0.5 # velocity
             p[2] = 1.0 # gas pressure
 
-        def mesh(self, num_zones):
-            return PlanarCartesianMesh(0.0, 1.0, num_zones)
+        def mesh(self, resolution):
+            return PlanarCartesianMesh(0.0, 1.0, resolution)
 
         @property
         def solver(self):
@@ -46,54 +46,81 @@ consisting of a periodic density wave:
 
 This setup uses the `srhd_1d` solver (relativistic 1D hydrodynamics) with
 cartesian coordinates, on a domain from 0.0 to 1.0. The boundary condition is
-periodic, and the hydrodynamic primitive data is initialized to a sine wave.
+periodic, and the hydrodynamic primitive data so the density has a sinusoidal
+variation, and the velocity is uniform.
 
 Required methods
 ^^^^^^^^^^^^^^^^
 
-Our setup class inherits (is a sub-class of) the :py:obj:`Setup` base class.
-The base class provides a lot of functionality in the form of methods that
-have trivial default implementations, but can be overridden if needed. The
-four methods implemented in the example above are required for the setup to be
-instantiated (they are `abstract` methods in the base class).
+.. py:currentmodule:: sailfish.setup
 
-The :py:obj:`Setup.primitive` method takes as arguments the time, a coordinate
-position, and a slice of a primitive variable array where the initial
-condition should be written. The number and meaning of primitive variables
-depends on the system being solved, and the system is a property of the solver
-class, which is identified by the :py:obj:`Setup.solver` property. The object
-returned by the :py:obj:`Setup.mesh` method describes the physical extent of
-the simulation domain, as well as how it is discretized and what kind of
-coordinates are used (i.e. cartesian or spherical). The
-:py:obj:`Setup.boundary_condition` method returns string to identify the type
-of boundary condition to be applied. The mesh and boundary condition
+Custom setup classes must inherit the :obj:`Setup` base class. The setup base
+class provides a lot of functionality in the form of methods that have trivial
+default implementations, but can be overridden if needed. The four methods
+implemented in the example above are required for the setup to be instantiated
+(they are `abstract` methods in the base class).
+
+The :obj:`Setup.primitive` method takes as arguments the time, a coordinate
+position, and a slice of a primitive variable array representing a single
+zone. The result is written to this slice rather than returned from the
+function for efficiency reasons. Generally, the primitive method is only used
+at the start of a new simulation, so the time will typically be `t=0.0`.
+However, in the case of an inflow boundary condition, the solver will also
+call the setup's primitive method in the guard zones of the mesh each time
+boundary conditions need to be applied. In other words, the primitive method
+always serves as an initial condition, but it can also provide a
+time-dependent Dirichlet boundary condition. The number and meaning of
+primitive variables depends on the system being solved (the system is in turn
+a property of the solver class, which is identified by the :obj:`Setup.solver`
+property).
+
+The object returned by the :obj:`Setup.mesh` method describes the physical
+extent of the simulation domain, as well as how it is discretized and what
+kind of coordinates are used (i.e. cartesian or spherical). The `mesh` method
+accepts a `resolution` argument, the value of which comes from the command
+line option :code:`--resolution | -n`, or the `resolution` member of the
+:obj:`driver.DriverArgs` class. It should be interpreted sensibly in the
+context of your setup to create a mesh (for example no logical issues would
+arise if you were to ignore this argument altogether, but don't do that). For
+example if your setup uses a :obj:`mesh.LogSphericalMesh`, it makes sense to
+interpret the `resolution` as the number of zones per decade in radius. If it's
+a 2D problem in spherical coordinates, it could mean the number of polar
+zones, or in a 3D problem it could be the number of zones on each side of the
+domain.
+
+The :obj:`Setup.boundary_condition` method returns a string to identify the
+type of boundary condition to be applied. The mesh and boundary condition
 objects must be compatible with (supported by) the solver, otherwise the
-solver will through an exception when it's constructed.
+solver will throw an exception when it's constructed.
 
-Notice the mesh method takes a parameter specifying the number of zones, which
-is provided from driver, which instantiates the setup. This parameter can be
-interpreted freely by the setup in creating a mesh, for example if your setup
-uses a :py:obj:`sailfish.mesh.LogSphericalMesh`, it makes sense to interpret
-this parameter as the number of zones per decade in radius.
+.. py:currentmodule:: sailfish
+
 
 Choosing a setup
 ^^^^^^^^^^^^^^^^
 
-Setup sub-classes are automatically discovered when sailfish is imported or
-run from the command line. The first argument to the command line tool is the
-name of a setup class, converted to dash-case, i.e. you could run the setup
-above in a default configuration by running :code:`sailfish density-wave`. The
-command line tool will print the setup documentation to the terminal if
-invoked as :code:`sailfish density-wave --describe`. It's good practice to
-give your setup class an accurate doc string. 
+The first argument to the sailfish command line tool is the name of a setup
+class, converted to dash-case, i.e. you could run the setup above in a default
+configuration by running :code:`sailfish density-wave`. The command line tool
+will print the setup documentation to the terminal if invoked as
+:code:`sailfish density-wave --describe`. It's good practice to give your
+setup class an accurate doc string.
 
+Setup sub-classes are automatically discovered when sailfish is imported or
+run from the command line. However to be found, the module containing your
+class must be imported before :obj:`driver.simulate` is called. If you add a
+new source file to the :obj:`setups` module, you must import that module in
+the :code:`setups/__init__.py` file for the setup class(es) in it to be
+discovered.
 
 Model parameters
 ^^^^^^^^^^^^^^^^
 
+.. py:currentmodule:: sailfish.setup
+
 A setup can have internal degrees of freedom to be configured at runtime,
 which are referred to as `model parameters`. To add a model parameter to a
-setup, just define it as a class variable using the :py:obj:`param`
+setup, just define it as a class variable using the :obj:`param`
 constructor:
 
 .. code-block:: python
@@ -106,7 +133,7 @@ constructor:
 
         # ...
 
-The two positional arguments to :py:obj:`param` are a default value (from
+The two positional arguments to :obj:`param` are a default value (from
 which the parameter type is inferred), and a help message. An optional keyword
 argument :code:`mutable=True` can be supplied to indicate that a parameter can
 be changed in a restarted run from its initial value. For the model parameters
