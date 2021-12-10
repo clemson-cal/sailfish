@@ -1,4 +1,4 @@
-sailfish.setups.exploding\_star.ExplodingStar
+﻿sailfish.setups.exploding\_star.ExplodingStar
 =============================================
 
 .. currentmodule:: sailfish.setups.exploding_star
@@ -38,11 +38,9 @@ sailfish.setups.exploding\_star.ExplodingStar
 
    .. autosummary::
    
-      ~ExplodingStar.ascale
       ~ExplodingStar.boundary_condition
       ~ExplodingStar.default_end_time
       ~ExplodingStar.default_resolution
-      ~ExplodingStar.escale
       ~ExplodingStar.physics
       ~ExplodingStar.r_inner
       ~ExplodingStar.r_outer

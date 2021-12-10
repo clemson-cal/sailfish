@@ -1,4 +1,4 @@
-sailfish.mesh.LogSphericalMesh
+﻿sailfish.mesh.LogSphericalMesh
 ==============================
 
 .. currentmodule:: sailfish.mesh
@@ -23,6 +23,7 @@ sailfish.mesh.LogSphericalMesh
       ~LogSphericalMesh.min_spacing
       ~LogSphericalMesh.scale_factor
       ~LogSphericalMesh.zone_center
+      ~LogSphericalMesh.zone_centers
    
    
 

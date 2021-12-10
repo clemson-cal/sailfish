@@ -19,7 +19,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="sailfish.setups.simple1d" href="sailfish.setups.simple1d.html" />
-    <link rel="prev" title="sailfish.setups.exploding_star.rho0" href="sailfish.setups.exploding_star.rho0.html" /> 
+    <link rel="prev" title="sailfish.setups.exploding_star" href="sailfish.setups.exploding_star.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -50,7 +50,6 @@
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.envelope_shock.html">sailfish.setups.envelope_shock</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.setups.exploding_star.html">sailfish.setups.exploding_star</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.exploding_star.rho0.html">sailfish.setups.exploding_star.rho0</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.setups.exploding_star.ExplodingStar</a></li>
 </ul>
 </li>
@@ -98,6 +97,8 @@
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.setups.exploding_star.</span></span><span class="sig-name descname"><span class="pre">ExplodingStar</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/exploding_star.html#ExplodingStar"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code></a></p>
 <p>A star exploding.</p>
+<p>The model is based on Duffell &amp; MacFadyen (2015). Code was adapted from
+Marcus Dupont’s setup in Simbi.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar.__init__" title="Permalink to this definition"></a></dt>
@@ -141,7 +142,7 @@
 <td><p>Return an iterator over the model parameters chosen for this setup.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.primitive" title="sailfish.setups.exploding_star.ExplodingStar.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a>(t, r, primitive)</p></td>
-<td><p>Set initial or boundary data at a point.</p></td>
+<td><p>Approximate density profile of a MESA star.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.print_model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.print_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">print_model_parameters</span></code></a>([logger, newlines])</p></td>
 <td><p>Print parameter names, values, and about messages to <cite>stdout</cite>.</p></td>
@@ -158,20 +159,14 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">ascale</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.boundary_condition" title="sailfish.setups.exploding_star.ExplodingStar.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">boundary_condition</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.boundary_condition" title="sailfish.setups.exploding_star.ExplodingStar.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">boundary_condition</span></code></a></p></td>
 <td><p>Return a boundary condition mode.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.default_end_time" title="sailfish.setups.exploding_star.ExplodingStar.default_end_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_end_time</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.default_end_time" title="sailfish.setups.exploding_star.ExplodingStar.default_end_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_end_time</span></code></a></p></td>
 <td><p>Provide a default end-time to the simulation driven.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.default_resolution" title="sailfish.setups.exploding_star.ExplodingStar.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.default_resolution" title="sailfish.setups.exploding_star.ExplodingStar.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
 <td><p>Provide a default grid resolution.</p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">escale</span></code></p></td>
-<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.physics" title="sailfish.setups.exploding_star.ExplodingStar.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
 <td><p>Return physics parameters used by the solver: EOS, gravity, etc.</p></td>
@@ -288,15 +283,8 @@ PLM theta value, RK integration type, or DG order.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar.primitive">
 <span class="sig-name descname"><span class="pre">primitive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/exploding_star.html#ExplodingStar.primitive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar.primitive" title="Permalink to this definition"></a></dt>
-<dd><p>Set initial or boundary data at a point.</p>
-<p>This method must be overridden to set the primitive hydrodynamic
-variables at a single point (given by <cite>coordinate</cite>) and time. The
-meaning of the coordinate is influenced by the type of mesh being
-used. Data is written to the output variable <cite>primitive</cite> for
-efficiency, since otherwise a tiny allocation is made for each zone in
-the simulation grid.</p>
-<p>The time coordinate enables the use of a time-dependent boundary
-condition.</p>
+<dd><p>Approximate density profile of a MESA star.</p>
+<p>Numerical values are from Table 1 of DM15.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -333,7 +321,7 @@ condition.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.setups.exploding_star.rho0.html" class="btn btn-neutral float-left" title="sailfish.setups.exploding_star.rho0" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.setups.exploding_star.html" class="btn btn-neutral float-left" title="sailfish.setups.exploding_star" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="sailfish.setups.simple1d.html" class="btn btn-neutral float-right" title="sailfish.setups.simple1d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

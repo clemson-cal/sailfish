@@ -1,4 +1,4 @@
-sailfish.solver.SolverBase
+﻿sailfish.solver.SolverBase
 ==========================
 
 .. currentmodule:: sailfish.solver

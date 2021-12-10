@@ -9,13 +9,6 @@ sailfish.setups.exploding\_star
 
    
    
-   .. rubric:: Functions
-
-   .. autosummary::
-      :toctree:
-   
-      rho0
-   
    
 
    

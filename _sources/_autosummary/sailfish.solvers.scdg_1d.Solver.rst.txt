@@ -1,4 +1,4 @@
-sailfish.solvers.scdg\_1d.Solver
+﻿sailfish.solvers.scdg\_1d.Solver
 ================================
 
 .. currentmodule:: sailfish.solvers.scdg_1d
