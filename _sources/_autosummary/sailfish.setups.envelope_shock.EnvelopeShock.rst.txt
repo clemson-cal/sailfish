@@ -27,7 +27,6 @@ sailfish.setups.envelope\_shock.EnvelopeShock
       ~EnvelopeShock.mesh
       ~EnvelopeShock.model_parameter_dict
       ~EnvelopeShock.model_parameters
-      ~EnvelopeShock.num_decades
       ~EnvelopeShock.primitive
       ~EnvelopeShock.print_model_parameters
       ~EnvelopeShock.r_shell

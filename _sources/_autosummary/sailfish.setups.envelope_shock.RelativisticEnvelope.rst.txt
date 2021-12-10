@@ -23,7 +23,6 @@ sailfish.setups.envelope\_shock.RelativisticEnvelope
       ~RelativisticEnvelope.gamma_beta
       ~RelativisticEnvelope.index
       ~RelativisticEnvelope.mass_rate_per_steradian
-      ~RelativisticEnvelope.wind_mass_rate_per_steradian
       ~RelativisticEnvelope.zone
    
    

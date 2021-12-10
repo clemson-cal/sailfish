@@ -1,0 +1,52 @@
+sailfish.setups.exploding\_star.ExplodingStar
+=============================================
+
+.. currentmodule:: sailfish.setups.exploding_star
+
+.. autoclass:: ExplodingStar
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~ExplodingStar.__init__
+      ~ExplodingStar.dash_case_class_name
+      ~ExplodingStar.default_model_parameters
+      ~ExplodingStar.describe_class
+      ~ExplodingStar.find_setup_class
+      ~ExplodingStar.has_model_parameters
+      ~ExplodingStar.immutable_parameter_keys
+      ~ExplodingStar.mesh
+      ~ExplodingStar.model_parameter_dict
+      ~ExplodingStar.model_parameters
+      ~ExplodingStar.primitive
+      ~ExplodingStar.print_model_parameters
+      ~ExplodingStar.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~ExplodingStar.ascale
+      ~ExplodingStar.boundary_condition
+      ~ExplodingStar.default_end_time
+      ~ExplodingStar.default_resolution
+      ~ExplodingStar.escale
+      ~ExplodingStar.physics
+      ~ExplodingStar.r_inner
+      ~ExplodingStar.r_outer
+      ~ExplodingStar.solver
+      ~ExplodingStar.start_time
+   
+   

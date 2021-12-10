@@ -28,5 +28,6 @@
    :recursive:
 
    sailfish.setups.envelope_shock
+   sailfish.setups.exploding_star
    sailfish.setups.simple1d
 

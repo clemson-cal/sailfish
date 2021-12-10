@@ -1,0 +1,6 @@
+sailfish.setups.exploding\_star.rho0
+====================================
+
+.. currentmodule:: sailfish.setups.exploding_star
+
+.. autofunction:: rho0

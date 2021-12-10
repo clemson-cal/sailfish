@@ -87,7 +87,7 @@ or other sources of configuration.</p>
 <section id="minimal-example">
 <h2>Minimal example<a class="headerlink" href="#minimal-example" title="Permalink to this headline"></a></h2>
 <p>Here is a minimal setup, which defines a 1D relativistic hydrodynamics problem
-consisting of a periodic density wave:</p>
+consisting of a traveling density wave:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sin</span><span class="p">,</span> <span class="n">pi</span>
 <span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span>
 <span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesianMesh</span>
@@ -101,8 +101,8 @@ consisting of a periodic density wave:</p>
         <span class="n">p</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="c1"># velocity</span>
         <span class="n">p</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="c1"># gas pressure</span>
 
-    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">PlanarCartesianMesh</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">)</span>
+    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesianMesh</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">resolution</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -114,44 +114,62 @@ consisting of a periodic density wave:</p>
 </pre></div>
 </div>
 <p>This setup uses the <cite>srhd_1d</cite> solver (relativistic 1D hydrodynamics) with
-cartesian coordinates, on a domain from 0.0 to 1.0. The boundary condition
-is periodic, and the hydrodynamic primitive data is initialized to a sin
-wave.</p>
+cartesian coordinates, on a domain from 0.0 to 1.0. The boundary condition is
+periodic, and the hydrodynamic primitive data so the density has a sinusoidal
+variation, and the velocity is uniform.</p>
 </section>
 <section id="required-methods">
 <h2>Required methods<a class="headerlink" href="#required-methods" title="Permalink to this headline"></a></h2>
-<p>Our setup class inherits (is a sub-class of) the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup</span></code></a> base class.
-The base class provides a lot of functionality in the form of methods that
-have trivial default implementations, but can be overridden if needed. The
-four methods implemented in the example above are required for the setup to be
-instantiated (they are <cite>abstract</cite> methods in the base class).</p>
+<p>Custom setup classes must inherit the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup</span></code></a> base class. The setup base
+class provides a lot of functionality in the form of methods that have trivial
+default implementations, but can be overridden if needed. The four methods
+implemented in the example above are required for the setup to be instantiated
+(they are <cite>abstract</cite> methods in the base class).</p>
 <p>The <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.primitive" title="sailfish.setup.Setup.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup.primitive</span></code></a> method takes as arguments the time, a coordinate
-position, and a slice of a primitive variable array where the initial
-condition should be written. The number and meaning of primitive variables
-depends on the system being solved, and the system is a property of the solver
-class, which is identified by the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.solver" title="sailfish.setup.Setup.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup.solver</span></code></a> property. The object
-returned by the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.mesh" title="sailfish.setup.Setup.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup.mesh</span></code></a> method describes the physical extent of
-the simulation domain, as well as how it is discretized and what kind of
-coordinates are used (i.e. cartesian or spherical). The
-<a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.boundary_condition" title="sailfish.setup.Setup.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup.boundary_condition</span></code></a> method returns string to identify the type
-of boundary condition to be applied. The mesh and boundary condition
+position, and a slice of a primitive variable array representing a single
+zone. The result is written to this slice rather than returned from the
+function for efficiency reasons. Generally, the primitive method is only used
+at the start of a new simulation, so the time will typically be <cite>t=0.0</cite>.
+However, in the case of an inflow boundary condition, the solver will also
+call the setup’s primitive method in the guard zones of the mesh each time
+boundary conditions need to be applied. In other words, the primitive method
+always serves as an initial condition, but it can also provide a
+time-dependent Dirichlet boundary condition. The number and meaning of
+primitive variables depends on the system being solved (the system is in turn
+a property of the solver class, which is identified by the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.solver" title="sailfish.setup.Setup.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup.solver</span></code></a>
+property).</p>
+<p>The object returned by the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.mesh" title="sailfish.setup.Setup.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup.mesh</span></code></a> method describes the physical
+extent of the simulation domain, as well as how it is discretized and what
+kind of coordinates are used (i.e. cartesian or spherical). The <cite>mesh</cite> method
+accepts a <cite>resolution</cite> argument, the value of which comes from the command
+line option <code class="code docutils literal notranslate"><span class="pre">--resolution</span> <span class="pre">|</span> <span class="pre">-n</span></code>, or the <cite>resolution</cite> member of the
+<code class="xref py py-obj docutils literal notranslate"><span class="pre">driver.DriverArgs</span></code> class. It should be interpreted sensibly in the
+context of your setup to create a mesh (for example no logical issues would
+arise if you were to ignore this argument altogether, but don’t do that). For
+example if your setup uses a <code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh.LogSphericalMesh</span></code>, it makes sense to
+interpret the <cite>resolution</cite> as the number of zones per decade in radius. If it’s
+a 2D problem in spherical coordinates, it could mean the number of polar
+zones, or in a 3D problem it could be the number of zones on each side of the
+domain.</p>
+<p>The <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.boundary_condition" title="sailfish.setup.Setup.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup.boundary_condition</span></code></a> method returns a string to identify the
+type of boundary condition to be applied. The mesh and boundary condition
 objects must be compatible with (supported by) the solver, otherwise the
-solver will through an exception when it’s constructed.</p>
-<p>Notice the mesh method takes a parameter specifying the number of zones, which
-is provided from driver, which instantiates the setup. This parameter can be
-interpreted freely by the setup in creating a mesh, for example if your setup
-uses a <a class="reference internal" href="_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh" title="sailfish.mesh.LogSphericalMesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.mesh.LogSphericalMesh</span></code></a>, it makes sense to interpret
-this parameter as the number of zones per decade in radius.</p>
+solver will throw an exception when it’s constructed.</p>
 </section>
 <section id="choosing-a-setup">
 <h2>Choosing a setup<a class="headerlink" href="#choosing-a-setup" title="Permalink to this headline"></a></h2>
+<p>The first argument to the sailfish command line tool is the name of a setup
+class, converted to dash-case, i.e. you could run the setup above in a default
+configuration by running <code class="code docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">density-wave</span></code>. The command line tool
+will print the setup documentation to the terminal if invoked as
+<code class="code docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">density-wave</span> <span class="pre">--describe</span></code>. It’s good practice to give your
+setup class an accurate doc string.</p>
 <p>Setup sub-classes are automatically discovered when sailfish is imported or
-run from the command line. The first argument to the command line tool is the
-name of a setup class, converted to dash-case, i.e. you could run the setup
-above in a default configuration by running <code class="code docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">density-wave</span></code>. The
-command line tool will print the setup documentation to the terminal if
-invoked as <code class="code docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">density-wave</span> <span class="pre">--describe</span></code>. It’s good practice to
-give your setup class an accurate doc string.</p>
+run from the command line. However to be found, the module containing your
+class must be imported before <a class="reference internal" href="_autosummary/sailfish.driver.simulate.html#sailfish.driver.simulate" title="sailfish.driver.simulate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">driver.simulate</span></code></a> is called. If you add a
+new source file to the <a class="reference internal" href="_autosummary/sailfish.setups.html#module-sailfish.setups" title="sailfish.setups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setups</span></code></a> module, you must import that module in
+the <code class="code docutils literal notranslate"><span class="pre">setups/__init__.py</span></code> file for the setup class(es) in it to be
+discovered.</p>
 </section>
 <section id="model-parameters">
 <h2>Model parameters<a class="headerlink" href="#model-parameters" title="Permalink to this headline"></a></h2>

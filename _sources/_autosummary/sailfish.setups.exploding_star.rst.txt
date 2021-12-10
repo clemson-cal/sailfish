@@ -1,0 +1,37 @@
+sailfish.setups.exploding\_star
+===============================
+
+.. automodule:: sailfish.setups.exploding_star
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      rho0
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      ExplodingStar
+   
+   
+
+   
+   
+   
+
+
+
