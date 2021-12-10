@@ -4,9 +4,10 @@ Library functions and command-line access to the simulation driver.
 
 import os, pickle, pathlib, logging
 from typing import NamedTuple, Dict
-from sailfish import solvers
+
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
+from sailfish import setups
 
 logger = logging.getLogger(__name__)
 
@@ -207,8 +208,8 @@ def simulate(driver):
     from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
     from sailfish import __version__ as version
     from sailfish.kernel.system import configure_build, log_system_info, measure_time
-    from sailfish.solvers import srhd_1d
     from sailfish.event import Recurrence
+    from sailfish import solvers
 
     main_logger = getLogger("main_logger")
     main_logger.info(f"\nsailfish {version}\n")

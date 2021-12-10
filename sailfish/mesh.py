@@ -62,7 +62,10 @@ class LogSphericalMesh(NamedTuple):
         else:
             motion = f"homologous with a-dot = {self.scale_factor_derivative:0.2f}"
 
-        return f"log spherical ({self.r0} -> {self.r1}) {motion}"
+        return (
+            f"log spherical ({self.r0} -> {self.r1}) {motion}, "
+            f"{self.num_zones_per_decade} zones per decade"
+        )
 
     def min_spacing(self, time=None):
         """
