@@ -15,7 +15,7 @@ class CellData:
     This class works for n-th order Gaussian quadrature in 1D.
     """
 
-    def __init__(self, order=1):
+    def __init__(self, order=3):
         import numpy as np
 
         if order <= 0:
@@ -89,9 +89,48 @@ def update(wavespeed, uw, cell, dx, dt):
             udot_v = +sum(fx[j] * pd[j][n] * w[j] for j in range(cell.num_points)) / dx
             uw[i, n] += (udot_s + udot_v) * dt
 
+def rhs(wavespeed, uw, cell, dx, uwdot):
+    import numpy as np
+
+    def flux(ux):
+        return wavespeed * ux
+
+    nz = uw.shape[0]
+    pv = cell.phi_value
+    pf = cell.phi_faces
+    pd = cell.phi_deriv
+    w = cell.weights
+    h = [-1.0, 1.0]
+
+    for i in range(nz):
+        im1 = (i - 1 + nz) % nz
+        ip1 = (i + 1 + nz) % nz
+
+        # surface fluxes
+        fimh_l = flux(dot(uw[im1], pf[1]))
+        fimh_r = flux(dot(uw[i], pf[0]))
+        fiph_l = flux(dot(uw[i], pf[1]))
+        fiph_r = flux(dot(uw[ip1], pf[0]))
+
+        if wavespeed > 0.0:
+            fimh = fimh_l
+            fiph = fiph_l
+        else:
+            fimh = fimh_r
+            fiph = fiph_r
+
+        fs = [fimh, fiph]
+        ux = [cell.sample(uw[i], j) for j in range(cell.order)]
+        fx = [flux(u) for u in ux]
+
+        for n in range(cell.order):
+            udot_s = -sum(fs[j] * pf[j][n] * h[j] for j in range(2)) / dx
+            udot_v = +sum(fx[j] * pd[j][n] * w[j] for j in range(cell.num_points)) / dx
+            uwdot[i, n] = udot_s + udot_v
+
 
 class Options(NamedTuple):
-    order: int = 1
+    order: int = 3
 
 
 class Physics(NamedTuple):
@@ -154,6 +193,8 @@ class Solver(SolverBase):
         else:
             self.conserved_w = solution
 
+        self.conserved_wdot = np.zeros_like(uw)
+        self.conserved_w_rk = np.zeros_like(uw)
         self.t = time
         self.mesh = mesh
         self.cell = cell
@@ -174,7 +215,7 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 0.05
+        return 1.0
 
     @property
     def options(self):
@@ -186,11 +227,39 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 0.05
+        return 1.0
 
     def maximum_wavespeed(self):
         return abs(self._physics.wavespeed)
 
     def advance(self, dt):
-        update(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
+
+        #update(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
+
+        # Strong Stability Preserving (TVD) 2nd Order SSP-RK2 (Shu & Osher Eq. 2.15)
+        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w_rk = self.conserved_w + dt * self.conserved_wdot
+        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w_rk += dt * self.conserved_wdot
+        #self.conserved_w = 0.5 * (self.conserved_w + self.conserved_w_rk)       
+
+        # Strong Stability Preserving (TVD) 3rd Order SSP-RK3 (Shu & Osher Eq. 2.18)
+        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w_rk = self.conserved_w + dt * self.conserved_wdot
+        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w_rk = 0.75 * self.conserved_w + dt * 0.25 * (self.conserved_w_rk + dt * self.conserved_wdot)
+        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w = (1.0 / 3.0) * self.conserved_w + (2.0 /3.0) * (self.conserved_w_rk + dt * self.conserved_wdot)
+
+        # Strong Stability Preserving (TVD) Four-stage 3rd Order SSP-4RK3; Stable for CFL <= 2.0 (Spiteri & Ruuth (2002))
+        rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        self.conserved_w_rk = self.conserved_w + 0.5 * dt * self.conserved_wdot
+        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        self.conserved_w_rk = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
+        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        self.conserved_w_rk = (2.0 / 3.0) * self.conserved_w + (1.0 / 3.0) * (self.conserved_w_rk + 0.5 * dt * self.conserved_wdot)
+        rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        self.conserved_w = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
+
+
         self.t += dt
