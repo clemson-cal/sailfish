@@ -247,22 +247,22 @@ class Solver(SolverBase):
         #self.conserved_w = 0.5 * (self.conserved_w + self.conserved_w_rk)       
 
         # Strong Stability Preserving (TVD) 3rd Order SSP-RK3 (Shu & Osher Eq. 2.18)
-        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w_rk = self.conserved_w + dt * self.conserved_wdot
-        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w_rk = 0.75 * self.conserved_w + dt * 0.25 * (self.conserved_w_rk + dt * self.conserved_wdot)
-        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w = (1.0 / 3.0) * self.conserved_w + (2.0 /3.0) * (self.conserved_w_rk + dt * self.conserved_wdot)
+        rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        self.conserved_w_rk = self.conserved_w + dt * self.conserved_wdot
+        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        self.conserved_w_rk = 0.75 * self.conserved_w + 0.25 * (self.conserved_w_rk + dt * self.conserved_wdot)
+        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        self.conserved_w = (1.0 / 3.0) * self.conserved_w + (2.0 /3.0) * (self.conserved_w_rk + dt * self.conserved_wdot)
 
         # Strong Stability Preserving (TVD) Four-stage 3rd Order SSP-4RK3; Stable for CFL <= 2.0 (Spiteri & Ruuth (2002))
-        rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        self.conserved_w_rk = self.conserved_w + 0.5 * dt * self.conserved_wdot
-        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        self.conserved_w_rk = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
-        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        self.conserved_w_rk = (2.0 / 3.0) * self.conserved_w + (1.0 / 3.0) * (self.conserved_w_rk + 0.5 * dt * self.conserved_wdot)
-        rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        self.conserved_w = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
+        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w_rk = self.conserved_w + 0.5 * dt * self.conserved_wdot
+        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w_rk = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
+        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w_rk = (2.0 / 3.0) * self.conserved_w + (1.0 / 3.0) * (self.conserved_w_rk + 0.5 * dt * self.conserved_wdot)
+        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
 
 
         self.t += dt
