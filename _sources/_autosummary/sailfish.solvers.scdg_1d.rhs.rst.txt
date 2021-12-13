@@ -1,0 +1,6 @@
+sailfish.solvers.scdg\_1d.rhs
+=============================
+
+.. currentmodule:: sailfish.solvers.scdg_1d
+
+.. autofunction:: rhs

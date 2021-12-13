@@ -28,6 +28,7 @@ sailfish.solvers.scdg\_1d.Options
 
    .. autosummary::
    
+      ~Options.integrator
       ~Options.order
    
    

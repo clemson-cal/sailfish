@@ -22,7 +22,6 @@ sailfish.solvers.srhd\_1d.Patch
       ~Patch.new_iteration
       ~Patch.primitive_to_conserved
       ~Patch.recompute_primitive
-      ~Patch.scale_factor
    
    
 
@@ -33,5 +32,6 @@ sailfish.solvers.srhd\_1d.Patch
    .. autosummary::
    
       ~Patch.primitive
+      ~Patch.scale_factor
    
    

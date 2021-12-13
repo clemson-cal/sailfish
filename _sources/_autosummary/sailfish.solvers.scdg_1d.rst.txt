@@ -15,7 +15,7 @@ sailfish.solvers.scdg\_1d
       :toctree:
    
       dot
-      update
+      rhs
    
    
 

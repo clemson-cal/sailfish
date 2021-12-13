@@ -1,4 +1,4 @@
-﻿sailfish.mesh.PlanarCartesianMesh
+sailfish.mesh.PlanarCartesianMesh
 =================================
 
 .. currentmodule:: sailfish.mesh

@@ -18,7 +18,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.setups.simple1d.DensityWave" href="sailfish.setups.simple1d.DensityWave.html" />
+    <link rel="next" title="sailfish.setups.simple1d.Advection" href="sailfish.setups.simple1d.Advection.html" />
     <link rel="prev" title="sailfish.setups.exploding_star.ExplodingStar" href="sailfish.setups.exploding_star.ExplodingStar.html" /> 
 </head>
 
@@ -51,8 +51,9 @@
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.envelope_shock.html">sailfish.setups.envelope_shock</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.exploding_star.html">sailfish.setups.exploding_star</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.setups.simple1d</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.simple1d.Advection.html">sailfish.setups.simple1d.Advection</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.simple1d.Burgers.html">sailfish.setups.simple1d.Burgers</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.setups.simple1d.DensityWave.html">sailfish.setups.simple1d.DensityWave</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.simple1d.Scalar.html">sailfish.setups.simple1d.Scalar</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.setups.simple1d.Shocktube.html">sailfish.setups.simple1d.Shocktube</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.setups.simple1d.Wind.html">sailfish.setups.simple1d.Wind</a></li>
 </ul>
@@ -101,16 +102,19 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.simple1d.Advection.html#sailfish.setups.simple1d.Advection" title="sailfish.setups.simple1d.Advection"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Advection</span></code></a>(**kwargs)</p></td>
+<td><p>Scalar advection, evolution of a smooth wave, using the DG solver.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.simple1d.Burgers.html#sailfish.setups.simple1d.Burgers" title="sailfish.setups.simple1d.Burgers"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Burgers</span></code></a>(**kwargs)</p></td>
+<td><p>Burgers equation, evolution of a smooth wave using the DG solver.</p></td>
+</tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave" title="sailfish.setups.simple1d.DensityWave"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DensityWave</span></code></a>(**kwargs)</p></td>
 <td><p>A sinusoidal variation of the gas density, with possible uniform translation.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.simple1d.Scalar.html#sailfish.setups.simple1d.Scalar" title="sailfish.setups.simple1d.Scalar"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Scalar</span></code></a>(**kwargs)</p></td>
-<td><p>Scalar advection with a smooth wave, using the DG solver.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube" title="sailfish.setups.simple1d.Shocktube"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Shocktube</span></code></a>(**kwargs)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube" title="sailfish.setups.simple1d.Shocktube"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Shocktube</span></code></a>(**kwargs)</p></td>
 <td><p>Discontinuous initial data, with uniform density and pressure to either side of the discontintuity at x=0.5.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind" title="sailfish.setups.simple1d.Wind"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Wind</span></code></a>(**kwargs)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind" title="sailfish.setups.simple1d.Wind"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Wind</span></code></a>(**kwargs)</p></td>
 <td><p>A cold, spherically symmetric relativistic wind.</p></td>
 </tr>
 </tbody>
@@ -122,7 +126,7 @@
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.setups.exploding_star.ExplodingStar.html" class="btn btn-neutral float-left" title="sailfish.setups.exploding_star.ExplodingStar" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.setups.simple1d.DensityWave.html" class="btn btn-neutral float-right" title="sailfish.setups.simple1d.DensityWave" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.setups.simple1d.Advection.html" class="btn btn-neutral float-right" title="sailfish.setups.simple1d.Advection" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

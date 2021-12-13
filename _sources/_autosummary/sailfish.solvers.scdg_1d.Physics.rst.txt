@@ -28,6 +28,7 @@ sailfish.solvers.scdg\_1d.Physics
 
    .. autosummary::
    
+      ~Physics.equation
       ~Physics.wavespeed
    
    

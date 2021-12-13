@@ -18,8 +18,9 @@ sailfish.setups.simple1d
    .. autosummary::
       :toctree:
    
+      Advection
+      Burgers
       DensityWave
-      Scalar
       Shocktube
       Wind
    

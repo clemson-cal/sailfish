@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.solvers.scdg_1d.CellData &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.solvers.scdg_1d.rhs &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -18,8 +18,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.scdg_1d.Options" href="sailfish.solvers.scdg_1d.Options.html" />
-    <link rel="prev" title="sailfish.solvers.scdg_1d.rhs" href="sailfish.solvers.scdg_1d.rhs.html" /> 
+    <link rel="next" title="sailfish.solvers.scdg_1d.CellData" href="sailfish.solvers.scdg_1d.CellData.html" />
+    <link rel="prev" title="sailfish.solvers.scdg_1d.dot" href="sailfish.solvers.scdg_1d.dot.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,8 +53,8 @@
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html">sailfish.solvers.scdg_1d.dot</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html">sailfish.solvers.scdg_1d.rhs</a></li>
-<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.scdg_1d.CellData</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.scdg_1d.rhs</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html">sailfish.solvers.scdg_1d.CellData</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Options.html">sailfish.solvers.scdg_1d.Options</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Physics.html">sailfish.solvers.scdg_1d.Physics</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Solver.html">sailfish.solvers.scdg_1d.Solver</a></li>
@@ -85,9 +85,9 @@
           <li><a href="../api.html">API documentation</a> &raquo;</li>
           <li><a href="sailfish.solvers.html">sailfish.solvers</a> &raquo;</li>
           <li><a href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a> &raquo;</li>
-      <li>sailfish.solvers.scdg_1d.CellData</li>
+      <li>sailfish.solvers.scdg_1d.rhs</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/_autosummary/sailfish.solvers.scdg_1d.CellData.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/_autosummary/sailfish.solvers.scdg_1d.rhs.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -95,50 +95,12 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solvers-scdg-1d-celldata">
-<h1>sailfish.solvers.scdg_1d.CellData<a class="headerlink" href="#sailfish-solvers-scdg-1d-celldata" title="Permalink to this headline"></a></h1>
-<dl class="py class">
-<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.CellData">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.scdg_1d.</span></span><span class="sig-name descname"><span class="pre">CellData</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#CellData"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.CellData" title="Permalink to this definition"></a></dt>
-<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>Gauss weights, quadrature points, and tabulated Legendre polonomials.</p>
-<p>This class works for n-th order Gaussian quadrature in 1D.</p>
-<dl class="py method">
-<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.CellData.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#CellData.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.CellData.__init__" title="Permalink to this definition"></a></dt>
+  <section id="sailfish-solvers-scdg-1d-rhs">
+<h1>sailfish.solvers.scdg_1d.rhs<a class="headerlink" href="#sailfish-solvers-scdg-1d-rhs" title="Permalink to this headline"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.rhs">
+<span class="sig-prename descclassname"><span class="pre">sailfish.solvers.scdg_1d.</span></span><span class="sig-name descname"><span class="pre">rhs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">physics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uw</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cell</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dx</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">uwdot</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#rhs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.rhs" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
-
-<p class="rubric">Methods</p>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.CellData.__init__" title="sailfish.solvers.scdg_1d.CellData.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([order])</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">sample</span></code>(uw, j)</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_weights</span></code>(ux)</p></td>
-<td><p></p></td>
-</tr>
-</tbody>
-</table>
-<p class="rubric">Attributes</p>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_points</span></code></p></td>
-<td><p></p></td>
-</tr>
-</tbody>
-</table>
-</dd></dl>
 
 </section>
 
@@ -146,8 +108,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.solvers.scdg_1d.rhs.html" class="btn btn-neutral float-left" title="sailfish.solvers.scdg_1d.rhs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.scdg_1d.Options.html" class="btn btn-neutral float-right" title="sailfish.solvers.scdg_1d.Options" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solvers.scdg_1d.dot.html" class="btn btn-neutral float-left" title="sailfish.solvers.scdg_1d.dot" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.solvers.scdg_1d.CellData.html" class="btn btn-neutral float-right" title="sailfish.solvers.scdg_1d.CellData" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

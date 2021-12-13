@@ -1,4 +1,4 @@
-﻿sailfish.mesh.LogSphericalMesh
+sailfish.mesh.LogSphericalMesh
 ==============================
 
 .. currentmodule:: sailfish.mesh

@@ -1,4 +1,4 @@
-﻿sailfish.setups.exploding\_star.ExplodingStar
+sailfish.setups.exploding\_star.ExplodingStar
 =============================================
 
 .. currentmodule:: sailfish.setups.exploding_star
@@ -44,6 +44,7 @@
       ~ExplodingStar.physics
       ~ExplodingStar.r_inner
       ~ExplodingStar.r_outer
+      ~ExplodingStar.r_shell
       ~ExplodingStar.solver
       ~ExplodingStar.start_time
    

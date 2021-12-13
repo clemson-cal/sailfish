@@ -53,7 +53,7 @@
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.solvers.scdg_1d</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html">sailfish.solvers.scdg_1d.dot</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.update.html">sailfish.solvers.scdg_1d.update</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html">sailfish.solvers.scdg_1d.rhs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html">sailfish.solvers.scdg_1d.CellData</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Options.html">sailfish.solvers.scdg_1d.Options</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Physics.html">sailfish.solvers.scdg_1d.Physics</a></li>
@@ -107,7 +107,7 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html#sailfish.solvers.scdg_1d.dot" title="sailfish.solvers.scdg_1d.dot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dot</span></code></a>(u, p)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.update.html#sailfish.solvers.scdg_1d.update" title="sailfish.solvers.scdg_1d.update"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update</span></code></a>(wavespeed, uw, cell, dx, dt)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html#sailfish.solvers.scdg_1d.rhs" title="sailfish.solvers.scdg_1d.rhs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rhs</span></code></a>(physics, uw, cell, dx, uwdot)</p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -122,10 +122,10 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html#sailfish.solvers.scdg_1d.CellData" title="sailfish.solvers.scdg_1d.CellData"><code class="xref py py-obj docutils literal notranslate"><span class="pre">CellData</span></code></a>([order])</p></td>
 <td><p>Gauss weights, quadrature points, and tabulated Legendre polonomials.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.Options.html#sailfish.solvers.scdg_1d.Options" title="sailfish.solvers.scdg_1d.Options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Options</span></code></a>(order)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.Options.html#sailfish.solvers.scdg_1d.Options" title="sailfish.solvers.scdg_1d.Options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Options</span></code></a>(order, integrator)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.Physics.html#sailfish.solvers.scdg_1d.Physics" title="sailfish.solvers.scdg_1d.Physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Physics</span></code></a>(wavespeed)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.Physics.html#sailfish.solvers.scdg_1d.Physics" title="sailfish.solvers.scdg_1d.Physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Physics</span></code></a>(wavespeed, equation)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver" title="sailfish.solvers.scdg_1d.Solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Solver</span></code></a>([setup, mesh, time, solution, ...])</p></td>

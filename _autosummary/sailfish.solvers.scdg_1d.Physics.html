@@ -53,7 +53,7 @@
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html">sailfish.solvers.scdg_1d.dot</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.update.html">sailfish.solvers.scdg_1d.update</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html">sailfish.solvers.scdg_1d.rhs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html">sailfish.solvers.scdg_1d.CellData</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Options.html">sailfish.solvers.scdg_1d.Options</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.scdg_1d.Physics</a></li>
@@ -99,7 +99,7 @@
 <h1>sailfish.solvers.scdg_1d.Physics<a class="headerlink" href="#sailfish-solvers-scdg-1d-physics" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Physics">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.scdg_1d.</span></span><span class="sig-name descname"><span class="pre">Physics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wavespeed</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#Physics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.Physics" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.scdg_1d.</span></span><span class="sig-name descname"><span class="pre">Physics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">wavespeed</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">equation</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#Physics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.Physics" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Physics.__init__">
@@ -131,7 +131,10 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Physics.wavespeed" title="sailfish.solvers.scdg_1d.Physics.wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">wavespeed</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Physics.equation" title="sailfish.solvers.scdg_1d.Physics.equation"><code class="xref py py-obj docutils literal notranslate"><span class="pre">equation</span></code></a></p></td>
+<td><p>Alias for field number 1</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Physics.wavespeed" title="sailfish.solvers.scdg_1d.Physics.wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">wavespeed</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
 </tr>
 </tbody>
@@ -140,6 +143,12 @@
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Physics.count">
 <span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.scdg_1d.Physics.count" title="Permalink to this definition"></a></dt>
 <dd><p>Return number of occurrences of value.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Physics.equation">
+<span class="sig-name descname"><span class="pre">equation</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#sailfish.solvers.scdg_1d.Physics.equation" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
 </dd></dl>
 
 <dl class="py method">

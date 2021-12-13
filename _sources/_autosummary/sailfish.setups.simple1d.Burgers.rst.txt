@@ -1,0 +1,48 @@
+sailfish.setups.simple1d.Burgers
+================================
+
+.. currentmodule:: sailfish.setups.simple1d
+
+.. autoclass:: Burgers
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Burgers.__init__
+      ~Burgers.dash_case_class_name
+      ~Burgers.default_model_parameters
+      ~Burgers.describe_class
+      ~Burgers.find_setup_class
+      ~Burgers.has_model_parameters
+      ~Burgers.immutable_parameter_keys
+      ~Burgers.mesh
+      ~Burgers.model_parameter_dict
+      ~Burgers.model_parameters
+      ~Burgers.primitive
+      ~Burgers.print_model_parameters
+      ~Burgers.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Burgers.boundary_condition
+      ~Burgers.default_end_time
+      ~Burgers.default_resolution
+      ~Burgers.physics
+      ~Burgers.solver
+      ~Burgers.start_time
+   
+   

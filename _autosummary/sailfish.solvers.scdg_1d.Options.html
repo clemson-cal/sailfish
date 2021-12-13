@@ -53,7 +53,7 @@
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html">sailfish.solvers.scdg_1d.dot</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.update.html">sailfish.solvers.scdg_1d.update</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html">sailfish.solvers.scdg_1d.rhs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html">sailfish.solvers.scdg_1d.CellData</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.scdg_1d.Options</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Physics.html">sailfish.solvers.scdg_1d.Physics</a></li>
@@ -99,7 +99,7 @@
 <h1>sailfish.solvers.scdg_1d.Options<a class="headerlink" href="#sailfish-solvers-scdg-1d-options" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Options">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.scdg_1d.</span></span><span class="sig-name descname"><span class="pre">Options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#Options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.Options" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.scdg_1d.</span></span><span class="sig-name descname"><span class="pre">Options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">order</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">integrator</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/scdg_1d.html#Options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.scdg_1d.Options" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Options.__init__">
@@ -131,7 +131,10 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Options.order" title="sailfish.solvers.scdg_1d.Options.order"><code class="xref py py-obj docutils literal notranslate"><span class="pre">order</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Options.integrator" title="sailfish.solvers.scdg_1d.Options.integrator"><code class="xref py py-obj docutils literal notranslate"><span class="pre">integrator</span></code></a></p></td>
+<td><p>Alias for field number 1</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Options.order" title="sailfish.solvers.scdg_1d.Options.order"><code class="xref py py-obj docutils literal notranslate"><span class="pre">order</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
 </tr>
 </tbody>
@@ -147,6 +150,12 @@
 <span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9223372036854775807</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.scdg_1d.Options.index" title="Permalink to this definition"></a></dt>
 <dd><p>Return first index of value.</p>
 <p>Raises ValueError if the value is not present.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Options.integrator">
+<span class="sig-name descname"><span class="pre">integrator</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#sailfish.solvers.scdg_1d.Options.integrator" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
 </dd></dl>
 
 <dl class="py attribute">
