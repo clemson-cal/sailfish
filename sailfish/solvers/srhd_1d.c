@@ -9,17 +9,10 @@ DESCRIPTION:
 */
 
 
-// ============================ MODES =========================================
-// ============================================================================
-
-#define BC_INFLOW 0
-#define BC_ZEROFLUX 1
-#define COORDS_CARTESIAN 0
-#define COORDS_SPHERICAL 1
-
-
 // ============================ PHYSICS =======================================
 // ============================================================================
+#define COORDS_CARTESIAN 0
+#define COORDS_SPHERICAL 1
 #define NCONS 4
 #define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
@@ -82,10 +75,26 @@ PRIVATE double primitive_to_enthalpy_density(const double* prim)
     return rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
 }
 
-PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
+PRIVATE void primitive_to_conserved(const double *prim, double *cons, double dv)
 {
-    const double newton_iter_max = 50;
-    const double error_tolerance = 1e-12 * cons[0] / dv;
+    const double rho = prim[0];
+    const double u1 = prim[1];
+    const double pre = prim[2];
+
+    const double w = primitive_to_lorentz_factor(prim);
+    const double h = primitive_to_enthalpy_density(prim) / rho;
+    const double m = rho * w;
+
+    cons[0] = dv * m;
+    cons[1] = dv * m * h * u1;
+    cons[2] = dv * m * (h * w - 1.0) - dv * pre;
+    cons[3] = dv * m * prim[3];
+}
+
+PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, double coordinate)
+{
+    const double newton_iter_max = 500;
+    const double error_tolerance = 1e-12 * (cons[0] + cons[2]) / dv;
     const double gm              = ADIABATIC_GAMMA;
     const double m               = cons[0] / dv;
     const double tau             = cons[2] / dv;
@@ -93,6 +102,7 @@ PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
     int iteration                = 0;
     double p                     = prim[2];
     double w0;
+    double f;
 
     while (1) {
         const double et = tau + p + m;
@@ -103,9 +113,9 @@ PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
         const double d  = m / w;
         const double h  = 1.0 + e + p / d;
         const double a2 = gm * p / (d * h);
-        const double f  = d * e * (gm - 1.0) - p;
         const double g  = b2 * a2 - 1.0;
 
+        f  = d * e * (gm - 1.0) - p;
         p -= f / g;
 
         if (fabs(f) < error_tolerance || iteration == newton_iter_max) {
@@ -127,34 +137,30 @@ PRIVATE void conserved_to_primitive(const double *cons, double *prim, double dv)
 
     if (e < emin) {
         prim[2] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
+        primitive_to_conserved(prim, cons, dv);
     }
 
     #if (EXEC_MODE != EXEC_GPU)
     if (iteration == newton_iter_max) {
-        printf("[FATAL] reached max iteration\n");
+        printf(
+            "[FATAL] srhd_1d_conserved_to_primitive reached max "
+            "iteration at position %.3f "
+            "cons = [%.3e %.3e %.3e] error = %.3e\n", coordinate, cons[0], cons[1], cons[2], f);
         exit(1);
     }
-    if (prim[2] < 0.0 || prim[2] != prim[2]) {
-        printf("[FATAL] srhd_1d got negative pressure p=%e at r=%e\n", prim[2], 0.0);
+    if (cons[2] <= 0.0) {
+        printf(
+            "[FATAL] srhd_1d_conserved_to_primitive found non-positive "
+            "or NaN total energy tau=%.5e at position %.3f\n", cons[2], coordinate);
+        exit(1);
+    }
+    if (prim[2] <= 0.0 || prim[2] != prim[2]) {
+        printf(
+            "[FATAL] srhd_1d_conserved_to_primitive found non-positive "
+            "or NaN pressure p=%.5e at position %.3f\n", prim[2], coordinate);
         exit(1);
     }
     #endif
-}
-
-PRIVATE void primitive_to_conserved(const double *prim, double *cons, double dv)
-{
-    const double rho = prim[0];
-    const double u1 = prim[1];
-    const double pre = prim[2];
-
-    const double w = primitive_to_lorentz_factor(prim);
-    const double h = primitive_to_enthalpy_density(prim) / rho;
-    const double m = rho * w;
-
-    cons[0] = dv * m;
-    cons[1] = dv * m * h * u1;
-    cons[2] = dv * m * (h * w - 1.0) - dv * pre;
-    cons[3] = dv * m * prim[3];
 }
 
 PRIVATE void primitive_to_flux(const double *prim, const double *cons, double *flux)
@@ -329,7 +335,7 @@ PUBLIC void srhd_1d_conserved_to_primitive(
         double xl = yl * scale_factor;
         double xr = yr * scale_factor;
         double dv = cell_volume(coords, xl, xr);
-        conserved_to_primitive(u, p, dv);
+        conserved_to_primitive(u, p, dv, xl);
     }
 }
 
@@ -362,9 +368,9 @@ PUBLIC void srhd_1d_advance_rk(
         double xr = yr * (a0 + adot * time);
 
         double *urk = &conserved_rk[NCONS * (i + ng)];
-        double *prd = &primitive_rd[NCONS * (i + ng)];
         double *urd = &conserved_rd[NCONS * (i + ng)];
         double *uwr = &conserved_wr[NCONS * (i + ng)];
+        double *prd = &primitive_rd[NCONS * (i + ng)];
         double *pli = &primitive_rd[NCONS * (i + ng - 1)];
         double *pri = &primitive_rd[NCONS * (i + ng + 1)];
         double *pki = &primitive_rd[NCONS * (i + ng - 2)];

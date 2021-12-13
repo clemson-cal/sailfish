@@ -16,7 +16,7 @@ class PlanarCartesianMesh(NamedTuple):
     num_zones: int = 1000
 
     def __str__(self):
-        return f"planar cartesian ({self.x0} -> {self.x1})"
+        return f"planar cartesian ({self.x0} -> {self.x1}), {self.num_zones} zones"
 
     @property
     def dx(self):

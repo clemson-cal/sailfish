@@ -2,6 +2,7 @@
 Setup for a thermal bomb set off inside an 18 solar mass progenitor.
 """
 
+from math import exp
 from sailfish.setup import Setup, param
 from sailfish.mesh import LogSphericalMesh
 
@@ -15,7 +16,8 @@ class ExplodingStar(Setup):
     """
 
     r_inner = param(0.005, "inner radius")
-    r_outer = param(10.0, "outer radius")
+    r_outer = param(5.000, "outer radius")
+    r_shell = param(0.020, "radius from which a fast shell is launched")
 
     def primitive(self, t, r, primitive):
         """
@@ -38,9 +40,10 @@ class ExplodingStar(Setup):
 
         primitive[0] = rho_c * core + rho_w * wind
         primitive[1] = 0.0
+        primitive[2] = primitive[0] * 1e-6
 
-        if r < self.r_inner * 1.5:
-            primitive[2] = primitive[0] * 10.0
+        if r < self.r_shell:
+            primitive[2] = primitive[0] * 100.0
         else:
             primitive[2] = primitive[0] * 1e-6
 
