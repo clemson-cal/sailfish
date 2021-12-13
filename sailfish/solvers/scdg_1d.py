@@ -93,7 +93,8 @@ def rhs(wavespeed, uw, cell, dx, uwdot):
     import numpy as np
 
     def flux(ux):
-        return wavespeed * ux
+        #return wavespeed * ux
+        return 0.5 * ux * ux
 
     nz = uw.shape[0]
     pv = cell.phi_value
@@ -193,8 +194,8 @@ class Solver(SolverBase):
         else:
             self.conserved_w = solution
 
-        self.conserved_wdot = np.zeros_like(uw)
-        self.conserved_w_rk = np.zeros_like(uw)
+        self.conserved_wdot = np.zeros_like(self.conserved_w)
+        self.conserved_w_rk = np.zeros_like(self.conserved_w)
         self.t = time
         self.mesh = mesh
         self.cell = cell
@@ -234,7 +235,9 @@ class Solver(SolverBase):
 
     def advance(self, dt):
 
-        #update(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, dt)
+        # Euler 1st order
+        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
+        #self.conserved_w = self.conserved_w + dt * self.conserved_wdot
 
         # Strong Stability Preserving (TVD) 2nd Order SSP-RK2 (Shu & Osher Eq. 2.15)
         #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
