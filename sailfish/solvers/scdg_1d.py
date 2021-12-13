@@ -240,7 +240,7 @@ class Solver(SolverBase):
         if self._physics.equation == "advection":
             return abs(self._physics.wavespeed)
         elif self._physics.equation == "burgers":
-            return abs(self.conserved_w_rk[:, 0]).max()
+            return abs(self.conserved_w[:, 0]).max()
 
     def advance(self, dt):
         import numpy as np
