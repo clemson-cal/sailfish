@@ -52,49 +52,36 @@ def dot(u, p):
     return sum(u[i] * p[i] for i in range(u.shape[0]))
 
 
-def update(wavespeed, uw, cell, dx, dt):
-    def flux(ux):
-        return wavespeed * ux
-
-    nz = uw.shape[0]
-    pv = cell.phi_value
-    pf = cell.phi_faces
-    pd = cell.phi_deriv
-    w = cell.weights
-    h = [-1.0, 1.0]
-
-    for i in range(nz):
-        im1 = (i - 1 + nz) % nz
-        ip1 = (i + 1 + nz) % nz
-
-        # surface fluxes
-        fimh_l = flux(dot(uw[im1], pf[1]))
-        fimh_r = flux(dot(uw[i], pf[0]))
-        fiph_l = flux(dot(uw[i], pf[1]))
-        fiph_r = flux(dot(uw[ip1], pf[0]))
-
-        if wavespeed > 0.0:
-            fimh = fimh_l
-            fiph = fiph_l
-        else:
-            fimh = fimh_r
-            fiph = fiph_r
-
-        fs = [fimh, fiph]
-        ux = [cell.sample(uw[i], j) for j in range(cell.order)]
-        fx = [flux(u) for u in ux]
-
-        for n in range(cell.order):
-            udot_s = -sum(fs[j] * pf[j][n] * h[j] for j in range(2)) / dx
-            udot_v = +sum(fx[j] * pd[j][n] * w[j] for j in range(cell.num_points)) / dx
-            uw[i, n] += (udot_s + udot_v) * dt
-
-def rhs(wavespeed, uw, cell, dx, uwdot):
+def rhs(physics, uw, cell, dx, uwdot):
     import numpy as np
 
-    def flux(ux):
-        #return wavespeed * ux
-        return 0.5 * ux * ux
+    if physics.equation == "advection":
+        wavespeed = physics.wavespeed
+
+        def flux(ux):
+            return wavespeed * ux
+
+        def upwind(ul, ur):
+            if wavespeed > 0.0:
+                return flux(ul)
+            else:
+                return flux(ur)
+
+    elif physics.equation == "burgers":
+
+        def flux(ux):
+            return 0.5 * ux * ux
+
+        def upwind(ul, ur):
+            al = ul
+            ar = ur
+
+            if al > 0.0 and ar > 0.0:
+                return flux(ul)
+            elif al < 0.0 and ar < 0.0:
+                return flux(ur)
+            else:
+                return 0.0
 
     nz = uw.shape[0]
     pv = cell.phi_value
@@ -107,18 +94,12 @@ def rhs(wavespeed, uw, cell, dx, uwdot):
         im1 = (i - 1 + nz) % nz
         ip1 = (i + 1 + nz) % nz
 
-        # surface fluxes
-        fimh_l = flux(dot(uw[im1], pf[1]))
-        fimh_r = flux(dot(uw[i], pf[0]))
-        fiph_l = flux(dot(uw[i], pf[1]))
-        fiph_r = flux(dot(uw[ip1], pf[0]))
-
-        if wavespeed > 0.0:
-            fimh = fimh_l
-            fiph = fiph_l
-        else:
-            fimh = fimh_r
-            fiph = fiph_r
+        uimh_l = dot(uw[im1], pf[1])
+        uimh_r = dot(uw[i], pf[0])
+        uiph_l = dot(uw[i], pf[1])
+        uiph_r = dot(uw[ip1], pf[0])
+        fimh = upwind(uimh_l, uimh_r)
+        fiph = upwind(uiph_l, uiph_r)
 
         fs = [fimh, fiph]
         ux = [cell.sample(uw[i], j) for j in range(cell.order)]
@@ -131,16 +112,25 @@ def rhs(wavespeed, uw, cell, dx, uwdot):
 
 
 class Options(NamedTuple):
-    order: int = 3
+    order: int = 1
+    integrator: str = "rk2"
 
 
 class Physics(NamedTuple):
     wavespeed: float = 1.0
+    equation: str = "advection"  # or burgers
 
 
 class Solver(SolverBase):
     """
     An n-th order, discontinuous Galerkin solver for 1D scalar advection.
+
+    Time-advance integrator options:
+
+    - :code:`rk1`: Forward Euler
+    - :code:`rk2`: SSP-RK2 of Shu & Osher (1988; Eq. 2.15)
+    - :code:`rk3`: SSP-RK3 of Shu & Osher (1988; Eq. 2.18)
+    - :code:`rk3-sr02`: four-stage 3rd Order SSP-4RK3 of Spiteri & Ruuth (2002)
     """
 
     def __init__(
@@ -156,6 +146,10 @@ class Solver(SolverBase):
     ):
         import numpy as np
 
+        options = Options(**options)
+        physics = Physics(**physics)
+        cell = CellData(order=options.order)
+
         if num_patches != 1:
             raise ValueError("only works on one patch")
 
@@ -168,9 +162,14 @@ class Solver(SolverBase):
         if setup.boundary_condition != "periodic":
             raise ValueError("only periodic boundaries are supported")
 
-        options = Options(**options)
-        physics = Physics(**physics)
-        cell = CellData(order=options.order)
+        if physics.equation not in ["advection", "burgers"]:
+            raise ValueError("physics.equation must be advection or burgers")
+
+        if options.integrator not in ["rk1", "rk2", "rk3", "rk3-sr02"]:
+            raise ValueError("options.integrator must be rk1|rk2|rk3|rk3-sr02")
+
+        if options.order <= 0:
+            raise ValueError("option.order must be greater than 0")
 
         if solution is None:
             num_zones = mesh.shape[0]
@@ -194,8 +193,6 @@ class Solver(SolverBase):
         else:
             self.conserved_w = solution
 
-        self.conserved_wdot = np.zeros_like(self.conserved_w)
-        self.conserved_w_rk = np.zeros_like(self.conserved_w)
         self.t = time
         self.mesh = mesh
         self.cell = cell
@@ -228,41 +225,57 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 1.0
+        k = self.cell.order - 1
+
+        if self._options.integrator == "rk1":
+            return 1.0 / (2 * k + 1)
+        if self._options.integrator == "rk2":
+            return 1.0 / (2 * k + 1)
+        if self._options.integrator == "rk3":
+            return 1.0 / (2 * k + 1)
+        if self._options.integrator == "rk3-sr02":
+            return 2.0 / (2 * k + 1)
 
     def maximum_wavespeed(self):
-        return abs(self._physics.wavespeed)
+        if self._physics.equation == "advection":
+            return abs(self._physics.wavespeed)
+        elif self._physics.equation == "burgers":
+            return abs(self.conserved_w_rk[:, 0]).max()
 
     def advance(self, dt):
+        import numpy as np
 
-        # Euler 1st order
-        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w = self.conserved_w + dt * self.conserved_wdot
+        def udot(u):
+            udot = np.zeros_like(u)
+            rhs(self._physics, u, self.cell, self.mesh.dx, udot)
+            return udot
 
-        # Strong Stability Preserving (TVD) 2nd Order SSP-RK2 (Shu & Osher Eq. 2.15)
-        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w_rk = self.conserved_w + dt * self.conserved_wdot
-        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w_rk += dt * self.conserved_wdot
-        #self.conserved_w = 0.5 * (self.conserved_w + self.conserved_w_rk)       
+        if self._options.integrator == "rk1":
+            u = self.conserved_w
+            u += dt * udot(u)
 
-        # Strong Stability Preserving (TVD) 3rd Order SSP-RK3 (Shu & Osher Eq. 2.18)
-        rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        self.conserved_w_rk = self.conserved_w + dt * self.conserved_wdot
-        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        self.conserved_w_rk = 0.75 * self.conserved_w + 0.25 * (self.conserved_w_rk + dt * self.conserved_wdot)
-        rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        self.conserved_w = (1.0 / 3.0) * self.conserved_w + (2.0 /3.0) * (self.conserved_w_rk + dt * self.conserved_wdot)
+        if self._options.integrator == "rk2":
+            b1 = 0.0
+            b2 = 0.5
+            u = u0 = self.conserved_w.copy()
+            u = u0 * b1 + (1.0 - b1) * (u + dt * udot(u))
+            u = u0 * b2 + (1.0 - b2) * (u + dt * udot(u))
 
-        # Strong Stability Preserving (TVD) Four-stage 3rd Order SSP-4RK3; Stable for CFL <= 2.0 (Spiteri & Ruuth (2002))
-        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w_rk = self.conserved_w + 0.5 * dt * self.conserved_wdot
-        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w_rk = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
-        #rhs(self._physics.wavespeed, self.conserved_w_rk, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w_rk = (2.0 / 3.0) * self.conserved_w + (1.0 / 3.0) * (self.conserved_w_rk + 0.5 * dt * self.conserved_wdot)
-        #rhs(self._physics.wavespeed, self.conserved_w, self.cell, self.mesh.dx, self.conserved_wdot)
-        #self.conserved_w = self.conserved_w_rk + 0.5 * dt * self.conserved_wdot
+        if self._options.integrator == "rk3":
+            b1 = 0.0
+            b2 = 3.0 / 4.0
+            b3 = 1.0 / 3.0
+            u = u0 = self.conserved_w.copy()
+            u = u0 * b1 + (1.0 - b1) * (u + dt * udot(u))
+            u = u0 * b2 + (1.0 - b2) * (u + dt * udot(u))
+            u = u0 * b3 + (1.0 - b3) * (u + dt * udot(u))
 
+        if self._options.integrator == "rk3-sr02":
+            u = u0 = self.conserved_w.copy()
+            u = u0 + 0.5 * dt * udot(u)
+            u = u + 0.5 * dt * udot(u)
+            u = 2.0 / 3.0 * u0 + 1.0 / 3.0 * (u + 0.5 * dt * udot(u))
+            u = u + 0.5 * dt * udot(u)
 
+        self.conserved_w = u
         self.t += dt
