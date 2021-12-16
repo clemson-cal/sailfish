@@ -68,6 +68,20 @@ impl<T: Copy> DeviceBuffer<T> {
         buffer
     }
 
+    /// Copy this buffer to another buffer on this device. This method panics
+    /// if the buffers have different sizes, or reside on different devices.
+    pub fn copy_into(&self, buffer: &mut Self) {
+        assert_eq!(self.len(), buffer.len());
+        assert_eq!(self.device(), buffer.device());
+        on_device(self.device_id, || unsafe {
+            gpu_memcpy_dtod(
+                buffer.ptr as *mut c_void,
+                self.ptr as *const c_void,
+                (self.len() * std::mem::size_of::<T>()) as c_ulong,
+            )
+        });
+    }
+
     /// Insert the contents of a contiguous buffer into a subset of this one.
     /// This buffer must have `shape` indexes on each axis, `elems` data
     /// elements per index, and `start + count` indexes must in-bounds on each

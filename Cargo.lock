@@ -230,7 +230,7 @@ dependencies = [
 
 [[package]]
 name = "sailfish"
-version = "0.3.4"
+version = "0.3.5"
 dependencies = [
  "cc",
  "cfg-if",

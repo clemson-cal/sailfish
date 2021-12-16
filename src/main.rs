@@ -104,7 +104,8 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
         if name.ends_with(".sf") {
             State::from_checkpoint(name, &parameters, cline)?
         } else if let Some(ref file) = sailfish::parse::last_in_dir_ending_with(name, ".sf") {
-            State::from_checkpoint(file, &parameters, cline)?
+            let chkpt = std::path::Path::new(name).join(file);
+            State::from_checkpoint(chkpt.to_str().unwrap(), &parameters, cline)?
         } else {
             new_state(cline.clone(), name, &parameters)?
         }
@@ -182,7 +183,9 @@ where
         }
     } else {
         vec![None]
-    }.into_iter().cycle();
+    }
+    .into_iter()
+    .cycle();
 
     let structured_mesh = match state.mesh {
         Mesh::Structured(mesh) => mesh,
@@ -306,8 +309,10 @@ fn launch_single_patch(
                 cline.device,
                 faces,
                 &state.primitive,
+                setup.homologous_mesh(),
                 setup.boundary_condition(),
                 setup.coordinate_system(),
+                setup.mesh_scale_factor(state.time),
             )?,
             _ => panic!("unknown solver name"),
         },
@@ -326,18 +331,20 @@ fn launch_single_patch(
 
     while state.time < end_time {
         if state.checkpoint.is_due(state.time, checkpoint_rule) {
-            state.set_primitive(solver.primitive());
+            state.set_primitive(solver.primitive(state.time));
             state.write_checkpoint(setup.as_ref(), &outdir)?;
         }
 
         if !dt_each_iter {
-            dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
+            dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref())
+                * setup.mesh_scale_factor(state.time);
         }
 
         let elapsed = time_exec(cline.device, || {
             for _ in 0..fold {
                 if dt_each_iter {
-                    dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref());
+                    dt = cfl * dx_min / solver.max_wavespeed(state.time, setup.as_ref())
+                        * setup.mesh_scale_factor(state.time);
                 }
                 solver.advance(setup.as_ref(), rk_order as u32, state.time, dt);
                 state.time += dt;
@@ -354,7 +361,7 @@ fn launch_single_patch(
             mzps,
         );
     }
-    state.set_primitive(solver.primitive());
+    state.set_primitive(solver.primitive(state.time));
     state.write_checkpoint(setup.as_ref(), &outdir)?;
     Ok(())
 }

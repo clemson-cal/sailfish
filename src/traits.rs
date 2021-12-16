@@ -13,11 +13,11 @@ pub trait Solve {
     /// Returns the primitive variable array for this solver. The data is
     /// row-major with contiguous primitive variable components. The array
     /// includes guard zones.
-    fn primitive(&self) -> Vec<f64>;
+    fn primitive(&self, time: f64) -> Vec<f64>;
 
     /// Converts the internal primitive variable array to a conserved variable
     /// array, and stores that array in the solver's conserved variable buffer.
-    fn primitive_to_conserved(&mut self);
+    fn new_timestep(&mut self, time: f64);
 
     /// Returns the largest wavespeed among the zones in the solver's current
     /// primitive array.
@@ -30,7 +30,7 @@ pub trait Solve {
     /// Primitive variable array in a solver using first, second, or third-order
     /// Runge-Kutta time stepping.
     fn advance(&mut self, setup: &dyn Setup, rk_order: u32, time: f64, dt: f64) {
-        self.primitive_to_conserved();
+        self.new_timestep(time);
         match rk_order {
             1 => {
                 self.advance_rk(setup, time, 0.0, dt);
@@ -232,6 +232,13 @@ pub trait Setup: Send + Sync {
         BoundaryCondition::Default
     }
 
+    /// May be implemented to enable homologous mesh expansion in certain
+    /// solvers. The numbers are (a0, adot): the scale factor at t=0, and the
+    /// the expansion rate.
+    fn homologous_mesh(&self) -> Option<(f64, f64)> {
+        None
+    }
+
     /// Invoked by solver modules which support viscous stresses.
     fn viscosity(&self) -> Option<f64> {
         None
@@ -261,6 +268,17 @@ pub trait Setup: Send + Sync {
 
     fn constant_softening(&self) -> Option<bool> {
         None
+    }
+
+    /// Provided method to conveniently determine a scale factor for
+    /// homologously expanding meshes. Returns 1.0 if this setup does not
+    /// specify a scale factor.
+    fn mesh_scale_factor(&self, time: f64) -> f64 {
+        if let Some((a0, a1)) = self.homologous_mesh() {
+            (a0 + a1 * time) / (a0 + a1 * self.initial_time())
+        } else {
+            1.0
+        }
     }
 
     fn initial_primitive_vec(&self, mesh: &Mesh) -> Vec<f64> {
