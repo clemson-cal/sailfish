@@ -2,12 +2,12 @@ from math import pi, sin
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 
-__all__ = ["Scalar", "DensityWave", "Shocktube", "Wind"]
+__all__ = ["Advection", "Burgers", "DensityWave", "Shocktube", "Wind"]
 
 
-class Scalar(Setup):
+class Advection(Setup):
     """
-    Scalar advection with a smooth wave, using the DG solver.
+    Scalar advection, evolution of a smooth wave, using the DG solver.
     """
 
     def primitive(self, t, x, primitive):
@@ -21,6 +21,43 @@ class Scalar(Setup):
     @property
     def solver(self):
         return "scdg_1d"
+
+    @property
+    def physics(self):
+        return dict(equation="advection")
+
+    @property
+    def boundary_condition(self):
+        return "periodic"
+
+    @property
+    def default_end_time(self):
+        return 1.0
+
+    def validate(self):
+        pass
+
+
+class Burgers(Setup):
+    """
+    Burgers equation, evolution of a smooth wave using the DG solver.
+    """
+
+    def primitive(self, t, x, primitive):
+        a = 0.1
+        k = 2.0 * pi
+        primitive[0] = 1.0 + a * sin(k * x)
+
+    def mesh(self, num_zones):
+        return PlanarCartesianMesh(0.0, 1.0, num_zones)
+
+    @property
+    def solver(self):
+        return "scdg_1d"
+
+    @property
+    def physics(self):
+        return dict(equation="burgers")
 
     @property
     def boundary_condition(self):

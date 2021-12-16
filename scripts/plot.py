@@ -20,13 +20,17 @@ def main(args):
         mesh = chkpt["mesh"]
         x = mesh.zone_centers(chkpt["time"])
         rho = chkpt["primitive"][:, 0]
-        pre = chkpt["primitive"][:, 2]
-        ax1.plot(x, rho)
-        ax1.plot(x, pre)
+        # vel = chkpt["primitive"][:, 1]
+        # pre = chkpt["primitive"][:, 2]
+        ax1.plot(x, rho, label=r"$\rho$")
+        # ax1.plot(x, vel, label=r"$\Gamma \beta$")
+        # ax1.plot(x, pre, label=r"$p$")
 
     if type(mesh) == sailfish.mesh.LogSphericalMesh:
         ax1.set_xscale("log")
         ax1.set_yscale("log")
+
+    ax1.legend()
     plt.show()
 
 

@@ -116,7 +116,7 @@ class Patch:
                 self.faces,
                 primitive,
                 conserved,
-                self.scale_factor(),
+                self.scale_factor,
                 self.coordinates,
             )
             return conserved
@@ -127,7 +127,7 @@ class Patch:
                 self.faces,
                 self.conserved1,
                 self.primitive1,
-                self.scale_factor(),
+                self.scale_factor,
                 self.coordinates,
             )
 
@@ -150,6 +150,7 @@ class Patch:
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
         self.recompute_primitive()
 
+    @property
     def scale_factor(self):
         return self.scale_factor_initial + self.scale_factor_derivative * self.time
 
