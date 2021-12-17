@@ -194,7 +194,7 @@ class DriverArgs(NamedTuple):
 
 def simulate(driver):
     """
-    Main denerator for running simulations.
+    Main generator for running simulations.
 
     If invoked with a `DriverArgs` instance in `driver`, the other arguments
     are ignored. Otherwise, the driver is created from the setup name, model

@@ -10,4 +10,6 @@ def make_solver(name, physics, options, **kwargs):
     """
     Find a solver with the given name and construct it.
     """
-    return globals()[name].Solver(physics=physics, options=options, **kwargs)
+    return globals()[name].Solver(
+        physics=physics or dict(), options=options or dict(), **kwargs
+    )
