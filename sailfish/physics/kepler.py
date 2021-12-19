@@ -158,56 +158,6 @@ class OrbitalState(NamedTuple):
         a1 = self[1].gravitational_acceleration(x, y, softening_length)
         return (a0[0] + a1[0], a0[1] + a1[1])
 
-    def transform(self, o: "OrbitalOrientation") -> "OrbitalState":
-        """
-        Transforms this orbital state vector to a new orientation.
-
-        This function rotates the position and velocity vectors according to
-        the argument of periapse, and translates them according to the
-        center-of-mass position and velocity. Note that the
-        time-of-last-periapse-passage is technically part of the orbital
-        orientation, but is ignored by this function, as that would change the
-        intrinsic orbital phase.
-        """
-        m1 = self[0].mass
-        m2 = self[1].mass
-        x1 = self[0].position_x
-        x2 = self[1].position_x
-        y1 = self[0].position_y
-        y2 = self[1].position_y
-        vx1 = self[0].velocity_x
-        vx2 = self[1].velocity_x
-        vy1 = self[0].velocity_y
-        vy2 = self[1].velocity_y
-
-        c = cos(-o.periapse_argument)
-        s = sin(-o.periapse_argument)
-
-        x1p = +x1 * c + y1 * s + o.cm_position_x
-        y1p = -x1 * s + y1 * c + o.cm_position_y
-        x2p = +x2 * c + y2 * s + o.cm_position_x
-        y2p = -x2 * s + y2 * c + o.cm_position_y
-        vx1p = +vx1 * c + vy1 * s + o.cm_velocity_x
-        vy1p = -vx1 * s + vy1 * c + o.cm_velocity_y
-        vx2p = +vx2 * c + vy2 * s + o.cm_velocity_x
-        vy2p = -vx2 * s + vy2 * c + o.cm_velocity_y
-
-        c1 = PointMass(m1, x1p, y1p, vx1p, vy1p)
-        c2 = PointMass(m2, x2p, y2p, vx2p, vy2p)
-
-        return OrbitalState(c1, c2)
-
-    def rotate(self, angle: float) -> "OrbitalState":
-        """
-        Rotate an orbital state vector by an angle.
-
-        Positive angle means that the argument of periapse moves
-        counter-clockwise, in other words this function rotates the binary,
-        not the coordinates.
-        """
-        orientation = OrbitalOrientation(0.0, 0.0, 0.0, 0.0, angle, 0.0)
-        return self.transform(orientation)
-
     def perturb(
         self, dm1: float, dm2: float, dpx1: float, dpx2: float, dpy1: float, dpy2: float
     ) -> "OrbitalState":
@@ -215,12 +165,12 @@ class OrbitalState(NamedTuple):
         Returns a new orbital state vector if this one is perturbed by the
         given masses and momenta.
 
-        - `dm1`   Mass added to the primary
-        - `dm2`   Mass added to the secondary
-        - `dpx1`  Impulse (x) added to the primary
-        - `dpx2`  Impulse (x) added to the secondary
-        - `dpy1`  Impulse (y) added to the primary
-        - `dpy2`  Impulse (y) added to the secondary
+        - :code:`dm1`   Mass added to the primary
+        - :code:`dm2`   Mass added to the secondary
+        - :code:`dpx1`  Impulse (x) added to the primary
+        - :code:`dpx2`  Impulse (x) added to the secondary
+        - :code:`dpy1`  Impulse (y) added to the primary
+        - :code:`dpy2`  Impulse (y) added to the secondary
         """
 
         return OrbitalState(
@@ -228,7 +178,7 @@ class OrbitalState(NamedTuple):
             self[1].perturb_mass_and_momentum(dm2, dpx2, dpy2),
         )
 
-    def orbital_parameters(self, t: float) -> "OrbitalParameters":
+    def orbital_parameters(self, t: float) -> ("OrbitalElements", "OrbitalOrientation"):
         """
         Compute the inverse Kepler two-body problem.
 
@@ -321,18 +271,7 @@ class OrbitalState(NamedTuple):
         elements = OrbitalElements(a, m, q, e)
         orientation = OrbitalOrientation(x_cm, y_cm, vx_cm, vy_cm, pomega, tau)
 
-        return OrbitalParameters(elements, orientation)
-
-
-class OrbitalElements(NamedTuple):
-    """
-    The orbital elements of a two-body system on a bound orbit
-    """
-
-    semimajor_axis: float
-    total_mass: float
-    mass_ratio: float
-    eccentricity: float
+        return elements, orientation
 
 
 class OrbitalOrientation(NamedTuple):
@@ -348,19 +287,15 @@ class OrbitalOrientation(NamedTuple):
     periapse_time: float
 
 
-class OrbitalParameters(NamedTuple):
+class OrbitalElements(NamedTuple):
     """
-    Combination of orbital elements and orientation
-
-    This class is in one-to-one correspondence with an `OrbitalState` and a
-    time-since-periapse. Orbital state and time can be converted to orbital
-    parameters with the `OrbitalState.orbital_parameters` function, and
-    `OrbitalParameters` plus time-since-periapse can be converted to
-    `OrbitalState` with the `OrbitalParameters.orbital_state` function.
+    The orbital elements of a two-body system on a bound orbit
     """
 
-    elements: OrbitalElements
-    orientation: OrbitalOrientation
+    semimajor_axis: float
+    total_mass: float
+    mass_ratio: float
+    eccentricity: float
 
     @property
     def omega(self) -> float:
@@ -395,7 +330,7 @@ class OrbitalParameters(NamedTuple):
         self, eccentric_anomaly: float
     ) -> OrbitalState:
         """
-        Compute the orbital state at a given (absolute) time.
+        Compute the orbital state, given the eccentric anomaly.
         """
         a = self.semimajor_axis
         m = self.total_mass
@@ -407,23 +342,22 @@ class OrbitalParameters(NamedTuple):
         ck = cos(eccentric_anomaly)
         sk = sin(eccentric_anomaly)
         x1 = -a * q / (1.0 + q) * (e - ck)
-        y1 = a * q / (1.0 + q) * (sk) * (1.0 - e * e).sqrt
+        y1 = +a * q / (1.0 + q) * (sk) * sqrt(1.0 - e * e)
         x2 = -x1 / q
         y2 = -y1 / q
         vx1 = -a * q / (1.0 + q) * w / (1.0 - e * ck) * sk
-        vy1 = a * q / (1.0 + q) * w / (1.0 - e * ck) * ck * (1.0 - e * e).sqrt
+        vy1 = +a * q / (1.0 + q) * w / (1.0 - e * ck) * ck * sqrt(1.0 - e * e)
         vx2 = -vx1 / q
         vy2 = -vy1 / q
         c1 = PointMass(m1, x1, y1, vx1, vy1)
         c2 = PointMass(m2, x2, y2, vx2, vy2)
         return OrbitalState(c1, c2)
 
-    def eccentric_anomaly(self, t: float) -> float:
+    def eccentric_anomaly(self, time_since_periapse: float) -> float:
         """
-        Compute the eccentric anomaly from the (absolute) time.
+        Compute the eccentric anomaly from the time since last periapse.
         """
         p = self.period
-        t = t - self.periapse_time
         t = t - self.period * floor(t / p)
         e = self.eccentricity
         n = self.omega * t  # n := mean anomaly M
@@ -431,11 +365,50 @@ class OrbitalParameters(NamedTuple):
         g = lambda k: 1.0 - e * cos(k)
         return solve_newton_rapheson(f, g, n)
 
-    def orbital_state(self, t: float) -> OrbitalState:
+    def orbital_state(self, time_since_periapse: float) -> OrbitalState:
         """
-        Compute the orbital state a the given (absolute) time.
+        Compute the orbital state vector from the time since last periapse.
         """
-        return self.orbital_state_from_eccentric_anomaly(self.eccentric_anomaly(t))
+        E = self.eccentric_anomaoly(time_since_periapse)
+        return self.orbital_state_from_eccentric_anomaly(E)
+
+    def orbital_state_with_orientation(
+        self, absolute_time, orientation: OrbitalOrientation
+    ) -> OrbitalState:
+        """
+        Compute the orbital state from an absolute time and orientation.
+        """
+        t = absolute_time - orientation.periapse_time
+        E = self.eccentric_anomaoly(t)
+        state = self.orbital_state_from_eccentric_anomaly(E)
+
+        m1 = state[0].mass
+        m2 = state[1].mass
+        x1 = state[0].position_x
+        x2 = state[1].position_x
+        y1 = state[0].position_y
+        y2 = state[1].position_y
+        vx1 = state[0].velocity_x
+        vx2 = state[1].velocity_x
+        vy1 = state[0].velocity_y
+        vy2 = state[1].velocity_y
+
+        c = cos(-orientation.periapse_argument)
+        s = sin(-orientation.periapse_argument)
+
+        x1p = +x1 * c + y1 * s + orientation.cm_position_x
+        y1p = -x1 * s + y1 * c + orientation.cm_position_y
+        x2p = +x2 * c + y2 * s + orientation.cm_position_x
+        y2p = -x2 * s + y2 * c + orientation.cm_position_y
+        vx1p = +vx1 * c + vy1 * s + orientation.cm_velocity_x
+        vy1p = -vx1 * s + vy1 * c + orientation.cm_velocity_y
+        vx2p = +vx2 * c + vy2 * s + orientation.cm_velocity_x
+        vy2p = -vx2 * s + vy2 * c + orientation.cm_velocity_y
+
+        c1 = PointMass(m1, x1p, y1p, vx1p, vy1p)
+        c2 = PointMass(m2, x2p, y2p, vx2p, vy2p)
+
+        return OrbitalState(c1, c2)
 
 
 def solve_newton_rapheson(f, g, x: float) -> float:
@@ -444,7 +417,7 @@ def solve_newton_rapheson(f, g, x: float) -> float:
         x -= f(x) / g(x)
         n += 1
         if n > 10:
-            return None
+            raise ValueError("solve_newton_rapheson: no solution")
     return x
 
 
