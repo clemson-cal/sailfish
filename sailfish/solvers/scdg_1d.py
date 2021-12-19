@@ -165,8 +165,8 @@ class Solver(SolverBase):
         if physics.equation not in ["advection", "burgers"]:
             raise ValueError("physics.equation must be advection or burgers")
 
-        if options.integrator not in ["rk1", "rk2", "rk3", "rk3-sr02", "SSPRK32", "SSPRK54"]:
-            raise ValueError("options.integrator must be rk1|rk2|rk3|rk3-sr02|SSPRK32|SSPRK54")
+        if options.integrator not in ["rk1", "rk2", "rk3", "rk3-sr02", "SSPRK32", "SSPRK43", "SSPRK53", "SSPRK54"]:
+            raise ValueError("options.integrator must be rk1|rk2|rk3|rk3-sr02|SSPRK32|SSPRK43|SSPRK53|SSPRK54")
 
         if options.order <= 0:
             raise ValueError("option.order must be greater than 0")
@@ -236,9 +236,13 @@ class Solver(SolverBase):
         if self._options.integrator == "rk3-sr02":
             return 2.0 / (2 * k + 1)
         if self._options.integrator == "SSPRK32":
-            return 1.0 / (2 * k + 1)
+            return 2.0 / (2 * k + 1) # up to 2.2 / (2 * k + 1) seems to work
+        if self._options.integrator == "SSPRK43":
+            return 2.0 / (2 * k + 1) # C = 1.683339717642499
+        if self._options.integrator == "SSPRK53":
+            return 2.387300839230550  / (2 * k + 1) # C = 2.387300839230550 
         if self._options.integrator == "SSPRK54":
-            return 1.0 / (2 * k + 1)
+            return 1.5 / (2 * k + 1) # up to 1.7 / (2 * k + 1) seems to work
 
     def maximum_wavespeed(self):
         if self._physics.equation == "advection":
@@ -282,8 +286,12 @@ class Solver(SolverBase):
             u = u + 0.5 * dt * udot(u)
 
         if self._options.integrator == "SSPRK32":
-            # Kubatko+, J Sci Comput (2014) 60:313–344 Table 7
-            # SSPRK(3,2) in Shu-Osher form
+            """
+            3-stage 2nd-order Strong Stability Preserving SSPRK(3,2) integrator in Shu-Osher form
+            Not a low storage integrator: requires 3 copies of the conserved array, plus 2 copies
+            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
+            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 7
+            """
             alpha = [
             [1.000000000000000, 0.000000000000000, 0.000000000000000],
             [0.087353119859156, 0.912646880140844, 0.000000000000000],
@@ -300,15 +308,101 @@ class Solver(SolverBase):
             u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
             udot_1 = udot(u1)
             u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
-                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)
-            udot_2 = udot(u2)    
+                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)  
+            #udot_2 = udot(u2) 
             u  = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
                  +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
+                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot(u2))
+
+        if self._options.integrator == "SSPRK43":
+            """
+            4-stage 3rd-order Strong Stability Preserving SSPRK(4,3) integrator in Shu-Osher form
+            Not a low storage integrator: requires 4 copies of the conserved array, plus 3 copies
+            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
+            C = 1.683339717642499
+            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 13
+            """
+            alpha = [
+            [1.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.522361915162541, 0.477638084837459, 0.000000000000000, 0.000000000000000],
+            [0.368530939472566, 0.000000000000000, 0.631469060527434, 0.000000000000000],
+            [0.334082932462285, 0.006966183666289, 0.000000000000000, 0.658950883871426],
+            ]
+            beta = [
+            [0.594057152884440, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.000000000000000, 0.283744320787718, 0.000000000000000, 0.000000000000000],
+            [0.000000038023030, 0.000000000000000, 0.375128712231540, 0.000000000000000],
+            [0.116941419604231, 0.004138311235266, 0.000000000000000, 0.391454485963345],
+            ]
+
+            u = u0 = self.conserved_w.copy()
+            udot_0 = udot(u0)
+            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
+            udot_1 = udot(u1)
+            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
+                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)  
+            udot_2 = udot(u2) 
+            u3 = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
+                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
                  +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot_2)
+            #udot_3 = udot(u3)
+            u  = (alpha[4-1][0]*u0 + beta[4-1][0]*dt*udot_0
+                 +alpha[4-1][1]*u1 + beta[4-1][1]*dt*udot_1
+                 +alpha[4-1][2]*u2 + beta[4-1][2]*dt*udot_2
+                 +alpha[4-1][3]*u3 + beta[4-1][3]*dt*udot(u3))
+
+        if self._options.integrator == "SSPRK53":
+            """
+            5-stage 3rd-order Strong Stability Preserving SSPRK(5,3) integrator in Shu-Osher form
+            Not a low storage integrator: requires 5 copies of the conserved array, plus 4 copies
+            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
+            C = 2.387300839230550 
+            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 18
+            """
+            alpha = [
+            [1.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.495124140877703, 0.504875859122297, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.105701991897526, 0.000000000000000, 0.894298008102474, 0.000000000000000, 0.000000000000000],
+            [0.411551205755676, 0.011170516177380, 0.000000000000000, 0.577278278066944, 0.000000000000000],
+            [0.186911123548222, 0.013354480555382, 0.012758264566319, 0.000000000000000, 0.786976131330077]
+            ]
+            beta  = [
+            [0.418883109982196, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.000000000000000, 0.211483970024081, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.000000000612488, 0.000000000000000, 0.374606330884848, 0.000000000000000, 0.000000000000000],
+            [0.046744815663888, 0.004679140556487, 0.000000000000000, 0.241812120441849, 0.000000000000000],
+            [0.071938257223857, 0.005593966347235, 0.005344221539515, 0.000000000000000, 0.329651009373300]
+            ] 
+            
+            u = u0 = self.conserved_w.copy()
+            udot_0 = udot(u0)
+            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
+            udot_1 = udot(u1)
+            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
+                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)
+            udot_2 = udot(u2)
+            u3 = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
+                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
+                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot_2)
+            udot_3 = udot(u3)
+            u4 = (alpha[4-1][0]*u0 + beta[4-1][0]*dt*udot_0
+                 +alpha[4-1][1]*u1 + beta[4-1][1]*dt*udot_1
+                 +alpha[4-1][2]*u2 + beta[4-1][2]*dt*udot_2
+                 +alpha[4-1][3]*u3 + beta[4-1][3]*dt*udot_3)
+            #udot_4 = udot(u4)
+            u  = (alpha[5-1][0]*u0 + beta[5-1][0]*dt*udot_0
+                 +alpha[5-1][1]*u1 + beta[5-1][1]*dt*udot_1
+                 +alpha[5-1][2]*u2 + beta[5-1][2]*dt*udot_2
+                 +alpha[5-1][3]*u3 + beta[5-1][3]*dt*udot_3
+                 +alpha[5-1][4]*u4 + beta[5-1][4]*dt*udot(u4))
 
         if self._options.integrator == "SSPRK54":
-            # Kubatko+, J Sci Comput (2014) 60:313–344 Table 18
-            # SSPRK(5,4) in Shu-Osher form
+            """
+            5-stage 4th-order Strong Stability Preserving SSPRK(5,4) integrator in Shu-Osher form
+            Not a low storage integrator: requires 5 copies of the conserved array, plus 4 copies
+            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
+            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 18
+            """
             alpha = [
             [1.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
             [0.261216512493821, 0.738783487506179, 0.000000000000000, 0.000000000000000, 0.000000000000000],
@@ -339,12 +433,12 @@ class Solver(SolverBase):
                  +alpha[4-1][1]*u1 + beta[4-1][1]*dt*udot_1
                  +alpha[4-1][2]*u2 + beta[4-1][2]*dt*udot_2
                  +alpha[4-1][3]*u3 + beta[4-1][3]*dt*udot_3)
-            udot_4 = udot(u4)
+            #udot_4 = udot(u4)
             u  = (alpha[5-1][0]*u0 + beta[5-1][0]*dt*udot_0
                  +alpha[5-1][1]*u1 + beta[5-1][1]*dt*udot_1
                  +alpha[5-1][2]*u2 + beta[5-1][2]*dt*udot_2
                  +alpha[5-1][3]*u3 + beta[5-1][3]*dt*udot_3
-                 +alpha[5-1][4]*u4 + beta[5-1][4]*dt*udot_4)
+                 +alpha[5-1][4]*u4 + beta[5-1][4]*dt*udot(u4))
 
         self.conserved_w = u
         self.t += dt
