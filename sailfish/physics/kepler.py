@@ -25,7 +25,7 @@ class PointMass(NamedTuple):
     @property
     def kinetic_energy(self) -> float:
         """
-        Return the kinetic energy of a point mass.
+        The kinetic energy of a point mass
         """
         vx = p.velocity_x
         vy = p.velocity_y
@@ -34,7 +34,7 @@ class PointMass(NamedTuple):
     @property
     def angular_momentum(self) -> float:
         """
-        Return the angular momentum of a point mass.
+        The angular momentum of a point mass
         """
         x = p.position_x
         y = p.position_y
@@ -93,21 +93,21 @@ class OrbitalState(NamedTuple):
     @property
     def total_mass(self) -> float:
         """
-        Return the sum of the two point masses.
+        The sum of the two point masses
         """
         self[0].mass + self[1].mass
 
     @property
     def mass_ratio(self) -> float:
         """
-        Return the system mass ratio, secondary / primary.
+        The system mass ratio, secondary / primary
         """
         self[1].mass / self[0].mass
 
     @property
     def separation(self) -> float:
         """
-        Return the orbital separation.
+        The orbital separation
 
         This will always be the semi-major axis if the eccentricity is zero.
         """
@@ -120,21 +120,21 @@ class OrbitalState(NamedTuple):
     @property
     def total_energy(self) -> float:
         """
-        Return the system total energy.
+        The system total energy
         """
         return self.kinetic_energy - G * self[0].mass * self[1].mass / self.separation
 
     @property
     def kinetic_energy(self) -> float:
         """
-        Return the total kinetic energy of the system.
+        The total kinetic energy of the system
         """
         return self[0].kinetic_energy + self[1].kinetic_energy
 
     @property
     def angular_momentum(self) -> float:
         """
-        Return the total anuglar momentum of the system.
+        The total anuglar momentum of the system
         """
         return self[0].angular_momentum + self[1].angular_momentum
 
@@ -233,7 +233,7 @@ class OrbitalState(NamedTuple):
         Compute the inverse Kepler two-body problem.
 
         This function determines the orbital elements and orientation from the
-        orbital state vector and a current time, since last periapse.
+        orbital state vector and an absolute time.
         """
         c1 = self[0]
         c2 = self[1]
