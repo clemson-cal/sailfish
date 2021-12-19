@@ -1,5 +1,5 @@
 """
-An n-th order discontinuous Galerkin solver for 1D scalar advection.
+An n-th order discontinuous Galerkin solver for 1D scalar advection and inviscid Burgers eqn.
 """
 
 from typing import NamedTuple
@@ -50,6 +50,37 @@ class CellData:
 
 def dot(u, p):
     return sum(u[i] * p[i] for i in range(u.shape[0]))
+
+def limit_troubled_cells(u):
+
+    def minmod(w1, w0l, w0, w0r):
+        import numpy as np
+        BETA_TVB = 1.0
+        a = w1 * (3.0 ** 0.5)
+        b = (w0 - w0l) * BETA_TVB
+        c = (w0r - w0) * BETA_TVB
+
+        return (0.25 / (3.0 ** 0.5)) * abs(np.sign(a) + np.sign(b)) * (np.sign(a) + np.sign(c)) * min(abs(a), abs(b), abs(c))
+
+    nz = u.shape[0]
+    for i in range(nz):
+        im1 = (i - 1 + nz) % nz
+        ip1 = (i + 1 + nz) % nz
+
+        # integrating polynomial extended from left zone into this zone
+        a = 1.0 * u[im1,0] + 2.0 * (3.0 ** 0.5) * u[im1,1] + 5.0 * (5.0 ** 0.5) / 3.0 * u[im1,2]
+
+        # integrating polynomial extended from right zone into this zone
+        b = 1.0 * u[ip1,0] - 2.0 * (3.0 ** 0.5) * u[ip1,1] + 5.0 * (5.0 ** 0.5) / 3.0 * u[ip1,2]
+
+        tci = (abs(u[i,0] - a) + abs(u[i,0] - b)) / max(abs(u[im1,0]), abs(u[i,0]), abs(u[ip1,0]))
+
+        if (tci > 0.1):
+            w1t = minmod(u[i,1], u[im1,0], u[i,0], u[ip1,0])
+            if u[i,1] != w1t:
+                u[i,1] = w1t
+                u[i,2] = 0.0
+
 
 
 def rhs(physics, uw, cell, dx, uwdot):
@@ -198,6 +229,13 @@ class Solver(SolverBase):
         self.cell = cell
         self._options = options
         self._physics = physics
+
+#        #troubled cell indicator
+#        self.tci = np.zeros(self.conserved_w.shape[0])
+#
+#    @property
+#    def tci(self):
+#        return self.tci
 
     @property
     def solution(self):
@@ -440,5 +478,8 @@ class Solver(SolverBase):
                  +alpha[5-1][3]*u3 + beta[5-1][3]*dt*udot_3
                  +alpha[5-1][4]*u4 + beta[5-1][4]*dt*udot(u4))
 
+        limit_troubled_cells(u)
+
         self.conserved_w = u
         self.t += dt
+
