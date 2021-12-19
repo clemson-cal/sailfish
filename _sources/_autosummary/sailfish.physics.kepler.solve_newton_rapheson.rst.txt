@@ -1,0 +1,6 @@
+sailfish.physics.kepler.solve\_newton\_rapheson
+===============================================
+
+.. currentmodule:: sailfish.physics.kepler
+
+.. autofunction:: solve_newton_rapheson

@@ -1,0 +1,42 @@
+sailfish.physics.kepler.PointMass
+=================================
+
+.. currentmodule:: sailfish.physics.kepler
+
+.. autoclass:: PointMass
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PointMass.__init__
+      ~PointMass.count
+      ~PointMass.gravitational_acceleration
+      ~PointMass.gravitational_potential
+      ~PointMass.index
+      ~PointMass.perturb
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PointMass.angular_momentum
+      ~PointMass.kinetic_energy
+      ~PointMass.mass
+      ~PointMass.position_x
+      ~PointMass.position_y
+      ~PointMass.velocity_x
+      ~PointMass.velocity_y
+   
+   

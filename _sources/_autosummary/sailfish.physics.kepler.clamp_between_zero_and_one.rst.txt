@@ -1,0 +1,6 @@
+sailfish.physics.kepler.clamp\_between\_zero\_and\_one
+======================================================
+
+.. currentmodule:: sailfish.physics.kepler
+
+.. autofunction:: clamp_between_zero_and_one

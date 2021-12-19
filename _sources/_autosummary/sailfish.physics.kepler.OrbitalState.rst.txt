@@ -1,0 +1,46 @@
+sailfish.physics.kepler.OrbitalState
+====================================
+
+.. currentmodule:: sailfish.physics.kepler
+
+.. autoclass:: OrbitalState
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~OrbitalState.__init__
+      ~OrbitalState.count
+      ~OrbitalState.gravitational_acceleration
+      ~OrbitalState.gravitational_potential
+      ~OrbitalState.index
+      ~OrbitalState.orbital_parameters
+      ~OrbitalState.perturb
+      ~OrbitalState.rotate
+      ~OrbitalState.transform
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~OrbitalState.angular_momentum
+      ~OrbitalState.kinetic_energy
+      ~OrbitalState.mass_ratio
+      ~OrbitalState.primary
+      ~OrbitalState.secondary
+      ~OrbitalState.separation
+      ~OrbitalState.total_energy
+      ~OrbitalState.total_mass
+   
+   

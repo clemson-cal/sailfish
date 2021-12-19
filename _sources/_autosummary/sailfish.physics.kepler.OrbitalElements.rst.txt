@@ -1,0 +1,36 @@
+sailfish.physics.kepler.OrbitalElements
+=======================================
+
+.. currentmodule:: sailfish.physics.kepler
+
+.. autoclass:: OrbitalElements
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~OrbitalElements.__init__
+      ~OrbitalElements.count
+      ~OrbitalElements.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~OrbitalElements.eccentricity
+      ~OrbitalElements.mass_ratio
+      ~OrbitalElements.semimajor_axis
+      ~OrbitalElements.total_mass
+   
+   

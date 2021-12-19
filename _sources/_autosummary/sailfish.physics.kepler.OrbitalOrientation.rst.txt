@@ -1,0 +1,38 @@
+sailfish.physics.kepler.OrbitalOrientation
+==========================================
+
+.. currentmodule:: sailfish.physics.kepler
+
+.. autoclass:: OrbitalOrientation
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~OrbitalOrientation.__init__
+      ~OrbitalOrientation.count
+      ~OrbitalOrientation.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~OrbitalOrientation.cm_position_x
+      ~OrbitalOrientation.cm_position_y
+      ~OrbitalOrientation.cm_velocity_x
+      ~OrbitalOrientation.cm_velocity_y
+      ~OrbitalOrientation.periapse_argument
+      ~OrbitalOrientation.periapse_time
+   
+   

@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.driver.simulate &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.physics.kepler.solve_newton_rapheson &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -18,8 +18,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.driver.update_dict_where_none" href="sailfish.driver.update_dict_where_none.html" />
-    <link rel="prev" title="sailfish.driver.run" href="sailfish.driver.run.html" /> 
+    <link rel="next" title="sailfish.physics.kepler.OrbitalElements" href="sailfish.physics.kepler.OrbitalElements.html" />
+    <link rel="prev" title="sailfish.physics.kepler.clamp_between_zero_and_one" href="sailfish.physics.kepler.clamp_between_zero_and_one.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -42,27 +42,23 @@
 <li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
 <li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
-<li class="toctree-l2 current"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.asdict.html">sailfish.driver.asdict</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.first_not_none.html">sailfish.driver.first_not_none</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.fromdict.html">sailfish.driver.fromdict</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.init_logging.html">sailfish.driver.init_logging</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_event.html">sailfish.driver.keyed_event</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_value.html">sailfish.driver.keyed_value</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_checkpoint.html">sailfish.driver.load_checkpoint</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.main.html">sailfish.driver.main</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.run.html">sailfish.driver.run</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.driver.simulate</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_dict_where_none.html">sailfish.driver.update_dict_where_none</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_where_none.html">sailfish.driver.update_where_none</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.write_checkpoint.html">sailfish.driver.write_checkpoint</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.DriverArgs.html">sailfish.driver.DriverArgs</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ConfigurationError.html">sailfish.driver.ConfigurationError</a></li>
-</ul>
-</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="sailfish.physics.kepler.html">sailfish.physics.kepler</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.clamp_between_zero_and_one.html">sailfish.physics.kepler.clamp_between_zero_and_one</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.physics.kepler.solve_newton_rapheson</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.OrbitalElements.html">sailfish.physics.kepler.OrbitalElements</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.OrbitalOrientation.html">sailfish.physics.kepler.OrbitalOrientation</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.OrbitalParameters.html">sailfish.physics.kepler.OrbitalParameters</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.OrbitalState.html">sailfish.physics.kepler.OrbitalState</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.PointMass.html">sailfish.physics.kepler.PointMass</a></li>
+</ul>
+</li>
+</ul>
+</li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
@@ -87,10 +83,11 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
           <li><a href="../api.html">API documentation</a> &raquo;</li>
-          <li><a href="sailfish.driver.html">sailfish.driver</a> &raquo;</li>
-      <li>sailfish.driver.simulate</li>
+          <li><a href="sailfish.physics.html">sailfish.physics</a> &raquo;</li>
+          <li><a href="sailfish.physics.kepler.html">sailfish.physics.kepler</a> &raquo;</li>
+      <li>sailfish.physics.kepler.solve_newton_rapheson</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/_autosummary/sailfish.driver.simulate.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/_autosummary/sailfish.physics.kepler.solve_newton_rapheson.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -98,18 +95,12 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-driver-simulate">
-<h1>sailfish.driver.simulate<a class="headerlink" href="#sailfish-driver-simulate" title="Permalink to this headline"></a></h1>
+  <section id="sailfish-physics-kepler-solve-newton-rapheson">
+<h1>sailfish.physics.kepler.solve_newton_rapheson<a class="headerlink" href="#sailfish-physics-kepler-solve-newton-rapheson" title="Permalink to this headline"></a></h1>
 <dl class="py function">
-<dt class="sig sig-object py" id="sailfish.driver.simulate">
-<span class="sig-prename descclassname"><span class="pre">sailfish.driver.</span></span><span class="sig-name descname"><span class="pre">simulate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">driver</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/driver.html#simulate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.driver.simulate" title="Permalink to this definition"></a></dt>
-<dd><p>Main generator for running simulations.</p>
-<p>If invoked with a <cite>DriverArgs</cite> instance in <cite>driver</cite>, the other arguments
-are ignored. Otherwise, the driver is created from the setup name, model
-paramters, and keyword arguments.</p>
-<p>This function is a generator: it yields its state at a sequence of
-pause points, defined by the <cite>events</cite> dictionary.</p>
-</dd></dl>
+<dt class="sig sig-object py" id="sailfish.physics.kepler.solve_newton_rapheson">
+<span class="sig-prename descclassname"><span class="pre">sailfish.physics.kepler.</span></span><span class="sig-name descname"><span class="pre">solve_newton_rapheson</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">f</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">g</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="../_modules/sailfish/physics/kepler.html#solve_newton_rapheson"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.kepler.solve_newton_rapheson" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
 
 </section>
 
@@ -117,8 +108,8 @@ pause points, defined by the <cite>events</cite> dictionary.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.driver.run.html" class="btn btn-neutral float-left" title="sailfish.driver.run" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.driver.update_dict_where_none.html" class="btn btn-neutral float-right" title="sailfish.driver.update_dict_where_none" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.physics.kepler.clamp_between_zero_and_one.html" class="btn btn-neutral float-left" title="sailfish.physics.kepler.clamp_between_zero_and_one" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.physics.kepler.OrbitalElements.html" class="btn btn-neutral float-right" title="sailfish.physics.kepler.OrbitalElements" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
