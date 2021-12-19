@@ -165,8 +165,8 @@ class Solver(SolverBase):
         if physics.equation not in ["advection", "burgers"]:
             raise ValueError("physics.equation must be advection or burgers")
 
-        if options.integrator not in ["rk1", "rk2", "rk3", "rk3-sr02"]:
-            raise ValueError("options.integrator must be rk1|rk2|rk3|rk3-sr02")
+        if options.integrator not in ["rk1", "rk2", "rk3", "rk3-sr02", "SSPRK32", "SSPRK54"]:
+            raise ValueError("options.integrator must be rk1|rk2|rk3|rk3-sr02|SSPRK32|SSPRK54")
 
         if options.order <= 0:
             raise ValueError("option.order must be greater than 0")
@@ -235,6 +235,10 @@ class Solver(SolverBase):
             return 1.0 / (2 * k + 1)
         if self._options.integrator == "rk3-sr02":
             return 2.0 / (2 * k + 1)
+        if self._options.integrator == "SSPRK32":
+            return 1.0 / (2 * k + 1)
+        if self._options.integrator == "SSPRK54":
+            return 1.0 / (2 * k + 1)
 
     def maximum_wavespeed(self):
         if self._physics.equation == "advection":
@@ -276,6 +280,71 @@ class Solver(SolverBase):
             u = u + 0.5 * dt * udot(u)
             u = 2.0 / 3.0 * u0 + 1.0 / 3.0 * (u + 0.5 * dt * udot(u))
             u = u + 0.5 * dt * udot(u)
+
+        if self._options.integrator == "SSPRK32":
+            # Kubatko+, J Sci Comput (2014) 60:313–344 Table 7
+            # SSPRK(3,2) in Shu-Osher form
+            alpha = [
+            [1.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.087353119859156, 0.912646880140844, 0.000000000000000],
+            [0.344956917166841, 0.000000000000000, 0.655043082833159]
+            ]
+            beta = [
+            [0.528005024856522, 0.000000000000000, 0.000000000000000],
+            [0.000000000000000, 0.481882138633993, 0.000000000000000],
+            [0.022826837460491, 0.000000000000000, 0.345866039233415]
+            ]
+
+            u = u0 = self.conserved_w.copy()
+            udot_0 = udot(u0)
+            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
+            udot_1 = udot(u1)
+            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
+                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)
+            udot_2 = udot(u2)    
+            u  = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
+                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
+                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot_2)
+
+        if self._options.integrator == "SSPRK54":
+            # Kubatko+, J Sci Comput (2014) 60:313–344 Table 18
+            # SSPRK(5,4) in Shu-Osher form
+            alpha = [
+            [1.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.261216512493821, 0.738783487506179, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.623613752757655, 0.000000000000000, 0.376386247242345, 0.000000000000000, 0.000000000000000],
+            [0.444745181201454, 0.120932584902288, 0.000000000000000, 0.434322233896258, 0.000000000000000],
+            [0.213357715199957, 0.209928473023448, 0.063353148180384, 0.000000000000000, 0.513360663596212]
+            ]
+            beta  = [
+            [0.605491839566400, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.000000000000000, 0.447327372891397, 0.000000000000000, 0.000000000000000, 0.000000000000000],
+            [0.000000844149769, 0.000000000000000, 0.227898801230261, 0.000000000000000, 0.000000000000000],
+            [0.002856233144485, 0.073223693296006, 0.000000000000000, 0.262978568366434, 0.000000000000000],
+            [0.002362549760441, 0.127109977308333, 0.038359814234063, 0.000000000000000, 0.310835692561898]
+            ] 
+            
+            u = u0 = self.conserved_w.copy()
+            udot_0 = udot(u0)
+            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
+            udot_1 = udot(u1)
+            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
+                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)
+            udot_2 = udot(u2)
+            u3 = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
+                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
+                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot_2)
+            udot_3 = udot(u3)
+            u4 = (alpha[4-1][0]*u0 + beta[4-1][0]*dt*udot_0
+                 +alpha[4-1][1]*u1 + beta[4-1][1]*dt*udot_1
+                 +alpha[4-1][2]*u2 + beta[4-1][2]*dt*udot_2
+                 +alpha[4-1][3]*u3 + beta[4-1][3]*dt*udot_3)
+            udot_4 = udot(u4)
+            u  = (alpha[5-1][0]*u0 + beta[5-1][0]*dt*udot_0
+                 +alpha[5-1][1]*u1 + beta[5-1][1]*dt*udot_1
+                 +alpha[5-1][2]*u2 + beta[5-1][2]*dt*udot_2
+                 +alpha[5-1][3]*u3 + beta[5-1][3]*dt*udot_3
+                 +alpha[5-1][4]*u4 + beta[5-1][4]*dt*udot_4)
 
         self.conserved_w = u
         self.t += dt
