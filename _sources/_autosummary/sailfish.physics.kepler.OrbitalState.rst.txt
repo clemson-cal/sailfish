@@ -23,8 +23,6 @@ sailfish.physics.kepler.OrbitalState
       ~OrbitalState.index
       ~OrbitalState.orbital_parameters
       ~OrbitalState.perturb
-      ~OrbitalState.rotate
-      ~OrbitalState.transform
    
    
 

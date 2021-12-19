@@ -28,7 +28,6 @@ sailfish.physics.kepler
    
       OrbitalElements
       OrbitalOrientation
-      OrbitalParameters
       OrbitalState
       PointMass
    

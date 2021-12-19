@@ -19,7 +19,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="sailfish.physics.kepler.PointMass" href="sailfish.physics.kepler.PointMass.html" />
-    <link rel="prev" title="sailfish.physics.kepler.OrbitalParameters" href="sailfish.physics.kepler.OrbitalParameters.html" /> 
+    <link rel="prev" title="sailfish.physics.kepler.OrbitalOrientation" href="sailfish.physics.kepler.OrbitalOrientation.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -52,7 +52,6 @@
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.solve_newton_rapheson.html">sailfish.physics.kepler.solve_newton_rapheson</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.OrbitalElements.html">sailfish.physics.kepler.OrbitalElements</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.OrbitalOrientation.html">sailfish.physics.kepler.OrbitalOrientation</a></li>
-<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.OrbitalParameters.html">sailfish.physics.kepler.OrbitalParameters</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.physics.kepler.OrbitalState</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.PointMass.html">sailfish.physics.kepler.PointMass</a></li>
 </ul>
@@ -134,12 +133,6 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.kepler.OrbitalState.perturb" title="sailfish.physics.kepler.OrbitalState.perturb"><code class="xref py py-obj docutils literal notranslate"><span class="pre">perturb</span></code></a>(dm1, dm2, dpx1, dpx2, dpy1, dpy2)</p></td>
 <td><p>Returns a new orbital state vector if this one is perturbed by the given masses and momenta.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.kepler.OrbitalState.rotate" title="sailfish.physics.kepler.OrbitalState.rotate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rotate</span></code></a>(angle)</p></td>
-<td><p>Rotate an orbital state vector by an angle.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.kepler.OrbitalState.transform" title="sailfish.physics.kepler.OrbitalState.transform"><code class="xref py py-obj docutils literal notranslate"><span class="pre">transform</span></code></a>(o)</p></td>
-<td><p>Transforms this orbital state vector to a new orientation.</p></td>
-</tr>
 </tbody>
 </table>
 <p class="rubric">Attributes</p>
@@ -220,7 +213,7 @@
 
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.physics.kepler.OrbitalState.orbital_parameters">
-<span class="sig-name descname"><span class="pre">orbital_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="sailfish.physics.kepler.OrbitalParameters.html#sailfish.physics.kepler.OrbitalParameters" title="sailfish.physics.kepler.OrbitalParameters"><span class="pre">sailfish.physics.kepler.OrbitalParameters</span></a></span></span><a class="reference internal" href="../_modules/sailfish/physics/kepler.html#OrbitalState.orbital_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.kepler.OrbitalState.orbital_parameters" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">orbital_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/physics/kepler.html#OrbitalState.orbital_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.kepler.OrbitalState.orbital_parameters" title="Permalink to this definition"></a></dt>
 <dd><p>Compute the inverse Kepler two-body problem.</p>
 <p>This function determines the orbital elements and orientation from the
 orbital state vector and an absolute time.</p>
@@ -232,12 +225,12 @@ orbital state vector and an absolute time.</p>
 <dd><p>Returns a new orbital state vector if this one is perturbed by the
 given masses and momenta.</p>
 <ul class="simple">
-<li><p><cite>dm1</cite>   Mass added to the primary</p></li>
-<li><p><cite>dm2</cite>   Mass added to the secondary</p></li>
-<li><p><cite>dpx1</cite>  Impulse (x) added to the primary</p></li>
-<li><p><cite>dpx2</cite>  Impulse (x) added to the secondary</p></li>
-<li><p><cite>dpy1</cite>  Impulse (y) added to the primary</p></li>
-<li><p><cite>dpy2</cite>  Impulse (y) added to the secondary</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">dm1</span></code>   Mass added to the primary</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">dm2</span></code>   Mass added to the secondary</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">dpx1</span></code>  Impulse (x) added to the primary</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">dpx2</span></code>  Impulse (x) added to the secondary</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">dpy1</span></code>  Impulse (y) added to the primary</p></li>
+<li><p><code class="code docutils literal notranslate"><span class="pre">dpy2</span></code>  Impulse (y) added to the secondary</p></li>
 </ul>
 </dd></dl>
 
@@ -245,15 +238,6 @@ given masses and momenta.</p>
 <dt class="sig sig-object py" id="sailfish.physics.kepler.OrbitalState.primary">
 <span class="sig-name descname"><span class="pre">primary</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="sailfish.physics.kepler.PointMass.html#sailfish.physics.kepler.PointMass" title="sailfish.physics.kepler.PointMass"><span class="pre">sailfish.physics.kepler.PointMass</span></a></em><a class="headerlink" href="#sailfish.physics.kepler.OrbitalState.primary" title="Permalink to this definition"></a></dt>
 <dd><p>Alias for field number 0</p>
-</dd></dl>
-
-<dl class="py method">
-<dt class="sig sig-object py" id="sailfish.physics.kepler.OrbitalState.rotate">
-<span class="sig-name descname"><span class="pre">rotate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">angle</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#sailfish.physics.kepler.OrbitalState" title="sailfish.physics.kepler.OrbitalState"><span class="pre">sailfish.physics.kepler.OrbitalState</span></a></span></span><a class="reference internal" href="../_modules/sailfish/physics/kepler.html#OrbitalState.rotate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.kepler.OrbitalState.rotate" title="Permalink to this definition"></a></dt>
-<dd><p>Rotate an orbital state vector by an angle.</p>
-<p>Positive angle means that the argument of periapse moves
-counter-clockwise, in other words this function rotates the binary,
-not the coordinates.</p>
 </dd></dl>
 
 <dl class="py attribute">
@@ -281,18 +265,6 @@ not the coordinates.</p>
 <dd><p>The sum of the two point masses</p>
 </dd></dl>
 
-<dl class="py method">
-<dt class="sig sig-object py" id="sailfish.physics.kepler.OrbitalState.transform">
-<span class="sig-name descname"><span class="pre">transform</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">o</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="sailfish.physics.kepler.OrbitalOrientation.html#sailfish.physics.kepler.OrbitalOrientation" title="sailfish.physics.kepler.OrbitalOrientation"><span class="pre">sailfish.physics.kepler.OrbitalOrientation</span></a></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="#sailfish.physics.kepler.OrbitalState" title="sailfish.physics.kepler.OrbitalState"><span class="pre">sailfish.physics.kepler.OrbitalState</span></a></span></span><a class="reference internal" href="../_modules/sailfish/physics/kepler.html#OrbitalState.transform"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.kepler.OrbitalState.transform" title="Permalink to this definition"></a></dt>
-<dd><p>Transforms this orbital state vector to a new orientation.</p>
-<p>This function rotates the position and velocity vectors according to
-the argument of periapse, and translates them according to the
-center-of-mass position and velocity. Note that the
-time-of-last-periapse-passage is technically part of the orbital
-orientation, but is ignored by this function, as that would change the
-intrinsic orbital phase.</p>
-</dd></dl>
-
 </dd></dl>
 
 </section>
@@ -301,7 +273,7 @@ intrinsic orbital phase.</p>
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.physics.kepler.OrbitalParameters.html" class="btn btn-neutral float-left" title="sailfish.physics.kepler.OrbitalParameters" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.physics.kepler.OrbitalOrientation.html" class="btn btn-neutral float-left" title="sailfish.physics.kepler.OrbitalOrientation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="sailfish.physics.kepler.PointMass.html" class="btn btn-neutral float-right" title="sailfish.physics.kepler.PointMass" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

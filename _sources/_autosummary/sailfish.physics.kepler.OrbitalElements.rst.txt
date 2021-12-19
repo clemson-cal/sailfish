@@ -18,7 +18,11 @@ sailfish.physics.kepler.OrbitalElements
    
       ~OrbitalElements.__init__
       ~OrbitalElements.count
+      ~OrbitalElements.eccentric_anomaly
       ~OrbitalElements.index
+      ~OrbitalElements.orbital_state
+      ~OrbitalElements.orbital_state_from_eccentric_anomaly
+      ~OrbitalElements.orbital_state_with_orientation
    
    
 
@@ -28,8 +32,11 @@ sailfish.physics.kepler.OrbitalElements
 
    .. autosummary::
    
+      ~OrbitalElements.angular_momentum
       ~OrbitalElements.eccentricity
       ~OrbitalElements.mass_ratio
+      ~OrbitalElements.omega
+      ~OrbitalElements.period
       ~OrbitalElements.semimajor_axis
       ~OrbitalElements.total_mass
    
