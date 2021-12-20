@@ -1,8 +1,9 @@
 """
-Two-dimensional vertically integrated hydro with gamma-law EOS.
+Two-dimensional vertically integrated hydro with gamma-law EOS
+
+This solver is still a work-in-progress.
 
 Fill in more details about the physics here:
-
 """
 
 from logging import getLogger
@@ -14,6 +15,16 @@ from sailfish.solver import SolverBase
 
 
 logger = getLogger(__name__)
+
+
+class Physics(NamedTuple):
+    gamma_law_index: float = 5.0 / 3.0
+    viscosity_coefficient: float = 0.01
+
+
+class Options(NamedTuple):
+    velocity_ceiling: float = None
+    mach_ceiling: float = None
 
 
 def initial_condition(setup, mesh, time):
@@ -44,26 +55,21 @@ class Patch:
         primitive,
         mesh,
         index_range,
+        physics,
+        options,
         lib,
         xp,
     ):
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
-        self.num_zones = index_range[1] - index_range[0]
-        self.faces = self.xp.array(mesh.faces(*index_range))
-        self.coordinates = COORDINATES_DICT[type(mesh)]
-        try:
-            adot = float(mesh.scale_factor_derivative)
-            self.scale_factor_initial = 0.0
-            self.scale_factor_derivative = adot
-        except (TypeError, AttributeError):
-            self.scale_factor_initial = 1.0
-            self.scale_factor_derivative = 0.0
-
         self.time = self.time0 = time
+        self.shape = (i1 - i0, mesh.shape[1])  # not including guard zones
+        self.physics = physics
+        self.options = options
 
         with self.execution_context():
+            self.wavespeeds = self.xp.zeros(primitive.shape[:2])
             self.primitive1 = self.xp.array(primitive)
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.primitive_to_conserved(self.primitive1)
@@ -72,51 +78,27 @@ class Patch:
         """TODO: return a CUDA context for execution on the assigned device"""
         return nullcontext()
 
+    def maximum_wavespeed(self):
+        with self.execution_context():
+            self.lib.cbdgam_2d_wavespeed[self.shape](
+                self.primitive1,
+                self.wavespeeds,
+                self.physics.gamma_law_index,
+            )
+            return self.xp.max(self.wavespeeds[ng:-ng, ng:-ng])
+
     def primitive_to_conserved(self, primitive):
         with self.execution_context():
-            # TODO: use correct function signature
-            conserved = self.xp.zeros_like(primitive)
-            self.lib.cbdgam_2d_primitive_to_conserved[self.num_zones](
-                self.faces,
-                primitive,
-                conserved,
-                self.scale_factor,
-                self.coordinates,
-            )
-            return conserved
-
-    def recompute_primitive(self):
-        with self.execution_context():
-            # TODO: use correct function signature
-            self.lib.cbdgam_2d_conserved_to_primitive[self.num_zones](
-                self.faces,
-                self.conserved1,
-                self.primitive1,
-            )
+            pass
 
     def recompute_conserved(self):
         with self.execution_context():
-            # TODO: use correct function signature
-            self.lib.cbdgam_2d_primitive_to_conserved[self.num_zones](
-                self.faces,
-                self.primitive1,
-                self.conserved1,
-            )
+            pass
 
     def advance_rk(self, rk_param, dt):
         with self.execution_context():
-            # TODO: use correct function signature
-            self.lib.cbdgam_2d_advance_rk[self.num_zones](
-                self.faces,
-                self.conserved0,
-                self.primitive1,
-                self.conserved1,
-                self.conserved2,
-                self.time,
-                rk_param,
-                dt,
-                self.coordinates,
-            )
+            pass
+
         self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
@@ -126,7 +108,6 @@ class Patch:
 
     @property
     def primitive(self):
-        self.recompute_primitive()
         return self.primitive1
 
 
@@ -152,12 +133,15 @@ class Solver(SolverBase):
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
+        self._physics = Physics(**physics)
+        self._options = Options(**options)
+
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        lib = Library(code, mode=mode, debug=False)
+        lib = Library(code, mode=mode, debug=True)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
@@ -179,7 +163,9 @@ class Solver(SolverBase):
         for (a, b) in subdivide(mesh.shape[0], num_patches):
             prim = xp.zeros([b - a + 2 * ng, mesh.shape[1] + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
-            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
+            self.patches.append(
+                Patch(time, prim, mesh, (a, b), physics, options, lib, xp)
+            )
 
         self.set_bc("primitive1")
 
@@ -204,18 +190,18 @@ class Solver(SolverBase):
 
     @property
     def options(self):
-        return dict()
+        return self._options._asdict()
 
     @property
     def physics(self):
-        return dict()
+        return self._physics._asdict()
 
     @property
     def maximum_cfl(self):
         return 0.1
 
     def maximum_wavespeed(self):
-        raise NotImplementedError("need to compute max wavespeeds on the grid patches")
+        return max(patch.maximum_wavespeed() for patch in self.patches)
 
     def advance(self, dt):
         self.new_iteration()
