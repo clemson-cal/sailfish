@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.physics.kepler &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.physics.kepler</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.physics.kepler</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Code to solve the Kepler two-body problem, and its inverse.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sin</span><span class="p">,</span> <span class="n">cos</span><span class="p">,</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">atan2</span>
+
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Newton&#39;s gravitational constant is G=1.0, so mass M really means G M.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="n">NEWTON_G</span> <span class="o">=</span> <span class="mf">1.0</span>
+
+
+<div class="viewcode-block" id="PointMass"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.PointMass.html#sailfish.physics.kepler.PointMass">[docs]</a><span class="k">class</span> <span class="nc">PointMass</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The mass, 2D position, and 2D velocity of a point-like particle</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">mass</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">position_x</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">position_y</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">velocity_x</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">velocity_y</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">kinetic_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The kinetic energy of a point mass</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">vx</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">velocity_x</span>
+        <span class="n">vy</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">velocity_y</span>
+        <span class="k">return</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">mass</span> <span class="o">*</span> <span class="p">(</span><span class="n">vx</span> <span class="o">*</span> <span class="n">vx</span> <span class="o">+</span> <span class="n">vy</span> <span class="o">*</span> <span class="n">vy</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">angular_momentum</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The angular momentum of a point mass</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">position_x</span>
+        <span class="n">y</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">position_y</span>
+        <span class="n">vx</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">velocity_x</span>
+        <span class="n">vy</span> <span class="o">=</span> <span class="n">p</span><span class="o">.</span><span class="n">velocity_y</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">mass</span> <span class="o">*</span> <span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">vy</span> <span class="o">-</span> <span class="n">y</span> <span class="o">*</span> <span class="n">vx</span><span class="p">)</span>
+
+<div class="viewcode-block" id="PointMass.gravitational_potential"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.PointMass.html#sailfish.physics.kepler.PointMass.gravitational_potential">[docs]</a>    <span class="k">def</span> <span class="nf">gravitational_potential</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the gravitational potential of a point mass, with softening.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">position_x</span>
+        <span class="n">dy</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">position_y</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">dx</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">+</span> <span class="n">dy</span> <span class="o">*</span> <span class="n">dy</span>
+        <span class="n">s2</span> <span class="o">=</span> <span class="n">softening_length</span><span class="o">.</span><span class="n">powi</span><span class="p">(</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="o">-</span><span class="n">NEWTON_G</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">mass</span> <span class="o">/</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">r2</span> <span class="o">+</span> <span class="n">s2</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PointMass.gravitational_acceleration"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.PointMass.html#sailfish.physics.kepler.PointMass.gravitational_acceleration">[docs]</a>    <span class="k">def</span> <span class="nf">gravitational_acceleration</span><span class="p">(</span>
+        <span class="n">p</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span><span class="nb">float</span><span class="p">,</span> <span class="nb">float</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the gravitational acceleration due to a point mass.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">position_x</span>
+        <span class="n">dy</span> <span class="o">=</span> <span class="n">y</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">position_y</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">dx</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">+</span> <span class="n">dy</span> <span class="o">*</span> <span class="n">dy</span>
+        <span class="n">s2</span> <span class="o">=</span> <span class="n">softening_length</span> <span class="o">**</span> <span class="mf">2.0</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="o">-</span><span class="n">NEWTON_G</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">mass</span> <span class="o">/</span> <span class="p">(</span><span class="n">r2</span> <span class="o">+</span> <span class="n">s2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">1.5</span> <span class="o">*</span> <span class="n">dx</span>
+        <span class="n">ay</span> <span class="o">=</span> <span class="o">-</span><span class="n">NEWTON_G</span> <span class="o">*</span> <span class="n">p</span><span class="o">.</span><span class="n">mass</span> <span class="o">/</span> <span class="p">(</span><span class="n">r2</span> <span class="o">+</span> <span class="n">s2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">1.5</span> <span class="o">*</span> <span class="n">dy</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">ax</span><span class="p">,</span> <span class="n">ay</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="PointMass.perturb"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.PointMass.html#sailfish.physics.kepler.PointMass.perturb">[docs]</a>    <span class="k">def</span> <span class="nf">perturb</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dm</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">dpx</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span><span class="p">,</span> <span class="n">dpy</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;PointMass&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Perturb the mass and momentum of a point mass.</span>
+
+<span class="sd">        Since the point mass maintains a velocity rather than momentum,</span>
+<span class="sd">        the velocity is changed according to</span>
+
+<span class="sd">        dv = (dp - v dm) / m</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">p</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span>
+            <span class="n">mass</span><span class="o">=</span><span class="n">p</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="n">dm</span><span class="p">,</span>
+            <span class="n">velocity_x</span><span class="o">=</span><span class="n">velocity_x</span> <span class="o">+</span> <span class="p">(</span><span class="n">dpx</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">velocity_x</span> <span class="o">*</span> <span class="n">dm</span><span class="p">)</span> <span class="o">/</span> <span class="n">p</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+            <span class="n">velocity_y</span><span class="o">=</span><span class="n">velocity_y</span> <span class="o">+</span> <span class="p">(</span><span class="n">dpy</span> <span class="o">-</span> <span class="n">p</span><span class="o">.</span><span class="n">velocity_y</span> <span class="o">*</span> <span class="n">dm</span><span class="p">)</span> <span class="o">/</span> <span class="n">p</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+        <span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="OrbitalState"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalState.html#sailfish.physics.kepler.OrbitalState">[docs]</a><span class="k">class</span> <span class="nc">OrbitalState</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="n">primary</span><span class="p">:</span> <span class="n">PointMass</span>
+    <span class="n">secondary</span><span class="p">:</span> <span class="n">PointMass</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">total_mass</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The sum of the two point masses</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">mass_ratio</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The system mass ratio, secondary / primary</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span> <span class="o">/</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">separation</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The orbital separation</span>
+
+<span class="sd">        This will always be the semi-major axis if the eccentricity is zero.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">position_x</span>
+        <span class="n">y1</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">position_y</span>
+        <span class="n">x2</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">position_x</span>
+        <span class="n">y2</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">position_y</span>
+        <span class="k">return</span> <span class="n">sqrt</span><span class="p">((</span><span class="n">x2</span> <span class="o">-</span> <span class="n">x1</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span> <span class="o">+</span> <span class="p">(</span><span class="n">y2</span> <span class="o">-</span> <span class="n">y1</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">total_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The system total energy</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">kinetic_energy</span> <span class="o">-</span> <span class="n">G</span> <span class="o">*</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span> <span class="o">*</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">separation</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">kinetic_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The total kinetic energy of the system</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">kinetic_energy</span> <span class="o">+</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">kinetic_energy</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">angular_momentum</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The total anuglar momentum of the system</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">angular_momentum</span> <span class="o">+</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">angular_momentum</span>
+
+<div class="viewcode-block" id="OrbitalState.gravitational_potential"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalState.html#sailfish.physics.kepler.OrbitalState.gravitational_potential">[docs]</a>    <span class="k">def</span> <span class="nf">gravitational_potential</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the combined gravitational potential at a point, with softening.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">p0</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">gravitational_potential</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">)</span>
+        <span class="n">p1</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">gravitational_potential</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">p0</span> <span class="o">+</span> <span class="n">p1</span></div>
+
+<div class="viewcode-block" id="OrbitalState.gravitational_acceleration"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalState.html#sailfish.physics.kepler.OrbitalState.gravitational_acceleration">[docs]</a>    <span class="k">def</span> <span class="nf">gravitational_acceleration</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">y</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the combined gravitational acceleration at a point, with softening.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">a0</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">gravitational_acceleration</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">)</span>
+        <span class="n">a1</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">gravitational_acceleration</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">,</span> <span class="n">softening_length</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span><span class="n">a0</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="n">a1</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">a0</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">a1</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span></div>
+
+<div class="viewcode-block" id="OrbitalState.perturb"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalState.html#sailfish.physics.kepler.OrbitalState.perturb">[docs]</a>    <span class="k">def</span> <span class="nf">perturb</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">dm1</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dm2</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dpx1</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dpx2</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dpy1</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">dpy2</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="s2">&quot;OrbitalState&quot;</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns a new orbital state vector if this one is perturbed by the</span>
+<span class="sd">        given masses and momenta.</span>
+
+<span class="sd">        - :code:`dm1`   Mass added to the primary</span>
+<span class="sd">        - :code:`dm2`   Mass added to the secondary</span>
+<span class="sd">        - :code:`dpx1`  Impulse (x) added to the primary</span>
+<span class="sd">        - :code:`dpx2`  Impulse (x) added to the secondary</span>
+<span class="sd">        - :code:`dpy1`  Impulse (y) added to the primary</span>
+<span class="sd">        - :code:`dpy2`  Impulse (y) added to the secondary</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">return</span> <span class="n">OrbitalState</span><span class="p">(</span>
+            <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">perturb_mass_and_momentum</span><span class="p">(</span><span class="n">dm1</span><span class="p">,</span> <span class="n">dpx1</span><span class="p">,</span> <span class="n">dpy1</span><span class="p">),</span>
+            <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">perturb_mass_and_momentum</span><span class="p">(</span><span class="n">dm2</span><span class="p">,</span> <span class="n">dpx2</span><span class="p">,</span> <span class="n">dpy2</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="OrbitalState.orbital_parameters"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalState.html#sailfish.physics.kepler.OrbitalState.orbital_parameters">[docs]</a>    <span class="k">def</span> <span class="nf">orbital_parameters</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="p">(</span><span class="s2">&quot;OrbitalElements&quot;</span><span class="p">,</span> <span class="s2">&quot;OrbitalOrientation&quot;</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the inverse Kepler two-body problem.</span>
+
+<span class="sd">        This function determines the orbital elements and orientation from the</span>
+<span class="sd">        orbital state vector and an absolute time.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">c1</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">c2</span> <span class="o">=</span> <span class="bp">self</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+
+        <span class="c1"># component masses, total mass, and mass ratio</span>
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">c1</span><span class="o">.</span><span class="n">mass</span>
+        <span class="n">m2</span> <span class="o">=</span> <span class="n">c2</span><span class="o">.</span><span class="n">mass</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">m1</span> <span class="o">+</span> <span class="n">m2</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="n">m2</span> <span class="o">/</span> <span class="n">m1</span>
+
+        <span class="c1"># position and velocity of the CM frame</span>
+        <span class="n">x_cm</span> <span class="o">=</span> <span class="p">(</span><span class="n">c1</span><span class="o">.</span><span class="n">position_x</span> <span class="o">*</span> <span class="n">c1</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="n">c2</span><span class="o">.</span><span class="n">position_x</span> <span class="o">*</span> <span class="n">c2</span><span class="o">.</span><span class="n">mass</span><span class="p">)</span> <span class="o">/</span> <span class="n">m</span>
+        <span class="n">y_cm</span> <span class="o">=</span> <span class="p">(</span><span class="n">c1</span><span class="o">.</span><span class="n">position_y</span> <span class="o">*</span> <span class="n">c1</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="n">c2</span><span class="o">.</span><span class="n">position_y</span> <span class="o">*</span> <span class="n">c2</span><span class="o">.</span><span class="n">mass</span><span class="p">)</span> <span class="o">/</span> <span class="n">m</span>
+        <span class="n">vx_cm</span> <span class="o">=</span> <span class="p">(</span><span class="n">c1</span><span class="o">.</span><span class="n">velocity_x</span> <span class="o">*</span> <span class="n">c1</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="n">c2</span><span class="o">.</span><span class="n">velocity_x</span> <span class="o">*</span> <span class="n">c2</span><span class="o">.</span><span class="n">mass</span><span class="p">)</span> <span class="o">/</span> <span class="n">m</span>
+        <span class="n">vy_cm</span> <span class="o">=</span> <span class="p">(</span><span class="n">c1</span><span class="o">.</span><span class="n">velocity_y</span> <span class="o">*</span> <span class="n">c1</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="n">c2</span><span class="o">.</span><span class="n">velocity_y</span> <span class="o">*</span> <span class="n">c2</span><span class="o">.</span><span class="n">mass</span><span class="p">)</span> <span class="o">/</span> <span class="n">m</span>
+
+        <span class="c1"># positions and velocities of the components in the CM frame</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="n">c1</span><span class="o">.</span><span class="n">position_x</span> <span class="o">-</span> <span class="n">x_cm</span>
+        <span class="n">y1</span> <span class="o">=</span> <span class="n">c1</span><span class="o">.</span><span class="n">position_y</span> <span class="o">-</span> <span class="n">y_cm</span>
+        <span class="n">x2</span> <span class="o">=</span> <span class="n">c2</span><span class="o">.</span><span class="n">position_x</span> <span class="o">-</span> <span class="n">x_cm</span>
+        <span class="n">y2</span> <span class="o">=</span> <span class="n">c2</span><span class="o">.</span><span class="n">position_y</span> <span class="o">-</span> <span class="n">y_cm</span>
+        <span class="n">r1</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x1</span> <span class="o">*</span> <span class="n">x1</span> <span class="o">+</span> <span class="n">y1</span> <span class="o">*</span> <span class="n">y1</span><span class="p">)</span>
+        <span class="n">r2</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x2</span> <span class="o">*</span> <span class="n">x2</span> <span class="o">+</span> <span class="n">y2</span> <span class="o">*</span> <span class="n">y2</span><span class="p">)</span>
+        <span class="n">vx1</span> <span class="o">=</span> <span class="n">c1</span><span class="o">.</span><span class="n">velocity_x</span> <span class="o">-</span> <span class="n">vx_cm</span>
+        <span class="n">vy1</span> <span class="o">=</span> <span class="n">c1</span><span class="o">.</span><span class="n">velocity_y</span> <span class="o">-</span> <span class="n">vy_cm</span>
+        <span class="n">vx2</span> <span class="o">=</span> <span class="n">c2</span><span class="o">.</span><span class="n">velocity_x</span> <span class="o">-</span> <span class="n">vx_cm</span>
+        <span class="n">vy2</span> <span class="o">=</span> <span class="n">c2</span><span class="o">.</span><span class="n">velocity_y</span> <span class="o">-</span> <span class="n">vy_cm</span>
+        <span class="n">vf1</span> <span class="o">=</span> <span class="o">-</span><span class="n">vx1</span> <span class="o">*</span> <span class="n">y1</span> <span class="o">/</span> <span class="n">r1</span> <span class="o">+</span> <span class="n">vy1</span> <span class="o">*</span> <span class="n">x1</span> <span class="o">/</span> <span class="n">r1</span>
+        <span class="n">vf2</span> <span class="o">=</span> <span class="o">-</span><span class="n">vx2</span> <span class="o">*</span> <span class="n">y2</span> <span class="o">/</span> <span class="n">r2</span> <span class="o">+</span> <span class="n">vy2</span> <span class="o">*</span> <span class="n">x2</span> <span class="o">/</span> <span class="n">r2</span>
+        <span class="n">v1</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">vx1</span> <span class="o">*</span> <span class="n">vx1</span> <span class="o">+</span> <span class="n">vy1</span> <span class="o">*</span> <span class="n">vy1</span><span class="p">)</span>
+
+        <span class="c1"># energy and angular momentum (t := kinetic energy, l := angular</span>
+        <span class="c1"># momentum, h := total energy)</span>
+        <span class="n">t1</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">m1</span> <span class="o">*</span> <span class="p">(</span><span class="n">vx1</span> <span class="o">*</span> <span class="n">vx1</span> <span class="o">+</span> <span class="n">vy1</span> <span class="o">*</span> <span class="n">vy1</span><span class="p">)</span>
+        <span class="n">t2</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">m2</span> <span class="o">*</span> <span class="p">(</span><span class="n">vx2</span> <span class="o">*</span> <span class="n">vx2</span> <span class="o">+</span> <span class="n">vy2</span> <span class="o">*</span> <span class="n">vy2</span><span class="p">)</span>
+        <span class="n">l1</span> <span class="o">=</span> <span class="n">m1</span> <span class="o">*</span> <span class="n">r1</span> <span class="o">*</span> <span class="n">vf1</span>
+        <span class="n">l2</span> <span class="o">=</span> <span class="n">m2</span> <span class="o">*</span> <span class="n">r2</span> <span class="o">*</span> <span class="n">vf2</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">r1</span> <span class="o">+</span> <span class="n">r2</span>
+        <span class="n">l</span> <span class="o">=</span> <span class="n">l1</span> <span class="o">+</span> <span class="n">l2</span>
+        <span class="n">h</span> <span class="o">=</span> <span class="n">t1</span> <span class="o">+</span> <span class="n">t2</span> <span class="o">-</span> <span class="n">G</span> <span class="o">*</span> <span class="n">m1</span> <span class="o">*</span> <span class="n">m2</span> <span class="o">/</span> <span class="n">r</span>
+
+        <span class="k">if</span> <span class="n">h</span> <span class="o">&gt;=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;the orbit is unbound&quot;</span><span class="p">)</span>
+
+        <span class="c1"># semi-major, semi-minor axes eccentricity, apsides</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">NEWTON_G</span> <span class="o">*</span> <span class="n">m1</span> <span class="o">*</span> <span class="n">m2</span> <span class="o">/</span> <span class="n">h</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="o">-</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">l</span> <span class="o">*</span> <span class="n">l</span> <span class="o">/</span> <span class="n">h</span> <span class="o">*</span> <span class="p">(</span><span class="n">m1</span> <span class="o">+</span> <span class="n">m2</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">m1</span> <span class="o">*</span> <span class="n">m2</span><span class="p">))</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">clamp_between_zero_and_one</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">b</span> <span class="o">/</span> <span class="n">a</span> <span class="o">/</span> <span class="n">a</span><span class="p">))</span>
+        <span class="n">omega</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">G</span> <span class="o">*</span> <span class="n">m</span> <span class="o">/</span> <span class="n">a</span> <span class="o">/</span> <span class="n">a</span> <span class="o">/</span> <span class="n">a</span><span class="p">)</span>
+
+        <span class="c1"># semi-major and semi-minor axes of the primary</span>
+        <span class="n">a1</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="n">q</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span>
+        <span class="n">b1</span> <span class="o">=</span> <span class="n">b</span> <span class="o">*</span> <span class="n">q</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span>
+
+        <span class="c1"># cos of nu and f: phase angle and true anomaly</span>
+        <span class="k">if</span> <span class="n">e</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">cn</span> <span class="o">=</span> <span class="n">x1</span> <span class="o">/</span> <span class="n">r1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">cn</span> <span class="o">=</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">r1</span> <span class="o">/</span> <span class="n">a1</span><span class="p">)</span> <span class="o">/</span> <span class="n">e</span>
+        <span class="n">cf</span> <span class="o">=</span> <span class="n">a1</span> <span class="o">/</span> <span class="n">r1</span> <span class="o">*</span> <span class="p">(</span><span class="n">cn</span> <span class="o">-</span> <span class="n">e</span><span class="p">)</span>
+
+        <span class="c1"># sin of nu and f</span>
+        <span class="k">if</span> <span class="n">e</span> <span class="o">==</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">sn</span> <span class="o">=</span> <span class="n">y1</span> <span class="o">/</span> <span class="n">r1</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">sn</span> <span class="o">=</span> <span class="p">(</span><span class="n">vx1</span> <span class="o">*</span> <span class="n">x1</span> <span class="o">+</span> <span class="n">vy1</span> <span class="o">*</span> <span class="n">y1</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="n">e</span> <span class="o">*</span> <span class="n">v1</span> <span class="o">*</span> <span class="n">r1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">e</span> <span class="o">*</span> <span class="n">cn</span> <span class="o">*</span> <span class="n">cn</span><span class="p">)</span>
+
+        <span class="n">sf</span> <span class="o">=</span> <span class="p">(</span><span class="n">b1</span> <span class="o">/</span> <span class="n">r1</span><span class="p">)</span> <span class="o">*</span> <span class="n">sn</span>
+
+        <span class="c1"># cos and sin of eccentric anomaly</span>
+        <span class="n">ck</span> <span class="o">=</span> <span class="p">(</span><span class="n">e</span> <span class="o">+</span> <span class="n">cf</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">e</span> <span class="o">*</span> <span class="n">cf</span><span class="p">)</span>
+        <span class="n">sk</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">sf</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">e</span> <span class="o">*</span> <span class="n">cf</span><span class="p">)</span>
+
+        <span class="c1"># mean anomaly and tau</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">atan2</span><span class="p">(</span><span class="n">sk</span><span class="p">,</span> <span class="n">ck</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="n">k</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">sk</span>
+        <span class="n">tau</span> <span class="o">=</span> <span class="n">t</span> <span class="o">-</span> <span class="n">n</span> <span class="o">/</span> <span class="n">omega</span>
+
+        <span class="c1"># cartesian components of semi-major axis, and the argument of periapse</span>
+        <span class="n">ax</span> <span class="o">=</span> <span class="p">(</span><span class="n">cn</span> <span class="o">-</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">x1</span> <span class="o">+</span> <span class="n">sn</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">y1</span>
+        <span class="n">ay</span> <span class="o">=</span> <span class="p">(</span><span class="n">cn</span> <span class="o">-</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">y1</span> <span class="o">-</span> <span class="n">sn</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">e</span><span class="p">)</span> <span class="o">*</span> <span class="n">x1</span>
+        <span class="n">pomega</span> <span class="o">=</span> <span class="n">atan2</span><span class="p">(</span><span class="n">ay</span><span class="p">,</span> <span class="n">ax</span><span class="p">)</span>
+
+        <span class="c1"># final result</span>
+        <span class="n">elements</span> <span class="o">=</span> <span class="n">OrbitalElements</span><span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">e</span><span class="p">)</span>
+        <span class="n">orientation</span> <span class="o">=</span> <span class="n">OrbitalOrientation</span><span class="p">(</span><span class="n">x_cm</span><span class="p">,</span> <span class="n">y_cm</span><span class="p">,</span> <span class="n">vx_cm</span><span class="p">,</span> <span class="n">vy_cm</span><span class="p">,</span> <span class="n">pomega</span><span class="p">,</span> <span class="n">tau</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">elements</span><span class="p">,</span> <span class="n">orientation</span></div></div>
+
+
+<div class="viewcode-block" id="OrbitalOrientation"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalOrientation.html#sailfish.physics.kepler.OrbitalOrientation">[docs]</a><span class="k">class</span> <span class="nc">OrbitalOrientation</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The position, velocity, and orientation of a two-body orbit</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">cm_position_x</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">cm_position_y</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">cm_velocity_x</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">cm_velocity_y</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">periapse_argument</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">periapse_time</span><span class="p">:</span> <span class="nb">float</span></div>
+
+
+<div class="viewcode-block" id="OrbitalElements"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalElements.html#sailfish.physics.kepler.OrbitalElements">[docs]</a><span class="k">class</span> <span class="nc">OrbitalElements</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    The orbital elements of a two-body system on a bound orbit</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">semimajor_axis</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">total_mass</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">mass_ratio</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="n">eccentricity</span><span class="p">:</span> <span class="nb">float</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">omega</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The orbital angular frequency</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_mass</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">semimajor_axis</span>
+        <span class="k">return</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">G</span> <span class="o">*</span> <span class="n">m</span> <span class="o">/</span> <span class="n">a</span> <span class="o">/</span> <span class="n">a</span> <span class="o">/</span> <span class="n">a</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">period</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The orbital period</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">PI</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">angular_momentum</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The orbital angular momentum</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">semimajor_axis</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_mass</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mass_ratio</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentricity</span>
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">m</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span>
+        <span class="n">m2</span> <span class="o">=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">m1</span>
+        <span class="k">return</span> <span class="n">m1</span> <span class="o">*</span> <span class="n">m2</span> <span class="o">/</span> <span class="n">m</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">NEWTON_G</span> <span class="o">*</span> <span class="n">m</span> <span class="o">*</span> <span class="n">a</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">e</span><span class="p">))</span>
+
+<div class="viewcode-block" id="OrbitalElements.orbital_state_from_eccentric_anomaly"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalElements.html#sailfish.physics.kepler.OrbitalElements.orbital_state_from_eccentric_anomaly">[docs]</a>    <span class="k">def</span> <span class="nf">orbital_state_from_eccentric_anomaly</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">eccentric_anomaly</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OrbitalState</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the orbital state, given the eccentric anomaly.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">semimajor_axis</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">total_mass</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mass_ratio</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentricity</span>
+        <span class="n">w</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega</span>
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">m</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span>
+        <span class="n">m2</span> <span class="o">=</span> <span class="n">m</span> <span class="o">-</span> <span class="n">m1</span>
+        <span class="n">ck</span> <span class="o">=</span> <span class="n">cos</span><span class="p">(</span><span class="n">eccentric_anomaly</span><span class="p">)</span>
+        <span class="n">sk</span> <span class="o">=</span> <span class="n">sin</span><span class="p">(</span><span class="n">eccentric_anomaly</span><span class="p">)</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="o">-</span><span class="n">a</span> <span class="o">*</span> <span class="n">q</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">e</span> <span class="o">-</span> <span class="n">ck</span><span class="p">)</span>
+        <span class="n">y1</span> <span class="o">=</span> <span class="o">+</span><span class="n">a</span> <span class="o">*</span> <span class="n">q</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">sk</span><span class="p">)</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">e</span><span class="p">)</span>
+        <span class="n">x2</span> <span class="o">=</span> <span class="o">-</span><span class="n">x1</span> <span class="o">/</span> <span class="n">q</span>
+        <span class="n">y2</span> <span class="o">=</span> <span class="o">-</span><span class="n">y1</span> <span class="o">/</span> <span class="n">q</span>
+        <span class="n">vx1</span> <span class="o">=</span> <span class="o">-</span><span class="n">a</span> <span class="o">*</span> <span class="n">q</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="n">w</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">ck</span><span class="p">)</span> <span class="o">*</span> <span class="n">sk</span>
+        <span class="n">vy1</span> <span class="o">=</span> <span class="o">+</span><span class="n">a</span> <span class="o">*</span> <span class="n">q</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">q</span><span class="p">)</span> <span class="o">*</span> <span class="n">w</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">ck</span><span class="p">)</span> <span class="o">*</span> <span class="n">ck</span> <span class="o">*</span> <span class="n">sqrt</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">e</span><span class="p">)</span>
+        <span class="n">vx2</span> <span class="o">=</span> <span class="o">-</span><span class="n">vx1</span> <span class="o">/</span> <span class="n">q</span>
+        <span class="n">vy2</span> <span class="o">=</span> <span class="o">-</span><span class="n">vy1</span> <span class="o">/</span> <span class="n">q</span>
+        <span class="n">c1</span> <span class="o">=</span> <span class="n">PointMass</span><span class="p">(</span><span class="n">m1</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">vx1</span><span class="p">,</span> <span class="n">vy1</span><span class="p">)</span>
+        <span class="n">c2</span> <span class="o">=</span> <span class="n">PointMass</span><span class="p">(</span><span class="n">m2</span><span class="p">,</span> <span class="n">x2</span><span class="p">,</span> <span class="n">y2</span><span class="p">,</span> <span class="n">vx2</span><span class="p">,</span> <span class="n">vy2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">OrbitalState</span><span class="p">(</span><span class="n">c1</span><span class="p">,</span> <span class="n">c2</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="OrbitalElements.eccentric_anomaly"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalElements.html#sailfish.physics.kepler.OrbitalElements.eccentric_anomaly">[docs]</a>    <span class="k">def</span> <span class="nf">eccentric_anomaly</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_since_periapse</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the eccentric anomaly from the time since last periapse.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">period</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">t</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">period</span> <span class="o">*</span> <span class="n">floor</span><span class="p">(</span><span class="n">t</span> <span class="o">/</span> <span class="n">p</span><span class="p">)</span>
+        <span class="n">e</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentricity</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">omega</span> <span class="o">*</span> <span class="n">t</span>  <span class="c1"># n := mean anomaly M</span>
+        <span class="n">f</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="n">k</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">k</span><span class="p">)</span> <span class="o">-</span> <span class="n">n</span>  <span class="c1"># k := eccentric anomaly E</span>
+        <span class="n">g</span> <span class="o">=</span> <span class="k">lambda</span> <span class="n">k</span><span class="p">:</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">e</span> <span class="o">*</span> <span class="n">cos</span><span class="p">(</span><span class="n">k</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">solve_newton_rapheson</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="OrbitalElements.orbital_state"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalElements.html#sailfish.physics.kepler.OrbitalElements.orbital_state">[docs]</a>    <span class="k">def</span> <span class="nf">orbital_state</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time_since_periapse</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OrbitalState</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the orbital state vector from the time since last periapse.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">E</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentric_anomaoly</span><span class="p">(</span><span class="n">time_since_periapse</span><span class="p">)</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_state_from_eccentric_anomaly</span><span class="p">(</span><span class="n">E</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="OrbitalElements.orbital_state_with_orientation"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalElements.html#sailfish.physics.kepler.OrbitalElements.orbital_state_with_orientation">[docs]</a>    <span class="k">def</span> <span class="nf">orbital_state_with_orientation</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span> <span class="n">absolute_time</span><span class="p">,</span> <span class="n">orientation</span><span class="p">:</span> <span class="n">OrbitalOrientation</span>
+    <span class="p">)</span> <span class="o">-&gt;</span> <span class="n">OrbitalState</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Compute the orbital state from an absolute time and orientation.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">t</span> <span class="o">=</span> <span class="n">absolute_time</span> <span class="o">-</span> <span class="n">orientation</span><span class="o">.</span><span class="n">periapse_time</span>
+        <span class="n">E</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentric_anomaoly</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_state_from_eccentric_anomaly</span><span class="p">(</span><span class="n">E</span><span class="p">)</span>
+
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span>
+        <span class="n">m2</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span>
+        <span class="n">x1</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">position_x</span>
+        <span class="n">x2</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">position_x</span>
+        <span class="n">y1</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">position_y</span>
+        <span class="n">y2</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">position_y</span>
+        <span class="n">vx1</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">velocity_x</span>
+        <span class="n">vx2</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">velocity_x</span>
+        <span class="n">vy1</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">velocity_y</span>
+        <span class="n">vy2</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span><span class="o">.</span><span class="n">velocity_y</span>
+
+        <span class="n">c</span> <span class="o">=</span> <span class="n">cos</span><span class="p">(</span><span class="o">-</span><span class="n">orientation</span><span class="o">.</span><span class="n">periapse_argument</span><span class="p">)</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">sin</span><span class="p">(</span><span class="o">-</span><span class="n">orientation</span><span class="o">.</span><span class="n">periapse_argument</span><span class="p">)</span>
+
+        <span class="n">x1p</span> <span class="o">=</span> <span class="o">+</span><span class="n">x1</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">y1</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_position_x</span>
+        <span class="n">y1p</span> <span class="o">=</span> <span class="o">-</span><span class="n">x1</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">y1</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_position_y</span>
+        <span class="n">x2p</span> <span class="o">=</span> <span class="o">+</span><span class="n">x2</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">y2</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_position_x</span>
+        <span class="n">y2p</span> <span class="o">=</span> <span class="o">-</span><span class="n">x2</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">y2</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_position_y</span>
+        <span class="n">vx1p</span> <span class="o">=</span> <span class="o">+</span><span class="n">vx1</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">vy1</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_velocity_x</span>
+        <span class="n">vy1p</span> <span class="o">=</span> <span class="o">-</span><span class="n">vx1</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">vy1</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_velocity_y</span>
+        <span class="n">vx2p</span> <span class="o">=</span> <span class="o">+</span><span class="n">vx2</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">vy2</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_velocity_x</span>
+        <span class="n">vy2p</span> <span class="o">=</span> <span class="o">-</span><span class="n">vx2</span> <span class="o">*</span> <span class="n">s</span> <span class="o">+</span> <span class="n">vy2</span> <span class="o">*</span> <span class="n">c</span> <span class="o">+</span> <span class="n">orientation</span><span class="o">.</span><span class="n">cm_velocity_y</span>
+
+        <span class="n">c1</span> <span class="o">=</span> <span class="n">PointMass</span><span class="p">(</span><span class="n">m1</span><span class="p">,</span> <span class="n">x1p</span><span class="p">,</span> <span class="n">y1p</span><span class="p">,</span> <span class="n">vx1p</span><span class="p">,</span> <span class="n">vy1p</span><span class="p">)</span>
+        <span class="n">c2</span> <span class="o">=</span> <span class="n">PointMass</span><span class="p">(</span><span class="n">m2</span><span class="p">,</span> <span class="n">x2p</span><span class="p">,</span> <span class="n">y2p</span><span class="p">,</span> <span class="n">vx2p</span><span class="p">,</span> <span class="n">vy2p</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">OrbitalState</span><span class="p">(</span><span class="n">c1</span><span class="p">,</span> <span class="n">c2</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="solve_newton_rapheson"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.solve_newton_rapheson.html#sailfish.physics.kepler.solve_newton_rapheson">[docs]</a><span class="k">def</span> <span class="nf">solve_newton_rapheson</span><span class="p">(</span><span class="n">f</span><span class="p">,</span> <span class="n">g</span><span class="p">,</span> <span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="k">while</span> <span class="nb">abs</span><span class="p">(</span><span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">))</span> <span class="o">&gt;</span> <span class="mf">1e-15</span><span class="p">:</span>
+        <span class="n">x</span> <span class="o">-=</span> <span class="n">f</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="o">/</span> <span class="n">g</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+        <span class="n">n</span> <span class="o">+=</span> <span class="mi">1</span>
+        <span class="k">if</span> <span class="n">n</span> <span class="o">&gt;</span> <span class="mi">10</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solve_newton_rapheson: no solution&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">x</span></div>
+
+
+<div class="viewcode-block" id="clamp_between_zero_and_one"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.clamp_between_zero_and_one.html#sailfish.physics.kepler.clamp_between_zero_and_one">[docs]</a><span class="k">def</span> <span class="nf">clamp_between_zero_and_one</span><span class="p">(</span><span class="n">x</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="nb">max</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">x</span><span class="p">))</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

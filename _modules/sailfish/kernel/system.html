@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.kernel.system &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.kernel.system</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.kernel.system</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Functions for querying compute capabilities and configuring JIT builds.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">contextlib</span>
+<span class="kn">import</span> <span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">multiprocessing</span>
+<span class="kn">import</span> <span class="nn">platform</span>
+<span class="kn">import</span> <span class="nn">time</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<span class="n">build_config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;extra_compile_args&quot;</span><span class="p">:</span> <span class="p">[],</span>
+    <span class="s2">&quot;extra_link_args&quot;</span><span class="p">:</span> <span class="p">[],</span>
+<span class="p">}</span>
+
+
+<div class="viewcode-block" id="configure_build"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.configure_build.html#sailfish.kernel.system.configure_build">[docs]</a><span class="k">def</span> <span class="nf">configure_build</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initiate the `build_config` module-level variable.</span>
+
+<span class="sd">    The build configuration is presently inferred from a crude check to see</span>
+<span class="sd">    whether we&#39;re on Linux or MacOS. This procedure can be easily generalized</span>
+<span class="sd">    to accommodate other or more specific platforms, check for hardware or</span>
+<span class="sd">    software availability, or read a bulid configuration from a user or</span>
+<span class="sd">    site-specified machine file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Darwin&quot;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for MacOS&quot;</span><span class="p">)</span>
+        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_compile_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-Xpreprocessor&quot;</span><span class="p">,</span> <span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
+        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_link_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-lomp&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for Linux&quot;</span><span class="p">)</span>
+        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_compile_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
+        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_link_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for unknown system&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="get_array_module"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.get_array_module.html#sailfish.kernel.system.get_array_module">[docs]</a><span class="k">def</span> <span class="nf">get_array_module</span><span class="p">(</span><span class="n">mode</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return either the numpy or cupy module, depending on the value of mode.</span>
+
+<span class="sd">    If mode is &quot;cpu&quot; or &quot;omp&quot;, then the `numpy` module is returned. Otherwise</span>
+<span class="sd">    if mode is &quot;gpu&quot; then `cupy` is returned. The `cupy` documentation</span>
+<span class="sd">    recommends assigning whichever module is returned to a variable called</span>
+<span class="sd">    `xp`, and using that variable to access functions that are common to both,</span>
+<span class="sd">    for example use :code:`xp.zeros(100)`. This pattern facilitates writing</span>
+<span class="sd">    CPU-GPU agnostic code.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="s2">&quot;omp&quot;</span><span class="p">]:</span>
+        <span class="kn">import</span> <span class="nn">numpy</span>
+
+        <span class="k">return</span> <span class="n">numpy</span>
+    <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span><span class="p">:</span>
+        <span class="kn">import</span> <span class="nn">cupy</span>
+
+        <span class="k">return</span> <span class="n">cupy</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unknown execution mode </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">, must be [cpu|omp|gpu]&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="log_system_info"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.log_system_info.html#sailfish.kernel.system.log_system_info">[docs]</a><span class="k">def</span> <span class="nf">log_system_info</span><span class="p">(</span><span class="n">mode</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Log relevant details of the system&#39;s compute capabilities.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">cupy.cuda.runtime</span> <span class="kn">import</span> <span class="n">getDeviceCount</span><span class="p">,</span> <span class="n">getDeviceProperties</span>
+
+        <span class="n">num_devices</span> <span class="o">=</span> <span class="n">getDeviceCount</span><span class="p">()</span>
+        <span class="n">gpu_devices</span> <span class="o">=</span> <span class="s2">&quot;:&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">getDeviceProperties</span><span class="p">(</span><span class="n">i</span><span class="p">)[</span><span class="s2">&quot;name&quot;</span><span class="p">]</span><span class="o">.</span><span class="n">decode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_devices</span><span class="p">)]</span>
+        <span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;gpu devices: </span><span class="si">{</span><span class="n">num_devices</span><span class="si">}</span><span class="s2">x </span><span class="si">{</span><span class="n">gpu_devices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;compute cores: </span><span class="si">{</span><span class="n">multiprocessing</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="measure_time"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.measure_time.html#sailfish.kernel.system.measure_time">[docs]</a><span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
+<span class="k">def</span> <span class="nf">measure_time</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A context manager to measure the execution time of a piece of code.</span>
+
+<span class="sd">    Example:</span>
+
+<span class="sd">    .. code-block:: python</span>
+
+<span class="sd">        with measure_time() as duration:</span>
+<span class="sd">            expensive_function()</span>
+<span class="sd">        print(f&quot;execution took {duration()} seconds&quot;)</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+    <span class="k">yield</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

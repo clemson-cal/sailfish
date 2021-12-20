@@ -1,0 +1,270 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.setups.simple1d &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.setups.simple1d</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.setups.simple1d</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">pi</span><span class="p">,</span> <span class="n">sin</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">SetupError</span><span class="p">,</span> <span class="n">param</span>
+<span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesianMesh</span><span class="p">,</span> <span class="n">LogSphericalMesh</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Advection&quot;</span><span class="p">,</span> <span class="s2">&quot;Burgers&quot;</span><span class="p">,</span> <span class="s2">&quot;DensityWave&quot;</span><span class="p">,</span> <span class="s2">&quot;Shocktube&quot;</span><span class="p">,</span> <span class="s2">&quot;Wind&quot;</span><span class="p">]</span>
+
+
+<div class="viewcode-block" id="Advection"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Advection.html#sailfish.setups.simple1d.Advection">[docs]</a><span class="k">class</span> <span class="nc">Advection</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Scalar advection, evolution of a smooth wave, using the DG solver.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Advection.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Advection.html#sailfish.setups.simple1d.Advection.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mf">0.1</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">pi</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">a</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Advection.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Advection.html#sailfish.setups.simple1d.Advection.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesianMesh</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;scdg_1d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">equation</span><span class="o">=</span><span class="s2">&quot;advection&quot;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;periodic&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+<div class="viewcode-block" id="Advection.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Advection.html#sailfish.setups.simple1d.Advection.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="Burgers"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Burgers.html#sailfish.setups.simple1d.Burgers">[docs]</a><span class="k">class</span> <span class="nc">Burgers</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Burgers equation, evolution of a smooth wave using the DG solver.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Burgers.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Burgers.html#sailfish.setups.simple1d.Burgers.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mf">0.1</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">pi</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">a</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Burgers.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Burgers.html#sailfish.setups.simple1d.Burgers.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesianMesh</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;scdg_1d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">equation</span><span class="o">=</span><span class="s2">&quot;burgers&quot;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;periodic&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+<div class="viewcode-block" id="Burgers.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Burgers.html#sailfish.setups.simple1d.Burgers.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">pass</span></div></div>
+
+
+<div class="viewcode-block" id="Shocktube"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube">[docs]</a><span class="k">class</span> <span class="nc">Shocktube</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Discontinuous initial data, with uniform density and pressure to either</span>
+<span class="sd">    side of the discontintuity at x=0.5.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Shocktube.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">x</span> <span class="o">&lt;</span> <span class="mf">0.5</span><span class="p">:</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.125</span></div>
+
+<div class="viewcode-block" id="Shocktube.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesianMesh</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;srhd_1d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.25</span></div>
+
+
+<div class="viewcode-block" id="DensityWave"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave">[docs]</a><span class="k">class</span> <span class="nc">DensityWave</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A sinusoidal variation of the gas density, with possible uniform</span>
+<span class="sd">    translation. The gas pressure is uniform.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">wavenumber</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;wavenumber of the sinusoid&quot;</span><span class="p">)</span>
+    <span class="n">amplitude</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="s2">&quot;amplitude of the density variation&quot;</span><span class="p">)</span>
+    <span class="n">velocity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;speed of the wave (gamma-beta if relativistic)&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="DensityWave.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">x</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavenumber</span> <span class="o">*</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">pi</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">velocity</span>
+
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">+</span> <span class="n">a</span> <span class="o">*</span> <span class="n">sin</span><span class="p">(</span><span class="n">k</span> <span class="o">*</span> <span class="n">x</span><span class="p">)</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">u</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span></div>
+
+<div class="viewcode-block" id="DensityWave.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesianMesh</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;srhd_1d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;periodic&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+<div class="viewcode-block" id="DensityWave.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">amplitude</span> <span class="o">&gt;=</span> <span class="mf">1.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SetupError</span><span class="p">(</span><span class="s2">&quot;amplitude must be less than 1.0&quot;</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="Wind"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind">[docs]</a><span class="k">class</span> <span class="nc">Wind</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A cold, spherically symmetric relativistic wind.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">velocity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;velocity of the wind (gamma-beta if relativistic)&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="Wind.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">r</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">velocity</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-4</span> <span class="o">*</span> <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="p">(</span><span class="mi">4</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="Wind.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_zones_per_decade</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">LogSphericalMesh</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">,</span> <span class="n">num_zones_per_decade</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;srhd_1d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;inflow&quot;</span><span class="p">,</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+<div class="viewcode-block" id="Wind.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">velocity</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SetupError</span><span class="p">(</span><span class="s2">&quot;velocity must be non-negative&quot;</span><span class="p">)</span></div></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

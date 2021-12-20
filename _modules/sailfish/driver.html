@@ -1,0 +1,701 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.driver &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.driver</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.driver</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Library functions and command-line access to the simulation driver.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">import</span> <span class="nn">os</span><span class="o">,</span> <span class="nn">pickle</span><span class="o">,</span> <span class="nn">pathlib</span><span class="o">,</span> <span class="nn">logging</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span><span class="p">,</span> <span class="n">Dict</span>
+
+<span class="kn">from</span> <span class="nn">sailfish.event</span> <span class="kn">import</span> <span class="n">Recurrence</span><span class="p">,</span> <span class="n">RecurringEvent</span><span class="p">,</span> <span class="n">ParseRecurrenceError</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">SetupError</span>
+<span class="kn">from</span> <span class="nn">sailfish</span> <span class="kn">import</span> <span class="n">setups</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="ConfigurationError"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.ConfigurationError.html#sailfish.driver.ConfigurationError">[docs]</a><span class="k">class</span> <span class="nc">ConfigurationError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An invalid runtime configuration&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="keyed_event"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.keyed_event.html#sailfish.driver.keyed_event">[docs]</a><span class="k">def</span> <span class="nf">keyed_event</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+    <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">key</span><span class="p">,</span> <span class="n">Recurrence</span><span class="o">.</span><span class="n">from_str</span><span class="p">(</span><span class="n">val</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="keyed_value"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.keyed_value.html#sailfish.driver.keyed_value">[docs]</a><span class="k">def</span> <span class="nf">keyed_value</span><span class="p">(</span><span class="n">item</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="o">=</span> <span class="n">item</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;=&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">key</span><span class="p">,</span> <span class="nb">eval</span><span class="p">(</span><span class="n">val</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">NameError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span>
+
+    <span class="k">except</span> <span class="ne">SyntaxError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;badly formed model parameter value </span><span class="si">{</span><span class="n">val</span><span class="si">}</span><span class="s2"> in </span><span class="si">{</span><span class="n">item</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;badly formed model parameter </span><span class="si">{</span><span class="n">item</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="first_not_none"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.first_not_none.html#sailfish.driver.first_not_none">[docs]</a><span class="k">def</span> <span class="nf">first_not_none</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">):</span>
+    <span class="k">for</span> <span class="n">arg</span> <span class="ow">in</span> <span class="n">args</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">arg</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">arg</span></div>
+
+
+<div class="viewcode-block" id="update_dict_where_none"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.update_dict_where_none.html#sailfish.driver.update_dict_where_none">[docs]</a><span class="k">def</span> <span class="nf">update_dict_where_none</span><span class="p">(</span><span class="n">new_dict</span><span class="p">,</span> <span class="n">old_dict</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Like `dict.update`, except `key=value` pairs in `old_dict` are only used</span>
+<span class="sd">    to add / overwrite values in `new_dict` if they are `None` or missing.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">old_dict</span><span class="p">:</span>
+        <span class="n">old_val</span> <span class="o">=</span> <span class="n">old_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+        <span class="n">new_val</span> <span class="o">=</span> <span class="n">new_dict</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">key</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">new_val</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">dict</span> <span class="ow">and</span> <span class="nb">type</span><span class="p">(</span><span class="n">old_val</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">dict</span><span class="p">:</span>
+            <span class="n">update_dict_where_none</span><span class="p">(</span><span class="n">new_val</span><span class="p">,</span> <span class="n">old_val</span><span class="p">)</span>
+
+        <span class="k">elif</span> <span class="n">old_val</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">new_val</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+                <span class="n">new_dict</span><span class="p">[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">old_val</span>
+            <span class="k">elif</span> <span class="n">key</span> <span class="ow">in</span> <span class="n">frozen</span> <span class="ow">and</span> <span class="n">new_val</span> <span class="o">!=</span> <span class="n">old_val</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">key</span><span class="si">}</span><span class="s2"> cannot be changed&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="update_where_none"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.update_where_none.html#sailfish.driver.update_where_none">[docs]</a><span class="k">def</span> <span class="nf">update_where_none</span><span class="p">(</span><span class="n">new</span><span class="p">,</span> <span class="n">old</span><span class="p">,</span> <span class="n">frozen</span><span class="o">=</span><span class="p">[]):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Same as `update_dict_where_none`, except operates on (immutable) named tuple</span>
+<span class="sd">    instances and returns a new named tuple.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">new_dict</span> <span class="o">=</span> <span class="n">new</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()</span>
+    <span class="n">old_dict</span> <span class="o">=</span> <span class="n">old</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()</span>
+    <span class="n">update_dict_where_none</span><span class="p">(</span><span class="n">new_dict</span><span class="p">,</span> <span class="n">old_dict</span><span class="p">,</span> <span class="n">frozen</span><span class="p">)</span>
+    <span class="k">return</span> <span class="nb">type</span><span class="p">(</span><span class="n">new</span><span class="p">)(</span><span class="o">**</span><span class="n">new_dict</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="asdict"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.asdict.html#sailfish.driver.asdict">[docs]</a><span class="k">def</span> <span class="nf">asdict</span><span class="p">(</span><span class="n">t</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert named tuple instances to dictionaries.</span>
+
+<span class="sd">    This function operates recursively on the data members of a dictionary or</span>
+<span class="sd">    named tuple. Each object that is a named tuple is mapped to its dictionary</span>
+<span class="sd">    representation, with an additional `_type` key to indicate the named tuple</span>
+<span class="sd">    subclass. This mapping is applied to the simulation state before pickling,</span>
+<span class="sd">    so that `sailfish` module is not required to unpickle the checkpoint</span>
+<span class="sd">    files.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">asdict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">):</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">asdict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">t</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+        <span class="n">d</span><span class="p">[</span><span class="s2">&quot;_type&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="s2">&quot;.&quot;</span><span class="o">.</span><span class="n">join</span><span class="p">([</span><span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="o">.</span><span class="vm">__module__</span><span class="p">,</span> <span class="nb">type</span><span class="p">(</span><span class="n">t</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">d</span>
+    <span class="k">return</span> <span class="n">t</span></div>
+
+
+<div class="viewcode-block" id="fromdict"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.fromdict.html#sailfish.driver.fromdict">[docs]</a><span class="k">def</span> <span class="nf">fromdict</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convert from dictionaries to named tuples.</span>
+
+<span class="sd">    This function performs the inverse of the `asdict` method, and is applied</span>
+<span class="sd">    to pickled simulation states.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">sailfish</span>
+
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">d</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="k">if</span> <span class="s2">&quot;_type&quot;</span> <span class="ow">in</span> <span class="n">d</span><span class="p">:</span>
+            <span class="bp">cls</span> <span class="o">=</span> <span class="nb">eval</span><span class="p">(</span><span class="n">d</span><span class="p">[</span><span class="s2">&quot;_type&quot;</span><span class="p">])</span>
+            <span class="k">del</span> <span class="n">d</span><span class="p">[</span><span class="s2">&quot;_type&quot;</span><span class="p">]</span>
+            <span class="k">return</span> <span class="bp">cls</span><span class="p">(</span><span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">fromdict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">()})</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">fromdict</span><span class="p">(</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">d</span><span class="o">.</span><span class="n">items</span><span class="p">()}</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">d</span></div>
+
+
+<div class="viewcode-block" id="write_checkpoint"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.write_checkpoint.html#sailfish.driver.write_checkpoint">[docs]</a><span class="k">def</span> <span class="nf">write_checkpoint</span><span class="p">(</span><span class="n">number</span><span class="p">,</span> <span class="n">outdir</span><span class="p">,</span> <span class="n">state</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Write the simulation state to a file, as a pickle.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">number</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;chkpt.</span><span class="si">{</span><span class="n">number</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">.pk&quot;</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;chkpt.final.pk&quot;</span>
+
+    <span class="k">if</span> <span class="n">outdir</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">pathlib</span><span class="o">.</span><span class="n">Path</span><span class="p">(</span><span class="n">outdir</span><span class="p">)</span><span class="o">.</span><span class="n">mkdir</span><span class="p">(</span><span class="n">parents</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">exist_ok</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">filename</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">path</span><span class="o">.</span><span class="n">join</span><span class="p">(</span><span class="n">outdir</span><span class="p">,</span> <span class="n">filename</span><span class="p">)</span>
+
+    <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">filename</span><span class="p">,</span> <span class="s2">&quot;wb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">chkpt</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">logger</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;write checkpoint </span><span class="si">{</span><span class="n">chkpt</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="c1"># TODO: make it an option whether to strip class info from checkpoints</span>
+        <span class="c1"># pickle.dump(asdict(state), chkpt)</span>
+        <span class="n">pickle</span><span class="o">.</span><span class="n">dump</span><span class="p">(</span><span class="n">state</span><span class="p">,</span> <span class="n">chkpt</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="load_checkpoint"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.load_checkpoint.html#sailfish.driver.load_checkpoint">[docs]</a><span class="k">def</span> <span class="nf">load_checkpoint</span><span class="p">(</span><span class="n">chkpt_file</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Load the simulation state from a pickle file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="n">chkpt_file</span><span class="p">,</span> <span class="s2">&quot;rb&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">file</span><span class="p">:</span>
+            <span class="c1"># TODO: make it an option whether to strip class info from checkpoints</span>
+            <span class="c1"># return fromdict(pickle.load(file))</span>
+            <span class="k">return</span> <span class="n">pickle</span><span class="o">.</span><span class="n">load</span><span class="p">(</span><span class="n">file</span><span class="p">)</span>
+    <span class="k">except</span> <span class="ne">FileNotFoundError</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;could not open checkpoint file </span><span class="si">{</span><span class="n">chkpt_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="DriverArgs"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs">[docs]</a><span class="k">class</span> <span class="nc">DriverArgs</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Contains data used by the driver.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">setup_name</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">chkpt_file</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">model_parameters</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">solver_options</span><span class="p">:</span> <span class="nb">dict</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">cfl_number</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">end_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">execution_mode</span><span class="p">:</span> <span class="nb">str</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">fold</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">resolution</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">num_patches</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">events</span><span class="p">:</span> <span class="n">Dict</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="n">Recurrence</span><span class="p">]</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+<div class="viewcode-block" id="DriverArgs.from_namespace"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs.from_namespace">[docs]</a>    <span class="k">def</span> <span class="nf">from_namespace</span><span class="p">(</span><span class="n">args</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Construct an instance from an argparse-type namespace object.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">driver</span> <span class="o">=</span> <span class="n">DriverArgs</span><span class="p">(</span>
+            <span class="o">**</span><span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">w</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">w</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="n">args</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">k</span> <span class="ow">in</span> <span class="n">DriverArgs</span><span class="o">.</span><span class="n">_fields</span><span class="p">}</span>
+        <span class="p">)</span>
+        <span class="n">parts</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.pk&quot;</span><span class="p">):</span>
+            <span class="n">setup_name</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">chkpt_file</span> <span class="o">=</span> <span class="kc">None</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">setup_name</span> <span class="o">=</span> <span class="kc">None</span>
+            <span class="n">chkpt_file</span> <span class="o">=</span> <span class="n">parts</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">model_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="n">keyed_value</span><span class="p">(</span><span class="n">a</span><span class="p">)</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">parts</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
+        <span class="k">except</span> <span class="ne">IndexError</span><span class="p">:</span>
+            <span class="n">model_parameters</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
+
+        <span class="n">model_parameters</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">args</span><span class="o">.</span><span class="n">model_parameters</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">driver</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span>
+            <span class="n">setup_name</span><span class="o">=</span><span class="n">setup_name</span><span class="p">,</span>
+            <span class="n">chkpt_file</span><span class="o">=</span><span class="n">chkpt_file</span><span class="p">,</span>
+            <span class="n">model_parameters</span><span class="o">=</span><span class="n">model_parameters</span><span class="p">,</span>
+        <span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="simulate"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.simulate.html#sailfish.driver.simulate">[docs]</a><span class="k">def</span> <span class="nf">simulate</span><span class="p">(</span><span class="n">driver</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Main generator for running simulations.</span>
+
+<span class="sd">    If invoked with a `DriverArgs` instance in `driver`, the other arguments</span>
+<span class="sd">    are ignored. Otherwise, the driver is created from the setup name, model</span>
+<span class="sd">    paramters, and keyword arguments.</span>
+
+<span class="sd">    This function is a generator: it yields its state at a sequence of</span>
+<span class="sd">    pause points, defined by the `events` dictionary.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="kn">from</span> <span class="nn">time</span> <span class="kn">import</span> <span class="n">perf_counter</span>
+    <span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span><span class="p">,</span> <span class="n">basicConfig</span><span class="p">,</span> <span class="n">StreamHandler</span><span class="p">,</span> <span class="n">Formatter</span><span class="p">,</span> <span class="n">INFO</span>
+    <span class="kn">from</span> <span class="nn">sailfish</span> <span class="kn">import</span> <span class="n">__version__</span> <span class="k">as</span> <span class="n">version</span>
+    <span class="kn">from</span> <span class="nn">sailfish.kernel.system</span> <span class="kn">import</span> <span class="n">configure_build</span><span class="p">,</span> <span class="n">log_system_info</span><span class="p">,</span> <span class="n">measure_time</span>
+    <span class="kn">from</span> <span class="nn">sailfish.event</span> <span class="kn">import</span> <span class="n">Recurrence</span>
+    <span class="kn">from</span> <span class="nn">sailfish</span> <span class="kn">import</span> <span class="n">solvers</span>
+
+    <span class="n">main_logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="s2">&quot;main_logger&quot;</span><span class="p">)</span>
+    <span class="n">main_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">sailfish </span><span class="si">{</span><span class="n">version</span><span class="si">}</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Initialize and log state in the the system module. The build system</span>
+<span class="sd">    influences JIT-compiled module code. Currently the build parameters are</span>
+<span class="sd">    inferred from the platform (Linux or MacOS), but in the future these</span>
+<span class="sd">    should also be extensible by a system-specific rc-style configuration</span>
+<span class="sd">    file.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">configure_build</span><span class="p">()</span>
+    <span class="n">log_system_info</span><span class="p">(</span><span class="n">driver</span><span class="o">.</span><span class="n">execution_mode</span> <span class="ow">or</span> <span class="s2">&quot;cpu&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">driver</span><span class="o">.</span><span class="n">setup_name</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate an initial driver state from command line arguments, model</span>
+<span class="sd">        parametrs, and a setup instance.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;start new simulation with setup </span><span class="si">{</span><span class="n">driver</span><span class="o">.</span><span class="n">setup_name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">setup</span> <span class="o">=</span> <span class="n">Setup</span><span class="o">.</span><span class="n">find_setup_class</span><span class="p">(</span><span class="n">driver</span><span class="o">.</span><span class="n">setup_name</span><span class="p">)(</span>
+            <span class="o">**</span><span class="n">driver</span><span class="o">.</span><span class="n">model_parameters</span> <span class="ow">or</span> <span class="nb">dict</span><span class="p">()</span>
+        <span class="p">)</span>
+        <span class="n">driver</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span>
+            <span class="n">resolution</span><span class="o">=</span><span class="n">driver</span><span class="o">.</span><span class="n">resolution</span> <span class="ow">or</span> <span class="n">setup</span><span class="o">.</span><span class="n">default_resolution</span><span class="p">,</span>
+        <span class="p">)</span>
+
+        <span class="n">iteration</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">setup</span><span class="o">.</span><span class="n">start_time</span>
+        <span class="n">event_states</span> <span class="o">=</span> <span class="p">{</span><span class="n">name</span><span class="p">:</span> <span class="n">RecurringEvent</span><span class="p">()</span> <span class="k">for</span> <span class="n">name</span> <span class="ow">in</span> <span class="n">driver</span><span class="o">.</span><span class="n">events</span><span class="p">}</span>
+        <span class="n">solution</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="k">elif</span> <span class="n">driver</span><span class="o">.</span><span class="n">chkpt_file</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Load driver state from a checkpoint file. The setup model parameters</span>
+<span class="sd">        are updated with any items given on the command line after the setup</span>
+<span class="sd">        name. All command line arguments are also restorted from the</span>
+<span class="sd">        previous session, but are updated with the command line argument</span>
+<span class="sd">        given for this session, except for &quot;frozen&quot; arguments.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;load checkpoint </span><span class="si">{</span><span class="n">driver</span><span class="o">.</span><span class="n">chkpt_file</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">chkpt</span> <span class="o">=</span> <span class="n">load_checkpoint</span><span class="p">(</span><span class="n">driver</span><span class="o">.</span><span class="n">chkpt_file</span><span class="p">)</span>
+        <span class="n">setup_class</span> <span class="o">=</span> <span class="n">Setup</span><span class="o">.</span><span class="n">find_setup_class</span><span class="p">(</span><span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;setup_name&quot;</span><span class="p">])</span>
+        <span class="n">driver</span> <span class="o">=</span> <span class="n">update_where_none</span><span class="p">(</span><span class="n">driver</span><span class="p">,</span> <span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;driver&quot;</span><span class="p">],</span> <span class="n">frozen</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;resolution&quot;</span><span class="p">])</span>
+
+        <span class="n">update_dict_where_none</span><span class="p">(</span>
+            <span class="n">driver</span><span class="o">.</span><span class="n">model_parameters</span><span class="p">,</span>
+            <span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;model_parameters&quot;</span><span class="p">],</span>
+            <span class="n">frozen</span><span class="o">=</span><span class="nb">list</span><span class="p">(</span><span class="n">setup_class</span><span class="o">.</span><span class="n">immutable_parameter_keys</span><span class="p">()),</span>
+        <span class="p">)</span>
+
+        <span class="n">update_dict_where_none</span><span class="p">(</span>
+            <span class="n">driver</span><span class="o">.</span><span class="n">solver_options</span><span class="p">,</span>
+            <span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;solver_options&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="n">setup</span> <span class="o">=</span> <span class="n">setup_class</span><span class="p">(</span><span class="o">**</span><span class="n">driver</span><span class="o">.</span><span class="n">model_parameters</span><span class="p">)</span>
+
+        <span class="n">iteration</span> <span class="o">=</span> <span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;iteration&quot;</span><span class="p">]</span>
+        <span class="n">time</span> <span class="o">=</span> <span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;time&quot;</span><span class="p">]</span>
+        <span class="n">event_states</span> <span class="o">=</span> <span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;event_states&quot;</span><span class="p">]</span>
+        <span class="n">solution</span> <span class="o">=</span> <span class="n">chkpt</span><span class="p">[</span><span class="s2">&quot;solution&quot;</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">driver</span><span class="o">.</span><span class="n">events</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">event</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">event_states</span><span class="p">:</span>
+                <span class="n">event_states</span><span class="p">[</span><span class="n">event</span><span class="p">]</span> <span class="o">=</span> <span class="n">RecurringEvent</span><span class="p">()</span>
+
+    <span class="k">else</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span><span class="s2">&quot;driver args must specify setup_name or chkpt_file&quot;</span><span class="p">)</span>
+
+    <span class="n">mode</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">execution_mode</span> <span class="ow">or</span> <span class="s2">&quot;cpu&quot;</span>
+    <span class="n">fold</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">fold</span> <span class="ow">or</span> <span class="mi">10</span>
+    <span class="n">mesh</span> <span class="o">=</span> <span class="n">setup</span><span class="o">.</span><span class="n">mesh</span><span class="p">(</span><span class="n">driver</span><span class="o">.</span><span class="n">resolution</span><span class="p">)</span>
+    <span class="n">end_time</span> <span class="o">=</span> <span class="n">first_not_none</span><span class="p">(</span><span class="n">driver</span><span class="o">.</span><span class="n">end_time</span><span class="p">,</span> <span class="n">setup</span><span class="o">.</span><span class="n">default_end_time</span><span class="p">,</span> <span class="nb">float</span><span class="p">(</span><span class="s2">&quot;inf&quot;</span><span class="p">))</span>
+
+    <span class="n">solver</span> <span class="o">=</span> <span class="n">solvers</span><span class="o">.</span><span class="n">make_solver</span><span class="p">(</span>
+        <span class="n">setup</span><span class="o">.</span><span class="n">solver</span><span class="p">,</span>
+        <span class="n">setup</span><span class="o">.</span><span class="n">physics</span><span class="p">,</span>
+        <span class="n">driver</span><span class="o">.</span><span class="n">solver_options</span><span class="p">,</span>
+        <span class="n">setup</span><span class="o">=</span><span class="n">setup</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span>
+        <span class="n">time</span><span class="o">=</span><span class="n">time</span><span class="p">,</span>
+        <span class="n">solution</span><span class="o">=</span><span class="n">solution</span><span class="p">,</span>
+        <span class="n">num_patches</span><span class="o">=</span><span class="n">driver</span><span class="o">.</span><span class="n">num_patches</span> <span class="ow">or</span> <span class="mi">1</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">if</span> <span class="p">(</span><span class="n">driver</span><span class="o">.</span><span class="n">cfl_number</span> <span class="ow">or</span> <span class="mf">0.0</span><span class="p">)</span> <span class="o">&gt;</span> <span class="n">solver</span><span class="o">.</span><span class="n">maximum_cfl</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">ConfigurationError</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;cfl number </span><span class="si">{</span><span class="n">driver</span><span class="o">.</span><span class="n">cfl_number</span><span class="si">}</span><span class="s2"> &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;is greater than </span><span class="si">{</span><span class="n">solver</span><span class="o">.</span><span class="n">maximum_cfl</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;max allowed by solver </span><span class="si">{</span><span class="n">setup</span><span class="o">.</span><span class="n">solver</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="n">cfl_number</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">cfl_number</span> <span class="ow">or</span> <span class="n">solver</span><span class="o">.</span><span class="n">maximum_cfl</span>
+
+    <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">driver</span><span class="o">.</span><span class="n">events</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;recurrence for </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> event is </span><span class="si">{</span><span class="n">event</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;run until t=</span><span class="si">{</span><span class="n">end_time</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;CFL number is </span><span class="si">{</span><span class="n">cfl_number</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">setup</span><span class="o">.</span><span class="n">print_model_parameters</span><span class="p">(</span><span class="n">newlines</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">logger</span><span class="o">=</span><span class="n">main_logger</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">grab_state</span><span class="p">():</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Collect items from the driver and solver state, as well as run</span>
+<span class="sd">        details, sufficient for restarts and post processing.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">iteration</span><span class="o">=</span><span class="n">iteration</span><span class="p">,</span>
+            <span class="n">time</span><span class="o">=</span><span class="n">solver</span><span class="o">.</span><span class="n">time</span><span class="p">,</span>
+            <span class="n">solution</span><span class="o">=</span><span class="n">solver</span><span class="o">.</span><span class="n">solution</span><span class="p">,</span>
+            <span class="n">primitive</span><span class="o">=</span><span class="n">solver</span><span class="o">.</span><span class="n">primitive</span><span class="p">,</span>
+            <span class="n">solver_options</span><span class="o">=</span><span class="n">solver</span><span class="o">.</span><span class="n">options</span><span class="p">,</span>
+            <span class="n">event_states</span><span class="o">=</span><span class="n">event_states</span><span class="p">,</span>
+            <span class="n">driver</span><span class="o">=</span><span class="n">driver</span><span class="p">,</span>
+            <span class="n">model_parameters</span><span class="o">=</span><span class="n">setup</span><span class="o">.</span><span class="n">model_parameter_dict</span><span class="p">(),</span>
+            <span class="n">setup_name</span><span class="o">=</span><span class="n">setup</span><span class="o">.</span><span class="n">dash_case_class_name</span><span class="p">(),</span>
+            <span class="n">mesh</span><span class="o">=</span><span class="n">mesh</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">while</span> <span class="n">end_time</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">end_time</span> <span class="o">&gt;</span> <span class="n">solver</span><span class="o">.</span><span class="n">time</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Run the main simulation loop. Iterations are grouped according the</span>
+<span class="sd">        the fold parameter. Side effects including the iteration message are</span>
+<span class="sd">        performed between fold boundaries.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">event</span> <span class="ow">in</span> <span class="n">driver</span><span class="o">.</span><span class="n">events</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
+            <span class="n">state</span> <span class="o">=</span> <span class="n">event_states</span><span class="p">[</span><span class="n">name</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">event_states</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">is_due</span><span class="p">(</span><span class="n">solver</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">event</span><span class="p">):</span>
+                <span class="n">event_states</span><span class="p">[</span><span class="n">name</span><span class="p">]</span> <span class="o">=</span> <span class="n">state</span><span class="o">.</span><span class="n">next</span><span class="p">(</span><span class="n">solver</span><span class="o">.</span><span class="n">time</span><span class="p">,</span> <span class="n">event</span><span class="p">)</span>
+                <span class="k">yield</span> <span class="n">name</span><span class="p">,</span> <span class="n">state</span><span class="o">.</span><span class="n">number</span><span class="p">,</span> <span class="n">grab_state</span><span class="p">()</span>
+
+        <span class="k">with</span> <span class="n">measure_time</span><span class="p">()</span> <span class="k">as</span> <span class="n">fold_time</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">_</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">fold</span><span class="p">):</span>
+                <span class="n">dx</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">min_spacing</span><span class="p">(</span><span class="n">solver</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+                <span class="n">dt</span> <span class="o">=</span> <span class="n">dx</span> <span class="o">/</span> <span class="n">solver</span><span class="o">.</span><span class="n">maximum_wavespeed</span><span class="p">()</span> <span class="o">*</span> <span class="n">cfl_number</span>
+                <span class="n">solver</span><span class="o">.</span><span class="n">advance</span><span class="p">(</span><span class="n">dt</span><span class="p">)</span>
+                <span class="n">iteration</span> <span class="o">+=</span> <span class="mi">1</span>
+
+        <span class="n">Mzps</span> <span class="o">=</span> <span class="n">driver</span><span class="o">.</span><span class="n">resolution</span> <span class="o">/</span> <span class="n">fold_time</span><span class="p">()</span> <span class="o">*</span> <span class="mf">1e-6</span> <span class="o">*</span> <span class="n">fold</span>
+        <span class="n">main_logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">iteration</span><span class="si">:</span><span class="s2">04d</span><span class="si">}</span><span class="s2">] t=</span><span class="si">{</span><span class="n">solver</span><span class="o">.</span><span class="n">time</span><span class="si">:</span><span class="s2">0.3f</span><span class="si">}</span><span class="s2"> dt=</span><span class="si">{</span><span class="n">dt</span><span class="si">:</span><span class="s2">.3e</span><span class="si">}</span><span class="s2"> Mzps=</span><span class="si">{</span><span class="n">Mzps</span><span class="si">:</span><span class="s2">.3f</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="p">)</span>
+
+    <span class="k">yield</span> <span class="s2">&quot;end&quot;</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">grab_state</span><span class="p">()</span></div>
+
+
+<div class="viewcode-block" id="run"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.run.html#sailfish.driver.run">[docs]</a><span class="k">def</span> <span class="nf">run</span><span class="p">(</span><span class="n">setup_name</span><span class="p">,</span> <span class="n">quiet</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Run a simulation with no side-effects, and return the final state.</span>
+
+<span class="sd">    This function is intended for use by scripts that run a simulation and</span>
+<span class="sd">    inspect the output in-memory, or otherwise handle archiving the final</span>
+<span class="sd">    result themselves. Event monitoring is not supported. If `quiet=True`</span>
+<span class="sd">    (default) then logging is suppressed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="s2">&quot;events&quot;</span> <span class="ow">in</span> <span class="n">kwargs</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;events are not supported&quot;</span><span class="p">)</span>
+
+    <span class="n">driver</span> <span class="o">=</span> <span class="n">DriverArgs</span><span class="p">(</span><span class="n">setup_name</span><span class="o">=</span><span class="n">setup_name</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">quiet</span><span class="p">:</span>
+        <span class="n">init_logging</span><span class="p">()</span>
+
+    <span class="k">return</span> <span class="nb">next</span><span class="p">(</span><span class="n">simulate</span><span class="p">(</span><span class="n">driver</span><span class="p">))[</span><span class="mi">2</span><span class="p">]</span></div>
+
+
+<div class="viewcode-block" id="init_logging"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.init_logging.html#sailfish.driver.init_logging">[docs]</a><span class="k">def</span> <span class="nf">init_logging</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Convenience method to enable logging to standard output.</span>
+
+<span class="sd">    This function is called from the `main` entry point (i.e. when sailfish is</span>
+<span class="sd">    used as a command line tool). However when sailfish is used as a library,</span>
+<span class="sd">    logging is not enabled by default (Python&#39;s `logging` module recommends</span>
+<span class="sd">    that libraries should not install any event handlers on the root logger).</span>
+<span class="sd">    This function enables a sensible logging configuration, so if the calling</span>
+<span class="sd">    application or script is not particular about how logging should take</span>
+<span class="sd">    place, but it doesn&#39;t want the driver to be silent, then invoking this</span>
+<span class="sd">    function will do it for you. Note this function is also invoked by the</span>
+<span class="sd">    `run` function if :code:`quiet=False` is passed to it.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">StreamHandler</span><span class="p">,</span> <span class="n">Formatter</span><span class="p">,</span> <span class="n">getLogger</span><span class="p">,</span> <span class="n">INFO</span>
+
+    <span class="k">class</span> <span class="nc">RunFormatter</span><span class="p">(</span><span class="n">Formatter</span><span class="p">):</span>
+        <span class="k">def</span> <span class="nf">format</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">record</span><span class="p">):</span>
+            <span class="n">name</span> <span class="o">=</span> <span class="n">record</span><span class="o">.</span><span class="n">name</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;sailfish.&quot;</span><span class="p">,</span> <span class="s2">&quot;&quot;</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;main_logger&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">if</span> <span class="n">record</span><span class="o">.</span><span class="n">levelno</span> <span class="o">&lt;=</span> <span class="mi">20</span><span class="p">:</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;[</span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">:</span><span class="si">{</span><span class="n">record</span><span class="o">.</span><span class="n">levelname</span><span class="o">.</span><span class="n">lower</span><span class="p">()</span><span class="si">}</span><span class="s2">] </span><span class="si">{</span><span class="n">record</span><span class="o">.</span><span class="n">msg</span><span class="si">}</span><span class="s2">&quot;</span>
+
+    <span class="n">handler</span> <span class="o">=</span> <span class="n">StreamHandler</span><span class="p">()</span>
+    <span class="n">handler</span><span class="o">.</span><span class="n">setFormatter</span><span class="p">(</span><span class="n">RunFormatter</span><span class="p">())</span>
+
+    <span class="n">root_logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">()</span>
+    <span class="n">root_logger</span><span class="o">.</span><span class="n">addHandler</span><span class="p">(</span><span class="n">handler</span><span class="p">)</span>
+    <span class="n">root_logger</span><span class="o">.</span><span class="n">setLevel</span><span class="p">(</span><span class="n">INFO</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="main"><a class="viewcode-back" href="../../_autosummary/sailfish.driver.main.html#sailfish.driver.main">[docs]</a><span class="k">def</span> <span class="nf">main</span><span class="p">():</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    General-purpose command line interface.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">argparse</span>
+
+    <span class="k">class</span> <span class="nc">MakeDict</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+        <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="nb">setattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">values</span><span class="p">))</span>
+
+    <span class="k">def</span> <span class="nf">add_dict_entry</span><span class="p">(</span><span class="n">key</span><span class="p">):</span>
+        <span class="k">class</span> <span class="nc">AddDictEntry</span><span class="p">(</span><span class="n">argparse</span><span class="o">.</span><span class="n">Action</span><span class="p">):</span>
+            <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">parser</span><span class="p">,</span> <span class="n">namespace</span><span class="p">,</span> <span class="n">values</span><span class="p">,</span> <span class="n">option_string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+                <span class="nb">getattr</span><span class="p">(</span><span class="n">namespace</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dest</span><span class="p">)[</span><span class="n">key</span><span class="p">]</span> <span class="o">=</span> <span class="n">values</span>
+
+        <span class="k">return</span> <span class="n">AddDictEntry</span>
+
+    <span class="n">init_logging</span><span class="p">()</span>
+
+    <span class="n">parser</span> <span class="o">=</span> <span class="n">argparse</span><span class="o">.</span><span class="n">ArgumentParser</span><span class="p">(</span>
+        <span class="n">prog</span><span class="o">=</span><span class="s2">&quot;sailfish&quot;</span><span class="p">,</span>
+        <span class="n">description</span><span class="o">=</span><span class="s2">&quot;gpu-accelerated astrophysical gasdynamics code&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;command&quot;</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;?&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;setup name or restart file&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--describe&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_true&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;print a description of the setup and exit&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--resolution&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-n&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;grid resolution&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--patches&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;N&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;num_patches&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;number of patches for domain decomposition&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--cfl&quot;</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;cfl_number&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;CFL parameter&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--fold&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-f&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;F&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">int</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;iterations between messages and side effects&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--events&quot;</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;E=V&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">keyed_event</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="n">MakeDict</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;a sequence of events and recurrence rules to be emitted&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--checkpoint&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-c&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;C&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Recurrence</span><span class="o">.</span><span class="n">from_str</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="n">add_dict_entry</span><span class="p">(</span><span class="s2">&quot;checkpoint&quot;</span><span class="p">),</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;events&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;checkpoint recurrence [&lt;delta&gt;|&lt;log:mul&gt;]&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--timeseries&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-t&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;T&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">Recurrence</span><span class="o">.</span><span class="n">from_str</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="n">add_dict_entry</span><span class="p">(</span><span class="s2">&quot;timeseries&quot;</span><span class="p">),</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;events&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;timeseries recurrence [&lt;delta&gt;|&lt;log:mul&gt;]&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--model&quot;</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;K=V&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">keyed_value</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="n">MakeDict</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;model_parameters&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;key-value pairs given as models parameters to the setup&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--solver&quot;</span><span class="p">,</span>
+        <span class="n">nargs</span><span class="o">=</span><span class="s2">&quot;*&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;K=V&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="n">keyed_value</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="n">MakeDict</span><span class="p">,</span>
+        <span class="n">default</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;solver_options&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;key-value pairs passed as options to the solver&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--outdir&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-o&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;D&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">str</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;output_directory&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;directory where checkpoints are written&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">parser</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--end-time&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-e&quot;</span><span class="p">,</span>
+        <span class="n">metavar</span><span class="o">=</span><span class="s2">&quot;T&quot;</span><span class="p">,</span>
+        <span class="nb">type</span><span class="o">=</span><span class="nb">float</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;when to end the simulation&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">exec_group</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">add_mutually_exclusive_group</span><span class="p">()</span>
+    <span class="n">exec_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--mode&quot;</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;execution_mode&quot;</span><span class="p">,</span>
+        <span class="n">choices</span><span class="o">=</span><span class="p">[</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="s2">&quot;omp&quot;</span><span class="p">,</span> <span class="s2">&quot;gpu&quot;</span><span class="p">],</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;execution mode&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">exec_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--use-omp&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-p&quot;</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;execution_mode&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_const&quot;</span><span class="p">,</span>
+        <span class="n">const</span><span class="o">=</span><span class="s2">&quot;omp&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;multi-core with OpenMP&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">exec_group</span><span class="o">.</span><span class="n">add_argument</span><span class="p">(</span>
+        <span class="s2">&quot;--use-gpu&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;-g&quot;</span><span class="p">,</span>
+        <span class="n">dest</span><span class="o">=</span><span class="s2">&quot;execution_mode&quot;</span><span class="p">,</span>
+        <span class="n">action</span><span class="o">=</span><span class="s2">&quot;store_const&quot;</span><span class="p">,</span>
+        <span class="n">const</span><span class="o">=</span><span class="s2">&quot;gpu&quot;</span><span class="p">,</span>
+        <span class="n">help</span><span class="o">=</span><span class="s2">&quot;gpu acceleration&quot;</span><span class="p">,</span>
+    <span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">args</span> <span class="o">=</span> <span class="n">parser</span><span class="o">.</span><span class="n">parse_args</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="n">args</span><span class="o">.</span><span class="n">describe</span> <span class="ow">and</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">setup_name</span> <span class="o">=</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">Setup</span><span class="o">.</span><span class="n">find_setup_class</span><span class="p">(</span><span class="n">setup_name</span><span class="p">)</span><span class="o">.</span><span class="n">describe_class</span><span class="p">()</span>
+
+        <span class="k">elif</span> <span class="n">args</span><span class="o">.</span><span class="n">command</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;specify setup:&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">setup</span> <span class="ow">in</span> <span class="n">Setup</span><span class="o">.</span><span class="n">__subclasses__</span><span class="p">():</span>
+                <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;    </span><span class="si">{</span><span class="n">setup</span><span class="o">.</span><span class="n">dash_case_class_name</span><span class="p">()</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">driver</span> <span class="o">=</span> <span class="n">DriverArgs</span><span class="o">.</span><span class="n">from_namespace</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+            <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">number</span><span class="p">,</span> <span class="n">state</span> <span class="ow">in</span> <span class="n">simulate</span><span class="p">(</span><span class="n">driver</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;checkpoint&quot;</span><span class="p">:</span>
+                    <span class="n">write_checkpoint</span><span class="p">(</span><span class="n">number</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span>
+                <span class="k">elif</span> <span class="n">name</span> <span class="o">==</span> <span class="s2">&quot;end&quot;</span><span class="p">:</span>
+                    <span class="n">write_checkpoint</span><span class="p">(</span><span class="s2">&quot;final&quot;</span><span class="p">,</span> <span class="n">args</span><span class="o">.</span><span class="n">output_directory</span><span class="p">,</span> <span class="n">state</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="n">logger</span><span class="o">.</span><span class="n">warning</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unrecognized event </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="n">ConfigurationError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;bad configuration: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="n">SetupError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;setup error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="n">ParseRecurrenceError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;parse error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">OSError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;file system error: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">ModuleNotFoundError</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unsatisfied dependency: </span><span class="si">{</span><span class="n">e</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">except</span> <span class="ne">KeyboardInterrupt</span><span class="p">:</span>
+        <span class="nb">print</span><span class="p">(</span><span class="s2">&quot;&quot;</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

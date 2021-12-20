@@ -1,0 +1,209 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.solver &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.solver</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.solver</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">The `Solver` class maintains physics state and implements a solution scheme.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
+
+
+<div class="viewcode-block" id="SolverBase"><a class="viewcode-back" href="../../_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase">[docs]</a><span class="k">class</span> <span class="nc">SolverBase</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Base class for solver implementations.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">solution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return an object representing the solution state.</span>
+
+<span class="sd">        The solution object is generally going to be either an array of</span>
+<span class="sd">        primitive hydrodynamic data, or of conserved quantities, depending on</span>
+<span class="sd">        which the solver considers to be more fundamental. If the solver</span>
+<span class="sd">        maintains state in addition to the hydrodynamic data, such as a list</span>
+<span class="sd">        of tracer or star particles, then objects like that should also be</span>
+<span class="sd">        returned as part of the solution object.</span>
+
+<span class="sd">        The solution object will be written to the checkpoint file, read back</span>
+<span class="sd">        on restarts, and passed to the solver constructor. When the run is not</span>
+<span class="sd">        a restart, the solver should instead construct its initial solution</span>
+<span class="sd">        object from the setup and mesh instances.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return primitive hydrodynamic data for use in plotting.</span>
+
+<span class="sd">        The primitive variable data returned from this function could be</span>
+<span class="sd">        written to checkpoint files, but it might also be written to</span>
+<span class="sd">        non-checkpoint output files for offline analysis, or passed along to</span>
+<span class="sd">        runtime post-processing routines.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the simulation time.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">options</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A dictionary that reflects the solver solution scheme.</span>
+
+<span class="sd">        An example of an options object would be :py:obj:`dict(plm=1.5,</span>
+<span class="sd">        rk=2)`. The items should describe the solver algorithm, not the</span>
+<span class="sd">        parameters of the physical system being solved, such as an equation of</span>
+<span class="sd">        state or cooling prescription.</span>
+
+<span class="sd">        Solver options and physics parameters are kept logically separate</span>
+<span class="sd">        because their configuration comes from different places: the physics</span>
+<span class="sd">        parameters come from the :py:obj:`sailfish.setup.Setup` class instance</span>
+<span class="sd">        (which can in turn be set from model parameters), whereas the solver</span>
+<span class="sd">        options come directly from the driver instance (i.e. command line</span>
+<span class="sd">        :code:`--solver key=val` if sailfish is invoked as an executable).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A dictionary describing the physics parameters of the system.</span>
+
+<span class="sd">        The physics parameters are supplied by the setup. They can include</span>
+<span class="sd">        things like an equation of state, a cooling prescription, external</span>
+<span class="sd">        gravity, a wavespeed in the case of passive scalar advection, fluid</span>
+<span class="sd">        viscocity model, etc. These items can still be influenced at runtime</span>
+<span class="sd">        through the setup&#39;s model parameters.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+    <span class="nd">@property</span>
+    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">maximum_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the largest CFL number that should be used for this solver.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span>
+
+<div class="viewcode-block" id="SolverBase.maximum_wavespeed"><a class="viewcode-back" href="../../_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.maximum_wavespeed">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the largest wavespeed on the grid.</span>
+
+<span class="sd">        This function is not implemented as a property, to emphasize that it</span>
+<span class="sd">        might be relatively expensive to compute.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="SolverBase.advance"><a class="viewcode-back" href="../../_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.advance">[docs]</a>    <span class="nd">@abstractmethod</span>
+    <span class="k">def</span> <span class="nf">advance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Advance the solution state by one iteration.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">pass</span></div></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

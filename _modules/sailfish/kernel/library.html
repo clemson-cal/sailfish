@@ -1,0 +1,393 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.kernel.library &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.kernel.library</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.kernel.library</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Defines a `Library` utility class to encapulsate CPU/GPU compiled kernels.</span>
+
+<span class="sd">CPU modules are built with the cffi module. Build products including the .so</span>
+<span class="sd">file itself are placed in this module&#39;s __pycache__ directory, and stored for</span>
+<span class="sd">reuse based on the SHA value of the source code and #define macros. GPU</span>
+<span class="sd">modules are JIT-compiled with cupy. No caching is presently done for the GPU</span>
+<span class="sd">modules.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">ctypes</span> <span class="kn">import</span> <span class="n">c_double</span><span class="p">,</span> <span class="n">c_int</span><span class="p">,</span> <span class="n">POINTER</span><span class="p">,</span> <span class="n">CDLL</span>
+<span class="kn">from</span> <span class="nn">hashlib</span> <span class="kn">import</span> <span class="n">sha256</span>
+<span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span>
+<span class="kn">from</span> <span class="nn">os</span> <span class="kn">import</span> <span class="n">listdir</span>
+<span class="kn">from</span> <span class="nn">os.path</span> <span class="kn">import</span> <span class="n">join</span><span class="p">,</span> <span class="n">dirname</span>
+
+<span class="kn">from</span> <span class="nn">.parse_api</span> <span class="kn">import</span> <span class="n">parse_api</span>
+<span class="kn">from</span> <span class="nn">.system</span> <span class="kn">import</span> <span class="n">build_config</span><span class="p">,</span> <span class="n">measure_time</span>
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+<span class="n">THREAD_BLOCK_SIZE_1D</span> <span class="o">=</span> <span class="p">(</span><span class="mi">64</span><span class="p">,)</span>
+<span class="n">THREAD_BLOCK_SIZE_2D</span> <span class="o">=</span> <span class="p">(</span><span class="mi">8</span><span class="p">,</span> <span class="mi">8</span><span class="p">)</span>
+<span class="n">THREAD_BLOCK_SIZE_3D</span> <span class="o">=</span> <span class="p">(</span><span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">,</span> <span class="mi">4</span><span class="p">)</span>
+
+<span class="n">KERNEL_LIB_HEADER</span> <span class="o">=</span> <span class="sa">r</span><span class="s2">&quot;&quot;&quot;</span>
+<span class="s2">#define EXEC_CPU 0</span>
+<span class="s2">#define EXEC_OMP 1</span>
+<span class="s2">#define EXEC_GPU 2</span>
+
+<span class="s2">#if (EXEC_MODE != EXEC_GPU)</span>
+<span class="s2">#include &lt;math.h&gt;</span>
+<span class="s2">#include &lt;stddef.h&gt;</span>
+<span class="s2">#define PRIVATE static</span>
+<span class="s2">#define PUBLIC</span>
+<span class="s2">#else</span>
+<span class="s2">#define PRIVATE static __device__</span>
+<span class="s2">#define PUBLIC extern &quot;C&quot; __global__</span>
+<span class="s2">#endif</span>
+
+<span class="s2">#if (EXEC_MODE == EXEC_CPU)</span>
+<span class="s2">#define FOR_EACH_1D(NI) \</span>
+<span class="s2">for (int i = 0; i &lt; NI; ++i) \</span>
+
+<span class="s2">#define FOR_EACH_2D(NI, NJ) \</span>
+<span class="s2">for (int i = 0; i &lt; NI; ++i) \</span>
+<span class="s2">for (int j = 0; j &lt; NJ; ++j) \</span>
+
+<span class="s2">#define FOR_EACH_3D(NI, NJ, NK) \</span>
+<span class="s2">for (int i = 0; i &lt; NI; ++i) \</span>
+<span class="s2">for (int j = 0; j &lt; NJ; ++j) \</span>
+<span class="s2">for (int k = 0; k &lt; NK; ++k) \</span>
+
+<span class="s2">#elif (EXEC_MODE == EXEC_OMP)</span>
+<span class="s2">#define FOR_EACH_1D(NI) \</span>
+<span class="s2">_Pragma(&quot;omp parallel for&quot;) \</span>
+<span class="s2">for (int i = 0; i &lt; NI; ++i) \</span>
+
+<span class="s2">#define FOR_EACH_2D(NI, NJ) \</span>
+<span class="s2">_Pragma(&quot;omp parallel for&quot;) \</span>
+<span class="s2">for (int i = 0; i &lt; NI; ++i) \</span>
+<span class="s2">for (int j = 0; j &lt; NJ; ++j) \</span>
+
+<span class="s2">#define FOR_EACH_3D(NI, NJ, NK) \</span>
+<span class="s2">_Pragma(&quot;omp parallel for&quot;) \</span>
+<span class="s2">for (int i = 0; i &lt; NI; ++i) \</span>
+<span class="s2">for (int j = 0; j &lt; NJ; ++j) \</span>
+<span class="s2">for (int k = 0; k &lt; NK; ++k) \</span>
+
+<span class="s2">#elif (EXEC_MODE == EXEC_GPU)</span>
+<span class="s2">#define FOR_EACH_1D(NI) \</span>
+<span class="s2">int i = threadIdx.x + blockIdx.x * blockDim.x; \</span>
+<span class="s2">if (i &gt;= NI) return; \</span>
+
+<span class="s2">#define FOR_EACH_2D(NI, NJ) \</span>
+<span class="s2">int i = threadIdx.x + blockIdx.x * blockDim.x; \</span>
+<span class="s2">int j = threadIdx.y + blockIdx.y * blockDim.y; \</span>
+<span class="s2">if (i &gt;= NI || j &gt;= NJ) return; \</span>
+
+<span class="s2">#define FOR_EACH_3D(NI, NJ, NK) \</span>
+<span class="s2">int i = threadIdx.x + blockIdx.x * blockDim.x; \</span>
+<span class="s2">int j = threadIdx.y + blockIdx.y * blockDim.y; \</span>
+<span class="s2">int k = threadIdx.z + blockIdx.z * blockDim.z; \</span>
+<span class="s2">if (i &gt;= NI || j &gt;= NJ || k &gt;= NK) return; \</span>
+
+<span class="s2">#endif</span>
+<span class="s2">&quot;&quot;&quot;</span>
+
+
+<div class="viewcode-block" id="KernelInvocation"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.KernelInvocation.html#sailfish.kernel.library.KernelInvocation">[docs]</a><span class="k">class</span> <span class="nc">KernelInvocation</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A kernel whose execution shape is specified and is ready to be invoked.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="KernelInvocation.__init__"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.KernelInvocation.html#sailfish.kernel.library.KernelInvocation.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">kernel</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span> <span class="o">=</span> <span class="n">kernel</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="n">shape</span></div>
+
+    <span class="k">def</span> <span class="fm">__call__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">args</span><span class="p">):</span>
+        <span class="n">lib</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span><span class="o">.</span><span class="n">lib</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>
+        <span class="n">name</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span><span class="o">.</span><span class="n">symbol</span><span class="o">.</span><span class="n">name</span>
+        <span class="n">spec</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">kernel</span><span class="o">.</span><span class="n">symbol</span><span class="o">.</span><span class="n">args</span>
+
+        <span class="k">if</span> <span class="n">lib</span><span class="o">.</span><span class="n">cpu_mode</span><span class="p">:</span>
+            <span class="n">kernel</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">lib</span><span class="o">.</span><span class="n">module</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">kernel</span> <span class="o">=</span> <span class="n">lib</span><span class="o">.</span><span class="n">module</span><span class="o">.</span><span class="n">get_function</span><span class="p">(</span><span class="n">name</span><span class="p">)</span>
+
+        <span class="n">args</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">+</span> <span class="nb">list</span><span class="p">(</span><span class="n">args</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">lib</span><span class="o">.</span><span class="n">debug</span><span class="p">:</span>
+            <span class="n">validate_types</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">spec</span><span class="p">),</span> <span class="n">name</span><span class="p">,</span> <span class="n">lib</span><span class="o">.</span><span class="n">xp</span><span class="p">)</span>
+            <span class="n">validate_constraints</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">(</span><span class="n">spec</span><span class="p">),</span> <span class="n">name</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">lib</span><span class="o">.</span><span class="n">cpu_mode</span><span class="p">:</span>
+            <span class="n">kernel</span><span class="p">(</span><span class="o">*</span><span class="n">to_ctypes</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="p">(</span><span class="n">ti</span><span class="p">,)</span> <span class="o">=</span> <span class="n">bs</span> <span class="o">=</span> <span class="n">THREAD_BLOCK_SIZE_1D</span>
+                <span class="p">(</span><span class="n">ni</span><span class="p">,)</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+                <span class="n">nb</span> <span class="o">=</span> <span class="p">((</span><span class="n">ni</span> <span class="o">+</span> <span class="n">ti</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">ti</span><span class="p">,)</span>
+                <span class="n">kernel</span><span class="p">(</span><span class="n">nb</span><span class="p">,</span> <span class="n">bs</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">ti</span><span class="p">,</span> <span class="n">tj</span> <span class="o">=</span> <span class="n">bs</span> <span class="o">=</span> <span class="n">THREAD_BLOCK_SIZE_2D</span>
+                <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+                <span class="n">nb</span> <span class="o">=</span> <span class="p">((</span><span class="n">ni</span> <span class="o">+</span> <span class="n">ti</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">ti</span><span class="p">,</span> <span class="p">(</span><span class="n">nj</span> <span class="o">+</span> <span class="n">tj</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">tj</span><span class="p">)</span>
+                <span class="n">kernel</span><span class="p">(</span><span class="n">nb</span><span class="p">,</span> <span class="n">bs</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span>
+
+            <span class="k">elif</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+                <span class="n">ti</span><span class="p">,</span> <span class="n">tj</span><span class="p">,</span> <span class="n">tk</span> <span class="o">=</span> <span class="n">bs</span> <span class="o">=</span> <span class="n">THREAD_BLOCK_SIZE_3D</span>
+                <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span><span class="p">,</span> <span class="n">nk</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+                <span class="n">nb</span> <span class="o">=</span> <span class="p">((</span><span class="n">ni</span> <span class="o">+</span> <span class="n">ti</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">ti</span><span class="p">,</span> <span class="p">(</span><span class="n">nj</span> <span class="o">+</span> <span class="n">tj</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">tj</span><span class="p">,</span> <span class="p">(</span><span class="n">nk</span> <span class="o">+</span> <span class="n">tk</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">//</span> <span class="n">tk</span><span class="p">)</span>
+                <span class="n">kernel</span><span class="p">(</span><span class="n">nb</span><span class="p">,</span> <span class="n">bs</span><span class="p">,</span> <span class="n">args</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Kernel"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.Kernel.html#sailfish.kernel.library.Kernel">[docs]</a><span class="k">class</span> <span class="nc">Kernel</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    An object that uses `__getitem__` syntax to return a</span>
+<span class="sd">    :py:class:`KernelInvocation` instance.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Kernel.__init__"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.Kernel.html#sailfish.kernel.library.Kernel.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">lib</span><span class="p">,</span> <span class="n">symbol</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lib</span> <span class="o">=</span> <span class="n">lib</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">symbol</span> <span class="o">=</span> <span class="n">symbol</span></div>
+
+    <span class="k">def</span> <span class="fm">__getitem__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">):</span>
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">==</span> <span class="nb">int</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="p">[(</span><span class="n">shape</span><span class="p">,)]</span>
+        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">shape</span><span class="p">)</span> <span class="o">!=</span> <span class="bp">self</span><span class="o">.</span><span class="n">symbol</span><span class="o">.</span><span class="n">rank</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;incompatible shape </span><span class="si">{</span><span class="n">shape</span><span class="si">}</span><span class="s2"> for kernel &quot;</span>
+                <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">symbol</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2"> with rank </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">symbol</span><span class="o">.</span><span class="n">rank</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">KernelInvocation</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">shape</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="Library"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library">[docs]</a><span class="k">class</span> <span class="nc">Library</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Builds and maintains (in memory) a CPU or GPU dynamically compiled module.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Library.__init__"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="n">name</span><span class="o">=</span><span class="s2">&quot;module&quot;</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+        <span class="n">code</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">KERNEL_LIB_HEADER</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">code</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;debug mode </span><span class="si">{</span><span class="s1">&#39;enabled&#39;</span> <span class="k">if</span> <span class="n">debug</span> <span class="k">else</span> <span class="s1">&#39;disabled&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;prepare module </span><span class="si">{</span><span class="n">name</span><span class="si">}</span><span class="s2"> for </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2"> execution&quot;</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="n">measure_time</span><span class="p">()</span> <span class="k">as</span> <span class="n">prep_time</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">debug</span> <span class="o">=</span> <span class="n">debug</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">cpu_mode</span> <span class="o">=</span> <span class="n">mode</span> <span class="o">!=</span> <span class="s2">&quot;gpu&quot;</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">api</span> <span class="o">=</span> <span class="n">parse_api</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">cpu_mode</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">load_cpu_module</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">load_gpu_module</span><span class="p">(</span><span class="n">code</span><span class="p">)</span>
+
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;module preparation took </span><span class="si">{</span><span class="n">prep_time</span><span class="p">()</span><span class="si">:</span><span class="s2">0.3</span><span class="si">}</span><span class="s2">s&quot;</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">symbol</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">api</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;+-- </span><span class="si">{</span><span class="n">symbol</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">load_cpu_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">):</span>
+        <span class="kn">import</span> <span class="nn">cffi</span>
+        <span class="kn">import</span> <span class="nn">numpy</span>
+
+        <span class="n">define_macros</span> <span class="o">=</span> <span class="p">[(</span><span class="s2">&quot;EXEC_MODE&quot;</span><span class="p">,</span> <span class="nb">dict</span><span class="p">(</span><span class="n">cpu</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">omp</span><span class="o">=</span><span class="mi">1</span><span class="p">)[</span><span class="n">mode</span><span class="p">])]</span>
+        <span class="n">ffi</span> <span class="o">=</span> <span class="n">cffi</span><span class="o">.</span><span class="n">FFI</span><span class="p">()</span>
+        <span class="n">ffi</span><span class="o">.</span><span class="n">set_source</span><span class="p">(</span>
+            <span class="n">name</span><span class="p">,</span>
+            <span class="n">code</span><span class="p">,</span>
+            <span class="n">define_macros</span><span class="o">=</span><span class="n">define_macros</span><span class="p">,</span>
+            <span class="n">extra_compile_args</span><span class="o">=</span><span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_compile_args&quot;</span><span class="p">],</span>
+            <span class="n">extra_link_args</span><span class="o">=</span><span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_link_args&quot;</span><span class="p">],</span>
+        <span class="p">)</span>
+
+        <span class="c1"># Build a hash for the compiled library based on code, define</span>
+        <span class="c1"># macros, and build args.</span>
+        <span class="n">sha</span> <span class="o">=</span> <span class="n">sha256</span><span class="p">()</span>
+        <span class="n">sha</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+        <span class="n">sha</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">define_macros</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+        <span class="n">sha</span><span class="o">.</span><span class="n">update</span><span class="p">(</span><span class="nb">str</span><span class="p">(</span><span class="n">build_config</span><span class="p">)</span><span class="o">.</span><span class="n">encode</span><span class="p">(</span><span class="s2">&quot;utf-8&quot;</span><span class="p">))</span>
+        <span class="n">cache_dir</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span><span class="n">dirname</span><span class="p">(</span><span class="vm">__file__</span><span class="p">),</span> <span class="s2">&quot;__pycache__&quot;</span><span class="p">,</span> <span class="n">sha</span><span class="o">.</span><span class="n">hexdigest</span><span class="p">())</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">so_name</span> <span class="o">=</span> <span class="n">join</span><span class="p">(</span>
+                <span class="n">cache_dir</span><span class="p">,</span>
+                <span class="nb">next</span><span class="p">(</span><span class="nb">filter</span><span class="p">(</span><span class="k">lambda</span> <span class="n">f</span><span class="p">:</span> <span class="n">f</span><span class="o">.</span><span class="n">endswith</span><span class="p">(</span><span class="s2">&quot;.so&quot;</span><span class="p">),</span> <span class="n">listdir</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">))),</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">module</span> <span class="o">=</span> <span class="n">CDLL</span><span class="p">(</span><span class="n">so_name</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;load cached library&quot;</span><span class="p">)</span>
+        <span class="k">except</span> <span class="p">(</span><span class="ne">FileNotFoundError</span><span class="p">,</span> <span class="ne">StopIteration</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+            <span class="n">target</span> <span class="o">=</span> <span class="n">ffi</span><span class="o">.</span><span class="n">compile</span><span class="p">(</span><span class="n">cache_dir</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">module</span> <span class="o">=</span> <span class="n">CDLL</span><span class="p">(</span><span class="n">target</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;recompile library&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">xp</span> <span class="o">=</span> <span class="n">numpy</span>
+
+    <span class="k">def</span> <span class="nf">load_gpu_module</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">code</span><span class="p">):</span>
+        <span class="kn">import</span> <span class="nn">cupy</span>
+
+        <span class="n">module</span> <span class="o">=</span> <span class="n">cupy</span><span class="o">.</span><span class="n">RawModule</span><span class="p">(</span><span class="n">code</span><span class="o">=</span><span class="n">code</span><span class="p">,</span> <span class="n">options</span><span class="o">=</span><span class="p">(</span><span class="s2">&quot;-D EXEC_MODE=2&quot;</span><span class="p">,))</span>
+        <span class="n">module</span><span class="o">.</span><span class="n">compile</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">module</span> <span class="o">=</span> <span class="n">module</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xp</span> <span class="o">=</span> <span class="n">cupy</span>
+
+    <span class="k">def</span> <span class="fm">__getattr__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">symbol</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">Kernel</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">api</span><span class="p">[</span><span class="n">symbol</span><span class="p">])</span></div>
+
+
+<div class="viewcode-block" id="to_ctypes"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.to_ctypes.html#sailfish.kernel.library.to_ctypes">[docs]</a><span class="k">def</span> <span class="nf">to_ctypes</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Coerce a sequence of values to their appropriate ctype.</span>
+
+<span class="sd">    The expected type is determined from the `spec` list.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">for</span> <span class="n">arg</span><span class="p">,</span> <span class="p">(</span><span class="n">typename</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">typename</span> <span class="o">==</span> <span class="s2">&quot;int&quot;</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">c_int</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typename</span> <span class="o">==</span> <span class="s2">&quot;double&quot;</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">c_double</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typename</span> <span class="o">==</span> <span class="s2">&quot;double*&quot;</span><span class="p">:</span>
+            <span class="k">yield</span> <span class="n">arg</span><span class="o">.</span><span class="n">ctypes</span><span class="o">.</span><span class="n">data_as</span><span class="p">(</span><span class="n">POINTER</span><span class="p">(</span><span class="n">c_double</span><span class="p">))</span></div>
+
+
+<div class="viewcode-block" id="type_error"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.type_error.html#sailfish.kernel.library.type_error">[docs]</a><span class="k">def</span> <span class="nf">type_error</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;argument </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">sym</span><span class="si">}</span><span class="s2"> has type </span><span class="si">{</span><span class="nb">type</span><span class="p">(</span><span class="n">a</span><span class="p">)</span><span class="o">.</span><span class="vm">__name__</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">b</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="dtype_error"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.dtype_error.html#sailfish.kernel.library.dtype_error">[docs]</a><span class="k">def</span> <span class="nf">dtype_error</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;argument </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">sym</span><span class="si">}</span><span class="s2"> has dtype </span><span class="si">{</span><span class="n">a</span><span class="o">.</span><span class="n">dtype</span><span class="si">}</span><span class="s2">, expected </span><span class="si">{</span><span class="n">b</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="arglen_error"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.arglen_error.html#sailfish.kernel.library.arglen_error">[docs]</a><span class="k">def</span> <span class="nf">arglen_error</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">):</span>
+    <span class="k">return</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">sym</span><span class="si">}</span><span class="s2"> takes exactly </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">b</span><span class="p">)</span><span class="si">}</span><span class="s2"> arguments (</span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">a</span><span class="p">)</span><span class="si">}</span><span class="s2"> given)&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="layout_error"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.layout_error.html#sailfish.kernel.library.layout_error">[docs]</a><span class="k">def</span> <span class="nf">layout_error</span><span class="p">(</span><span class="n">sym</span><span class="p">,</span> <span class="n">n</span><span class="p">):</span>
+    <span class="k">return</span> <span class="ne">TypeError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;arg </span><span class="si">{</span><span class="n">n</span><span class="si">}</span><span class="s2"> to </span><span class="si">{</span><span class="n">sym</span><span class="si">}</span><span class="s2"> is not c-contiguous&quot;</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="validate_types"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.validate_types.html#sailfish.kernel.library.validate_types">[docs]</a><span class="k">def</span> <span class="nf">validate_types</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">symbol</span><span class="p">,</span> <span class="n">xp</span><span class="p">):</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">args</span><span class="p">)</span> <span class="o">!=</span> <span class="nb">len</span><span class="p">(</span><span class="n">spec</span><span class="p">):</span>
+        <span class="k">raise</span> <span class="n">arglen_error</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="p">(</span><span class="n">arg</span><span class="p">,</span> <span class="p">(</span><span class="n">typename</span><span class="p">,</span> <span class="n">argname</span><span class="p">,</span> <span class="n">constraint</span><span class="p">))</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="nb">zip</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">)):</span>
+        <span class="k">if</span> <span class="n">typename</span> <span class="o">==</span> <span class="s2">&quot;int&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">int</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">type_error</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="s2">&quot;int&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typename</span> <span class="o">==</span> <span class="s2">&quot;double&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">float</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">type_error</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="s2">&quot;float64&quot;</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="n">typename</span> <span class="o">==</span> <span class="s2">&quot;double*&quot;</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">arg</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">xp</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">type_error</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="s2">&quot;ndarray&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">arg</span><span class="o">.</span><span class="n">dtype</span> <span class="o">!=</span> <span class="n">xp</span><span class="o">.</span><span class="n">float64</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="n">dtype_error</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">n</span><span class="p">,</span> <span class="n">arg</span><span class="p">,</span> <span class="s2">&quot;float64&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="n">arg</span><span class="o">.</span><span class="n">flags</span><span class="p">[</span><span class="s2">&quot;C_CONTIGUOUS&quot;</span><span class="p">]:</span>
+                <span class="k">raise</span> <span class="n">layout_error</span><span class="p">(</span><span class="n">symbol</span><span class="p">,</span> <span class="n">n</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="validate_constraints"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.library.validate_constraints.html#sailfish.kernel.library.validate_constraints">[docs]</a><span class="k">def</span> <span class="nf">validate_constraints</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">,</span> <span class="n">symbol</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Validate kernel argument constraints for a symbol.</span>
+
+<span class="sd">    Constraints are optionally defined in C code and extracted in the</span>
+<span class="sd">    `parse_api` module.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">scope</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span><span class="nb">zip</span><span class="p">([</span><span class="n">a</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">spec</span><span class="p">],</span> <span class="n">args</span><span class="p">))</span>
+    <span class="k">for</span> <span class="n">arg</span><span class="p">,</span> <span class="p">(</span><span class="n">_</span><span class="p">,</span> <span class="n">name</span><span class="p">,</span> <span class="n">constraint</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">args</span><span class="p">,</span> <span class="n">spec</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">constraint</span><span class="p">:</span>
+            <span class="n">c</span> <span class="o">=</span> <span class="n">constraint</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;$&quot;</span><span class="p">,</span> <span class="n">name</span><span class="p">)</span>
+            <span class="k">if</span> <span class="ow">not</span> <span class="nb">eval</span><span class="p">(</span><span class="n">c</span><span class="p">,</span> <span class="kc">None</span><span class="p">,</span> <span class="n">scope</span><span class="p">):</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;argument constraint for </span><span class="si">{</span><span class="n">symbol</span><span class="si">}</span><span class="s2"> not satisfied: </span><span class="si">{</span><span class="n">c</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

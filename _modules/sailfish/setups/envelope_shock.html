@@ -1,0 +1,258 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.setups.envelope_shock &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.setups.envelope_shock</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.setups.envelope_shock</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Contains a setup for studying a relativistic type-II shockwave.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">pi</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">log10</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">SetupError</span><span class="p">,</span> <span class="n">param</span>
+<span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">LogSphericalMesh</span>
+
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">functools</span> <span class="kn">import</span> <span class="n">cached_property</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="c1"># revert to ordinary property on Python &lt; 3.8</span>
+    <span class="n">cached_property</span> <span class="o">=</span> <span class="nb">property</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;EnvelopeShock&quot;</span><span class="p">,</span> <span class="s2">&quot;RelativisticEnvelope&quot;</span><span class="p">]</span>
+
+
+<span class="n">ZONE_ENVELOPE</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">ZONE_WIND</span> <span class="o">=</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="RelativisticEnvelope"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.envelope_shock.RelativisticEnvelope.html#sailfish.setups.envelope_shock.RelativisticEnvelope">[docs]</a><span class="k">class</span> <span class="nc">RelativisticEnvelope</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Describes a homologous expanding medium with power-law mass coordinate.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">envelope_m1</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="sd">&quot;&quot;&quot; Mass coordinate of the u=1 shell &quot;&quot;&quot;</span>
+
+    <span class="n">envelope_slowest_beta</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="sd">&quot;&quot;&quot; Beta (v/c) of the slowest envelope shell &quot;&quot;&quot;</span>
+
+    <span class="n">envelope_fastest_beta</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="sd">&quot;&quot;&quot; Beta (v/c) of the outer shell &quot;&quot;&quot;</span>
+
+    <span class="n">envelope_psi</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="sd">&quot;&quot;&quot; Index psi in u(m) ~ m^-psi &quot;&quot;&quot;</span>
+
+    <span class="n">wind_mdot</span><span class="p">:</span> <span class="nb">float</span>
+    <span class="sd">&quot;&quot;&quot; The mass loss rate for the wind &quot;&quot;&quot;</span>
+
+    <span class="k">def</span> <span class="nf">envelop_slowest_u</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">envelope_slowest_beta</span>
+        <span class="k">return</span> <span class="n">b</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">b</span><span class="p">)</span><span class="o">.</span><span class="n">sqrt</span><span class="p">()</span>
+
+    <span class="k">def</span> <span class="nf">zone</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">r</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">int</span><span class="p">:</span>
+        <span class="n">v_min</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">envelope_slowest_beta</span>
+        <span class="n">r_wind_envelop_interface</span> <span class="o">=</span> <span class="n">v_min</span> <span class="o">*</span> <span class="n">t</span>
+
+        <span class="k">if</span> <span class="n">r</span> <span class="o">&gt;</span> <span class="n">r_wind_envelop_interface</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ZONE_ENVELOPE</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">ZONE_WIND</span>
+
+    <span class="k">def</span> <span class="nf">gamma_beta</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">r</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">zone</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="o">==</span> <span class="n">ZONE_WIND</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">envelope_slowest_u</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">zone</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="o">==</span> <span class="n">ZONE_ENVELOPE</span><span class="p">:</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">envelope_fastest_beta</span><span class="p">)</span>
+            <span class="n">u</span> <span class="o">=</span> <span class="n">b</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">b</span> <span class="o">*</span> <span class="n">b</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+            <span class="k">return</span> <span class="n">u</span>
+
+    <span class="k">def</span> <span class="nf">mass_rate_per_steradian</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">r</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">zone</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="o">==</span> <span class="n">ZONE_WIND</span><span class="p">:</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wind_mdot</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">zone</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="o">==</span> <span class="n">ZONE_ENVELOPE</span><span class="p">:</span>
+            <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">envelope_psi</span>
+            <span class="n">s</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">t</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">envelope_fastest_beta</span><span class="p">)</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">s</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">y</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">s</span> <span class="o">*</span> <span class="n">s</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="mf">0.5</span> <span class="o">/</span> <span class="n">y</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">envelope_m1</span> <span class="o">/</span> <span class="p">(</span><span class="mf">4.0</span> <span class="o">*</span> <span class="n">pi</span> <span class="o">*</span> <span class="n">y</span> <span class="o">*</span> <span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="n">f</span>
+
+    <span class="k">def</span> <span class="nf">comoving_mass_density</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">r</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">t</span><span class="p">:</span> <span class="nb">float</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">mass_rate_per_steradian</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="o">/</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gamma_beta</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span> <span class="o">*</span> <span class="n">r</span> <span class="o">*</span> <span class="n">r</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="EnvelopeShock"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock">[docs]</a><span class="k">class</span> <span class="nc">EnvelopeShock</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A relativistic shell launched into a homologous, relativistic envelope.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">u_shell</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">30.0</span><span class="p">,</span> <span class="s2">&quot;gamma-beta of the launched shell&quot;</span><span class="p">)</span>
+    <span class="n">m_shell</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;mass coordinate of the launched shell&quot;</span><span class="p">)</span>
+    <span class="n">w_shell</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;width of the shell in dm/m&quot;</span><span class="p">)</span>
+    <span class="n">t_start</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;time when the simulation starts&quot;</span><span class="p">)</span>
+    <span class="n">r_inner</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="s2">&quot;inner radius at start&quot;</span><span class="p">)</span>
+    <span class="n">r_outer</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s2">&quot;outer radius at start&quot;</span><span class="p">)</span>
+    <span class="n">expand</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;whether to expand the mesh homologously&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="EnvelopeShock.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">ambient</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">ambient</span>
+        <span class="n">psi</span> <span class="o">=</span> <span class="n">ambient</span><span class="o">.</span><span class="n">envelope_psi</span>
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">ambient</span><span class="o">.</span><span class="n">envelope_m1</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">r</span> <span class="o">/</span> <span class="n">t</span><span class="p">,</span> <span class="n">ambient</span><span class="o">.</span><span class="n">envelope_fastest_beta</span><span class="p">)</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="n">s</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">s</span> <span class="o">*</span> <span class="n">s</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+        <span class="n">m</span> <span class="o">=</span> <span class="n">m1</span> <span class="o">*</span> <span class="n">u</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">psi</span><span class="p">)</span>
+        <span class="n">d</span> <span class="o">=</span> <span class="n">ambient</span><span class="o">.</span><span class="n">comoving_mass_density</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="n">t</span><span class="p">)</span>
+        <span class="n">p</span> <span class="o">=</span> <span class="mf">1e-5</span> <span class="o">*</span> <span class="n">d</span>
+
+        <span class="k">def</span> <span class="nf">u_prof</span><span class="p">(</span><span class="n">m</span><span class="p">):</span>
+            <span class="k">if</span> <span class="n">m</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_shell</span><span class="p">:</span>
+                <span class="k">return</span> <span class="mf">0.0</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">(</span><span class="n">m</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_shell</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_shell</span><span class="p">)</span>
+
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">d</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">u</span> <span class="o">+</span> <span class="n">u_prof</span><span class="p">(</span><span class="n">m</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">u_shell</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">p</span>
+
+        <span class="k">if</span> <span class="n">m</span> <span class="o">&gt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_shell</span> <span class="ow">and</span> <span class="n">m</span> <span class="o">&lt;</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_shell</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_shell</span><span class="p">):</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span></div>
+
+<div class="viewcode-block" id="EnvelopeShock.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.envelope_shock.EnvelopeShock.html#sailfish.setups.envelope_shock.EnvelopeShock.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">num_zones_per_decade</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">LogSphericalMesh</span><span class="p">(</span>
+            <span class="n">r0</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">r_inner</span><span class="p">,</span>
+            <span class="n">r1</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">r_outer</span><span class="p">,</span>
+            <span class="n">num_zones_per_decade</span><span class="o">=</span><span class="n">num_zones_per_decade</span><span class="p">,</span>
+            <span class="n">scale_factor_derivative</span><span class="o">=</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_start</span><span class="p">)</span> <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">expand</span> <span class="k">else</span> <span class="kc">None</span><span class="p">,</span>
+        <span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;srhd_1d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">start_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_start</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span><span class="p">,</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+    <span class="k">def</span> <span class="nf">r_shell</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="n">u</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_shell</span> <span class="o">**</span> <span class="o">-</span><span class="mf">0.25</span>
+        <span class="n">s</span> <span class="o">=</span> <span class="n">u</span> <span class="o">/</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">u</span> <span class="o">*</span> <span class="n">u</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">t_start</span> <span class="o">*</span> <span class="n">s</span>
+
+    <span class="nd">@cached_property</span>
+    <span class="k">def</span> <span class="nf">ambient</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">RelativisticEnvelope</span><span class="p">(</span>
+            <span class="n">envelope_m1</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">envelope_fastest_beta</span><span class="o">=</span><span class="mf">0.999</span><span class="p">,</span>
+            <span class="n">envelope_slowest_beta</span><span class="o">=</span><span class="mf">0.00</span><span class="p">,</span>
+            <span class="n">envelope_psi</span><span class="o">=</span><span class="mf">0.25</span><span class="p">,</span>
+            <span class="n">wind_mdot</span><span class="o">=</span><span class="mf">100.0</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">gamma_shell</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">u_shell</span> <span class="o">**</span> <span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+
+    <span class="k">def</span> <span class="nf">shell_energy</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">w_shell</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">m_shell</span> <span class="o">*</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">gamma_shell</span><span class="p">()</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

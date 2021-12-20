@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.event &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
+        <script src="../../_static/jquery.js"></script>
+        <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/doctools.js"></script>
+    <script src="../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.event</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.event</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
+
+<span class="n">LINEAR</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">LOG</span> <span class="o">=</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="ParseRecurrenceError"><a class="viewcode-back" href="../../_autosummary/sailfish.event.ParseRecurrenceError.html#sailfish.event.ParseRecurrenceError">[docs]</a><span class="k">class</span> <span class="nc">ParseRecurrenceError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;Something went wrong parsing a recurrence rule&quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Recurrence"><a class="viewcode-back" href="../../_autosummary/sailfish.event.Recurrence.html#sailfish.event.Recurrence">[docs]</a><span class="k">class</span> <span class="nc">Recurrence</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Rule for how an event can recur throughout a simulation.</span>
+
+<span class="sd">    The available rules are:</span>
+
+<span class="sd">    - linear: at evenly spaced time intervals</span>
+<span class="sd">    - log: at multiplicative time intervals; `next = time * (1 + delta)`</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">kind</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">interval</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span>
+
+    <span class="nd">@classmethod</span>
+    <span class="k">def</span> <span class="nf">from_str</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">string</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">try</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">Recurrence</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="n">LINEAR</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">string</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>  <span class="c1"># parse float failed</span>
+            <span class="k">pass</span>
+
+        <span class="k">try</span><span class="p">:</span>
+            <span class="n">kind</span><span class="p">,</span> <span class="n">interval</span> <span class="o">=</span> <span class="n">string</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s2">&quot;:&quot;</span><span class="p">)</span>
+            <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;linear&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Recurrence</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="n">LINEAR</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">interval</span><span class="p">))</span>
+            <span class="k">if</span> <span class="n">kind</span> <span class="o">==</span> <span class="s2">&quot;log&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">Recurrence</span><span class="p">(</span><span class="n">kind</span><span class="o">=</span><span class="n">LOG</span><span class="p">,</span> <span class="n">interval</span><span class="o">=</span><span class="nb">float</span><span class="p">(</span><span class="n">interval</span><span class="p">))</span>
+        <span class="k">except</span> <span class="ne">ValueError</span><span class="p">:</span>  <span class="c1"># parse float failed or wrong number of arguments</span>
+            <span class="k">pass</span>
+
+        <span class="k">raise</span> <span class="n">ParseRecurrenceError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;badly formed recurrence rule </span><span class="si">{</span><span class="n">string</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">kind_str</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;linear&quot;</span><span class="p">,</span> <span class="s2">&quot;log&quot;</span><span class="p">][</span><span class="bp">self</span><span class="o">.</span><span class="n">kind</span><span class="p">]</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">LINEAR</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">kind_str</span><span class="si">}</span><span class="s2"> with interval </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="si">}</span><span class="s2">&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">LOG</span><span class="p">:</span>
+            <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">kind_str</span><span class="si">}</span><span class="s2"> with multiplier </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">interval</span><span class="si">}</span><span class="s2">&quot;</span></div>
+
+
+<div class="viewcode-block" id="RecurringEvent"><a class="viewcode-back" href="../../_autosummary/sailfish.event.RecurringEvent.html#sailfish.event.RecurringEvent">[docs]</a><span class="k">class</span> <span class="nc">RecurringEvent</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    State of a recurring event that occurs during a simulation.</span>
+
+<span class="sd">    Events signal side effects to a loop which monitors simulation progress,</span>
+<span class="sd">    include writing checkpoints, collecting time series data, and other</span>
+<span class="sd">    post-processing tasks.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">last_time</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">number</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="k">def</span> <span class="nf">next_time</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">recurrence</span><span class="p">):</span>
+        <span class="k">if</span> <span class="n">recurrence</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">LINEAR</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">number</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">time</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_time</span> <span class="o">+</span> <span class="n">recurrence</span><span class="o">.</span><span class="n">interval</span>
+        <span class="k">if</span> <span class="n">recurrence</span><span class="o">.</span><span class="n">kind</span> <span class="o">==</span> <span class="n">LOG</span><span class="p">:</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">number</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">time</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">last_time</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">+</span> <span class="n">recurrence</span><span class="o">.</span><span class="n">interval</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">is_due</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">recurrence</span><span class="p">):</span>
+        <span class="n">next_time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">next_time</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">recurrence</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">next_time</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="kc">False</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">time</span> <span class="o">&gt;=</span> <span class="n">next_time</span>
+
+    <span class="k">def</span> <span class="nf">next</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">,</span> <span class="n">recurrence</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span>
+            <span class="n">last_time</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">next_time</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">recurrence</span><span class="p">),</span> <span class="n">number</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">number</span> <span class="o">+</span> <span class="mi">1</span>
+        <span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>
