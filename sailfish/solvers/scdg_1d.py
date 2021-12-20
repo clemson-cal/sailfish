@@ -15,7 +15,7 @@ class CellData:
     This class works for n-th order Gaussian quadrature in 1D.
     """
 
-    def __init__(self, order=3):
+    def __init__(self, order=1):
         import numpy as np
 
         if order <= 0:

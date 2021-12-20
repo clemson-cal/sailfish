@@ -53,6 +53,7 @@ API documentation
    sailfish.event
    sailfish.kernel
    sailfish.mesh
+   sailfish.physics
    sailfish.setup
    sailfish.setups
    sailfish.solver
