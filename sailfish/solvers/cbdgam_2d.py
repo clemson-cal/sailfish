@@ -1,0 +1,266 @@
+"""
+Two-dimensional vertically integrated hydro with gamma-law EOS.
+
+Fill in more details about the physics here:
+
+"""
+
+from logging import getLogger
+from sailfish.kernel.library import Library
+from sailfish.kernel.system import get_array_module
+from sailfish.subdivide import subdivide
+from sailfish.mesh import PlanarCartesian2DMesh
+from sailfish.solver import SolverBase
+
+
+logger = getLogger(__name__)
+
+
+def initial_condition(setup, mesh, time):
+    """
+    Generate a 2D array of primitive data from a mesh and a setup.
+    """
+    import numpy as np
+
+    ni, nj = mesh.shape
+    primitive = np.zeros([ni, nj, 4])
+
+    for i in range(ni):
+        for j in range(nj):
+            setup.primitive(time, mesh.cell_coordinates(i, j), primitive[i, j])
+
+    return primitive
+
+
+class Patch:
+    """
+    Holds the array buffer state for the solution on a subset of the
+    solution domain.
+    """
+
+    def __init__(
+        self,
+        time,
+        primitive,
+        mesh,
+        index_range,
+        lib,
+        xp,
+    ):
+        i0, i1 = index_range
+        self.lib = lib
+        self.xp = xp
+        self.num_zones = index_range[1] - index_range[0]
+        self.faces = self.xp.array(mesh.faces(*index_range))
+        self.coordinates = COORDINATES_DICT[type(mesh)]
+        try:
+            adot = float(mesh.scale_factor_derivative)
+            self.scale_factor_initial = 0.0
+            self.scale_factor_derivative = adot
+        except (TypeError, AttributeError):
+            self.scale_factor_initial = 1.0
+            self.scale_factor_derivative = 0.0
+
+        self.time = self.time0 = time
+
+        with self.execution_context():
+            self.primitive1 = self.xp.array(primitive)
+            self.primitive2 = self.xp.array(primitive)
+            self.conserved0 = self.primitive_to_conserved(self.primitive1)
+
+    def execution_context(self):
+        """TODO: return a CUDA context for execution on the assigned device"""
+        return nullcontext()
+
+    def primitive_to_conserved(self, primitive):
+        with self.execution_context():
+            # TODO: use correct function signature
+            conserved = self.xp.zeros_like(primitive)
+            self.lib.cbdgam_2d_primitive_to_conserved[self.num_zones](
+                self.faces,
+                primitive,
+                conserved,
+                self.scale_factor,
+                self.coordinates,
+            )
+            return conserved
+
+    def recompute_primitive(self):
+        with self.execution_context():
+            # TODO: use correct function signature
+            self.lib.cbdgam_2d_conserved_to_primitive[self.num_zones](
+                self.faces,
+                self.conserved1,
+                self.primitive1,
+            )
+
+    def recompute_conserved(self):
+        with self.execution_context():
+            # TODO: use correct function signature
+            self.lib.cbdgam_2d_primitive_to_conserved[self.num_zones](
+                self.faces,
+                self.primitive1,
+                self.conserved1,
+            )
+
+    def advance_rk(self, rk_param, dt):
+        with self.execution_context():
+            # TODO: use correct function signature
+            self.lib.cbdgam_2d_advance_rk[self.num_zones](
+                self.faces,
+                self.conserved0,
+                self.primitive1,
+                self.conserved1,
+                self.conserved2,
+                self.time,
+                rk_param,
+                dt,
+                self.coordinates,
+            )
+        self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
+        self.primitive1, self.primitive2 = self.primitive2, self.primitive1
+
+    def new_iteration(self):
+        self.time0 = self.time
+        self.recompute_conserved()
+
+    @property
+    def primitive(self):
+        self.recompute_primitive()
+        return self.primitive1
+
+
+class Solver(SolverBase):
+    """
+    Adapter class to drive the srhd_1d C extension module.
+    """
+
+    def __init__(
+        self,
+        setup=None,
+        mesh=None,
+        time=0.0,
+        solution=None,
+        num_patches=1,
+        mode="cpu",
+        physics=dict(),
+        options=dict(),
+    ):
+        if type(mesh) is not PlanarCartesian2DMesh:
+            raise ValueError("solver only supports 2D cartesian mesh")
+
+        if setup.boundary_condition != "outflow":
+            raise ValueError("solver only supports outflow boundary condition")
+
+        xp = get_array_module(mode)
+        ng = 2  # number of guard zones
+        nq = 4  # number of conserved quantities
+        with open(__file__.replace(".py", ".c")) as f:
+            code = f.read()
+        lib = Library(code, mode=mode, debug=False)
+
+        logger.info(f"initiate with time={time:0.4f}")
+        logger.info(f"subdivide grid over {num_patches} patches")
+        logger.info(f"mesh is {mesh}")
+        logger.info(f"boundary condition is outflow")
+
+        self.mesh = mesh
+        self.setup = setup
+        self.num_guard = ng
+        self.num_cons = nq
+        self.xp = xp
+        self.patches = []
+
+        if solution is None:
+            primitive = initial_condition(setup, mesh, time)
+        else:
+            primitive = solution
+
+        for (a, b) in subdivide(mesh.shape[0], num_patches):
+            prim = xp.zeros([b - a + 2 * ng, mesh.shape[1] + 2 * ng, nq])
+            prim[ng:-ng, ng:-ng] = primitive[a:b]
+            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
+
+        self.set_bc("primitive1")
+
+    @property
+    def solution(self):
+        return self.primitive
+
+    @property
+    def primitive(self):
+        ni, nj = self.mesh.shape
+        ng = self.num_guard
+        nq = self.num_cons
+        np = len(self.patches)
+        primitive = self.xp.zeros([ni, nj, nq])
+        for (a, b), patch in zip(subdivide(ni, np), self.patches):
+            primitive[a:b] = patch.primitive[ng:-ng, ng:-ng]
+        return primitive
+
+    @property
+    def time(self):
+        return self.patches[0].time
+
+    @property
+    def options(self):
+        return dict()
+
+    @property
+    def physics(self):
+        return dict()
+
+    @property
+    def maximum_cfl(self):
+        return 0.1
+
+    def maximum_wavespeed(self):
+        raise NotImplementedError("need to compute max wavespeeds on the grid patches")
+
+    def advance(self, dt):
+        self.new_iteration()
+        self.advance_rk(0.0, dt)
+        self.advance_rk(0.5, dt)
+
+    def advance_rk(self, rk_param, dt):
+        self.set_bc("primitive1")
+        for patch in self.patches:
+            patch.advance_rk(rk_param, dt)
+
+    def set_bc(self, array):
+        ng = self.num_guard
+        num_patches = len(self.patches)
+        for i0 in range(num_patches):
+            il = (i0 + num_patches - 1) % num_patches
+            ir = (i0 + num_patches + 1) % num_patches
+            pl = getattr(self.patches[il], array)
+            pc = getattr(self.patches[i0], array)
+            pr = getattr(self.patches[ir], array)
+            self.set_bc_patch(pl, pc, pr, i0)
+
+    def set_bc_patch(self, pl, pc, pr, patch_index):
+        ni, nj = self.mesh.shape
+        ng = self.num_guard
+
+        # 1. write to the guard zones of pc, the internal BC
+        pc[:+ng] = pl[-2 * ng : -ng]
+        pc[-ng:] = pr[+ng : +2 * ng]
+
+        # 2. Set outflow BC on the left/right patch edges
+        if patch_index == 0:
+            for i in range(ng):
+                pc[i] = pc[ng]
+        if patch_index == len(self.patches) - 1:
+            for i in range(pc.shape[0] - ng, pc.shape[0]):
+                pc[i] = pc[-ng - 1]
+
+        # 3. Set outflow BC on bottom and top edges
+        for i in range(ng):
+            pc[:, i] = pc[:, ng]
+
+        for i in range(pc.shape[1] - ng, pc.shape[1]):
+            pc[:, i] = pc[:, -ng - 1]
+
+    def new_iteration(self):
+        for patch in self.patches:
+            patch.new_iteration()
