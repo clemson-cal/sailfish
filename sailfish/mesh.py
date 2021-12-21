@@ -116,3 +116,81 @@ class LogSphericalMesh(NamedTuple):
             i1 = self.shape[0]
         r0, k = self.r0, 1.0 / self.num_zones_per_decade
         return [r0 * 10 ** (i * k) for i in range(i0, i1 + 1)]
+
+
+class PlanarCartesian2DMesh(NamedTuple):
+    """
+    A 2D mesh with rectangular binning.
+
+    The length of the domain is related to height by an aspect ratio. The
+    minimum demarcations along an axis is also variable allowing for
+    non-square meshing if need be.
+    """
+
+    x0: float = 0.0
+    y0: float = 0.0
+    x1: float = 1.0
+    y1: float = 1.0
+    ni: int = 1000
+    nj: int = 1000
+
+    @classmethod
+    def centered_square(cls, domain_radius, resolution):
+        x0 = -domain_radius
+        y0 = -domain_radius
+        x1 = +domain_radius
+        y1 = +domain_radius
+        ni = resolution
+        nj = resolution
+        dx = 2.0 * domain_radius / resolution
+        dy = 2.0 * domain_radius / resolution
+        return PlanarCartesian2DMesh(x0, y0, x1, y1, ni, nj)
+
+    @classmethod
+    def centered_rectangle(cls, height, resolution, aspect: int):
+        if type(aspect) is not int:
+            raise ValueError("centered_rectangle requires aspect to be int")
+        x0 = -0.5 * height * aspect
+        y0 = -0.5 * height
+        x1 = +0.5 * height * aspect
+        y1 = +0.5 * height
+        ni = resolution * aspect
+        nj = resolution
+        return PlanarCartesian2DMesh(x0, y0, x1, y1, ni, nj)
+
+    @property
+    def dx(self):
+        return (self.x1 - self.x0) / self.ni
+
+    @property
+    def dy(self):
+        return (self.y1 - self.y0) / self.nj
+
+    def num_total_zones(self):
+        return self.ni * self.nj
+
+    def shape(self):
+        return self.ni, self.nj
+
+    def cell_coordinates(self, i, j):
+        x = self.x0 + (i + 0.5) * self.dx
+        y = self.y0 + (j + 0.5) * self.dy
+        return x, y
+
+    def vertex_coordinates(self, i, j):
+        x = self.x0 + i * self.dx
+        y = self.y0 + j * self.dy
+        return x, y
+
+    def sub_mesh(self, di, dj):
+        """
+        Return a new mesh that is a subset of this one.
+
+        The arguments di and dj are tuples, containing the lower and upper
+        index range on this mesh.
+        """
+        x0, y0 = self.vertex_coordinates(di[0], dj[0])
+        x1, y1 = self.vertex_coordinates(di[1], dj[1])
+        ni = di[1] - di[0]
+        nj = dj[1] - dj[0]
+        return PlanarCartesian2DMesh(x0, y0, x1, y1, ni, nj)
