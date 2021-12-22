@@ -397,8 +397,8 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, doub
 PUBLIC cbdgam_2d_wavespeed(
     int ni,
     int nj,
-    double *primitive, // :: $.shape == [ni + 4, nj + 4, 4]
-    double *wavespeed, // :: $.shape == [ni + 4, nj + 4]
+    double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
+    double *wavespeed, // :: $.shape == (ni + 4, nj + 4)
     double gamma_law_index)
 {
     int ng = 2; // number of guard zones
