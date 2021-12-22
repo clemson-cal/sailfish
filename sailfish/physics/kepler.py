@@ -369,7 +369,7 @@ class OrbitalElements(NamedTuple):
         """
         Compute the orbital state vector from the time since last periapse.
         """
-        E = self.eccentric_anomaoly(time_since_periapse)
+        E = self.eccentric_anomaly(time_since_periapse)
         return self.orbital_state_from_eccentric_anomaly(E)
 
     def orbital_state_with_orientation(
@@ -379,7 +379,7 @@ class OrbitalElements(NamedTuple):
         Compute the orbital state from an absolute time and orientation.
         """
         t = absolute_time - orientation.periapse_time
-        E = self.eccentric_anomaoly(t)
+        E = self.eccentric_anomaly(t)
         state = self.orbital_state_from_eccentric_anomaly(E)
 
         m1 = state[0].mass

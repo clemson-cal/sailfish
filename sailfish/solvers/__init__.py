@@ -4,6 +4,7 @@ Physics solvers and solution schemes.
 
 from . import srhd_1d
 from . import scdg_1d
+from . import cbdgam_2d
 
 
 def make_solver(name, physics, options, **kwargs):
