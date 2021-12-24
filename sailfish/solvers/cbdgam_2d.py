@@ -7,6 +7,7 @@ Fill in more details about the physics here:
 """
 
 from logging import getLogger
+from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
