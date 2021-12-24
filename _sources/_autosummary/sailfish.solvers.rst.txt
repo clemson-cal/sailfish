@@ -34,6 +34,7 @@
    :toctree:
    :recursive:
 
+   sailfish.solvers.cbdgam_2d
    sailfish.solvers.scdg_1d
    sailfish.solvers.srhd_1d
 

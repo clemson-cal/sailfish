@@ -4,7 +4,7 @@
   <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
 
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.solvers &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.solvers.cbdgam_2d.initial_condition &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -18,8 +18,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.make_solver" href="sailfish.solvers.make_solver.html" />
-    <link rel="prev" title="sailfish.solver.SolverBase" href="sailfish.solver.SolverBase.html" /> 
+    <link rel="next" title="sailfish.solvers.cbdgam_2d.Options" href="sailfish.solvers.cbdgam_2d.Options.html" />
+    <link rel="prev" title="sailfish.solvers.cbdgam_2d" href="sailfish.solvers.cbdgam_2d.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -50,9 +50,16 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.solvers</a><ul>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.cbdgam_2d.initial_condition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Options.html">sailfish.solvers.cbdgam_2d.Options</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Patch.html">sailfish.solvers.cbdgam_2d.Patch</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Physics.html">sailfish.solvers.cbdgam_2d.Physics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Solver.html">sailfish.solvers.cbdgam_2d.Solver</a></li>
+</ul>
+</li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 </ul>
@@ -77,9 +84,11 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
           <li><a href="../api.html">API documentation</a> &raquo;</li>
-      <li>sailfish.solvers</li>
+          <li><a href="sailfish.solvers.html">sailfish.solvers</a> &raquo;</li>
+          <li><a href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a> &raquo;</li>
+      <li>sailfish.solvers.cbdgam_2d.initial_condition</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/_autosummary/sailfish.solvers.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/_autosummary/sailfish.solvers.cbdgam_2d.initial_condition.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -87,47 +96,22 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.solvers">
-<span id="sailfish-solvers"></span><h1>sailfish.solvers<a class="headerlink" href="#module-sailfish.solvers" title="Permalink to this headline"></a></h1>
-<p>Physics solvers and solution schemes.</p>
-<p class="rubric">Functions</p>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.make_solver.html#sailfish.solvers.make_solver" title="sailfish.solvers.make_solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_solver</span></code></a>(name, physics, options, **kwargs)</p></td>
-<td><p>Find a solver with the given name and construct it.</p></td>
-</tr>
-</tbody>
-</table>
-<p class="rubric">Modules</p>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html#module-sailfish.solvers.cbdgam_2d" title="sailfish.solvers.cbdgam_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.cbdgam_2d</span></code></a></p></td>
-<td><p>Two-dimensional vertically integrated hydro with gamma-law EOS</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.html#module-sailfish.solvers.scdg_1d" title="sailfish.solvers.scdg_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.scdg_1d</span></code></a></p></td>
-<td><p>An n-th order discontinuous Galerkin solver for 1D scalar advection.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_1d.html#module-sailfish.solvers.srhd_1d" title="sailfish.solvers.srhd_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.srhd_1d</span></code></a></p></td>
-<td><p>One-dimensional relativistic hydro solver supporting homologous mesh motion.</p></td>
-</tr>
-</tbody>
-</table>
+  <section id="sailfish-solvers-cbdgam-2d-initial-condition">
+<h1>sailfish.solvers.cbdgam_2d.initial_condition<a class="headerlink" href="#sailfish-solvers-cbdgam-2d-initial-condition" title="Permalink to this headline"></a></h1>
+<dl class="py function">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.initial_condition">
+<span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdgam_2d.</span></span><span class="sig-name descname"><span class="pre">initial_condition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdgam_2d.html#initial_condition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.initial_condition" title="Permalink to this definition"></a></dt>
+<dd><p>Generate a 2D array of primitive data from a mesh and a setup.</p>
+</dd></dl>
+
 </section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.solver.SolverBase.html" class="btn btn-neutral float-left" title="sailfish.solver.SolverBase" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.make_solver.html" class="btn btn-neutral float-right" title="sailfish.solvers.make_solver" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solvers.cbdgam_2d.html" class="btn btn-neutral float-left" title="sailfish.solvers.cbdgam_2d" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.solvers.cbdgam_2d.Options.html" class="btn btn-neutral float-right" title="sailfish.solvers.cbdgam_2d.Options" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

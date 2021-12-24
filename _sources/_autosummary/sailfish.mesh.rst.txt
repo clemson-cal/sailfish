@@ -19,6 +19,7 @@
       :toctree:
    
       LogSphericalMesh
+      PlanarCartesian2DMesh
       PlanarCartesianMesh
    
    

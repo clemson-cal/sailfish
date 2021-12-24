@@ -1,0 +1,37 @@
+sailfish.solvers.cbdgam\_2d.Patch
+=================================
+
+.. currentmodule:: sailfish.solvers.cbdgam_2d
+
+.. autoclass:: Patch
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Patch.__init__
+      ~Patch.advance_rk
+      ~Patch.execution_context
+      ~Patch.maximum_wavespeed
+      ~Patch.new_iteration
+      ~Patch.primitive_to_conserved
+      ~Patch.recompute_conserved
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Patch.primitive
+   
+   

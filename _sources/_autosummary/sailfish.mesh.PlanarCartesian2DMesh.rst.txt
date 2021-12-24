@@ -1,0 +1,47 @@
+sailfish.mesh.PlanarCartesian2DMesh
+===================================
+
+.. currentmodule:: sailfish.mesh
+
+.. autoclass:: PlanarCartesian2DMesh
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PlanarCartesian2DMesh.__init__
+      ~PlanarCartesian2DMesh.cell_coordinates
+      ~PlanarCartesian2DMesh.centered_rectangle
+      ~PlanarCartesian2DMesh.centered_square
+      ~PlanarCartesian2DMesh.count
+      ~PlanarCartesian2DMesh.index
+      ~PlanarCartesian2DMesh.num_total_zones
+      ~PlanarCartesian2DMesh.shape
+      ~PlanarCartesian2DMesh.sub_mesh
+      ~PlanarCartesian2DMesh.vertex_coordinates
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PlanarCartesian2DMesh.dx
+      ~PlanarCartesian2DMesh.dy
+      ~PlanarCartesian2DMesh.ni
+      ~PlanarCartesian2DMesh.nj
+      ~PlanarCartesian2DMesh.x0
+      ~PlanarCartesian2DMesh.x1
+      ~PlanarCartesian2DMesh.y0
+      ~PlanarCartesian2DMesh.y1
+   
+   

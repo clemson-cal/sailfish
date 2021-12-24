@@ -437,7 +437,7 @@
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Compute the orbital state vector from the time since last periapse.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="n">E</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentric_anomaoly</span><span class="p">(</span><span class="n">time_since_periapse</span><span class="p">)</span>
+        <span class="n">E</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentric_anomaly</span><span class="p">(</span><span class="n">time_since_periapse</span><span class="p">)</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_state_from_eccentric_anomaly</span><span class="p">(</span><span class="n">E</span><span class="p">)</span></div>
 
 <div class="viewcode-block" id="OrbitalElements.orbital_state_with_orientation"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.kepler.OrbitalElements.html#sailfish.physics.kepler.OrbitalElements.orbital_state_with_orientation">[docs]</a>    <span class="k">def</span> <span class="nf">orbital_state_with_orientation</span><span class="p">(</span>
@@ -447,7 +447,7 @@
 <span class="sd">        Compute the orbital state from an absolute time and orientation.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">t</span> <span class="o">=</span> <span class="n">absolute_time</span> <span class="o">-</span> <span class="n">orientation</span><span class="o">.</span><span class="n">periapse_time</span>
-        <span class="n">E</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentric_anomaoly</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
+        <span class="n">E</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">eccentric_anomaly</span><span class="p">(</span><span class="n">t</span><span class="p">)</span>
         <span class="n">state</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_state_from_eccentric_anomaly</span><span class="p">(</span><span class="n">E</span><span class="p">)</span>
 
         <span class="n">m1</span> <span class="o">=</span> <span class="n">state</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">mass</span>

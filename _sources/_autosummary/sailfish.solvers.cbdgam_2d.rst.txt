@@ -1,0 +1,40 @@
+sailfish.solvers.cbdgam\_2d
+===========================
+
+.. automodule:: sailfish.solvers.cbdgam_2d
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      initial_condition
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Options
+      Patch
+      Physics
+      Solver
+   
+   
+
+   
+   
+   
+
+
+
