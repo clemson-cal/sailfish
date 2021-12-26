@@ -704,6 +704,7 @@ pub struct BinaryBondi{
     pub x_bin: f64,
     pub aspect: i64,
     pub height: f64,
+    pub bh_sep: f64,
     pub sink_model: SinkModel,
     form: kind_config::Form,
 }
@@ -721,6 +722,7 @@ impl FromStr for BinaryBondi {
             .item("x_bin",          0.0, "horizontal position of binary COM (with respect to domain centroid)")
             .item("aspect",           2, "aspect ratio for domain")
             .item("height",         1.0, "height")
+            .item("bh_sep",         1.0, "black hole separation")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
             .item("q",              1.0, "system mass ratio: [0-1]")
             .item("e",              0.0, "orbital eccentricity: [0-1]")
@@ -735,6 +737,7 @@ impl FromStr for BinaryBondi {
             x_bin: form.get("x_bin").into(),
             aspect: form.get("aspect").into(),
             height: form.get("height").into(),
+            bh_sep: form.get("bh_sep").into(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             form,
         })
@@ -778,8 +781,8 @@ impl Setup for BinaryBondi {
     }
 
     fn masses(&self, time: f64) -> PointMassList {
-        let a: f64 = 1.0;
-        let m: f64 = 1.0;
+        let a: f64 = self.bh_sep;
+        let m: f64 = self.bh_mass;
         let q: f64 = self.form.get("q").into();
         let e: f64 = self.form.get("e").into();
         let binary = OrbitalElements(a, m, q, e);
