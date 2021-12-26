@@ -1,5 +1,11 @@
-/target
-/data
 *.bin
 *.sf
 *.png
+*.pk
+__pycache__
+/build
+/dist
+/target
+/data
+/doc/source/_autosummary
+/doc/build
