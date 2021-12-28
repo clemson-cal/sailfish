@@ -371,13 +371,22 @@ struct Patch
     real *data;
 };
 
-static struct Patch patch(struct Mesh mesh, int num_fields, int num_guard, real *data)
+static struct Patch patch(
+    int ni, 
+    int nj,
+    real xl,
+    real xr,
+    real yl,
+    real yr, 
+    int num_fields, 
+    int num_guard, 
+    real *data)
 {
     struct Patch patch;
     patch.start[0] = -num_guard;
     patch.start[1] = -num_guard;
-    patch.count[0] = mesh.ni + 2 * num_guard;
-    patch.count[1] = mesh.nj + 2 * num_guard;
+    patch.count[0] = ni + 2 * num_guard;
+    patch.count[1] = nj + 2 * num_guard;
     patch.jumps[0] = num_fields * patch.count[1];
     patch.jumps[1] = num_fields;
     patch.num_fields = num_fields;
@@ -559,7 +568,7 @@ static __host__ __device__ void advance_rk_zone(
 
     primitive_to_conserved(pcc, ucc);
     //buffer_source_term(&bc, xc, yc, dt, ucc);
-    point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
+    point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);//MODIFY THE MASSLIST HERE
 
     for (int q = 0; q < NCONS; ++q)
     {
@@ -733,13 +742,18 @@ static __host__ __device__ void wavespeed_zone(
  * @param mode               The execution mode
  */
 EXTERN_C void iso2d_primitive_to_conserved(
-    struct Mesh mesh,
+    int ni,
+    int nj,
+    real xl,
+    real xr,
+    real yl,
+    real yr,
     real *primitive_ptr,
     real *conserved_ptr,
     enum ExecutionMode mode)
 {
-    struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
-    struct Patch conserved = patch(mesh, NCONS, 0, conserved_ptr);    
+    struct Patch primitive = patch(ni, nj, xl, xr, yl, yr, NCONS, 2, primitive_ptr);
+    struct Patch conserved = patch(ni, nj, xl, xr, yl, yr, NCONS, 0, conserved_ptr);    
 
     switch (mode) {
         case CPU: {
@@ -786,29 +800,47 @@ EXTERN_C void iso2d_primitive_to_conserved(
  * @param mode                  The execution mode
  */
 EXTERN_C void iso2d_advance_rk(
-    struct Mesh mesh,
+    int ni,
+    int nj,
+    real xl,
+    real xr,
+    real yl,
+    real yr,
     real *conserved_rk_ptr,
     real *primitive_rd_ptr,
     real *primitive_wr_ptr,
-    struct EquationOfState eos,
-    struct BoundaryCondition buffer,
-    struct PointMassList mass_list,
+    real cs2,
+    //struct BoundaryCondition buffer,
+    real x1,
+    real y1,
+    real vx1,
+    real vy1,
+    real mass1,
+    real rate1,
+    real radius1,
+    real x2,
+    real y2,
+    real vx2,
+    real vy2,
+    real mass2,
+    real rate2,
+    real radius2,
     real nu,
     real a,
     real dt,
     real velocity_ceiling,
     enum ExecutionMode mode)
 {
-    struct Patch conserved_rk = patch(mesh, NCONS, 0, conserved_rk_ptr);
-    struct Patch primitive_rd = patch(mesh, NCONS, 2, primitive_rd_ptr);
-    struct Patch primitive_wr = patch(mesh, NCONS, 2, primitive_wr_ptr);
+    struct Patch conserved_rk = patch(ni, nj, xl, xr, yl, yr, NCONS, 0, conserved_rk_ptr);
+    struct Patch primitive_rd = patch(ni, nj, xl, xr, yl, yr, NCONS, 2, primitive_rd_ptr);
+    struct Patch primitive_wr = patch(ni, nj, xl, xr, yl, yr, NCONS, 2, primitive_wr_ptr);
 
     switch (mode) {
         case CPU: {
             if (nu == 0.0) {
                 FOR_EACH(conserved_rk) {
                     advance_rk_zone_inviscid(
-                        mesh,
+                        ni, nj, xl, xr, yl, yr,
                         conserved_rk,
                         primitive_rd,
                         primitive_wr,
@@ -824,13 +856,26 @@ EXTERN_C void iso2d_advance_rk(
             } else {
                 FOR_EACH(conserved_rk) {
                     advance_rk_zone(
-                        mesh,
+                        ni, nj, xl, xr, yl, yr,
                         conserved_rk,
                         primitive_rd,
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        x1,
+                        y1,
+                        vx1,
+                        vy1,
+                        mass1,
+                        rate1,
+                        radius1,
+                        x2,
+                        y2,
+                        vx2,
+                        vy2,
+                        mass2,
+                        rate2,
+                        radius2,
                         nu,
                         a,
                         dt,
@@ -861,13 +906,26 @@ EXTERN_C void iso2d_advance_rk(
             } else {
                 FOR_EACH_OMP(conserved_rk) {
                     advance_rk_zone(
-                        mesh,
+                        ni, nj, xl, xr, yl, yr,
                         conserved_rk,
                         primitive_rd,
                         primitive_wr,
                         eos,
                         buffer,
-                        mass_list,
+                        x1,
+                        y1,
+                        vx1,
+                        vy1,
+                        mass1,
+                        rate1,
+                        radius1,
+                        x2,
+                        y2,
+                        vx2,
+                        vy2,
+                        mass2,
+                        rate2,
+                        radius2,
                         nu,
                         a,
                         dt,
@@ -886,7 +944,7 @@ EXTERN_C void iso2d_advance_rk(
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
             if (nu == 0.0) {
                 advance_rk_kernel_inviscid<<<bd, bs>>>(
-                    mesh,
+                    ni, nj, xl, xr, yl, yr,
                     conserved_rk,
                     primitive_rd,
                     primitive_wr,
@@ -899,13 +957,26 @@ EXTERN_C void iso2d_advance_rk(
                 );
             } else {
                 advance_rk_kernel<<<bd, bs>>>(
-                    mesh,
+                    ni, nj, xl, xr, yl, yr,
                     conserved_rk,
                     primitive_rd,
                     primitive_wr,
                     eos,
                     buffer,
-                    mass_list,
+                    x1,
+                    y1,
+                    vx1,
+                    vy1,
+                    mass1,
+                    rate1,
+                    radius1,
+                    x2,
+                    y2,
+                    vx2,
+                    vy2,
+                    mass2,
+                    rate2,
+                    radius2,
                     nu,
                     a,
                     dt,
@@ -931,19 +1002,24 @@ EXTERN_C void iso2d_advance_rk(
  * @param mode                The execution mode
  */
 EXTERN_C void iso2d_point_mass_source_term(
-    struct Mesh mesh,
+    int ni,
+    int nj,
+    real xl,
+    real xr,
+    real yl,
+    real yr,
     real *primitive_ptr,
     real *cons_rate_ptr,
     struct PointMass mass,
     enum ExecutionMode mode)
 {
-    struct Patch primitive = patch(mesh, NCONS, 2, primitive_ptr);
-    struct Patch cons_rate = patch(mesh, NCONS, 0, cons_rate_ptr);
+    struct Patch primitive = patch(ni, nj, xl, xr, yl, yr, NCONS, 2, primitive_ptr);
+    struct Patch cons_rate = patch(ni, nj, xl, xr, yl, yr, NCONS, 0, cons_rate_ptr);
 
     switch (mode) {
         case CPU: {
             FOR_EACH(cons_rate) {
-                point_mass_source_term_zone(mesh, primitive, cons_rate, mass, i, j);
+                point_mass_source_term_zone(ni, nj, xl, xr, yl, yr, primitive, cons_rate, mass, i, j);
             }
             break;
         }
@@ -951,7 +1027,7 @@ EXTERN_C void iso2d_point_mass_source_term(
         case OMP: {
             #ifdef _OPENMP
             FOR_EACH_OMP(cons_rate) {
-                point_mass_source_term_zone(mesh, primitive, cons_rate, mass, i, j);
+                point_mass_source_term_zone(ni, nj, xl, xr, yl, yr, primitive, cons_rate, mass, i, j);
             }
             #endif
             break;
@@ -960,8 +1036,8 @@ EXTERN_C void iso2d_point_mass_source_term(
         case GPU: {
             #if defined(__NVCC__) || defined(__ROCM__)
             dim3 bs = dim3(16, 16);
-            dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
-            point_mass_source_term_kernel<<<bd, bs>>>(mesh, primitive, cons_rate, mass);
+            dim3 bd = dim3((nj + bs.x - 1) / bs.x, (ni + bs.y - 1) / bs.y);
+            point_mass_source_term_kernel<<<bd, bs>>>(ni, nj, xl, xr, yl, yr, primitive, cons_rate, mass);
             #endif
             break;
         }
@@ -978,6 +1054,8 @@ EXTERN_C void iso2d_point_mass_source_term(
  * @param mass_list           A list of point mass objects
  * @param mode                The execution mode
  */
+
+//YOU HAVE TO CHANGE THIS
 EXTERN_C void iso2d_wavespeed(
     struct Mesh mesh,
     real *primitive_ptr,
