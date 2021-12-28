@@ -43,18 +43,35 @@ static __host__ __device__ void plm_gradient(real *yl, real *y0, real *yr, real 
 // ============================ GRAVITY =======================================
 // ============================================================================
 static __host__ __device__ real gravitational_potential(
-    struct PointMassList *mass_list,
+    real x1,
+    real y1,
+    real vx1,
+    real vy1,
+    real mass1,
+    real rate1,
+    real radius1,
+    real x2,
+    real y2,
+    real vx2,
+    real vy2,
+    real mass2,
+    real rate2,
+    real radius2,
+    int num_mass,
     real x1,
     real y1)
 {
     real phi = 0.0;
-
-    for (int p = 0; p < mass_list->count; ++p)
+    real X[] = {x1, x2}
+    real Y[] = {y1,y2}
+    real MASS[] = {mass1, mass2}
+    real RADIUS[] = {radius1, radius2} 
+    for (int p = 0; p < num_mass; ++p)
     {
-        real x0 = mass_list->masses[p].x;
-        real y0 = mass_list->masses[p].y;
-        real mp = mass_list->masses[p].mass;
-        real rs = mass_list->masses[p].radius;
+        real x0 = X[p];
+        real y0 = Y[p];
+        real mp = MASS[p];
+        real rs = RADIUS[p];
 
         real dx = x1 - x0;
         real dy = y1 - y0;
@@ -194,7 +211,7 @@ static __host__ __device__ real sound_speed_squared(real cs_squared)
 }
 
 static __host__ __device__ void buffer_source_term(
-    struct BoundaryCondition *bc,
+    struct BoundaryCondition *bc, 
     real xc,
     real yc,
     real dt,
@@ -206,6 +223,7 @@ static __host__ __device__ void buffer_source_term(
         case Inflow:
             break;
 
+        //LOOK INTO MODIFYING THE FUNCTION SIGNATURE IN ORDER TO ACCOMODATE THESE
         case KeplerianBuffer:
         {
             real rc = sqrt(xc * xc + yc * yc);
@@ -435,6 +453,7 @@ static __host__ __device__ void advance_rk_zone(
     real mass2,
     real rate2,
     real radius2,
+    int num_mass,
     real nu,
     real a,
     real dt,
@@ -578,7 +597,7 @@ static __host__ __device__ void advance_rk_zone(
     real *pout = GET(primitive_wr, i, j);
     conserved_to_primitive(ucc, pout, velocity_ceiling);
 }
-
+//MIGHT NOT BE REQUIRED SINCE WE AREN'T DOING INVISCID CALCULATIONS
 static __host__ __device__ void advance_rk_zone_inviscid(
     struct Mesh mesh,
     struct Patch conserved_rk,
@@ -715,6 +734,7 @@ static __host__ __device__ void wavespeed_zone(
     real mass2,
     real rate2,
     real radius2,
+    int num_mass,
     struct Patch primitive,
     struct Patch wavespeed,
     
@@ -825,6 +845,7 @@ EXTERN_C void iso2d_advance_rk(
     real mass2,
     real rate2,
     real radius2,
+    int num_mass,
     real nu,
     real a,
     real dt,
@@ -839,6 +860,7 @@ EXTERN_C void iso2d_advance_rk(
         case CPU: {
             if (nu == 0.0) {
                 FOR_EACH(conserved_rk) {
+                    //MIGHT NOT BE REQUIRED SINCE WE AREN'T DOING INVISCID CALCULATIONS
                     advance_rk_zone_inviscid(
                         ni, nj, xl, xr, yl, yr,
                         conserved_rk,
@@ -890,6 +912,7 @@ EXTERN_C void iso2d_advance_rk(
             #ifdef _OPENMP
             if (nu == 0.0) {
                 FOR_EACH_OMP(conserved_rk) {
+                    //MIGHT NOT BE REQUIRED SINCE WE AREN'T DOING INVISCID CALCULATIONS
                     advance_rk_zone_inviscid(
                         mesh,
                         conserved_rk,
@@ -943,6 +966,7 @@ EXTERN_C void iso2d_advance_rk(
             dim3 bs = dim3(16, 16);
             dim3 bd = dim3((mesh.nj + bs.x - 1) / bs.x, (mesh.ni + bs.y - 1) / bs.y);
             if (nu == 0.0) {
+                //MIGHT NOT BE REQUIRED SINCE WE AREN'T DOING INVISCID CALCULATIONS
                 advance_rk_kernel_inviscid<<<bd, bs>>>(
                     ni, nj, xl, xr, yl, yr,
                     conserved_rk,
@@ -1055,7 +1079,7 @@ EXTERN_C void iso2d_point_mass_source_term(
  * @param mode                The execution mode
  */
 
-//YOU HAVE TO CHANGE THIS
+//STILL HAVE TO CHANGE THIS
 EXTERN_C void iso2d_wavespeed(
     struct Mesh mesh,
     real *primitive_ptr,
