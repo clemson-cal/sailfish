@@ -14,28 +14,29 @@
 
 PRIVATE double minmod(double w1, double w0l, double w0, double w0r) 
 {
-    double a = w1 * (3.0**0.5)
-    double b = (w0 - w0l) * BETA_TVB
-    double c = (w0r - w0) * BETA_TVB
+    double a = w1 * sqrt(3.0);
+    double b = (w0 - w0l) * BETA_TVB;
+    double c = (w0r - w0) * BETA_TVB;
 
-    return (0.25 / (3.0**0.5)) * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
+    return 0.25 / sqrt(3.0) * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
 }
 
+// Identify troubled cells using Troubled Cell 
+// Indicator from G.Fu & C-W Shu, JCP 347, 305 (2017)
+// Then limit slopes of the troubled cells using TVB minmod
+// For limiting, use threshold of 0.1 appropriate for 1D k=2 (DG3) 
 PRIVATE double limit_troubled_cells(double *ul, double *u, double *ur)
-//    Identify troubled cells using Troubled Cell 
-//    Indicator from G.Fu & C-W Shu, JCP 347, 305 (2017)
-//    Then limit slopes of the troubled cells using TVB minmod
-//    For limiting, use threshold of 0.1 appropriate for 1D k=2 (DG3) 
 {
-    // integrating polynomial extended from left zone into this zone
-    double a = u[0] + 2.0 * (3.0**0.5) * ul[1] + 5.0 * (5.0**0.5) / 3.0 * ul[2];
-    // integrating polynomial extended from right zone into this zone
-    double b = u[0] - 2.0 * (3.0**0.5) * ur[1] + 5.0 * (5.0**0.5) / 3.0 * ur[2];
+    // integrating polynomial extended from left/right zone into this zone
+
+    double a = u[0] + 2.0 * sqrt(3.0) * ul[1] + 5.0 * sqrt(5.0) / 3.0 * ul[2];
+    double b = u[0] - 2.0 * sqrt(3.0) * ur[1] + 5.0 * sqrt(5.0) / 3.0 * ur[2];
     double tci = (fabs(u[0] - a) + fabs(u[0] - b)) / maxabs(ul[0], u[0], ur[0]);
 
     if (tci > 0.1)
     {
         w1t = minmod(u[1], ul[0], u[0], ur[0]);
+
         if (fabs(u[1] - w1t) > 1e-6)
         {             
             u[1] = w1t;
@@ -51,63 +52,60 @@ PRIVATE double flux(double ux)
         case 0: return WAVESPEED * ux; // Advection
         case 1: return 0.5 * ux * ux;  // Burgers
     }
+    return 0.0;
 }
 
 PRIVATE double upwind(double ul, double ur) 
 {
     switch (PDE) {
         case 0: // advection
-            if (WAVESPEED > 0.0){
+            if (WAVESPEED > 0.0) {
                 return flux(ul);
             }
-            else{
+            else {
                 return flux(ur);
             }
         case 1: // Burgers
             double al = ul;
             double ar = ur;
-            if (al > 0.0 && ar > 0.0){
+
+            if (al > 0.0 && ar > 0.0) {
                 return flux(ul);
             }
-            else if (al < 0.0 && ar < 0.0){
+            else if (al < 0.0 && ar < 0.0) {
                 return flux(ur);
             }
             else {
                 return 0.0;
-            } 
+            }
     }
 }
 
 PRIVATE double dot(double *u, double *p) 
 {
     double sum = 0.0;
-    for (int i = 0, i < NPOLY, ++i){
+
+    for (int i = 0, i < NPOLY, ++i) {
         sum += u[i] * p[i]; 
     }
     return sum;
 }
 
-"""
-Advance solution one Runge-Kutta substep
-"""
-PUBLIC void scdg_1d_advance_rk(
+PUBLIC void scdg_1d_udot(
     int num_zones,    // number of zones, not including guard zones
-    double *u_rk,     // :: $.shape == (num_zones + 2, NPOLY)
-    double *u_rd,     // :: $.shape == (num_zones + 2, NPOLY)
-    double *u_wr,     // :: $.shape == (num_zones + 2, NPOLY)
-    double time,      // current time
-    double rk_param,  // Runge-Kutta parameter
+    double *u_rd,     // :: $.shape == (num_zones + 2, 1, 3) # NPOLY = 3
+    double *udot,     // :: $.shape == (num_zones + 2, 1, 3) # NPOLY = 3
     double dt,        // time step
     double dx)        // grid spacing
 {
     int ng = 1; // number of guard zones
 
-    // TODO: pass cell data as a struct argument 
+    // TODO: pass cell data as a struct argument
 
     // Gaussian quadrature points in scaled domain xsi=[-1,1]
-    double g =  {-0.774596669241483, 0.000000000000000, 0.774596669241483}; 
+    double g = {-0.774596669241483, 0.000000000000000, 0.774596669241483}; 
     // Gaussian weights at quadrature points
-    double w =  { 0.555555555555556, 0.888888888888889, 0.555555555555556};
+    double w = { 0.555555555555556, 0.888888888888889, 0.555555555555556};
     // Scaled LeGendre polynomials at quadrature points
     double p = {{ 1.000000000000000, 1.000000000000000, 1.000000000000000},
                 {-1.341640786499873, 0.000000000000000, 1.341640786499873},
@@ -121,20 +119,19 @@ PUBLIC void scdg_1d_advance_rk(
     // Scaled LeGendre polynomials at left face
     double pfl = {1.000000000000000, -1.732050807568877, 2.23606797749979};
     // Scaled LeGendre polynomials at right face
-    double pfr = {1.000000000000000,  1.732050807568877, 2.23606797749979};    
+    double pfr = {1.000000000000000,  1.732050807568877, 2.23606797749979};
 
     FOR_EACH_1D(num_zones)
     {
-        double *urd = &conserved_rd[NPOLY * (i + ng)];
-        double *uli = &conserved_rd[NPOLY * (i + ng - 1)];
-        double *uri = &conserved_rd[NPOLY * (i + ng + 1)];
-        double *uwr = &conserved_wr[NPOLY * (i + ng)];
-        double *urk = &conserved_rk[NPOLY * (i + ng)];
+        double *uc = &u_rd[NPOLY * (i + ng)];
+        double *ul = &u_rd[NPOLY * (i + ng - 1)];
+        double *ur = &u_rd[NPOLY * (i + ng + 1)];
+        double *uc_dot = &udot[NPOLY * (i + ng)];
 
-        double uimh_l = dot(uli, pfr);
-        double uimh_r = dot(urd, pfl);
-        double uiph_l = dot(urd, pfr);
-        double uiph_r = dot(uri, pfl);
+        double uimh_l = dot(ul, pfr);
+        double uimh_r = dot(uc, pfl);
+        double uiph_l = dot(uc, pfr);
+        double uiph_r = dot(ur, pfl);
         double fimh = upwind(uimh_l, uimh_r);
         double fiph = upwind(uiph_l, uiph_r);
 
@@ -143,9 +140,10 @@ PUBLIC void scdg_1d_advance_rk(
         for (int n = 0; n < NUM_POINTS; ++n)
         {
             double ux = 0.0;
+
             for (int l = 0; l < NPOLY; ++l)
             {
-                ux += urd[l] * p[l, n];
+                ux += uc[l] * p[l][n];
             }
             fx[n] = flux(ux); 
         }
@@ -153,13 +151,14 @@ PUBLIC void scdg_1d_advance_rk(
         for (int l = 0; l < NPOLY; ++l)
         {
             double udot_v = 0.0;
+
             for (int n = 0; n < NUM_POINTS; ++n)
             {
-                udot_v += fx[n] * pp[l, n] * w[n] / dx;
+                udot_v += fx[n] * pp[l][n] * w[n] / dx;
             }
             double udot_s = -(fimh * pfl[l] * nhat[0] + fiph * pfr[l] * nhat[1]) / dx;
-            uwr[l] = urd[l] + (udot_v + udot_s) * dt;
-            uwr[l] = (1.0 - rk_param) * uwr[l] + rk_param * urk[l];
+
+            uc_dot[l] = udot_v + udot_s;
         }
     }
 }
