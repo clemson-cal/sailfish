@@ -54,6 +54,7 @@ PUBLIC void scdg_1d_udot(
     int num_zones,    // number of zones, not including guard zones
     double *u_rd,     // :: $.shape == (num_zones + 2, 1, 3) # NPOLY = 3
     double *udot,     // :: $.shape == (num_zones + 2, 1, 3) # NPOLY = 3
+    double dt,        // time step
     double dx)        // grid spacing
 {
     int ng = 1; // number of guard zones
