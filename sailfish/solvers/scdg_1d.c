@@ -56,7 +56,8 @@ PUBLIC void scdg_1d_advance_rk(
     double *u_wr,     // :: $.shape == (num_zones + 2, NPOLY)
     double time,      // current time
     double rk_param,  // Runge-Kutta parameter
-    double dt)        // time step
+    double dt,        // time step
+    double dx)        // grid spacing
 {
     int ng = 1; // number of guard zones
 
