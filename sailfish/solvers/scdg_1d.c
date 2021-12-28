@@ -5,6 +5,7 @@
 #define WAVESPEED 1.0
 
 #define min2(a, b) ((a) < (b) ? (a) : (b))
+#define max2(a, b) ((a) > (b) ? (a) : (b))
 #define min3(a, b, c) min2(a, min2(b, c))
 #define max3(a, b, c) max2(a, max2(b, c))
 #define sign(x) copysign(1.0, x)
@@ -27,9 +28,9 @@ PRIVATE double limit_troubled_cells(double *ul, double *u, double *ur)
 //    For limiting, use threshold of 0.1 appropriate for 1D k=2 (DG3) 
 {
     // integrating polynomial extended from left zone into this zone
-    double a = u[0] + 2.0 * (3.0 ** 0.5) * ul[1] + 5.0 * (5.0 ** 0.5) / 3.0 * ul[2];
+    double a = u[0] + 2.0 * (3.0**0.5) * ul[1] + 5.0 * (5.0**0.5) / 3.0 * ul[2];
     // integrating polynomial extended from right zone into this zone
-    double b = u[0] - 2.0 * (3.0 ** 0.5) * ur[1] + 5.0 * (5.0 ** 0.5) / 3.0 * ur[2];
+    double b = u[0] - 2.0 * (3.0**0.5) * ur[1] + 5.0 * (5.0**0.5) / 3.0 * ur[2];
     double tci = (fabs(u[0] - a) + fabs(u[0] - b)) / maxabs(ul[0], u[0], ur[0]);
 
     if (tci > 0.1)

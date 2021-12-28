@@ -174,21 +174,16 @@ class Patch:
     def advance_rk(self, rk_param, dt):
         with self.execution_context():
             self.lib.scdg_1d_advance_rk[self.num_zones](
-                self.faces,
                 self.conserved0,
-                self.primitive1,
                 self.conserved1,
                 self.conserved2,
-                self.scale_factor_initial,
-                self.scale_factor_derivative,
                 self.time,
                 rk_param,
                 dt,
-                self.coordinates,
+                dx,
             )
         self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
-        self.recompute_primitive()
 
     @property
     def scale_factor(self):
@@ -259,7 +254,7 @@ class Solver(SolverBase):
             prim[ng:-ng] = primitive[a:b]
             self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
 
-        self.set_bc("primitive1")
+        self.set_bc("conserved1")
 
     @property
     def solution(self):
