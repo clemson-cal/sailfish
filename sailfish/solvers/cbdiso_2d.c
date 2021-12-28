@@ -131,16 +131,32 @@ static __host__ __device__ void point_mass_source_term(
 }
 
 static __host__ __device__ void point_masses_source_term(
-    struct PointMassList *mass_list,
+    real x1,
+    real y1,
+    real vx1,
+    real vy1,
+    real mass1,
+    real rate1,
+    real radius1,
+    real x2,
+    real y2,
+    real vx2,
+    real vy2,
+    real mass2,
+    real rate2,
+    real radius2,
+    int num_mass,
     real x1,
     real y1,
     real dt,
     real *prim,
     real *cons)
 {
-    for (int p = 0; p < mass_list->count; ++p)
+    count = num_mass;
+    for (int p = 0; p < count; ++p)
     {
         real delta_cons[NCONS];
+
         point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
@@ -153,12 +169,14 @@ static __host__ __device__ void point_masses_source_term(
 
 // ============================ EOS AND BUFFER ================================
 // ============================================================================
-static __host__ __device__ real sound_speed_squared(
+/*static __host__ __device__ real sound_speed_squared(
     struct EquationOfState *eos,
     real x,
     real y,
+
     struct PointMassList *mass_list)
 {
+    return cs_squared->
     switch (eos->type)
     {
         case Isothermal:
@@ -168,6 +186,11 @@ static __host__ __device__ real sound_speed_squared(
         default:
             return 1.0; // WARNING
     }
+}*/
+
+static __host__ __device__ real sound_speed_squared(real cs_squared)
+{
+    return cs_squared;
 }
 
 static __host__ __device__ void buffer_source_term(
@@ -377,13 +400,32 @@ static __host__ __device__ void primitive_to_conserved_zone(
 }
 
 static __host__ __device__ void advance_rk_zone(
-    struct Mesh mesh,
+    int ni,
+    int nj,
+    real xl,
+    real xr,
+    real yl,
+    real yr,
     struct Patch conserved_rk,
     struct Patch primitive_rd,
     struct Patch primitive_wr,
-    struct EquationOfState eos,
-    struct BoundaryCondition bc,
-    struct PointMassList mass_list,
+    real cs2,
+    //struct BoundaryCondition bc,
+    //struct PointMassList mass_list,
+    real x1,
+    real y1,
+    real vx1,
+    real vy1,
+    real mass1,
+    real rate1,
+    real radius1,
+    real x2,
+    real y2,
+    real vx2,
+    real vy2,
+    real mass2,
+    real rate2,
+    real radius2,
     real nu,
     real a,
     real dt,
@@ -391,14 +433,14 @@ static __host__ __device__ void advance_rk_zone(
     int i,
     int j)
 {
-    real dx = mesh.dx;
-    real dy = mesh.dy;
-    real xl = mesh.x0 + (i + 0.0) * dx;
-    real xc = mesh.x0 + (i + 0.5) * dx;
-    real xr = mesh.x0 + (i + 1.0) * dx;
-    real yl = mesh.y0 + (j + 0.0) * dy;
-    real yc = mesh.y0 + (j + 0.5) * dy;
-    real yr = mesh.y0 + (j + 1.0) * dy;
+    real dx = (xr-xl)/ni;
+    real dy = (yr-yl)/nj;
+    real xl = xl + (i + 0.0) * dx;
+    real xc = xl + (i + 0.5) * dx;
+    real xr = xl + (i + 1.0) * dx;
+    real yl = yl + (j + 0.0) * dy;
+    real yc = yl + (j + 0.5) * dy;
+    real yr = yl + (j + 1.0) * dy;
 
     // ------------------------------------------------------------------------
     //                 tj
@@ -516,7 +558,7 @@ static __host__ __device__ void advance_rk_zone(
     frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
 
     primitive_to_conserved(pcc, ucc);
-    buffer_source_term(&bc, xc, yc, dt, ucc);
+    //buffer_source_term(&bc, xc, yc, dt, ucc);
     point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
 
     for (int q = 0; q < NCONS; ++q)
@@ -643,11 +685,30 @@ static __host__ __device__ void point_mass_source_term_zone(
 }
 
 static __host__ __device__ void wavespeed_zone(
-    struct Mesh mesh,
-    struct EquationOfState eos,
+    int ni,
+    int nj,
+    real xl,
+    real xr,
+    real yl,
+    real yr,
+    real cs2,
+    real x1,
+    real y1,
+    real vx1,
+    real vy1,
+    real mass1,
+    real rate1,
+    real radius1,
+    real x2,
+    real y2,
+    real vx2,
+    real vy2,
+    real mass2,
+    real rate2,
+    real radius2,
     struct Patch primitive,
     struct Patch wavespeed,
-    struct PointMassList mass_list,
+    
     int i,
     int j)
 {
