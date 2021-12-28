@@ -1,18 +1,80 @@
 """
-An n-th order discontinuous Galerkin solver for 1D scalar advection and inviscid Burgers eqn.
+One-dimensional discontinuous Galerkin (DG) scalar advection and Burgers solver.
 """
 
-from typing import NamedTuple
-from numpy.polynomial.legendre import leggauss, Legendre
-from sailfish.mesh import PlanarCartesianMesh
+from logging import getLogger
+from sailfish.kernel.library import Library
+from sailfish.kernel.system import get_array_module
+from sailfish.subdivide import subdivide
+from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
 
+try:
+    from contextlib import nullcontext
+
+except ImportError:
+    from contextlib import AbstractContextManager
+
+    class nullcontext(AbstractContextManager):
+        """
+        Scraped from contextlib source in Python >= 3.7 for backwards compatibility.
+        """
+
+        def __init__(self, enter_result=None):
+            self.enter_result = enter_result
+
+        def __enter__(self):
+            return self.enter_result
+
+        def __exit__(self, *excinfo):
+            pass
+
+        async def __aenter__(self):
+            return self.enter_result
+
+        async def __aexit__(self, *excinfo):
+            pass
+
+
+logger = getLogger(__name__)
+
+BC_PERIODIC = 0
+BC_OUTFLOW = 1
+BC_INFLOW = 2
+BC_REFLECT = 3
+
+BC_DICT = {
+    "periodic": BC_PERIODIC,
+    "outflow": BC_OUTFLOW,
+    "inflow": BC_INFLOW,
+    "reflect": BC_REFLECT,
+}
+COORDINATES_DICT = {
+    PlanarCartesianMesh: 0,
+    LogSphericalMesh: 1,
+}
+
+
+def initial_condition(setup, mesh, time):
+    import numpy as np
+
+    faces = np.array(mesh.faces(0, mesh.shape[0]))
+    zones = 0.5 * (faces[:-1] + faces[1:])
+    primitive = np.zeros([len(zones), 1])
+
+    for x, p in zip(zones, primitive):
+        setup.primitive(time, x, p)
+
+    return primitive
 
 class CellData:
     """
-    Gauss weights, quadrature points, and tabulated Legendre polonomials.
+    Gauss weights, quadrature points, and Legendre polynomials scaled by sqrt(2 * n + 1).
 
     This class works for n-th order Gaussian quadrature in 1D.
+
+    Unscaled Legendre polynomials at end points: P_k(-1) = (-1)^k  P_k(1) = 1
+    where k = order - 1 
     """
 
     def __init__(self, order=1):
@@ -25,18 +87,16 @@ class CellData:
             c = [(2 * n + 1) ** 0.5 if i is n else 0.0 for i in range(n + 1)]
             return Legendre(c).deriv(m)(x)
 
-        f = [-1.0, 1.0]  # xsi-coordinate of faces
         g, w = leggauss(order)
         self.gauss_points = g
         self.weights = w
-        self.phi_faces = np.array([[leg(x, n, m=0) for n in range(order)] for x in f])
         self.phi_value = np.array([[leg(x, n, m=0) for n in range(order)] for x in g])
         self.phi_deriv = np.array([[leg(x, n, m=1) for n in range(order)] for x in g])
         self.order = order
 
     def to_weights(self, ux):
         w = self.weights
-        p = self.phi_value
+        p = self.phi
         o = self.order
         return [sum(ux[j] * p[j][n] * w[j] for j in range(o)) * 0.5 for n in range(o)]
 
@@ -48,120 +108,105 @@ class CellData:
         return self.order
 
 
-def dot(u, p):
-    return sum(u[i] * p[i] for i in range(u.shape[0]))
+class Patch:
+    """
+    Holds the array buffer state for the solution on a subset of the
+    solution domain.
+    """
 
-def limit_troubled_cells(u):
+    def __init__(
+        self,
+        time,
+        primitive,
+        mesh,
+        index_range,
+        lib,
+        xp,
+    ):
+        i0, i1 = index_range
+        self.lib = lib
+        self.xp = xp
+        self.num_zones = index_range[1] - index_range[0]
+        self.faces = self.xp.array(mesh.faces(*index_range))
+        self.coordinates = COORDINATES_DICT[type(mesh)]
+        try:
+            adot = float(mesh.scale_factor_derivative)
+            self.scale_factor_initial = 0.0
+            self.scale_factor_derivative = adot
+        except (TypeError, AttributeError):
+            self.scale_factor_initial = 1.0
+            self.scale_factor_derivative = 0.0
 
-    def minmod(w1, w0l, w0, w0r):
-        import numpy as np
-        BETA_TVB = 1.0
-        a = w1 * (3.0 ** 0.5)
-        b = (w0 - w0l) * BETA_TVB
-        c = (w0r - w0) * BETA_TVB
+        self.time = self.time0 = time
 
-        return (0.25 / (3.0 ** 0.5)) * abs(np.sign(a) + np.sign(b)) * (np.sign(a) + np.sign(c)) * min(abs(a), abs(b), abs(c))
+        with self.execution_context():
+            self.primitive1 = self.xp.array(primitive)
+            self.conserved0 = self.primitive_to_conserved(self.primitive1)
+            self.conserved1 = self.conserved0.copy()
+            self.conserved2 = self.conserved0.copy()
 
-    nz = u.shape[0]
-    for i in range(nz):
-        im1 = (i - 1 + nz) % nz
-        ip1 = (i + 1 + nz) % nz
+    def execution_context(self):
+        """TODO: return a CUDA context for execution on the assigned device"""
+        return nullcontext()
 
-        # integrating polynomial extended from left zone into this zone
-        a = 1.0 * u[im1,0] + 2.0 * (3.0 ** 0.5) * u[im1,1] + 5.0 * (5.0 ** 0.5) / 3.0 * u[im1,2]
+    def primitive_to_conserved(self, primitive):
+        with self.execution_context():
+            conserved = self.xp.zeros_like(primitive)
+            self.lib.srhd_1d_primitive_to_conserved[self.num_zones](
+                self.faces,
+                primitive,
+                conserved,
+                self.scale_factor,
+                self.coordinates,
+            )
+            return conserved
 
-        # integrating polynomial extended from right zone into this zone
-        b = 1.0 * u[ip1,0] - 2.0 * (3.0 ** 0.5) * u[ip1,1] + 5.0 * (5.0 ** 0.5) / 3.0 * u[ip1,2]
+    def recompute_primitive(self):
+        with self.execution_context():
+            self.lib.srhd_1d_conserved_to_primitive[self.num_zones](
+                self.faces,
+                self.conserved1,
+                self.primitive1,
+                self.scale_factor,
+                self.coordinates,
+            )
 
-        tci = (abs(u[i,0] - a) + abs(u[i,0] - b)) / max(abs(u[im1,0]), abs(u[i,0]), abs(u[ip1,0]))
+    def advance_rk(self, rk_param, dt):
+        with self.execution_context():
+            self.lib.scdg_1d_advance_rk[self.num_zones](
+                self.faces,
+                self.conserved0,
+                self.primitive1,
+                self.conserved1,
+                self.conserved2,
+                self.scale_factor_initial,
+                self.scale_factor_derivative,
+                self.time,
+                rk_param,
+                dt,
+                self.coordinates,
+            )
+        self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
+        self.conserved1, self.conserved2 = self.conserved2, self.conserved1
+        self.recompute_primitive()
 
-        if (tci > 0.1):
-            w1t = minmod(u[i,1], u[im1,0], u[i,0], u[ip1,0])
-            if u[i,1] != w1t:
-                u[i,1] = w1t
-                u[i,2] = 0.0
+    @property
+    def scale_factor(self):
+        return self.scale_factor_initial + self.scale_factor_derivative * self.time
 
+    def new_iteration(self):
+        self.time0 = self.time
+        self.conserved0[...] = self.conserved1[...]
 
-
-def rhs(physics, uw, cell, dx, uwdot):
-    import numpy as np
-
-    if physics.equation == "advection":
-        wavespeed = physics.wavespeed
-
-        def flux(ux):
-            return wavespeed * ux
-
-        def upwind(ul, ur):
-            if wavespeed > 0.0:
-                return flux(ul)
-            else:
-                return flux(ur)
-
-    elif physics.equation == "burgers":
-
-        def flux(ux):
-            return 0.5 * ux * ux
-
-        def upwind(ul, ur):
-            al = ul
-            ar = ur
-
-            if al > 0.0 and ar > 0.0:
-                return flux(ul)
-            elif al < 0.0 and ar < 0.0:
-                return flux(ur)
-            else:
-                return 0.0
-
-    nz = uw.shape[0]
-    pv = cell.phi_value
-    pf = cell.phi_faces
-    pd = cell.phi_deriv
-    w = cell.weights
-    h = [-1.0, 1.0]
-
-    for i in range(nz):
-        im1 = (i - 1 + nz) % nz
-        ip1 = (i + 1 + nz) % nz
-
-        uimh_l = dot(uw[im1], pf[1])
-        uimh_r = dot(uw[i], pf[0])
-        uiph_l = dot(uw[i], pf[1])
-        uiph_r = dot(uw[ip1], pf[0])
-        fimh = upwind(uimh_l, uimh_r)
-        fiph = upwind(uiph_l, uiph_r)
-
-        fs = [fimh, fiph]
-        ux = [cell.sample(uw[i], j) for j in range(cell.order)]
-        fx = [flux(u) for u in ux]
-
-        for n in range(cell.order):
-            udot_s = -sum(fs[j] * pf[j][n] * h[j] for j in range(2)) / dx
-            udot_v = +sum(fx[j] * pd[j][n] * w[j] for j in range(cell.num_points)) / dx
-            uwdot[i, n] = udot_s + udot_v
-
-
-class Options(NamedTuple):
-    order: int = 1
-    integrator: str = "rk2"
-
-
-class Physics(NamedTuple):
-    wavespeed: float = 1.0
-    equation: str = "advection"  # or burgers
+    @property
+    def primitive(self):
+        self.recompute_primitive()
+        return self.primitive1
 
 
 class Solver(SolverBase):
     """
-    An n-th order, discontinuous Galerkin solver for 1D scalar advection.
-
-    Time-advance integrator options:
-
-    - :code:`rk1`: Forward Euler
-    - :code:`rk2`: SSP-RK2 of Shu & Osher (1988; Eq. 2.15)
-    - :code:`rk3`: SSP-RK3 of Shu & Osher (1988; Eq. 2.18)
-    - :code:`rk3-sr02`: four-stage 3rd Order SSP-4RK3 of Spiteri & Ruuth (2002)
+    Adapter class to drive the scdg_1d C extension module.
     """
 
     def __init__(
@@ -175,311 +220,137 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
-        import numpy as np
+        try:
+            bcl, bcr = setup.boundary_condition
+        except ValueError:
+            bcl = setup.boundary_condition
+            bcr = setup.boundary_condition
+        try:
+            self.boundary_condition = BC_DICT[bcl], BC_DICT[bcr]
+        except KeyError:
+            raise ValueError(f"bad boundary condition {bcl}/{bcr}")
 
-        options = Options(**options)
-        physics = Physics(**physics)
-        cell = CellData(order=options.order)
+        xp = get_array_module(mode)
+        ng = 1  # number of guard zones
+        nq = 1  # number of conserved quantities
+        with open(__file__.replace(".py", ".c")) as f:
+            code = f.read()
+        lib = Library(code, mode=mode, debug=False)
 
-        if num_patches != 1:
-            raise ValueError("only works on one patch")
+        logger.info(f"initiate with time={time:0.4f}")
+        logger.info(f"subdivide grid over {num_patches} patches")
+        logger.info(f"mesh is {mesh}")
+        logger.info(f"boundary condition is {bcl}/{bcr}")
 
-        if type(mesh) != PlanarCartesianMesh:
-            raise ValueError("only the planar cartesian mesh is supported")
-
-        if mode != "cpu":
-            raise ValueError("only cpu mode is supported")
-
-        if setup.boundary_condition != "periodic":
-            raise ValueError("only periodic boundaries are supported")
-
-        if physics.equation not in ["advection", "burgers"]:
-            raise ValueError("physics.equation must be advection or burgers")
-
-        if options.integrator not in ["rk1", "rk2", "rk3", "rk3-sr02", "SSPRK32", "SSPRK43", "SSPRK53", "SSPRK54"]:
-            raise ValueError("options.integrator must be rk1|rk2|rk3|rk3-sr02|SSPRK32|SSPRK43|SSPRK53|SSPRK54")
-
-        if options.order <= 0:
-            raise ValueError("option.order must be greater than 0")
+        self.mesh = mesh
+        self.setup = setup
+        self.num_guard = ng
+        self.num_cons = nq
+        self.xp = xp
+        self.patches = []
 
         if solution is None:
-            num_zones = mesh.shape[0]
-            xf = mesh.faces(0, num_zones)  # face coordinates
-            px = np.zeros([num_zones, cell.num_points, 1])
-            ux = np.zeros([num_zones, cell.num_points, 1])
-            uw = np.zeros([num_zones, cell.order, 1])
-            dx = mesh.dx
-
-            for i in range(num_zones):
-                for j in range(cell.num_points):
-                    xsi = cell.gauss_points[j]
-                    xj = xf[i] + (xsi + 1.0) * 0.5 * dx
-                    setup.primitive(time, xj, px[i, j])
-
-            ux[...] = px[...]  # the conserved variable is also the primitive
-
-            for i in range(num_zones):
-                uw[i] = cell.to_weights(ux[i])
-            self.conserved_w = uw
+            primitive = initial_condition(setup, mesh, time)
         else:
-            self.conserved_w = solution
+            primitive = solution
 
-        self.t = time
-        self.mesh = mesh
-        self.cell = cell
-        self._options = options
-        self._physics = physics
+        for (a, b) in subdivide(mesh.shape[0], num_patches):
+            prim = xp.zeros([b - a + 2 * ng, nq])
+            prim[ng:-ng] = primitive[a:b]
+            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
 
-#        #troubled cell indicator
-#        self.tci = np.zeros(self.conserved_w.shape[0])
-#
-#    @property
-#    def tci(self):
-#        return self.tci
+        self.set_bc("primitive1")
 
     @property
     def solution(self):
-        return self.conserved_w
+        return self.primitive
 
     @property
     def primitive(self):
-        return self.conserved_w[:, 0]
+        nz = self.mesh.shape[0]
+        ng = self.num_guard
+        nq = self.num_cons
+        np = len(self.patches)
+        primitive = self.xp.zeros([nz, nq])
+        for (a, b), patch in zip(subdivide(nz, np), self.patches):
+            primitive[a:b] = patch.primitive[ng:-ng]
+        return primitive
 
     @property
     def time(self):
-        return self.t
-
-    @property
-    def maximum_cfl(self):
-        return 1.0
+        return self.patches[0].time
 
     @property
     def options(self):
-        return self._options._asdict()
+        return dict()
 
     @property
     def physics(self):
-        return self._physics._asdict()
+        return dict()
 
     @property
     def maximum_cfl(self):
-        k = self.cell.order - 1
-
-        if self._options.integrator == "rk1":
-            return 1.0 / (2 * k + 1)
-        if self._options.integrator == "rk2":
-            return 1.0 / (2 * k + 1)
-        if self._options.integrator == "rk3":
-            return 1.0 / (2 * k + 1)
-        if self._options.integrator == "rk3-sr02":
-            return 2.0 / (2 * k + 1)
-        if self._options.integrator == "SSPRK32":
-            return 2.0 / (2 * k + 1) # up to 2.2 / (2 * k + 1) seems to work
-        if self._options.integrator == "SSPRK43":
-            return 2.0 / (2 * k + 1) # C = 1.683339717642499
-        if self._options.integrator == "SSPRK53":
-            return 2.387300839230550  / (2 * k + 1) # C = 2.387300839230550 
-        if self._options.integrator == "SSPRK54":
-            return 1.5 / (2 * k + 1) # up to 1.7 / (2 * k + 1) seems to work
+        return 0.6
 
     def maximum_wavespeed(self):
-        if self._physics.equation == "advection":
-            return abs(self._physics.wavespeed)
-        elif self._physics.equation == "burgers":
-            return abs(self.conserved_w[:, 0]).max()
+        return 1.0
 
     def advance(self, dt):
-        import numpy as np
+        self.new_iteration()
+        self.advance_rk(0.0, dt)
+        self.advance_rk(0.75, dt)
+        self.advance_rk(0.333333333333333, dt)
 
-        def udot(u):
-            udot = np.zeros_like(u)
-            rhs(self._physics, u, self.cell, self.mesh.dx, udot)
-            return udot
+    def advance_rk(self, rk_param, dt, dx):
+        self.set_bc("conserved1")
+        for patch in self.patches:
+            patch.advance_rk(rk_param, dt, dx)
 
-        if self._options.integrator == "rk1":
-            u = self.conserved_w
-            u += dt * udot(u)
+    def set_bc(self, array):
+        ng = self.num_guard
+        num_patches = len(self.patches)
+        for i0 in range(num_patches):
+            il = (i0 + num_patches - 1) % num_patches
+            ir = (i0 + num_patches + 1) % num_patches
+            pl = getattr(self.patches[il], array)
+            p0 = getattr(self.patches[i0], array)
+            pr = getattr(self.patches[ir], array)
+            self.set_bc_patch(pl, p0, pr, i0)
 
-        if self._options.integrator == "rk2":
-            b1 = 0.0
-            b2 = 0.5
-            u = u0 = self.conserved_w.copy()
-            u = u0 * b1 + (1.0 - b1) * (u + dt * udot(u))
-            u = u0 * b2 + (1.0 - b2) * (u + dt * udot(u))
+    def set_bc_patch(self, al, a0, ar, patch_index):
+        t = self.time
+        nz = self.mesh.shape[0]
+        ng = self.num_guard
+        bcl, bcr = self.boundary_condition
 
-        if self._options.integrator == "rk3":
-            b1 = 0.0
-            b2 = 3.0 / 4.0
-            b3 = 1.0 / 3.0
-            u = u0 = self.conserved_w.copy()
-            u = u0 * b1 + (1.0 - b1) * (u + dt * udot(u))
-            u = u0 * b2 + (1.0 - b2) * (u + dt * udot(u))
-            u = u0 * b3 + (1.0 - b3) * (u + dt * udot(u))
+        a0[:+ng] = al[-2 * ng : -ng]
+        a0[-ng:] = ar[+ng : +2 * ng]
 
-        if self._options.integrator == "rk3-sr02":
-            u = u0 = self.conserved_w.copy()
-            u = u0 + 0.5 * dt * udot(u)
-            u = u + 0.5 * dt * udot(u)
-            u = 2.0 / 3.0 * u0 + 1.0 / 3.0 * (u + 0.5 * dt * udot(u))
-            u = u + 0.5 * dt * udot(u)
+        def negative_vel(p):
+            return [p[0], -p[1], p[2], p[3]]
 
-        if self._options.integrator == "SSPRK32":
-            """
-            3-stage 2nd-order Strong Stability Preserving SSPRK(3,2) integrator in Shu-Osher form
-            Not a low storage integrator: requires 3 copies of the conserved array, plus 2 copies
-            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
-            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 7
-            """
-            alpha = [
-            [1.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.087353119859156, 0.912646880140844, 0.000000000000000],
-            [0.344956917166841, 0.000000000000000, 0.655043082833159]
-            ]
-            beta = [
-            [0.528005024856522, 0.000000000000000, 0.000000000000000],
-            [0.000000000000000, 0.481882138633993, 0.000000000000000],
-            [0.022826837460491, 0.000000000000000, 0.345866039233415]
-            ]
+        if patch_index == 0:
+            if bcl == BC_OUTFLOW:
+                a0[:+ng] = a0[+ng : +2 * ng]
+            elif bcl == BC_INFLOW:
+                for i in range(-ng, 0):
+                    x = self.mesh.zone_center(t, i)
+                    self.setup.primitive(t, x, a0[i + ng])
+            elif bcl == BC_REFLECT:
+                a0[0] = negative_vel(a0[3])
+                a0[1] = negative_vel(a0[2])
 
-            u = u0 = self.conserved_w.copy()
-            udot_0 = udot(u0)
-            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
-            udot_1 = udot(u1)
-            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
-                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)  
-            #udot_2 = udot(u2) 
-            u  = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
-                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
-                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot(u2))
+        if patch_index == len(self.patches) - 1:
+            if bcr == BC_OUTFLOW:
+                a0[-ng:] = a0[-2 * ng : -ng]
+            elif bcr == BC_INFLOW:
+                for i in range(nz, nz + ng):
+                    x = self.mesh.zone_center(t, i)
+                    self.setup.primitive(t, x, a0[i + ng])
+            elif bcr == BC_REFLECT:
+                a0[-2] = negative_vel(a0[-3])
+                a0[-1] = negative_vel(a0[-4])
 
-        if self._options.integrator == "SSPRK43":
-            """
-            4-stage 3rd-order Strong Stability Preserving SSPRK(4,3) integrator in Shu-Osher form
-            Not a low storage integrator: requires 4 copies of the conserved array, plus 3 copies
-            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
-            C = 1.683339717642499
-            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 13
-            """
-            alpha = [
-            [1.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.522361915162541, 0.477638084837459, 0.000000000000000, 0.000000000000000],
-            [0.368530939472566, 0.000000000000000, 0.631469060527434, 0.000000000000000],
-            [0.334082932462285, 0.006966183666289, 0.000000000000000, 0.658950883871426],
-            ]
-            beta = [
-            [0.594057152884440, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.000000000000000, 0.283744320787718, 0.000000000000000, 0.000000000000000],
-            [0.000000038023030, 0.000000000000000, 0.375128712231540, 0.000000000000000],
-            [0.116941419604231, 0.004138311235266, 0.000000000000000, 0.391454485963345],
-            ]
-
-            u = u0 = self.conserved_w.copy()
-            udot_0 = udot(u0)
-            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
-            udot_1 = udot(u1)
-            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
-                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)  
-            udot_2 = udot(u2) 
-            u3 = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
-                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
-                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot_2)
-            #udot_3 = udot(u3)
-            u  = (alpha[4-1][0]*u0 + beta[4-1][0]*dt*udot_0
-                 +alpha[4-1][1]*u1 + beta[4-1][1]*dt*udot_1
-                 +alpha[4-1][2]*u2 + beta[4-1][2]*dt*udot_2
-                 +alpha[4-1][3]*u3 + beta[4-1][3]*dt*udot(u3))
-
-        if self._options.integrator == "SSPRK53":
-            """
-            5-stage 3rd-order Strong Stability Preserving SSPRK(5,3) integrator in Shu-Osher form
-            Not a low storage integrator: requires 5 copies of the conserved array, plus 4 copies
-            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
-            C = 2.387300839230550 
-            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 18
-            """
-            alpha = [
-            [1.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.495124140877703, 0.504875859122297, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.105701991897526, 0.000000000000000, 0.894298008102474, 0.000000000000000, 0.000000000000000],
-            [0.411551205755676, 0.011170516177380, 0.000000000000000, 0.577278278066944, 0.000000000000000],
-            [0.186911123548222, 0.013354480555382, 0.012758264566319, 0.000000000000000, 0.786976131330077]
-            ]
-            beta  = [
-            [0.418883109982196, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.000000000000000, 0.211483970024081, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.000000000612488, 0.000000000000000, 0.374606330884848, 0.000000000000000, 0.000000000000000],
-            [0.046744815663888, 0.004679140556487, 0.000000000000000, 0.241812120441849, 0.000000000000000],
-            [0.071938257223857, 0.005593966347235, 0.005344221539515, 0.000000000000000, 0.329651009373300]
-            ] 
-            
-            u = u0 = self.conserved_w.copy()
-            udot_0 = udot(u0)
-            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
-            udot_1 = udot(u1)
-            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
-                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)
-            udot_2 = udot(u2)
-            u3 = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
-                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
-                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot_2)
-            udot_3 = udot(u3)
-            u4 = (alpha[4-1][0]*u0 + beta[4-1][0]*dt*udot_0
-                 +alpha[4-1][1]*u1 + beta[4-1][1]*dt*udot_1
-                 +alpha[4-1][2]*u2 + beta[4-1][2]*dt*udot_2
-                 +alpha[4-1][3]*u3 + beta[4-1][3]*dt*udot_3)
-            #udot_4 = udot(u4)
-            u  = (alpha[5-1][0]*u0 + beta[5-1][0]*dt*udot_0
-                 +alpha[5-1][1]*u1 + beta[5-1][1]*dt*udot_1
-                 +alpha[5-1][2]*u2 + beta[5-1][2]*dt*udot_2
-                 +alpha[5-1][3]*u3 + beta[5-1][3]*dt*udot_3
-                 +alpha[5-1][4]*u4 + beta[5-1][4]*dt*udot(u4))
-
-        if self._options.integrator == "SSPRK54":
-            """
-            5-stage 4th-order Strong Stability Preserving SSPRK(5,4) integrator in Shu-Osher form
-            Not a low storage integrator: requires 5 copies of the conserved array, plus 4 copies
-            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU
-            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 18
-            """
-            alpha = [
-            [1.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.261216512493821, 0.738783487506179, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.623613752757655, 0.000000000000000, 0.376386247242345, 0.000000000000000, 0.000000000000000],
-            [0.444745181201454, 0.120932584902288, 0.000000000000000, 0.434322233896258, 0.000000000000000],
-            [0.213357715199957, 0.209928473023448, 0.063353148180384, 0.000000000000000, 0.513360663596212]
-            ]
-            beta  = [
-            [0.605491839566400, 0.000000000000000, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.000000000000000, 0.447327372891397, 0.000000000000000, 0.000000000000000, 0.000000000000000],
-            [0.000000844149769, 0.000000000000000, 0.227898801230261, 0.000000000000000, 0.000000000000000],
-            [0.002856233144485, 0.073223693296006, 0.000000000000000, 0.262978568366434, 0.000000000000000],
-            [0.002362549760441, 0.127109977308333, 0.038359814234063, 0.000000000000000, 0.310835692561898]
-            ] 
-            
-            u = u0 = self.conserved_w.copy()
-            udot_0 = udot(u0)
-            u1 =  alpha[1-1][0]*u0 + beta[1-1][0]*dt*udot_0
-            udot_1 = udot(u1)
-            u2 = (alpha[2-1][0]*u0 + beta[2-1][0]*dt*udot_0
-                 +alpha[2-1][1]*u1 + beta[2-1][1]*dt*udot_1)
-            udot_2 = udot(u2)
-            u3 = (alpha[3-1][0]*u0 + beta[3-1][0]*dt*udot_0
-                 +alpha[3-1][1]*u1 + beta[3-1][1]*dt*udot_1
-                 +alpha[3-1][2]*u2 + beta[3-1][2]*dt*udot_2)
-            udot_3 = udot(u3)
-            u4 = (alpha[4-1][0]*u0 + beta[4-1][0]*dt*udot_0
-                 +alpha[4-1][1]*u1 + beta[4-1][1]*dt*udot_1
-                 +alpha[4-1][2]*u2 + beta[4-1][2]*dt*udot_2
-                 +alpha[4-1][3]*u3 + beta[4-1][3]*dt*udot_3)
-            #udot_4 = udot(u4)
-            u  = (alpha[5-1][0]*u0 + beta[5-1][0]*dt*udot_0
-                 +alpha[5-1][1]*u1 + beta[5-1][1]*dt*udot_1
-                 +alpha[5-1][2]*u2 + beta[5-1][2]*dt*udot_2
-                 +alpha[5-1][3]*u3 + beta[5-1][3]*dt*udot_3
-                 +alpha[5-1][4]*u4 + beta[5-1][4]*dt*udot(u4))
-
-        limit_troubled_cells(u)
-
-        self.conserved_w = u
-        self.t += dt
-
+    def new_iteration(self):
+        for patch in self.patches:
+            patch.new_iteration()
