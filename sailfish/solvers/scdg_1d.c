@@ -1,7 +1,7 @@
 #define BETA_TVB 1.0
 #define NPOLY 3      // Hard wire for 1D 3rd order for now
 #define NUM_POINTS 3 // Hard wire for 1D 3rd order for now
-#define PDE 0        // 0 for linear advection, 1 for Burgers
+#define PDE 1        // 0 for linear advection, 1 for Burgers
 #define WAVESPEED 1.0
 
 PRIVATE double flux(double ux) 
@@ -52,12 +52,11 @@ PRIVATE double dot(double *u, double *p)
 
 PUBLIC void scdg_1d_udot(
     int num_zones,    // number of zones, not including guard zones
-    double *u_rd,     // :: $.shape == (num_zones + 2, 1, 3) # NPOLY = 3
-    double *udot,     // :: $.shape == (num_zones + 2, 1, 3) # NPOLY = 3
-    double dt,        // time step
+    double *u_rd,     // :: $.shape == (num_zones, 1, 3) # NPOLY = 3
+    double *udot,     // :: $.shape == (num_zones, 1, 3) # NPOLY = 3
     double dx)        // grid spacing
 {
-    int ng = 1; // number of guard zones
+    // int ng = 0; // number of guard zones (zero; assume periodic)
 
     // TODO: pass cell data as a struct argument
 
@@ -82,10 +81,13 @@ PUBLIC void scdg_1d_udot(
 
     FOR_EACH_1D(num_zones)
     {
-        double *uc = &u_rd[NPOLY * (i + ng)];
-        double *ul = &u_rd[NPOLY * (i + ng - 1)];
-        double *ur = &u_rd[NPOLY * (i + ng + 1)];
-        double *uc_dot = &udot[NPOLY * (i + ng)];
+        int i0 = i;
+        int il = (i + num_zones - 1) % num_zones;
+        int ir = (i + num_zones + 1) % num_zones;
+        double *uc = &u_rd[NPOLY * i0];
+        double *ul = &u_rd[NPOLY * il];
+        double *ur = &u_rd[NPOLY * ir];
+        double *uc_dot = &udot[NPOLY * i0];
 
         double uimh_l = dot(ul, pfr);
         double uimh_r = dot(uc, pfl);

@@ -5,6 +5,7 @@ An n-th order discontinuous Galerkin solver for 1D scalar advection and inviscid
 from typing import NamedTuple
 from sailfish.mesh import PlanarCartesianMesh
 from sailfish.solver import SolverBase
+from sailfish.kernel.library import Library
 from numpy.polynomial.legendre import leggauss, Legendre
 import numpy as np
 
@@ -248,6 +249,11 @@ class Solver(SolverBase):
         if options.order <= 0:
             raise ValueError("option.order must be greater than 0")
 
+        with open(__file__.replace(".py", ".c"), "r") as f:
+            source = f.read()
+
+        self.lib = Library(source, mode=mode, debug=True)
+
         if solution is None:
             num_zones = mesh.shape[0]
             xf = mesh.faces(0, num_zones)  # face coordinates
@@ -330,7 +336,8 @@ class Solver(SolverBase):
     def advance(self, dt):
         def udot(u):
             udot = np.zeros_like(u)
-            rhs(self._physics, u, self.cell, self.mesh.dx, udot)
+            # rhs(self._physics, u, self.cell, self.mesh.dx, udot)
+            self.lib.scdg_1d_udot[u.shape[0]](u, udot, self.mesh.dx)
             return udot
 
         if self._options.integrator == "rk1":
