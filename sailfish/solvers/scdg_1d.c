@@ -29,7 +29,7 @@ PRIVATE double limit_troubled_cells(double *ul, double *u, double *ur)
     // integrating polynomial extended from left zone into this zone
     double a = u[0] + 2.0 * (3.0 ** 0.5) * ul[1] + 5.0 * (5.0 ** 0.5) / 3.0 * ul[2];
     // integrating polynomial extended from right zone into this zone
-    double b = u[0] - 2.0 * (3.0 ** 0.5) * ur[1] + 5.0 * (5.0 ** 0.5) / 3.0 * ur[2]
+    double b = u[0] - 2.0 * (3.0 ** 0.5) * ur[1] + 5.0 * (5.0 ** 0.5) / 3.0 * ur[2];
     double tci = (fabs(u[0] - a) + fabs(u[0] - b)) / maxabs(ul[0], u[0], ur[0]);
 
     if (tci > 0.1)
