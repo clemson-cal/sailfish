@@ -6,6 +6,7 @@ This solver is still a work-in-progress.
 Fill in more details about the physics here:
 """
 
+from typing import NamedTuple
 from logging import getLogger
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
