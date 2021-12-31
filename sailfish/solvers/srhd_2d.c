@@ -4,7 +4,7 @@ MODULE: srhd_2d
 AUTHOR: Jonathan Zrake
 
 DESCRIPTION:
-  Solves relativistic hydrodynamics in 2D spherical-polar.
+  Solves relativistic hydrodynamics in 2D spherical-polar coordinates.
 */
 
 
@@ -108,7 +108,7 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
     const double error_tolerance = 1e-12 * (cons[0] + cons[3]) / dv;
     const double gm              = ADIABATIC_GAMMA;
     const double m               = cons[0] / dv;
-    const double tau             = cons[2] / dv;
+    const double tau             = cons[3] / dv;
     const double s1              = cons[1] / dv;
     const double s2              = cons[2] / dv;
     const double ss              = s1 * s1 + s2 * s2;
