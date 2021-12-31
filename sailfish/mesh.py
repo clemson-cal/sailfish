@@ -3,7 +3,7 @@ Contains classes for different mesh geometries and dimensionalities.
 """
 
 from typing import NamedTuple
-from math import log10, pi
+from math import log, log10, pi
 
 
 class PlanarCartesianMesh(NamedTuple):
@@ -16,7 +16,9 @@ class PlanarCartesianMesh(NamedTuple):
     num_zones: int = 1000
 
     def __str__(self):
-        return f"planar cartesian ({self.x0} -> {self.x1}), {self.num_zones} zones"
+        return (
+            f"<planar cartesian 1d: ({self.x0} -> {self.x1}), {self.num_zones} zones>"
+        )
 
     @property
     def dx(self):
@@ -59,16 +61,13 @@ class LogSphericalMesh(NamedTuple):
 
     def __str__(self):
         if self.scale_factor_derivative is None:
-            motion = f"fixed mesh"
+            motion = f"no expansion"
         else:
             motion = f"homologous with a-dot = {self.scale_factor_derivative:0.2f}"
-        if not self.polar_grid:
-            dim = "1D"
-        else:
-            dim = "2D"
         return (
-            f"{dim} log spherical ({self.r0} -> {self.r1}) {motion}, "
-            f"{self.num_zones_per_decade} zones per decade"
+            f"<log spherical: ({self.r0} -> {self.r1}), {motion}, "
+            f"{self.num_zones_per_decade} zones per decade, "
+            f"shape {self.shape}>"
         )
 
     def min_spacing(self, time=None):
@@ -96,13 +95,10 @@ class LogSphericalMesh(NamedTuple):
 
     @property
     def shape(self):
-        num_radial = int(log10(self.r1 / self.r0) * self.num_zones_per_decade)
-
         if not self.polar_grid:
-            return (num_radial,)
+            return (self.num_radial_zones,)
         else:
-            num_polar = self.num_zones_per_decade
-            return (num_radial, num_polar)
+            return (self.num_radial_zones, self.num_polar_zones)
 
     def zone_center(self, t, i):
         """
@@ -131,22 +127,27 @@ class LogSphericalMesh(NamedTuple):
         """
         Return the 2D (r, theta) zone center proper coordinates at index (i, j).
         """
-        if not self.polar_grid:
-            raise ValueError("only defined for a 2D spherical polar mesh")
         r = self.zone_center(t, i)
-        q = (j + 0.5) * pi / self.num_zones_per_decade
+        q = (j + 0.5) * pi / self.num_polar_zones
         return r, q
 
-    def vertex_coordinates(self, t, i, j):
-        """
-        Return the 2D (r, theta) verterx proper coordinates at index (i, j).
-        """
+    @property
+    def num_radial_zones(self):
+        return int(log10(self.r1 / self.r0) * self.num_zones_per_decade)
+
+    @property
+    def num_polar_zones(self):
         if not self.polar_grid:
             raise ValueError("only defined for a 2D spherical polar mesh")
-        r0, k = self.r0, 1.0 / self.num_zones_per_decade
-        r = r0 * 10 ** (i * k)
-        q = j * pi / self.num_zones_per_decade
-        return r, q
+        return int(self.num_zones_per_decade * pi / log(10))
+
+    @property
+    def radial_vertices(self):
+        return self.faces()
+
+    @property
+    def polar_vertices(self):
+        return [j * pi / self.num_polar_zones for j in range(self.num_polar_zones + 1)]
 
 
 class PlanarCartesian2DMesh(NamedTuple):
@@ -164,6 +165,9 @@ class PlanarCartesian2DMesh(NamedTuple):
     y1: float = 1.0
     ni: int = 1000
     nj: int = 1000
+
+    def __str__(self):
+        return f"<planar cartesian 2d: ({self.x0} -> {self.x1}) x ({self.y0} -> {self.y1}), shape {self.shape}>"
 
     @classmethod
     def centered_square(cls, domain_radius, resolution):

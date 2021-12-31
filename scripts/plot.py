@@ -11,8 +11,8 @@ def plot_srhd_1d(ax, chkpt):
     mesh = chkpt["mesh"]
     x = mesh.zone_centers(chkpt["time"])
     rho = chkpt["primitive"][:, 0]
-    # vel = chkpt["primitive"][:, 1]
-    # pre = chkpt["primitive"][:, 2]
+    vel = chkpt["primitive"][:, 1]
+    pre = chkpt["primitive"][:, 2]
     ax.plot(x, rho, label=r"$\rho$")
     # ax.plot(x, vel, label=r"$\Gamma \beta$")
     # ax.plot(x, pre, label=r"$p$")
@@ -23,8 +23,19 @@ def plot_srhd_1d(ax, chkpt):
 
 
 def plot_srhd_2d(ax, chkpt):
+    import numpy as np
+
     mesh = chkpt["mesh"]
-    print(mesh.vertex_coordinates(chkpt["time"], 10, 20))
+    r = np.array(mesh.radial_vertices)
+    q = np.array(mesh.polar_vertices)
+
+    r, q = np.meshgrid(r, q)
+    z = r * np.cos(q)
+    x = r * np.sin(q)
+    s = chkpt["primitive"][:, :, 0].T
+    ax.set_aspect("equal")
+    cm = ax.pcolormesh(x, z, s, edgecolors="k")
+    return cm
 
 
 def main(args):
@@ -40,11 +51,11 @@ def main(args):
 
         if chkpt["solver"] == "srhd_1d":
             plot_srhd_1d(ax1, chkpt)
+            ax1.legend()
 
         elif chkpt["solver"] == "srhd_2d":
-            plot_srhd_2d(ax1, chkpt)
+            cm = plot_srhd_2d(ax1, chkpt)
 
-    ax1.legend()
     plt.show()
 
 

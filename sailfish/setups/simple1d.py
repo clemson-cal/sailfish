@@ -177,13 +177,14 @@ class UniformPolar(Setup):
     Tests the srhd_2d solver goemtrical source terms.
     """
 
-    def primitive(self, t, _, primitive):
-        primitive[0] = 1.0
+    def primitive(self, t, c, primitive):
+        r, q = c
+        primitive[0] = 1.0 / r
         primitive[1] = 0.0
         primitive[2] = 1.0
 
     def mesh(self, num_zones_per_decade):
-        return LogSphericalMesh(1.0, 10.0, num_zones_per_decade, polar_grid=True)
+        return LogSphericalMesh(1.0, 50.0, num_zones_per_decade, polar_grid=True)
 
     @property
     def solver(self):

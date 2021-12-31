@@ -22,7 +22,7 @@ def initial_condition(setup, mesh, time):
     for i in range(mesh.shape[0]):
         for j in range(mesh.shape[1]):
             r, q = mesh.cell_coordinates(time, i, j)
-            setup.primitive(time, r, primitive[i, j])
+            setup.primitive(time, (r, q), primitive[i, j])
 
     return primitive
 
