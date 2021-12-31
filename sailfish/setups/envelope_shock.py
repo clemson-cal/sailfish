@@ -120,11 +120,12 @@ class EnvelopeShock(Setup):
             r1=self.r_outer,
             num_zones_per_decade=num_zones_per_decade,
             scale_factor_derivative=(1.0 / self.t_start) if self.expand else None,
+            polar_grid=True,
         )
 
     @property
     def solver(self):
-        return "srhd_1d"
+        return "srhd_2d"
 
     @property
     def start_time(self):

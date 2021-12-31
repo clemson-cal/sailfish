@@ -323,6 +323,7 @@ def simulate(driver):
             time=solver.time,
             solution=solver.solution,
             primitive=solver.primitive,
+            solver=setup.solver,
             solver_options=solver.options,
             event_states=event_states,
             driver=driver,

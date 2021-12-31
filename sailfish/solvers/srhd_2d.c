@@ -260,19 +260,18 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, dou
 // ============================================================================
 PRIVATE double face_area(double r0, double r1, double q0, double q1)
 {
-    double s0 = r0 * sin(q0);
-    double s1 = r1 * sin(q1);
+    double R0 = r0 * sin(q0);
+    double R1 = r1 * sin(q1);
     double z0 = r0 * cos(q0);
     double z1 = r1 * cos(q1);
-    double ds = s1 - s0;
+    double dR = R1 - R0;
     double dz = z1 - z0;
-    return 0.5 * (s0 + s1) * sqrt(ds * ds + dz * dz);
+    return M_PI * (R0 + R1) * sqrt(dR * dR + dz * dz);
 }
 
 PRIVATE double cell_volume(double r0, double r1, double q0, double q1)
 {
-    double dcost = -(cos(q1) - cos(q0));
-    return (pow(r1, 3.0) - pow(r0, 3.0)) / 3.0 * dcost;
+    return -(r1 * r1 * r1 - r0 * r0 * r0) * (cos(q1) - cos(q0)) * 2.0 * M_PI / 3.0;
 }
 
 PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, const double *prim, double *source)
@@ -291,8 +290,8 @@ PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, 
     // over the cell volume with finite radial and polar extent.
     // 
     // https://iopscience.iop.org/article/10.1086/500792/pdf
-    double srdot = -0.5 * dr2 * dcosq * (rhoh * (uq * uq + up * up) + 2 * pg);
-    double sqdot = +0.5 * dr2 * (dcosq * rhoh * ur * uq + dsinq * (pg + rhoh * up * up));
+    double srdot = -M_PI * dr2 * dcosq * (rhoh * (uq * uq + up * up) + 2 * pg);
+    double sqdot = +M_PI * dr2 * (dcosq * rhoh * ur * uq + dsinq * (pg + rhoh * up * up));
 
     source[0] = 0.0;
     source[1] = srdot;
@@ -312,7 +311,7 @@ PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, 
 PUBLIC void srhd_2d_primitive_to_conserved(
     int ni,
     int nj,
-    double *face_positions,  // :: $.shape == (ni + 1)
+    double *face_positions,  // :: $.shape == (ni + 1,)
     double *primitive,       // :: $.shape == (ni + 4, nj, 4)
     double *conserved,       // :: $.shape == (ni + 4, nj, 4)
     double scale_factor)     // :: $ > 0.0
@@ -345,7 +344,7 @@ PUBLIC void srhd_2d_primitive_to_conserved(
 PUBLIC void srhd_2d_conserved_to_primitive(
     int ni,
     int nj,
-    double *face_positions,  // :: $.shape == (ni + 1)
+    double *face_positions,  // :: $.shape == (ni + 1,)
     double *conserved,       // :: $.shape == (ni + 4, nj, 4)
     double *primitive,       // :: $.shape == (ni + 4, nj, 4)
     double scale_factor)     // :: $ > 0.0
@@ -380,16 +379,15 @@ PUBLIC void srhd_2d_advance_rk(
     int ni,          // number of zones, not including guard zones
     int nj,
     double *face_positions, // :: $.shape == (ni + 1,)
-    double *conserved_rk,   // :: $.shape == (ni + 4, 4)
-    double *primitive_rd,   // :: $.shape == (ni + 4, 4)
-    double *conserved_rd,   // :: $.shape == (ni + 4, 4)
-    double *conserved_wr,   // :: $.shape == (ni + 4, 4)
+    double *conserved_rk,   // :: $.shape == (ni + 4, nj, 4)
+    double *primitive_rd,   // :: $.shape == (ni + 4, nj, 4)
+    double *conserved_rd,   // :: $.shape == (ni + 4, nj, 4)
+    double *conserved_wr,   // :: $.shape == (ni + 4, nj, 4)
     double a0,              // scale factor at t=0
     double adot,            // scale factor derivative
     double time,            // current time
     double rk_param,        // runge-kutta parameter
-    double dt,              // timestep size
-    int coords)             // :: $ in [0, 1]
+    double dt)              // timestep size
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
