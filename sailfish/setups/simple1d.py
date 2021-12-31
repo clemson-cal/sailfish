@@ -34,9 +34,6 @@ class Advection(Setup):
     def default_end_time(self):
         return 1.0
 
-    def validate(self):
-        pass
-
 
 class Burgers(Setup):
     """
@@ -66,9 +63,6 @@ class Burgers(Setup):
     @property
     def default_end_time(self):
         return 1.0
-
-    def validate(self):
-        pass
 
 
 class Shocktube(Setup):
@@ -170,30 +164,3 @@ class Wind(Setup):
     def validate(self):
         if self.velocity < 0.0:
             raise SetupError("velocity must be non-negative")
-
-
-class UniformPolar(Setup):
-    """
-    Tests the srhd_2d solver goemtrical source terms.
-    """
-
-    def primitive(self, t, c, primitive):
-        r, q = c
-        primitive[0] = 1.0 / r
-        primitive[1] = 0.0
-        primitive[2] = 1.0
-
-    def mesh(self, num_zones_per_decade):
-        return LogSphericalMesh(1.0, 50.0, num_zones_per_decade, polar_grid=True)
-
-    @property
-    def solver(self):
-        return "srhd_2d"
-
-    @property
-    def boundary_condition(self):
-        return "outflow"
-
-    @property
-    def default_end_time(self):
-        return 1.0

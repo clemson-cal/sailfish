@@ -31,6 +31,10 @@ class PlanarCartesianMesh(NamedTuple):
     def shape(self):
         return (self.num_zones,)
 
+    @property
+    def num_total_zones(self):
+        return self.num_zones * self.num_zones
+
     def zone_center(self, t, i):
         x0, dx = self.x0, self.dx
         return x0 + (i + 0.5) * dx
@@ -99,6 +103,13 @@ class LogSphericalMesh(NamedTuple):
             return (self.num_radial_zones,)
         else:
             return (self.num_radial_zones, self.num_polar_zones)
+
+    @property
+    def num_total_zones(self):
+        tot = 1
+        for n in self.shape:
+            tot *= n
+        return tot
 
     def zone_center(self, t, i):
         """
@@ -201,11 +212,11 @@ class PlanarCartesian2DMesh(NamedTuple):
     def dy(self):
         return (self.y1 - self.y0) / self.nj
 
-    def num_total_zones(self):
-        return self.ni * self.nj
-
     def shape(self):
         return self.ni, self.nj
+
+    def num_total_zones(self):
+        return self.ni * self.nj
 
     def cell_coordinates(self, i, j):
         x = self.x0 + (i + 0.5) * self.dx

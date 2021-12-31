@@ -352,7 +352,7 @@ def simulate(driver):
                 solver.advance(dt)
                 iteration += 1
 
-        Mzps = driver.resolution / fold_time() * 1e-6 * fold
+        Mzps = mesh.num_total_zones / fold_time() * 1e-6 * fold
         main_logger.info(
             f"[{iteration:04d}] t={solver.time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )

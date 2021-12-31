@@ -34,7 +34,7 @@ def plot_srhd_2d(ax, chkpt):
     x = r * np.sin(q)
     s = chkpt["primitive"][:, :, 0].T
     ax.set_aspect("equal")
-    cm = ax.pcolormesh(x, z, s, edgecolors="k")
+    cm = ax.pcolormesh(x, z, s, edgecolors="none")
     return cm
 
 
@@ -55,6 +55,7 @@ def main(args):
 
         elif chkpt["solver"] == "srhd_2d":
             cm = plot_srhd_2d(ax1, chkpt)
+            fig.colorbar(cm)
 
     plt.show()
 
