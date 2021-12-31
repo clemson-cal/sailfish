@@ -92,49 +92,13 @@ PRIVATE double gravitational_potential(
     return phi;
 }
 
-PRIVATE double disk_height(
-    struct PointMassList *mass_list,
-    double x1,
-    double y1,
-    double *prim)
-{
-    if (mass_list->masses[0].model == 0 && mass_list->masses[1].model == 0)
-    {
-        return 1.0;
-    }
-
-    double omegatilde2 = 0.0;
-    for (int p = 0; p < 2; ++p)
-    {
-        if (mass_list->masses[p].model != 0)
-        {
-            double x0 = mass_list->masses[p].x;
-            double y0 = mass_list->masses[p].y;
-            double mp = mass_list->masses[p].mass;
-
-            double dx = x1 - x0;
-            double dy = y1 - y0;
-            double r2 = dx * dx + dy * dy + 1e-12;
-            double r  = sqrt(r2);
-            omegatilde2 += mp * pow(r, -3.0);
-        }
-    }
-    double sigma = prim[0];
-    double pres  = prim[3];
-
-    return sqrt(pres / sigma) / sqrt(omegatilde2);
-}
-
 PRIVATE void point_mass_source_term(
     struct PointMass *mass,
     double x1,
     double y1,
     double dt,
     double *prim,
-    double h,
-    double *delta_cons,
-    int constant_softening,
-    double soft_length)
+    double *delta_cons)
 {
     double x0 = mass->x;
     double y0 = mass->y;
@@ -145,8 +109,7 @@ PRIVATE void point_mass_source_term(
     double dx = x1 - x0;
     double dy = y1 - y0;
     double r2 = dx * dx + dy * dy;
-    double softening_length = constant_softening ? soft_length : 0.5 * h;
-    double r2_soft = r2 + pow(softening_length, 2.0);
+    double r2_soft = r2 + rs * rs;
     double dr = sqrt(r2);
     double mag = sigma * mp * pow(r2_soft, -1.5);
     double fx = -mag * dx;
@@ -207,7 +170,7 @@ PRIVATE void point_masses_source_term(
     for (int p = 0; p < 2; ++p)
     {
         double delta_cons[NCONS];
-        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, h, delta_cons, constant_softening, soft_length);
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -439,9 +402,7 @@ PUBLIC cbdgam_2d_advance_rk(
     double nu, // other
     double a,
     double dt,
-    double velocity_ceiling,
-    int constant_softening,
-    double soft_length)
+    double velocity_ceiling)
 {
     struct KeplerianBuffer kb = {kb_surface_density,
                                  kb_surface_pressure,
@@ -591,8 +552,6 @@ PUBLIC cbdgam_2d_advance_rk(
         shear_strain(gxrj, gyrj, dx, dy, srj);
         shear_strain(gxcc, gycc, dx, dy, scc);
 
-        double hcc = disk_height(&mass_list, xc, yc, pcc);
-
         fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
         fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
         fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
@@ -602,9 +561,9 @@ PUBLIC cbdgam_2d_advance_rk(
         frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
         frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
 
-        primitive_to_conserved(pcc, ucc, gamma_law_index);
+        primitive_to_conserved(pcc, ucc);
         buffer_source_term(&kb, xc, yc, dt, ucc);
-        point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc, constant_softening, soft_length);
+        point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -664,9 +623,8 @@ PUBLIC void iso2d_point_mass_source_term(
     int model2,
     int which_mass,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
-    double *cons_rate, // :: $.shape == (ni + 4, nj + 4, 3)
-    int constant_softening,
-    double soft_length)
+    double *cons_rate // :: $.shape == (ni + 4, nj + 4, 3)
+    )
 {
     struct PointMass pointmass1 = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
     struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
@@ -697,8 +655,7 @@ PUBLIC void iso2d_point_mass_source_term(
         double yc = patch_yl + (j + 0.5) * dy;
         double *pc = &primitive[ncc];
         double *uc = &cons_rate[ncc];
-        double h = disk_height(&mass_list, xc, yc, pc);
-        point_mass_source_term(&pointmass, xc, yc, 1.0, pc, h, uc, constant_softening, soft_length);
+        point_mass_source_term(&pointmass, xc, yc, 1.0, pc, uc);
     }
 }
 
