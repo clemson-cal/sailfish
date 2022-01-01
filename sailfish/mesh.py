@@ -152,12 +152,18 @@ class LogSphericalMesh(NamedTuple):
             raise ValueError("only defined for a 2D spherical polar mesh")
         return int(self.num_zones_per_decade * pi / log(10))
 
-    @property
-    def radial_vertices(self):
-        return self.faces()
+    def radial_vertices(self, time):
+        """
+        Return a list of proper coordinates of the radial zone interfaces.
+        """
+        a = self.scale_factor(time)
+        return [r * a for r in self.faces()]
 
     @property
     def polar_vertices(self):
+        """
+        A list of the polar angles of the polar mesh faces
+        """
         return [j * pi / self.num_polar_zones for j in range(self.num_polar_zones + 1)]
 
 

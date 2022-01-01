@@ -88,11 +88,14 @@ class EnvelopeShock(Setup):
     r_inner = param(0.1, "inner radius at start")
     r_outer = param(10.0, "outer radius at start")
     expand = param(True, "whether to expand the mesh homologously")
+    polar = param(False, "whether the simulation is 2D")
 
-    def primitive(self, t, r, primitive):
+    def primitive(self, t, coord, primitive):
         ambient = self.ambient
         psi = ambient.envelope_psi
         m1 = ambient.envelope_m1
+
+        r = coord[0] if self.polar else coord
         s = min(r / t, ambient.envelope_fastest_beta)
         u = s / (1.0 - s * s) ** 0.5
         m = m1 * u ** (-1.0 / psi)
@@ -105,14 +108,21 @@ class EnvelopeShock(Setup):
             else:
                 return exp(-(m / self.m_shell - 1.0) / self.w_shell)
 
-        primitive[0] = d
-        primitive[1] = u + u_prof(m) * self.u_shell
-        primitive[2] = p
+        if not self.polar:
+            primitive[0] = d
+            primitive[1] = u + u_prof(m) * self.u_shell
+            primitive[2] = p
 
-        if m > self.m_shell and m < self.m_shell * (1.0 + self.w_shell):
-            primitive[3] = 1.0
+            if m > self.m_shell and m < self.m_shell * (1.0 + self.w_shell):
+                primitive[3] = 1.0
+            else:
+                primitive[3] = 0.0
         else:
-            primitive[3] = 0.0
+            q = coord[1]
+            primitive[0] = d
+            primitive[1] = u + u_prof(m) * self.u_shell * exp(-(q ** 2) / 0.01)
+            primitive[2] = 0.0
+            primitive[3] = p
 
     def mesh(self, num_zones_per_decade):
         return LogSphericalMesh(
@@ -120,12 +130,15 @@ class EnvelopeShock(Setup):
             r1=self.r_outer,
             num_zones_per_decade=num_zones_per_decade,
             scale_factor_derivative=(1.0 / self.t_start) if self.expand else None,
-            polar_grid=True,
+            polar_grid=self.polar,
         )
 
     @property
     def solver(self):
-        return "srhd_2d"
+        if not self.polar:
+            return "srhd_1d"
+        else:
+            return "srhd_2d"
 
     @property
     def start_time(self):
@@ -133,7 +146,7 @@ class EnvelopeShock(Setup):
 
     @property
     def boundary_condition(self):
-        return "outflow", "outflow"
+        return "outflow"
 
     @property
     def default_end_time(self):
