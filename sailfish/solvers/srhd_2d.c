@@ -467,7 +467,7 @@ PUBLIC void srhd_2d_advance_rk(
         riemann_hlle(prim, prip, x1 * adot, fri, 1);
         riemann_hlle(pljm, pljp, 0.0, flj, 2);
         riemann_hlle(prjm, prjp, 0.0, frj, 2);
-        geometric_source_terms(x0, x1, q0, q1, pcc, sources);
+        geometric_source_terms(r0, r1, q0, q1, pcc, sources);
 
         for (int q = 0; q < NCONS; ++q)
         {
