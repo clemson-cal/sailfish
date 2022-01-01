@@ -139,8 +139,8 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
     }
 
     prim[0] = m / w0;
-    prim[1] = w0 * cons[1] / dv / (tau + m + p);
-    prim[2] = w0 * cons[2] / dv / (tau + m + p);
+    prim[1] = w0 * s1 / (tau + m + p);
+    prim[2] = w0 * s2 / (tau + m + p);
     prim[3] = p;
     // prim[4] = cons[4] / cons[0];
 
@@ -314,12 +314,13 @@ PUBLIC void srhd_2d_primitive_to_conserved(
     double *face_positions,  // :: $.shape == (ni + 1,)
     double *primitive,       // :: $.shape == (ni + 4, nj, 4)
     double *conserved,       // :: $.shape == (ni + 4, nj, 4)
+    double polar_extent,
     double scale_factor)     // :: $ > 0.0
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = M_PI / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {
@@ -347,12 +348,13 @@ PUBLIC void srhd_2d_conserved_to_primitive(
     double *face_positions,  // :: $.shape == (ni + 1,)
     double *conserved,       // :: $.shape == (ni + 4, nj, 4)
     double *primitive,       // :: $.shape == (ni + 4, nj, 4)
+    double polar_extent,
     double scale_factor)     // :: $ > 0.0
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = M_PI / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {
@@ -376,13 +378,14 @@ PUBLIC void srhd_2d_conserved_to_primitive(
  * step.
  */
 PUBLIC void srhd_2d_advance_rk(
-    int ni,          // number of zones, not including guard zones
+    int ni,
     int nj,
     double *face_positions, // :: $.shape == (ni + 1,)
     double *conserved_rk,   // :: $.shape == (ni + 4, nj, 4)
     double *primitive_rd,   // :: $.shape == (ni + 4, nj, 4)
     double *conserved_rd,   // :: $.shape == (ni + 4, nj, 4)
     double *conserved_wr,   // :: $.shape == (ni + 4, nj, 4)
+    double polar_extent,
     double a0,              // scale factor at t=0
     double adot,            // scale factor derivative
     double time,            // current time
@@ -392,7 +395,7 @@ PUBLIC void srhd_2d_advance_rk(
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = M_PI / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {

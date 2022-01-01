@@ -62,6 +62,7 @@ class LogSphericalMesh(NamedTuple):
     num_zones_per_decade: int = 1000
     scale_factor_derivative: float = None
     polar_grid: bool = False
+    polar_extent: float = pi
 
     def __str__(self):
         if self.scale_factor_derivative is None:
@@ -84,6 +85,10 @@ class LogSphericalMesh(NamedTuple):
         """
         r0, r1 = self.faces(0, 1)
         return (r1 - r0) * self.scale_factor(time)
+
+    @property
+    def polar_spacing(self):
+        return self.polar_extent / self.num_polar_zones
 
     def scale_factor(self, time):
         """
@@ -139,7 +144,7 @@ class LogSphericalMesh(NamedTuple):
         Return the 2D (r, theta) zone center proper coordinates at index (i, j).
         """
         r = self.zone_center(t, i)
-        q = (j + 0.5) * pi / self.num_polar_zones
+        q = (j + 0.5) * self.polar_spacing
         return r, q
 
     @property
@@ -150,7 +155,7 @@ class LogSphericalMesh(NamedTuple):
     def num_polar_zones(self):
         if not self.polar_grid:
             raise ValueError("only defined for a 2D spherical polar mesh")
-        return int(self.num_zones_per_decade * pi / log(10))
+        return int(self.num_zones_per_decade * self.polar_extent / log(10))
 
     def radial_vertices(self, time):
         """
@@ -164,7 +169,7 @@ class LogSphericalMesh(NamedTuple):
         """
         A list of the polar angles of the polar mesh faces
         """
-        return [j * pi / self.num_polar_zones for j in range(self.num_polar_zones + 1)]
+        return [j * self.polar_spacing for j in range(self.num_polar_zones + 1)]
 
 
 class PlanarCartesian2DMesh(NamedTuple):

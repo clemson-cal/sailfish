@@ -47,6 +47,8 @@ class Patch:
         self.xp = xp
         self.shape = (i1 - i0, mesh.shape[1])  # not including guard zones
         self.faces = self.xp.array(mesh.faces(*index_range))
+        self.polar_extent = mesh.polar_extent
+
         try:
             adot = float(mesh.scale_factor_derivative)
             self.scale_factor_initial = 0.0
@@ -74,6 +76,7 @@ class Patch:
                 self.faces,
                 primitive,
                 conserved,
+                self.polar_extent,
                 self.scale_factor,
             )
             return conserved
@@ -84,6 +87,7 @@ class Patch:
                 self.faces,
                 self.conserved1,
                 self.primitive1,
+                self.polar_extent,
                 self.scale_factor,
             )
 
@@ -95,6 +99,7 @@ class Patch:
                 self.primitive1,
                 self.conserved1,
                 self.conserved2,
+                self.polar_extent,
                 self.scale_factor_initial,
                 self.scale_factor_derivative,
                 self.time,

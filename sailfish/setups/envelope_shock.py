@@ -84,11 +84,13 @@ class EnvelopeShock(Setup):
     u_shell = param(30.0, "gamma-beta of the launched shell")
     m_shell = param(1.0, "mass coordinate of the launched shell")
     w_shell = param(1.0, "width of the shell in dm/m")
+    q_shell = param(0.1, "opening angle of the shell")
     t_start = param(1.0, "time when the simulation starts")
     r_inner = param(0.1, "inner radius at start")
     r_outer = param(10.0, "outer radius at start")
     expand = param(True, "whether to expand the mesh homologously")
     polar = param(False, "whether the simulation is 2D")
+    polar_extent = param(0.5, "polar domain extent, over pi (0.5 is the equator)")
 
     def primitive(self, t, coord, primitive):
         ambient = self.ambient
@@ -118,9 +120,9 @@ class EnvelopeShock(Setup):
             else:
                 primitive[3] = 0.0
         else:
-            q = coord[1]
+            q_bar = coord[1] / self.q_shell
             primitive[0] = d
-            primitive[1] = u + u_prof(m) * self.u_shell * exp(-(q ** 2) / 0.01)
+            primitive[1] = u + u_prof(m) * self.u_shell * exp(-(q_bar ** 2.0))
             primitive[2] = 0.0
             primitive[3] = p
 
@@ -131,6 +133,7 @@ class EnvelopeShock(Setup):
             num_zones_per_decade=num_zones_per_decade,
             scale_factor_derivative=(1.0 / self.t_start) if self.expand else None,
             polar_grid=self.polar,
+            polar_extent=self.polar_extent * pi,
         )
 
     @property
@@ -161,7 +164,7 @@ class EnvelopeShock(Setup):
     def ambient(self):
         return RelativisticEnvelope(
             envelope_m1=1.0,
-            envelope_fastest_beta=0.999,
+            envelope_fastest_beta=0.99,
             envelope_slowest_beta=0.00,
             envelope_psi=0.25,
             wind_mdot=100.0,
