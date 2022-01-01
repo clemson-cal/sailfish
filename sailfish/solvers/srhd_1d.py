@@ -146,7 +146,7 @@ class Patch:
                 dt,
                 self.coordinates,
             )
-        self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
+        self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
         self.recompute_primitive()
 
