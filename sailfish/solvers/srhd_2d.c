@@ -102,7 +102,7 @@ PRIVATE void primitive_to_conserved(const double *prim, double *cons, double dv)
     // cons[4] = dv * m * prim[3];
 }
 
-PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, double r, double q)
+PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, double x, double q)
 {
     const double newton_iter_max = 500;
     const double error_tolerance = 1e-12 * (cons[0] + cons[3]) / dv;
@@ -144,34 +144,34 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
     prim[3] = p;
     // prim[4] = cons[4] / cons[0];
 
-    double mach_ceiling = 500.0;
+    double mach_ceiling = 100.0;
     double u_squared = prim[1] * prim[1] + prim[2] * prim[2];
     double e = prim[3] / prim[0] * 3.0;
     double emin = u_squared / (1.0 + u_squared) / pow(mach_ceiling, 2.0);
 
     if (e < emin) {
         prim[3] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
-        // primitive_to_conserved(prim, cons, dv);
+        primitive_to_conserved(prim, cons, dv);
     }
 
     #if (EXEC_MODE != EXEC_GPU)
     if (iteration == newton_iter_max) {
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive reached max "
-            "iteration at position (%.3f %.3f) "
-            "cons = [%.3e %.3e %.3e %.3e] error = %.3e\n", r, q, cons[0], cons[1], cons[2], cons[3], f);
+            "iteration at comoving position (%.3f %.3f) "
+            "cons = [%.3e %.3e %.3e %.3e] error = %.3e\n", x, q, cons[0], cons[1], cons[2], cons[3], f);
         exit(1);
     }
     if (cons[3] <= 0.0) {
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive found non-positive "
-            "or NaN total energy tau=%.5e at position (%.3f %.3f)\n", cons[3], r, q);
+            "or NaN total energy tau=%.5e at comoving position (%.3f %.3f)\n", cons[3], x, q);
         exit(1);
     }
     if (prim[3] <= 0.0 || prim[3] != prim[3]) {
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive found non-positive "
-            "or NaN pressure p=%.5e at position (%.3f %.3f)\n", prim[3], r, q);
+            "or NaN pressure p=%.5e at comoving position (%.3f %.3f)\n", prim[3], x, q);
         exit(1);
     }
     #endif
@@ -367,7 +367,7 @@ PUBLIC void srhd_2d_conserved_to_primitive(
         double q0 = dq * (j + 0);
         double q1 = dq * (j + 1);
         double dv = cell_volume(r0, r1, q0, q1);
-        conserved_to_primitive(u, p, dv, r0, q0);
+        conserved_to_primitive(u, p, dv, x0, q0);
     }
 }
 

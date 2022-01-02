@@ -201,15 +201,20 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 0.3
+        return 100.0
 
     def maximum_wavespeed(self):
         return 1.0
 
     def advance(self, dt):
+        bs_rk1 = [0 / 1]
+        bs_rk2 = [0 / 1, 1 / 2]
+        bs_rk3 = [0 / 1, 3 / 4, 1 / 3]
+
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-        self.advance_rk(0.5, dt)
+
+        for b in bs_rk2:
+            self.advance_rk(b, dt)
 
     def advance_rk(self, rk_param, dt):
         for patch in self.patches:

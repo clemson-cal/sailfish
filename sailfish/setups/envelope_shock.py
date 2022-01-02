@@ -89,8 +89,11 @@ class EnvelopeShock(Setup):
     r_inner = param(0.1, "inner radius at start")
     r_outer = param(10.0, "outer radius at start")
     expand = param(True, "whether to expand the mesh homologously")
-    polar = param(False, "whether the simulation is 2D")
-    polar_extent = param(0.5, "polar domain extent, over pi (0.5 is the equator)")
+    polar_extent = param(0.5, "polar domain extent over pi (equator is 0.5, 1D is 0.0)")
+
+    @property
+    def polar(self):
+        return self.polar_extent > 0.0
 
     def primitive(self, t, coord, primitive):
         ambient = self.ambient
@@ -102,7 +105,7 @@ class EnvelopeShock(Setup):
         u = s / (1.0 - s * s) ** 0.5
         m = m1 * u ** (-1.0 / psi)
         d = ambient.comoving_mass_density(r, t)
-        p = 1e-5 * d
+        p = 1e-4 * d
 
         def u_prof(m):
             if m < self.m_shell:
@@ -164,7 +167,7 @@ class EnvelopeShock(Setup):
     def ambient(self):
         return RelativisticEnvelope(
             envelope_m1=1.0,
-            envelope_fastest_beta=0.99,
+            envelope_fastest_beta=self.u_shell / (1.0 + self.u_shell ** 2) ** 0.5,
             envelope_slowest_beta=0.00,
             envelope_psi=0.25,
             wind_mdot=100.0,
