@@ -184,13 +184,12 @@ PRIVATE double primitive_to_sound_speed_squared(const double *prim)
 
 PRIVATE void primitive_to_outer_wavespeeds(const double *prim, double *wavespeeds)
 {
-    const double a2 = primitive_to_sound_speed_squared(prim);
-    const double un = primitive_to_gamma_beta_component(prim);
-    const double uu = primitive_to_gamma_beta_squared(prim);
-    const double vv = uu / (1.0 + uu);
-    const double v2 = un * un / (1.0 + uu);
-    const double vn = sqrt(v2);
-    const double k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
+    double a2 = primitive_to_sound_speed_squared(prim);
+    double vn = primitive_to_gamma_beta_component(prim);
+    double uu = primitive_to_gamma_beta_squared(prim);
+    double vv = uu / (1.0 + uu);
+    double v2 = vn * vn;
+    double k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
 
     wavespeeds[0] = (vn * (1.0 - a2) - k0) / (1.0 - vv * a2);
     wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
