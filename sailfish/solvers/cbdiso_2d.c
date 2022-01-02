@@ -599,8 +599,7 @@ PUBLIC void iso2d_primitive_to_conserved(
     int ni,
     int nj,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
-    double *conserved // :: $.shape == (ni + 4, nj + 4, 3)
-    )
+    double *conserved) // :: $.shape == (ni + 4, nj + 4, 3)
 {
     int ng = 2; // number of guard zones
     int si = NCONS * (nj + 2 * ng);
@@ -642,8 +641,7 @@ PUBLIC void iso2d_point_mass_source_term(
     int model2,
     int which_mass,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
-    double *cons_rate // :: $.shape == (ni + 4, nj + 4, 3)
-    )
+    double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 3)
 {
     struct PointMass pointmass1 = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
     struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
@@ -690,8 +688,7 @@ PUBLIC cbdgam_2d_wavespeed(
     double mn2,
     int model,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
-    double *wavespeed // :: $.shape == (ni + 4, nj + 4)
-)
+    double *wavespeed) // :: $.shape == (ni + 4, nj + 4)
 {
     int ng = 2; // number of guard zones
     int si = NCONS * (nj + 2 * ng);
