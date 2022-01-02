@@ -576,12 +576,17 @@ def main():
 
         else:
             driver = DriverArgs.from_namespace(args)
+            outdir = (
+                args.output_directory
+                or (driver.chkpt_file and os.path.dirname(driver.chkpt_file))
+                or "."
+            )
 
             for name, number, state in simulate(driver):
                 if name == "checkpoint":
-                    write_checkpoint(number, args.output_directory, state)
+                    write_checkpoint(number, outdir, state)
                 elif name == "end":
-                    write_checkpoint("final", args.output_directory, state)
+                    write_checkpoint("final", outdir, state)
                 else:
                     logger.warning(f"unrecognized event {name}")
 
