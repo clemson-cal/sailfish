@@ -108,7 +108,6 @@ class Patch:
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
-        self.recompute_primitive()
 
     @property
     def scale_factor(self):
@@ -213,7 +212,11 @@ class Solver(SolverBase):
         self.advance_rk(0.5, dt)
 
     def advance_rk(self, rk_param, dt):
+        for patch in self.patches:
+            patch.recompute_primitive()
+
         self.set_bc("primitive1")
+
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
 
