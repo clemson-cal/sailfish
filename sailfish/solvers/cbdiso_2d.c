@@ -245,7 +245,12 @@ PRIVATE void buffer_source_term(
     }
 }
 
-PRIVATE void shear_strain(const double *gx, const double *gy, double dx, double dy, double *s)
+PRIVATE void shear_strain(
+    const double *gx, 
+    const double *gy, 
+    double dx, 
+    double dy, 
+    double *s)
 {
     double sxx = 4.0 / 3.0 * gx[1] / dx - 2.0 / 3.0 * gy[2] / dy;
     double syy =-2.0 / 3.0 * gx[1] / dx + 4.0 / 3.0 * gy[2] / dy;
@@ -260,7 +265,10 @@ PRIVATE void shear_strain(const double *gx, const double *gy, double dx, double 
 
 // ============================ HYDRO =========================================
 // ============================================================================
-PRIVATE void conserved_to_primitive(const double *cons, double *prim, double velocity_ceiling)
+PRIVATE void conserved_to_primitive(
+    const double *cons, 
+    double *prim, 
+    double velocity_ceiling)
 {
     double rho = cons[0];
     double px = cons[1];
@@ -273,7 +281,9 @@ PRIVATE void conserved_to_primitive(const double *cons, double *prim, double vel
     prim[2] = vy;
 }
 
-PRIVATE void primitive_to_conserved(const double *prim, double *cons)
+PRIVATE void primitive_to_conserved(
+    const double *prim, 
+    double *cons)
 {
     double rho = prim[0];
     double vx = prim[1];
@@ -286,7 +296,9 @@ PRIVATE void primitive_to_conserved(const double *prim, double *cons)
     cons[2] = py;
 }
 
-PRIVATE double primitive_to_velocity(const double *prim, int direction)
+PRIVATE double primitive_to_velocity(
+    const double *prim, 
+    int direction)
 {
     switch (direction)
     {
@@ -324,7 +336,9 @@ PRIVATE void primitive_to_outer_wavespeeds(
     wavespeeds[1] = vn + cs;
 }
 
-PRIVATE double primitive_max_wavespeed(const double *prim, double cs2)
+PRIVATE double primitive_max_wavespeed(
+    const double *prim, 
+    double cs2)
 {
     double cs = sqrt(cs2);
     double vx = prim[1];
@@ -334,7 +348,12 @@ PRIVATE double primitive_max_wavespeed(const double *prim, double cs2)
     return max2(ax, ay);
 }
 
-PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, double cs2, int direction)
+PRIVATE void riemann_hlle(
+    const double *pl, 
+    const double *pr, 
+    double *flux, 
+    double cs2, 
+    int direction)
 {
     double ul[NCONS];
     double ur[NCONS];

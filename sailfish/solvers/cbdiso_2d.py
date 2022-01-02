@@ -119,7 +119,7 @@ class Patch:
     def advance_rk(self, rk_param, dt):
         with self.execution_context():
             pass
-        self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
+        self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
     def new_iteration(self):
