@@ -33,7 +33,7 @@ class PlanarCartesianMesh(NamedTuple):
 
     @property
     def num_total_zones(self):
-        return self.num_zones * self.num_zones
+        return self.num_zones
 
     def zone_center(self, t, i):
         x0, dx = self.x0, self.dx

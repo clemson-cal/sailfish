@@ -57,10 +57,10 @@ PRIVATE double primitive_to_lorentz_factor(const double *prim)
     return sqrt(1.0 + primitive_to_gamma_beta_squared(prim));
 }
 
-PRIVATE double primitive_to_gamma_beta_component(const double *prim)
-{
-    return prim[1];
-}
+// PRIVATE double primitive_to_gamma_beta_component(const double *prim)
+// {
+//     return prim[1];
+// }
 
 PRIVATE double primitive_to_beta_component(const double *prim)
 {

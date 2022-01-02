@@ -144,14 +144,14 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
     prim[3] = p;
     // prim[4] = cons[4] / cons[0];
 
-    double mach_ceiling = 100.0;
+    double mach_ceiling = 1e6;
     double u_squared = prim[1] * prim[1] + prim[2] * prim[2];
     double e = prim[3] / prim[0] * 3.0;
     double emin = u_squared / (1.0 + u_squared) / pow(mach_ceiling, 2.0);
 
     if (e < emin) {
         prim[3] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
-        primitive_to_conserved(prim, cons, dv);
+        // primitive_to_conserved(prim, cons, dv);
     }
 
     #if (EXEC_MODE != EXEC_GPU)

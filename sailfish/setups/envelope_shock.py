@@ -105,7 +105,7 @@ class EnvelopeShock(Setup):
         u = s / (1.0 - s * s) ** 0.5
         m = m1 * u ** (-1.0 / psi)
         d = ambient.comoving_mass_density(r, t)
-        p = 1e-4 * d
+        p = 1e-6 * d
 
         def u_prof(m):
             if m < self.m_shell:
@@ -167,7 +167,7 @@ class EnvelopeShock(Setup):
     def ambient(self):
         return RelativisticEnvelope(
             envelope_m1=1.0,
-            envelope_fastest_beta=self.u_shell / (1.0 + self.u_shell ** 2) ** 0.5,
+            envelope_fastest_beta=0.995,  # self.u_shell / (1.0 + self.u_shell ** 2) ** 0.5,
             envelope_slowest_beta=0.00,
             envelope_psi=0.25,
             wind_mdot=100.0,
