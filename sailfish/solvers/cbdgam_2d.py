@@ -8,6 +8,7 @@ Fill in more details about the physics here:
 
 from typing import NamedTuple
 from logging import getLogger
+from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
@@ -100,7 +101,7 @@ class Patch:
         with self.execution_context():
             pass
 
-        self.time = self.time0 * rk_param + (self.time0 + dt) * (1.0 - rk_param)
+        self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
     def new_iteration(self):
