@@ -40,10 +40,6 @@ class RelativisticEnvelope(NamedTuple):
     wind_mdot: float
     """ The mass loss rate for the wind """
 
-    def envelop_slowest_u(self) -> float:
-        b = self.envelope_slowest_beta
-        return b / (1.0 - b * b).sqrt()
-
     def zone(self, r: float, t: float) -> int:
         v_min = self.envelope_slowest_beta
         r_wind_envelop_interface = v_min * t
