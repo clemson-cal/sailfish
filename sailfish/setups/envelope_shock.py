@@ -163,7 +163,7 @@ class EnvelopeShock(Setup):
     def ambient(self):
         return RelativisticEnvelope(
             envelope_m1=1.0,
-            envelope_fastest_beta=0.995,  # self.u_shell / (1.0 + self.u_shell ** 2) ** 0.5,
+            envelope_fastest_beta=0.999,
             envelope_slowest_beta=0.00,
             envelope_psi=0.25,
             wind_mdot=100.0,

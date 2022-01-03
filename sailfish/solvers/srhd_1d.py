@@ -86,7 +86,7 @@ class Patch:
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
-        self.num_zones = index_range[1] - index_range[0]
+        self.num_zones = num_zones = index_range[1] - index_range[0]
         self.faces = self.xp.array(mesh.faces(*index_range))
         self.coordinates = COORDINATES_DICT[type(mesh)]
         try:
@@ -100,6 +100,7 @@ class Patch:
         self.time = self.time0 = time
 
         with self.execution_context():
+            self.wavespeeds = self.xp.zeros(num_zones)
             self.primitive1 = self.xp.array(primitive)
             self.conserved0 = self.primitive_to_conserved(self.primitive1)
             self.conserved1 = self.conserved0.copy()
@@ -148,6 +149,18 @@ class Patch:
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
+
+    @property
+    def maximum_wavespeed(self):
+        self.recompute_primitive()
+        with self.execution_context():
+            self.lib.srhd_1d_max_wavespeeds[self.num_zones](
+                self.faces,
+                self.primitive1,
+                self.wavespeeds,
+                self.scale_factor_derivative,
+            )
+            return self.wavespeeds.max()
 
     @property
     def scale_factor(self):
@@ -249,10 +262,10 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 0.6
+        return 16.0
 
     def maximum_wavespeed(self):
-        return 1.0
+        return 1.0  # max(patch.maximum_wavespeed for patch in self.patches)
 
     def advance(self, dt):
         self.new_iteration()

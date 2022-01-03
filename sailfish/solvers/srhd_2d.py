@@ -45,7 +45,7 @@ class Patch:
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
-        self.shape = (i1 - i0, mesh.shape[1])  # not including guard zones
+        self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
         self.faces = self.xp.array(mesh.faces(*index_range))
         self.polar_extent = mesh.polar_extent
 
@@ -60,6 +60,7 @@ class Patch:
         self.time = self.time0 = time
 
         with self.execution_context():
+            self.wavespeeds = self.xp.zeros(shape)
             self.primitive1 = self.xp.array(primitive)
             self.conserved0 = self.primitive_to_conserved(self.primitive1)
             self.conserved1 = self.conserved0.copy()
@@ -110,6 +111,18 @@ class Patch:
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 
     @property
+    def maximum_wavespeed(self):
+        self.recompute_primitive()
+        with self.execution_context():
+            self.lib.srhd_2d_max_wavespeeds[self.shape](
+                self.faces,
+                self.primitive1,
+                self.wavespeeds,
+                self.scale_factor_derivative,
+            )
+            return self.wavespeeds.max()
+
+    @property
     def scale_factor(self):
         return self.scale_factor_initial + self.scale_factor_derivative * self.time
 
@@ -144,7 +157,7 @@ class Solver(SolverBase):
         nq = 4  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        lib = Library(code, mode=mode, debug=True)
+        lib = Library(code, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
@@ -201,10 +214,16 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 100.0
+        """
+        When the mesh is expanding, it's possible to use a CFL number
+        significantly larger than the theoretical max. I haven't seen
+        how this makes sense, but it works in practice.
+        """
+        return 16.0
 
     def maximum_wavespeed(self):
         return 1.0
+        # return max(patch.maximum_wavespeed for patch in self.patches)
 
     def advance(self, dt):
         bs_rk1 = [0 / 1]
