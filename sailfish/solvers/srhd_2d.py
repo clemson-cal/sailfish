@@ -36,7 +36,7 @@ class Patch:
     def __init__(
         self,
         time,
-        primitive,
+        conserved,
         mesh,
         index_range,
         lib,
@@ -46,7 +46,7 @@ class Patch:
         self.lib = lib
         self.xp = xp
         self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
-        self.faces = self.xp.array(mesh.faces(*index_range))
+        self.faces = xp.array(mesh.faces(*index_range))
         self.polar_extent = mesh.polar_extent
 
         try:
@@ -60,27 +60,15 @@ class Patch:
         self.time = self.time0 = time
 
         with self.execution_context():
-            self.wavespeeds = self.xp.zeros(shape)
-            self.primitive1 = self.xp.array(primitive)
-            self.conserved0 = self.primitive_to_conserved(self.primitive1)
+            self.wavespeeds = xp.zeros(shape)
+            self.primitive1 = xp.zeros_like(conserved)
+            self.conserved0 = conserved
             self.conserved1 = self.conserved0.copy()
             self.conserved2 = self.conserved0.copy()
 
     def execution_context(self):
         """TODO: return a CUDA context for execution on the assigned device"""
         return nullcontext()
-
-    def primitive_to_conserved(self, primitive):
-        with self.execution_context():
-            conserved = self.xp.zeros_like(primitive)
-            self.lib.srhd_2d_primitive_to_conserved[self.shape](
-                self.faces,
-                primitive,
-                conserved,
-                self.polar_extent,
-                self.scale_factor,
-            )
-            return conserved
 
     def recompute_primitive(self):
         with self.execution_context():
@@ -131,6 +119,10 @@ class Patch:
         self.conserved0[...] = self.conserved1[...]
 
     @property
+    def conserved(self):
+        return self.conserved1
+
+    @property
     def primitive(self):
         self.recompute_primitive()
         return self.primitive1
@@ -175,30 +167,39 @@ class Solver(SolverBase):
 
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
+            conserved = xp.zeros_like(primitive)
+            lib.srhd_2d_primitive_to_conserved[mesh.shape](
+                xp.array(mesh.faces()),
+                primitive,
+                conserved,
+                mesh.polar_extent,
+                mesh.scale_factor(time),
+            )
         else:
-            primitive = solution
+            conserved = solution
 
         for (a, b) in subdivide(mesh.shape[0], num_patches):
-            prim = xp.zeros([b - a + 2 * ng, mesh.shape[1], nq])
-            prim[ng:-ng] = primitive[a:b]
-            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
-
-        self.set_bc("primitive1")
+            cons = xp.zeros([b - a + 2 * ng, mesh.shape[1], nq])
+            cons[ng:-ng] = conserved[a:b]
+            self.patches.append(Patch(time, cons, mesh, (a, b), lib, xp))
 
     @property
     def solution(self):
-        return self.primitive
+        return self.reconstruct("conserved")
 
     @property
     def primitive(self):
+        return self.reconstruct("primitive")
+
+    def reconstruct(self, array):
         ni, nj = self.mesh.shape
         ng = self.num_guard
         nq = self.num_cons
         np = len(self.patches)
-        primitive = self.xp.zeros([ni, nj, nq])
+        result = self.xp.zeros([ni, nj, nq])
         for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            primitive[a:b] = patch.primitive[ng:-ng]
-        return primitive
+            result[a:b] = getattr(patch, array)[ng:-ng]
+        return result
 
     @property
     def time(self):

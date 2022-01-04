@@ -298,22 +298,23 @@ PRIVATE void geometric_source_terms(int coords, double x0, double x1, const doub
 
 
 /**
- * Converts an array of primitive data to an array of conserved data.
+ * Converts an array of primitive data to an array of conserved data. Note:
+ * unlike srhd_1d_conserved_to_primitive, this function assumes there no guard
+ * zones on the input or output arrays. This is to be consistent with how this
+ * function is used by the Python solver class.
  */
 PUBLIC void srhd_1d_primitive_to_conserved(
     int num_zones,
     double *face_positions,  // :: $.shape == (num_zones + 1,)
-    double *primitive,       // :: $.shape == (num_zones + 4, 4)
-    double *conserved,       // :: $.shape == (num_zones + 4, 4)
+    double *primitive,       // :: $.shape == (num_zones, 4)
+    double *conserved,       // :: $.shape == (num_zones, 4)
     double scale_factor,     // :: $ >= 0.0
     int coords)              // :: $ in [0, 1]
 {
-    int ng = 2; // number of guard zones
-
     FOR_EACH_1D(num_zones)
     {
-        double *p = &primitive[NCONS * (i + ng)];
-        double *u = &conserved[NCONS * (i + ng)];
+        double *p = &primitive[NCONS * i];
+        double *u = &conserved[NCONS * i];
         double yl = face_positions[i];
         double yr = face_positions[i + 1];
         double xl = yl * scale_factor;
@@ -371,8 +372,8 @@ PUBLIC void srhd_1d_max_wavespeeds(
         double x1 = face_positions[i + 1];
         double p_boosted[NCONS];
         double ai[2];
-        // primitive_with_radial_boost(p, p_boosted, 0.5 * (x0 + x1) * adot);
-        // primitive_to_outer_wavespeeds(p_boosted, ai);
+        primitive_with_radial_boost(p, p_boosted, 0.5 * (x0 + x1) * adot);
+        primitive_to_outer_wavespeeds(p_boosted, ai);
         primitive_to_outer_wavespeeds(p, ai);
         *a = max2(fabs(ai[0]), fabs(ai[1]));
     }

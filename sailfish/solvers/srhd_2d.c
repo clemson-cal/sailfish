@@ -318,25 +318,27 @@ PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, 
 
 
 /**
- * Converts an array of primitive data to an array of conserved data.
+ * Converts an array of primitive data to an array of conserved data. Note:
+ * unlike srhd_1d_conserved_to_primitive, this function assumes there no guard
+ * zones on the input or output arrays. This is to be consistent with how this
+ * function is used by the Python solver class.
  */
 PUBLIC void srhd_2d_primitive_to_conserved(
     int ni,
     int nj,
     double *face_positions,  // :: $.shape == (ni + 1,)
-    double *primitive,       // :: $.shape == (ni + 4, nj, 4)
-    double *conserved,       // :: $.shape == (ni + 4, nj, 4)
+    double *primitive,       // :: $.shape == (ni, nj, 4)
+    double *conserved,       // :: $.shape == (ni, nj, 4)
     double polar_extent,
     double scale_factor)     // :: $ >= 0.0
 {
-    int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
     double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {
-        int n = (i + ng) * si + j * sj;
+        int n = i * si + j * sj;
         double *p = &primitive[n];
         double *u = &conserved[n];
         double x0 = face_positions[i];

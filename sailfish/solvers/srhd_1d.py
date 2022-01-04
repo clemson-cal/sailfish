@@ -77,7 +77,7 @@ class Patch:
     def __init__(
         self,
         time,
-        primitive,
+        conserved,
         mesh,
         index_range,
         lib,
@@ -87,8 +87,9 @@ class Patch:
         self.lib = lib
         self.xp = xp
         self.num_zones = num_zones = index_range[1] - index_range[0]
-        self.faces = self.xp.array(mesh.faces(*index_range))
+        self.faces = xp.array(mesh.faces(*index_range))
         self.coordinates = COORDINATES_DICT[type(mesh)]
+
         try:
             adot = float(mesh.scale_factor_derivative)
             self.scale_factor_initial = 0.0
@@ -100,27 +101,15 @@ class Patch:
         self.time = self.time0 = time
 
         with self.execution_context():
-            self.wavespeeds = self.xp.zeros(num_zones)
-            self.primitive1 = self.xp.array(primitive)
-            self.conserved0 = self.primitive_to_conserved(self.primitive1)
+            self.wavespeeds = xp.zeros(num_zones)
+            self.primitive1 = xp.zeros_like(conserved)
+            self.conserved0 = conserved
             self.conserved1 = self.conserved0.copy()
             self.conserved2 = self.conserved0.copy()
 
     def execution_context(self):
         """TODO: return a CUDA context for execution on the assigned device"""
         return nullcontext()
-
-    def primitive_to_conserved(self, primitive):
-        with self.execution_context():
-            conserved = self.xp.zeros_like(primitive)
-            self.lib.srhd_1d_primitive_to_conserved[self.num_zones](
-                self.faces,
-                primitive,
-                conserved,
-                self.scale_factor,
-                self.coordinates,
-            )
-            return conserved
 
     def recompute_primitive(self):
         with self.execution_context():
@@ -169,6 +158,10 @@ class Patch:
     def new_iteration(self):
         self.time0 = self.time
         self.conserved0[...] = self.conserved1[...]
+
+    @property
+    def conserved(self):
+        return self.conserved1
 
     @property
     def primitive(self):
@@ -223,30 +216,41 @@ class Solver(SolverBase):
 
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
+            conserved = xp.zeros_like(primitive)
+            coordinates = COORDINATES_DICT[type(mesh)]
+
+            lib.srhd_1d_primitive_to_conserved[mesh.shape](
+                xp.array(mesh.faces()),
+                primitive,
+                conserved,
+                mesh.scale_factor(time),
+                coordinates,
+            )
         else:
-            primitive = solution
+            conserved = solution
 
         for (a, b) in subdivide(mesh.shape[0], num_patches):
-            prim = xp.zeros([b - a + 2 * ng, nq])
-            prim[ng:-ng] = primitive[a:b]
-            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
-
-        self.set_bc("primitive1")
+            cons = xp.zeros([b - a + 2 * ng, nq])
+            cons[ng:-ng] = conserved[a:b]
+            self.patches.append(Patch(time, cons, mesh, (a, b), lib, xp))
 
     @property
     def solution(self):
-        return self.primitive
+        return self.reconstruct("conserved")
 
     @property
     def primitive(self):
+        return self.reconstruct("primitive")
+
+    def reconstruct(self, array):
         nz = self.mesh.shape[0]
         ng = self.num_guard
         nq = self.num_cons
         np = len(self.patches)
-        primitive = self.xp.zeros([nz, nq])
+        result = self.xp.zeros([nz, nq])
         for (a, b), patch in zip(subdivide(nz, np), self.patches):
-            primitive[a:b] = patch.primitive[ng:-ng]
-        return primitive
+            result[a:b] = getattr(patch, array)[ng:-ng]
+        return result
 
     @property
     def time(self):
@@ -269,7 +273,8 @@ class Solver(SolverBase):
         return 16.0
 
     def maximum_wavespeed(self):
-        return 1.0  # max(patch.maximum_wavespeed for patch in self.patches)
+        return 1.0
+        # max(patch.maximum_wavespeed for patch in self.patches)
 
     def advance(self, dt):
         self.new_iteration()
