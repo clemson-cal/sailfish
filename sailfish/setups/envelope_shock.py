@@ -82,10 +82,10 @@ class EnvelopeShock(Setup):
     w_shell = param(1.0, "width of the shell in dm/m")
     q_shell = param(0.1, "opening angle of the shell")
     t_start = param(1.0, "time when the simulation starts")
-    r_inner = param(0.1, "inner radius at start")
-    r_outer = param(10.0, "outer radius at start")
+    r_inner = param(0.1, "inner radius (comoving if expand=True)")
+    r_outer = param(1.0, "outer radius (comoving if expand=True)")
     expand = param(True, "whether to expand the mesh homologously")
-    polar_extent = param(0.5, "polar domain extent over pi (equator is 0.5, 1D is 0.0)")
+    polar_extent = param(0.0, "polar domain extent over pi (equator is 0.5, 1D is 0.0)")
 
     @property
     def polar(self):
@@ -153,6 +153,13 @@ class EnvelopeShock(Setup):
     @property
     def default_end_time(self):
         return 1.0
+
+    @property
+    def default_resolution(self):
+        if self.polar:
+            return 800
+        else:
+            return 20000
 
     def r_shell(self) -> float:
         u = self.m_shell ** -0.25
