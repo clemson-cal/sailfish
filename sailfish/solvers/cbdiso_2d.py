@@ -4,10 +4,12 @@ One-dimensional relativistic hydro solver supporting homologous mesh motion.
 
 from logging import getLogger
 from sailfish.kernel.library import Library
+from typing import NamedTuple
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.solver import SolverBase
+from sailfish.physics.kepler import OrbitalElements
 
 try:
     from contextlib import nullcontext
@@ -40,12 +42,25 @@ logger = getLogger(__name__)
 
 class Physics(NamedTuple):
     sound_speed_squared: float = 1.0
+    mach_number: float = 10.0
     viscosity_coefficient: float = 0.01
-
+    kb_surface_density: float = 1.0
+    kb_central_mass: float = 1.0
+    kb_driving_rate: float = 1000.0
+    kb_onset_width: float = 0.1
+    kb_mode: int = 0
+    q: float = 1.0
+    e: float = 0.0
+    sink_rate: float = 10.0
+    sink_radius: float = 0.05
+    mass_model1: int = 1
+    mass_model2: int = 1
+    eos_model: int = 1 # 1: globally isothermal scenario 
+                       # 2: locally isothermal
 
 class Options(NamedTuple):
-    velocity_ceiling: float = None
-    mach_ceiling: float = None
+    velocity_ceiling: float = 1e12
+    mach_ceiling: float = 1e12
  
 def initial_condition(setup, mesh, time):
     """
@@ -89,37 +104,101 @@ class Patch:
         self.shape = (i1 - i0, nj)  # not including guard zones
         self.physics = physics
         self.options = options
+        self.xl, self.yl = self.mesh.vertex_coordinates(i0,0)
+        self.xr, self.yr = self.xl + (i1-i0)*self.mesh.dx, self.yl + nj*self.mesh.dy
+        self.kb_outer_radius = self.mesh.x1 - self.physics.kb_onset_width
+
+        self.orbelement =  OrbitalElements(1.0,1.0,self.physics.q,self.physics.e)
+        orbstate = self.orbelement.orbital_state(self.time)
 
         with self.execution_context():
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
             self.primitive1 = self.xp.array(primitive)
             self.primitive2 = self.xp.array(primitive)
-            self.conserved0 = self.primitive_to_conserved(self.primitive1)
-
+            self.conserved0 = self.xp.zeros(primitive.shape)
     def execution_context(self):
         """TODO: return a CUDA context for execution on the assigned device"""
         return nullcontext()
 
     def maximum_wavespeed(self):
+        orbstate = self.orbelement.orbital_state(self.time)
         with self.execution_context():
             self.lib.cbdiso_wavespeed[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.physics.sound_speed_squared,
+                self.physics.mach_number**2.0,
+                self.physics.eos_model,
+                orbstate.primary.position_x,
+                orbstate.primary.position_y,
+                orbstate.primary.velocity_x,
+                orbstate.primary.velocity_y,
+                orbstate.primary.mass,
+                self.physics.sink_rate,
+                self.physics.sink_radius,
+                self.physics.mass_model1,
+                orbstate.secondary.position_x,
+                orbstate.secondary.position_y,
+                orbstate.secondary.velocity_x,
+                orbstate.secondary.velocity_y,
+                orbstate.secondary.mass,
+                self.physics.sink_rate,
+                self.physics.sink_radius,
+                self.physics.mass_model2,
                 self.primitive1,
                 self.wavespeeds,
-                self.physics.sound_speed_squared,
             )
-            return self.xp.max(self.wavespeeds[ng:-ng, ng:-ng])
-
-    def primitive_to_conserved(self, primitive):
-        with self.execution_context():
-            pass
+            return self.wavespeeds.max()
 
     def recompute_conserved(self):
         with self.execution_context():
-            pass
+            return self.lib.iso2d_primitive_to_conserved[self.shape](
+                self.primitive1,
+                self.conserved0,
+            )
 
     def advance_rk(self, rk_param, dt):
+        orbstate = self.orbelement.orbital_state(self.time)
         with self.execution_context():
-            pass
+            self.lib.cbdiso_advance_rk[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.conserved0,
+                self.primitive1,
+                self.primitive2,
+                self.physics.kb_surface_density,
+                self.physics.kb_central_mass,
+                self.physics.kb_driving_rate,
+                self.kb_outer_radius,
+                self.physics.kb_onset_width,
+                self.physics.kb_mode,
+                orbstate.primary.position_x,
+                orbstate.primary.position_y,
+                orbstate.primary.velocity_x,
+                orbstate.primary.velocity_y,
+                orbstate.primary.mass,
+                self.physics.sink_rate,
+                self.physics.sink_radius,
+                self.physics.mass_model1,
+                orbstate.secondary.position_x,
+                orbstate.secondary.position_y,
+                orbstate.secondary.velocity_x,
+                orbstate.secondary.velocity_y,
+                orbstate.secondary.mass,
+                self.physics.sink_rate,
+                self.physics.sink_radius,
+                self.physics.mass_model2,
+                self.physics.sound_speed_squared,
+                self.physics.mach_number**2.0,
+                self.physics.eos_model,
+                self.physics.viscosity_coefficient,
+                rk_param,
+                dt,
+                self.options.velocity_ceiling)
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
@@ -156,7 +235,6 @@ class Solver(SolverBase):
 
         self._physics = Physics(**physics)
         self._options = Options(**options)
-
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 3  # number of conserved quantities
@@ -186,7 +264,7 @@ class Solver(SolverBase):
             prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
             self.patches.append(
-                Patch(time, prim, mesh, (a, b), physics, options, lib, xp)
+                Patch(time, prim, mesh, (a, b), self._physics, self._options, lib, xp)
             )
 
         self.set_bc("primitive1")
