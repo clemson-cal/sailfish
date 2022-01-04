@@ -57,10 +57,10 @@ PRIVATE double primitive_to_lorentz_factor(const double *prim)
     return sqrt(1.0 + primitive_to_gamma_beta_squared(prim));
 }
 
-PRIVATE double primitive_to_gamma_beta_component(const double *prim)
-{
-    return prim[1];
-}
+// PRIVATE double primitive_to_gamma_beta_component(const double *prim)
+// {
+//     return prim[1];
+// }
 
 PRIVATE double primitive_to_beta_component(const double *prim)
 {
@@ -130,14 +130,14 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
     prim[2] = p;
     prim[3] = cons[3] / cons[0];
 
-    double mach_ceiling = 100.0;
+    double mach_ceiling = 1e6;
     double u = prim[1];
     double e = prim[2] / prim[0] * 3.0;
     double emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
 
     if (e < emin) {
         prim[2] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
-        primitive_to_conserved(prim, cons, dv);
+        // primitive_to_conserved(prim, cons, dv);
     }
 
     #if (EXEC_MODE != EXEC_GPU)
@@ -184,16 +184,27 @@ PRIVATE double primitive_to_sound_speed_squared(const double *prim)
 
 PRIVATE void primitive_to_outer_wavespeeds(const double *prim, double *wavespeeds)
 {
-    const double a2 = primitive_to_sound_speed_squared(prim);
-    const double un = primitive_to_gamma_beta_component(prim);
-    const double uu = primitive_to_gamma_beta_squared(prim);
-    const double vv = uu / (1.0 + uu);
-    const double v2 = un * un / (1.0 + uu);
-    const double vn = sqrt(v2);
-    const double k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
+    double a2 = primitive_to_sound_speed_squared(prim);
+    double uu = primitive_to_gamma_beta_squared(prim);
+    double vn = primitive_to_beta_component(prim);
+    double vv = uu / (1.0 + uu);
+    double v2 = vn * vn;
+    double k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
 
     wavespeeds[0] = (vn * (1.0 - a2) - k0) / (1.0 - vv * a2);
     wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
+}
+
+PRIVATE void primitive_with_radial_boost(const double *prim, double *prim_boosted, double beta)
+{
+    double gw = 1.0 / sqrt(1.0 - beta * beta);
+    double u0 = primitive_to_lorentz_factor(prim);
+    double u1 = prim[1];
+
+    prim_boosted[0] = prim[0];
+    prim_boosted[1] = u1 * gw - u0 * gw * beta;
+    prim_boosted[2] = prim[2];
+    prim_boosted[3] = prim[3];
 }
 
 PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux)
@@ -294,7 +305,7 @@ PUBLIC void srhd_1d_primitive_to_conserved(
     double *face_positions,  // :: $.shape == (num_zones + 1,)
     double *primitive,       // :: $.shape == (num_zones + 4, 4)
     double *conserved,       // :: $.shape == (num_zones + 4, 4)
-    double scale_factor,     // :: $ > 0.0
+    double scale_factor,     // :: $ >= 0.0
     int coords)              // :: $ in [0, 1]
 {
     int ng = 2; // number of guard zones
@@ -321,7 +332,7 @@ PUBLIC void srhd_1d_conserved_to_primitive(
     double *face_positions, // :: $.shape == (num_zones + 1,)
     double *conserved,      // :: $.shape == (num_zones + 4, 4)
     double *primitive,      // :: $.shape == (num_zones + 4, 4)
-    double scale_factor,    // :: $ > 0.0
+    double scale_factor,    // :: $ >= 0.0
     int coords)             // :: $ in [0, 1]
 {
     int ng = 2; // number of guard zones
@@ -336,6 +347,34 @@ PUBLIC void srhd_1d_conserved_to_primitive(
         double xr = yr * scale_factor;
         double dv = cell_volume(coords, xl, xr);
         conserved_to_primitive(u, p, dv, xl);
+    }
+}
+
+
+/**
+ * Computes the maximum wavespeed in each zone.
+ */
+PUBLIC void srhd_1d_max_wavespeeds(
+    int num_zones,           // number of zones, not including guard zones
+    double *face_positions,  // :: $.shape == (num_zones + 1,)
+    double *primitive,       // :: $.shape == (num_zones + 4, 4)
+    double *wavespeed,       // :: $.shape == (num_zones,)
+    double adot)             // :: $ >= 0.0
+{
+    int ng = 2; // number of guard zones in the radial direction
+
+    FOR_EACH_1D(num_zones)
+    {
+        double *p = &primitive[(i + ng) * NCONS];
+        double *a = &wavespeed[i];
+        double x0 = face_positions[i];
+        double x1 = face_positions[i + 1];
+        double p_boosted[NCONS];
+        double ai[2];
+        // primitive_with_radial_boost(p, p_boosted, 0.5 * (x0 + x1) * adot);
+        // primitive_to_outer_wavespeeds(p_boosted, ai);
+        primitive_to_outer_wavespeeds(p, ai);
+        *a = max2(fabs(ai[0]), fabs(ai[1]));
     }
 }
 

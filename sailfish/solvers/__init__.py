@@ -3,6 +3,7 @@ Physics solvers and solution schemes.
 """
 
 from . import srhd_1d
+from . import srhd_2d
 from . import scdg_1d
 from . import cbdgam_2d
 
