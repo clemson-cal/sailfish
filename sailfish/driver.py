@@ -297,14 +297,14 @@ def simulate(driver):
         mode=mode,
     )
 
-    if (driver.cfl_number or 0.0) > solver.maximum_cfl:
+    if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
         raise ConfigurationError(
             f"cfl number {driver.cfl_number} "
             f"is greater than {solver.maximum_cfl}, "
             f"max allowed by solver {setup.solver}"
         )
 
-    cfl_number = driver.cfl_number or solver.maximum_cfl
+    cfl_number = driver.cfl_number or solver.recommended_cfl
 
     for name, event in driver.events.items():
         logger.info(f"recurrence for {name} event is {event}")

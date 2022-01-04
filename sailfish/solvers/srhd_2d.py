@@ -213,6 +213,10 @@ class Solver(SolverBase):
         return dict()
 
     @property
+    def recommended_cfl(self):
+        return 0.4
+
+    @property
     def maximum_cfl(self):
         """
         When the mesh is expanding, it's possible to use a CFL number

@@ -261,6 +261,10 @@ class Solver(SolverBase):
         return dict()
 
     @property
+    def recommended_cfl(self):
+        return 0.6
+
+    @property
     def maximum_cfl(self):
         return 16.0
 
