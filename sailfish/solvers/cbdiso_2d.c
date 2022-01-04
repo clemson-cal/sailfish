@@ -129,7 +129,7 @@ PRIVATE void point_mass_source_term(
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
             break;
         case 2: //TorqueFree
-        {}
+        {
             double vx        = prim[1];
             double vy        = prim[2];
             double vx0       = mass->vx;
@@ -644,7 +644,7 @@ PUBLIC void iso2d_point_mass_source_term(
     struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
     struct PointMassList mass_list = {{pointmass1, pointmass2}};
 
-    struct Pointmass pointmass;
+    struct PointMass pointmass;
     if (which_mass == 1) {
         struct PointMass p = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
         pointmass = p;
@@ -674,7 +674,7 @@ PUBLIC void iso2d_point_mass_source_term(
 }
 
 
-PUBLIC cbdiso_wavespeed(
+PUBLIC void cbdiso_wavespeed(
     int ni, //mesh
     int nj,
     double patch_xl,
@@ -706,7 +706,7 @@ PUBLIC cbdiso_wavespeed(
     struct PointMass pointmass1 = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
     struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
     struct PointMassList mass_list = {{pointmass1, pointmass2}};
-    
+
     int ng = 2; // number of guard zones
     int si = NCONS * (nj + 2 * ng);
     int sj = NCONS;
