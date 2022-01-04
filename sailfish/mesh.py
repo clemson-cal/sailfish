@@ -226,6 +226,9 @@ class PlanarCartesian2DMesh(NamedTuple):
     def shape(self):
         return self.ni, self.nj
 
+    def min_spacing(self, time=None):
+        return self.dx
+
     def num_total_zones(self):
         return self.ni * self.nj
 
