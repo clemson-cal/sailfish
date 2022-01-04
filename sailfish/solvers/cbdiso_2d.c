@@ -388,9 +388,7 @@ PUBLIC void cbdiso_advance_rk(
     double *conserved_rk, // :: $.shape == (ni + 4, nj + 4, 3)
     double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, 3)
     double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, 3)
-    double gamma_law_index,
     double kb_surface_density, // KeplerianBuffer
-    double kb_surface_pressure,
     double kb_central_mass,
     double kb_driving_rate,
     double kb_outer_radius,
@@ -421,7 +419,6 @@ PUBLIC void cbdiso_advance_rk(
     double velocity_ceiling)
 {
     struct KeplerianBuffer kb = {kb_surface_density,
-                                 kb_surface_pressure,
                                  kb_central_mass,
                                  kb_driving_rate,
                                  kb_outer_radius,
