@@ -40,10 +40,6 @@ class RelativisticEnvelope(NamedTuple):
     wind_mdot: float
     """ The mass loss rate for the wind """
 
-    def envelop_slowest_u(self) -> float:
-        b = self.envelope_slowest_beta
-        return b / (1.0 - b * b).sqrt()
-
     def zone(self, r: float, t: float) -> int:
         v_min = self.envelope_slowest_beta
         r_wind_envelop_interface = v_min * t
@@ -84,20 +80,28 @@ class EnvelopeShock(Setup):
     u_shell = param(30.0, "gamma-beta of the launched shell")
     m_shell = param(1.0, "mass coordinate of the launched shell")
     w_shell = param(1.0, "width of the shell in dm/m")
+    q_shell = param(0.1, "opening angle of the shell")
     t_start = param(1.0, "time when the simulation starts")
     r_inner = param(0.1, "inner radius at start")
     r_outer = param(10.0, "outer radius at start")
     expand = param(True, "whether to expand the mesh homologously")
+    polar_extent = param(0.5, "polar domain extent over pi (equator is 0.5, 1D is 0.0)")
 
-    def primitive(self, t, r, primitive):
+    @property
+    def polar(self):
+        return self.polar_extent > 0.0
+
+    def primitive(self, t, coord, primitive):
         ambient = self.ambient
         psi = ambient.envelope_psi
         m1 = ambient.envelope_m1
+
+        r = coord[0] if self.polar else coord
         s = min(r / t, ambient.envelope_fastest_beta)
         u = s / (1.0 - s * s) ** 0.5
         m = m1 * u ** (-1.0 / psi)
         d = ambient.comoving_mass_density(r, t)
-        p = 1e-5 * d
+        p = 1e-6 * d
 
         def u_prof(m):
             if m < self.m_shell:
@@ -105,14 +109,21 @@ class EnvelopeShock(Setup):
             else:
                 return exp(-(m / self.m_shell - 1.0) / self.w_shell)
 
-        primitive[0] = d
-        primitive[1] = u + u_prof(m) * self.u_shell
-        primitive[2] = p
+        if not self.polar:
+            primitive[0] = d
+            primitive[1] = u + u_prof(m) * self.u_shell
+            primitive[2] = p
 
-        if m > self.m_shell and m < self.m_shell * (1.0 + self.w_shell):
-            primitive[3] = 1.0
+            if m > self.m_shell and m < self.m_shell * (1.0 + self.w_shell):
+                primitive[3] = 1.0
+            else:
+                primitive[3] = 0.0
         else:
-            primitive[3] = 0.0
+            q_bar = coord[1] / self.q_shell
+            primitive[0] = d
+            primitive[1] = u + u_prof(m) * self.u_shell * exp(-(q_bar ** 2.0))
+            primitive[2] = 0.0
+            primitive[3] = p
 
     def mesh(self, num_zones_per_decade):
         return LogSphericalMesh(
@@ -120,11 +131,16 @@ class EnvelopeShock(Setup):
             r1=self.r_outer,
             num_zones_per_decade=num_zones_per_decade,
             scale_factor_derivative=(1.0 / self.t_start) if self.expand else None,
+            polar_grid=self.polar,
+            polar_extent=self.polar_extent * pi,
         )
 
     @property
     def solver(self):
-        return "srhd_1d"
+        if not self.polar:
+            return "srhd_1d"
+        else:
+            return "srhd_2d"
 
     @property
     def start_time(self):
@@ -132,7 +148,7 @@ class EnvelopeShock(Setup):
 
     @property
     def boundary_condition(self):
-        return "outflow", "outflow"
+        return "outflow"
 
     @property
     def default_end_time(self):

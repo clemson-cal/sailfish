@@ -266,10 +266,10 @@ def validate_types(args, spec, symbol, xp):
 
     for n, (arg, (typename, argname, constraint)) in enumerate(zip(args, spec)):
         if typename == "int":
-            if type(arg) is not int:
+            if type(arg) not in [int, xp.int32]:
                 raise type_error(symbol, n, arg, "int")
         elif typename == "double":
-            if type(arg) is not float:
+            if type(arg) not in [float, xp.float64]:
                 raise type_error(symbol, n, arg, "float64")
         elif typename == "double*":
             if type(arg) is not xp.ndarray:

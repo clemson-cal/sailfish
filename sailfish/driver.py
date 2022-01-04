@@ -323,6 +323,7 @@ def simulate(driver):
             time=solver.time,
             solution=solver.solution,
             primitive=solver.primitive,
+            solver=setup.solver,
             solver_options=solver.options,
             event_states=event_states,
             driver=driver,
@@ -351,7 +352,7 @@ def simulate(driver):
                 solver.advance(dt)
                 iteration += 1
 
-        Mzps = driver.resolution / fold_time() * 1e-6 * fold
+        Mzps = mesh.num_total_zones / fold_time() * 1e-6 * fold
         main_logger.info(
             f"[{iteration:04d}] t={solver.time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )
@@ -575,12 +576,17 @@ def main():
 
         else:
             driver = DriverArgs.from_namespace(args)
+            outdir = (
+                args.output_directory
+                or (driver.chkpt_file and os.path.dirname(driver.chkpt_file))
+                or "."
+            )
 
             for name, number, state in simulate(driver):
                 if name == "checkpoint":
-                    write_checkpoint(number, args.output_directory, state)
+                    write_checkpoint(number, outdir, state)
                 elif name == "end":
-                    write_checkpoint("final", args.output_directory, state)
+                    write_checkpoint("final", outdir, state)
                 else:
                     logger.warning(f"unrecognized event {name}")
 
