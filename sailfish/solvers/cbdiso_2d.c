@@ -123,12 +123,13 @@ PRIVATE void point_mass_source_term(
     double mdot = sigma * sink_rate * -1.0;
 
     switch (mass->model) {
-        case 1: //AccelerationFree:
+        case 1: //AccelerationFree
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
             break;
-        case 2: //TorqueFree: {
+        case 2: //TorqueFree
+        {}
             double vx        = prim[1];
             double vy        = prim[2];
             double vx0       = mass->vx;
@@ -143,7 +144,7 @@ PRIVATE void point_mass_source_term(
             delta_cons[2] = dt * mdot * vystar + dt * fy;
             break;
         }
-        case 3: //ForceFree:
+        case 3: //ForceFree
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * fx;
             delta_cons[2] = dt * fy;
@@ -162,10 +163,7 @@ PRIVATE void point_masses_source_term(
     double y1,
     double dt,
     double *prim,
-    double h,
-    double *cons
-    int constant_softening,
-    double soft_length)
+    double *cons)
 {
     for (int p = 0; p < 2; ++p)
     {
@@ -190,7 +188,6 @@ PRIVATE double sound_speed_squared(
     double y,
     struct PointMassList *mass_list)
 {
-    return cs_squared->
     switch (model)
     {
         case 1: //Isothermal
@@ -381,7 +378,7 @@ PRIVATE void riemann_hlle(
 // ============================ PUBLIC API ====================================
 // ============================================================================
 
-PUBLIC cbdgam_2d_advance_rk(
+PUBLIC void cbdiso_advance_rk(
     int ni,
     int nj,
     double patch_xl, //Mesh
@@ -484,20 +481,20 @@ PUBLIC cbdgam_2d_advance_rk(
         int nrl = (i + 1 + ng) * si + (j - 1 + ng) * sj;
         int nrr = (i + 1 + ng) * si + (j + 1 + ng) * sj;
 
-        double *un = conserved_rk[ncc];
-        double *pcc = primitive_rd[ncc];
-        double *pli = primitive_rd[nli];
-        double *pri = primitive_rd[nri];
-        double *plj = primitive_rd[nlj];
-        double *prj = primitive_rd[nrj];
-        double *pki = primitive_rd[nki];
-        double *pti = primitive_rd[nti];
-        double *pkj = primitive_rd[nkj];
-        double *ptj = primitive_rd[ntj];
-        double *pll = primitive_rd[nll];
-        double *plr = primitive_rd[nlr];
-        double *prl = primitive_rd[nrl];
-        double *prr = primitive_rd[nrr];
+        double *un = &conserved_rk[ncc];
+        double *pcc = &primitive_rd[ncc];
+        double *pli = &primitive_rd[nli];
+        double *pri = &primitive_rd[nri];
+        double *plj = &primitive_rd[nlj];
+        double *prj = &primitive_rd[nrj];
+        double *pki = &primitive_rd[nki];
+        double *pti = &primitive_rd[nti];
+        double *pkj = &primitive_rd[nkj];
+        double *ptj = &primitive_rd[ntj];
+        double *pll = &primitive_rd[nll];
+        double *plr = &primitive_rd[nlr];
+        double *prl = &primitive_rd[nrl];
+        double *prr = &primitive_rd[nrr];
 
         double plip[NCONS];
         double plim[NCONS];
@@ -589,7 +586,7 @@ PUBLIC cbdgam_2d_advance_rk(
             ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
         }
-        double *pout = primitive_wr[ncc];
+        double *pout = &primitive_wr[ncc];
         conserved_to_primitive(ucc, pout, velocity_ceiling);
 
     }
@@ -649,11 +646,11 @@ PUBLIC void iso2d_point_mass_source_term(
 
     struct Pointmass pointmass;
     if (which_mass == 1) {
-        struct p = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
+        struct PointMass p = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
         pointmass = p;
     }
     if (which_mass == 2) {
-        struct p = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
+        struct PointMass p = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
         pointmass = p;
     }
 
@@ -677,7 +674,7 @@ PUBLIC void iso2d_point_mass_source_term(
 }
 
 
-PUBLIC cbdgam_2d_wavespeed(
+PUBLIC cbdiso_wavespeed(
     int ni, //mesh
     int nj,
     double patch_xl,
@@ -687,9 +684,29 @@ PUBLIC cbdgam_2d_wavespeed(
     double soundspeed2, //equation of state
     double mn2,
     int model,
+    double x1, // PointMass*2
+    double y1,
+    double vx1,
+    double vy1,
+    double mass1,
+    double rate1,
+    double radius1,
+    int model1,
+    double x2,
+    double y2,
+    double vx2,
+    double vy2,
+    double mass2,
+    double rate2,
+    double radius2,
+    int model2,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
     double *wavespeed) // :: $.shape == (ni + 4, nj + 4)
 {
+    struct PointMass pointmass1 = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
+    struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
+    struct PointMassList mass_list = {{pointmass1, pointmass2}};
+    
     int ng = 2; // number of guard zones
     int si = NCONS * (nj + 2 * ng);
     int sj = NCONS;
@@ -707,7 +724,7 @@ PUBLIC cbdgam_2d_wavespeed(
         double y = patch_yl + (j + 0.5) * dy;
 
         double *pc = &primitive[np];
-        double cs2 = sound_speed_squared(soundspeed2, mn2, model, x, y, pc);
+        double cs2 = sound_speed_squared(soundspeed2, mn2, model, x, y, &mass_list);
         double a = primitive_max_wavespeed(pc, cs2);
         wavespeed[na] = a;
     }
