@@ -4,7 +4,7 @@ MODULE: srhd_2d
 AUTHOR: Jonathan Zrake
 
 DESCRIPTION:
-  Solves relativistic hydrodynamics in 2D spherical-polar.
+  Solves relativistic hydrodynamics in 2D spherical-polar coordinates.
 */
 
 
@@ -55,15 +55,15 @@ PRIVATE double primitive_to_lorentz_factor(const double *prim)
     return sqrt(1.0 + primitive_to_gamma_beta_squared(prim));
 }
 
-PRIVATE double primitive_to_gamma_beta_component(const double *prim, int direction)
-{
-    switch (direction)
-    {
-        case 1: return prim[1];
-        case 2: return prim[2];
-    }
-    return 0.0;
-}
+// PRIVATE double primitive_to_gamma_beta_component(const double *prim, int direction)
+// {
+//     switch (direction)
+//     {
+//         case 1: return prim[1];
+//         case 2: return prim[2];
+//     }
+//     return 0.0;
+// }
 
 PRIVATE double primitive_to_beta_component(const double *prim, int direction)
 {
@@ -102,13 +102,13 @@ PRIVATE void primitive_to_conserved(const double *prim, double *cons, double dv)
     // cons[4] = dv * m * prim[3];
 }
 
-PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, double r, double q)
+PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, double x, double q)
 {
     const double newton_iter_max = 500;
     const double error_tolerance = 1e-12 * (cons[0] + cons[3]) / dv;
     const double gm              = ADIABATIC_GAMMA;
     const double m               = cons[0] / dv;
-    const double tau             = cons[2] / dv;
+    const double tau             = cons[3] / dv;
     const double s1              = cons[1] / dv;
     const double s2              = cons[2] / dv;
     const double ss              = s1 * s1 + s2 * s2;
@@ -139,39 +139,39 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
     }
 
     prim[0] = m / w0;
-    prim[1] = w0 * cons[1] / dv / (tau + m + p);
-    prim[2] = w0 * cons[2] / dv / (tau + m + p);
+    prim[1] = w0 * s1 / (tau + m + p);
+    prim[2] = w0 * s2 / (tau + m + p);
     prim[3] = p;
     // prim[4] = cons[4] / cons[0];
 
-    double mach_ceiling = 100.0;
-    double u = prim[1];
+    double mach_ceiling = 1e6;
+    double u_squared = prim[1] * prim[1] + prim[2] * prim[2];
     double e = prim[3] / prim[0] * 3.0;
-    double emin = u * u / (1.0 + u * u) / pow(mach_ceiling, 2.0);
+    double emin = u_squared / (1.0 + u_squared) / pow(mach_ceiling, 2.0);
 
     if (e < emin) {
         prim[3] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
-        primitive_to_conserved(prim, cons, dv);
+        // primitive_to_conserved(prim, cons, dv);
     }
 
     #if (EXEC_MODE != EXEC_GPU)
     if (iteration == newton_iter_max) {
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive reached max "
-            "iteration at position (%.3f %.3f) "
-            "cons = [%.3e %.3e %.3e %.3e] error = %.3e\n", r, q, cons[0], cons[1], cons[2], cons[3], f);
+            "iteration at comoving position (%.3f %.3f) "
+            "cons = [%.3e %.3e %.3e %.3e] error = %.3e\n", x, q, cons[0], cons[1], cons[2], cons[3], f);
         exit(1);
     }
     if (cons[3] <= 0.0) {
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive found non-positive "
-            "or NaN total energy tau=%.5e at position (%.3f %.3f)\n", cons[3], r, q);
+            "or NaN total energy tau=%.5e at comoving position (%.3f %.3f)\n", cons[3], x, q);
         exit(1);
     }
     if (prim[3] <= 0.0 || prim[3] != prim[3]) {
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive found non-positive "
-            "or NaN pressure p=%.5e at position (%.3f %.3f)\n", prim[3], r, q);
+            "or NaN pressure p=%.5e at comoving position (%.3f %.3f)\n", prim[3], x, q);
         exit(1);
     }
     #endif
@@ -199,16 +199,28 @@ PRIVATE double primitive_to_sound_speed_squared(const double *prim)
 
 PRIVATE void primitive_to_outer_wavespeeds(const double *prim, double *wavespeeds, int direction)
 {
-    const double a2 = primitive_to_sound_speed_squared(prim);
-    const double un = primitive_to_gamma_beta_component(prim, direction);
-    const double uu = primitive_to_gamma_beta_squared(prim);
-    const double vv = uu / (1.0 + uu);
-    const double v2 = un * un / (1.0 + uu);
-    const double vn = sqrt(v2);
-    const double k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
+    double a2 = primitive_to_sound_speed_squared(prim);
+    double uu = primitive_to_gamma_beta_squared(prim);
+    double vn = primitive_to_beta_component(prim, direction);
+    double vv = uu / (1.0 + uu);
+    double v2 = vn * vn;
+    double k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
 
     wavespeeds[0] = (vn * (1.0 - a2) - k0) / (1.0 - vv * a2);
     wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
+}
+
+PRIVATE void primitive_with_radial_boost(const double *prim, double *prim_boosted, double beta)
+{
+    double gw = 1.0 / sqrt(1.0 - beta * beta);
+    double u0 = primitive_to_lorentz_factor(prim);
+    double u1 = prim[1];
+    double u2 = prim[2];
+
+    prim_boosted[0] = prim[0];
+    prim_boosted[1] = u1 * gw - u0 * gw * beta;
+    prim_boosted[2] = u2;
+    prim_boosted[3] = prim[3];
 }
 
 PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux, int direction)
@@ -260,19 +272,18 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, dou
 // ============================================================================
 PRIVATE double face_area(double r0, double r1, double q0, double q1)
 {
-    double s0 = r0 * sin(q0);
-    double s1 = r1 * sin(q1);
+    double R0 = r0 * sin(q0);
+    double R1 = r1 * sin(q1);
     double z0 = r0 * cos(q0);
     double z1 = r1 * cos(q1);
-    double ds = s1 - s0;
+    double dR = R1 - R0;
     double dz = z1 - z0;
-    return 0.5 * (s0 + s1) * sqrt(ds * ds + dz * dz);
+    return M_PI * (R0 + R1) * sqrt(dR * dR + dz * dz);
 }
 
 PRIVATE double cell_volume(double r0, double r1, double q0, double q1)
 {
-    double dcost = -(cos(q1) - cos(q0));
-    return (pow(r1, 3.0) - pow(r0, 3.0)) / 3.0 * dcost;
+    return -(r1 * r1 * r1 - r0 * r0 * r0) * (cos(q1) - cos(q0)) * 2.0 * M_PI / 3.0;
 }
 
 PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, const double *prim, double *source)
@@ -291,8 +302,8 @@ PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, 
     // over the cell volume with finite radial and polar extent.
     // 
     // https://iopscience.iop.org/article/10.1086/500792/pdf
-    double srdot = -0.5 * dr2 * dcosq * (rhoh * (uq * uq + up * up) + 2 * pg);
-    double sqdot = +0.5 * dr2 * (dcosq * rhoh * ur * uq + dsinq * (pg + rhoh * up * up));
+    double srdot = -M_PI * dr2 * dcosq * (rhoh * (uq * uq + up * up) + 2 * pg);
+    double sqdot = +M_PI * dr2 * (dcosq * rhoh * ur * uq + dsinq * (pg + rhoh * up * up));
 
     source[0] = 0.0;
     source[1] = srdot;
@@ -307,24 +318,27 @@ PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, 
 
 
 /**
- * Converts an array of primitive data to an array of conserved data.
+ * Converts an array of primitive data to an array of conserved data. Note:
+ * unlike srhd_1d_conserved_to_primitive, this function assumes there no guard
+ * zones on the input or output arrays. This is to be consistent with how this
+ * function is used by the Python solver class.
  */
 PUBLIC void srhd_2d_primitive_to_conserved(
     int ni,
     int nj,
-    double *face_positions,  // :: $.shape == (ni + 1)
-    double *primitive,       // :: $.shape == (ni + 4, nj, 4)
-    double *conserved,       // :: $.shape == (ni + 4, nj, 4)
-    double scale_factor)     // :: $ > 0.0
+    double *face_positions,  // :: $.shape == (ni + 1,)
+    double *primitive,       // :: $.shape == (ni, nj, 4)
+    double *conserved,       // :: $.shape == (ni, nj, 4)
+    double polar_extent,
+    double scale_factor)     // :: $ >= 0.0
 {
-    int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = M_PI / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {
-        int n = (i + ng) * si + j * sj;
+        int n = i * si + j * sj;
         double *p = &primitive[n];
         double *u = &conserved[n];
         double x0 = face_positions[i];
@@ -345,15 +359,16 @@ PUBLIC void srhd_2d_primitive_to_conserved(
 PUBLIC void srhd_2d_conserved_to_primitive(
     int ni,
     int nj,
-    double *face_positions,  // :: $.shape == (ni + 1)
+    double *face_positions,  // :: $.shape == (ni + 1,)
     double *conserved,       // :: $.shape == (ni + 4, nj, 4)
     double *primitive,       // :: $.shape == (ni + 4, nj, 4)
-    double scale_factor)     // :: $ > 0.0
+    double polar_extent,
+    double scale_factor)     // :: $ >= 0.0
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = M_PI / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {
@@ -367,7 +382,41 @@ PUBLIC void srhd_2d_conserved_to_primitive(
         double q0 = dq * (j + 0);
         double q1 = dq * (j + 1);
         double dv = cell_volume(r0, r1, q0, q1);
-        conserved_to_primitive(u, p, dv, r0, q0);
+        conserved_to_primitive(u, p, dv, x0, q0);
+    }
+}
+
+
+/**
+ * Computes the maximum wavespeed in each zone.
+ */
+PUBLIC void srhd_2d_max_wavespeeds(
+    int ni,
+    int nj,
+    double *face_positions,  // :: $.shape == (ni + 1,)
+    double *primitive,       // :: $.shape == (ni + 4, nj, 4)
+    double *wavespeed,       // :: $.shape == (ni, nj)
+    double adot)             // :: $ >= 0.0
+{
+    int ng = 2; // number of guard zones in the radial direction
+    int si = NCONS * nj;
+    int sj = NCONS;
+    int ti = nj;
+    int tj = 1;
+
+    FOR_EACH_2D(ni, nj)
+    {
+        double *p = &primitive[(i + ng) * si + j * sj];
+        double *a = &wavespeed[(i +  0) * ti + j * tj];
+        double x0 = face_positions[i];
+        double x1 = face_positions[i + 1];
+        double p_boosted[NCONS];
+        double ai[2];
+        double aj[2];
+        primitive_with_radial_boost(p, p_boosted, 0.5 * (x0 + x1) * adot);
+        primitive_to_outer_wavespeeds(p_boosted, ai, 1);
+        primitive_to_outer_wavespeeds(p_boosted, aj, 2);
+        *a = max2(max2(fabs(ai[0]), fabs(ai[1])), max2(fabs(aj[0]), fabs(aj[1])));
     }
 }
 
@@ -377,24 +426,24 @@ PUBLIC void srhd_2d_conserved_to_primitive(
  * step.
  */
 PUBLIC void srhd_2d_advance_rk(
-    int ni,          // number of zones, not including guard zones
+    int ni,
     int nj,
     double *face_positions, // :: $.shape == (ni + 1,)
-    double *conserved_rk,   // :: $.shape == (ni + 4, 4)
-    double *primitive_rd,   // :: $.shape == (ni + 4, 4)
-    double *conserved_rd,   // :: $.shape == (ni + 4, 4)
-    double *conserved_wr,   // :: $.shape == (ni + 4, 4)
+    double *conserved_rk,   // :: $.shape == (ni + 4, nj, 4)
+    double *primitive_rd,   // :: $.shape == (ni + 4, nj, 4)
+    double *conserved_rd,   // :: $.shape == (ni + 4, nj, 4)
+    double *conserved_wr,   // :: $.shape == (ni + 4, nj, 4)
+    double polar_extent,
     double a0,              // scale factor at t=0
     double adot,            // scale factor derivative
     double time,            // current time
     double rk_param,        // runge-kutta parameter
-    double dt,              // timestep size
-    int coords)             // :: $ in [0, 1]
+    double dt)              // timestep size
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = M_PI / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {
@@ -466,7 +515,7 @@ PUBLIC void srhd_2d_advance_rk(
         riemann_hlle(prim, prip, x1 * adot, fri, 1);
         riemann_hlle(pljm, pljp, 0.0, flj, 2);
         riemann_hlle(prjm, prjp, 0.0, frj, 2);
-        geometric_source_terms(x0, x1, q0, q1, pcc, sources);
+        geometric_source_terms(r0, r1, q0, q1, pcc, sources);
 
         for (int q = 0; q < NCONS; ++q)
         {

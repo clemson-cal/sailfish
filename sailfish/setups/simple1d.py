@@ -34,9 +34,6 @@ class Advection(Setup):
     def default_end_time(self):
         return 1.0
 
-    def validate(self):
-        pass
-
 
 class Burgers(Setup):
     """
@@ -66,9 +63,6 @@ class Burgers(Setup):
     @property
     def default_end_time(self):
         return 1.0
-
-    def validate(self):
-        pass
 
 
 class Shocktube(Setup):
