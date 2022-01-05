@@ -3,73 +3,11 @@ Contains a setup for studying a relativistic type-II shockwave.
 """
 
 from math import pi, exp, log10
-from typing import NamedTuple
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
 
-try:
-    from functools import cached_property
-except ImportError:
-    # revert to ordinary property on Python < 3.8
-    cached_property = property
 
-__all__ = ["EnvelopeShock", "RelativisticEnvelope"]
-
-
-ZONE_ENVELOPE = 0
-ZONE_WIND = 1
-
-
-class RelativisticEnvelope(NamedTuple):
-    """
-    Describes a homologous expanding medium with power-law mass coordinate.
-    """
-
-    envelope_m1: float
-    """ Mass coordinate of the u=1 shell """
-
-    envelope_slowest_beta: float
-    """ Beta (v/c) of the slowest envelope shell """
-
-    envelope_fastest_beta: float
-    """ Beta (v/c) of the outer shell """
-
-    envelope_psi: float
-    """ Index psi in u(m) ~ m^-psi """
-
-    wind_mdot: float
-    """ The mass loss rate for the wind """
-
-    def zone(self, r: float, t: float) -> int:
-        v_min = self.envelope_slowest_beta
-        r_wind_envelop_interface = v_min * t
-
-        if r > r_wind_envelop_interface:
-            return ZONE_ENVELOPE
-        else:
-            return ZONE_WIND
-
-    def gamma_beta(self, r: float, t: float) -> float:
-        if self.zone(r, t) == ZONE_WIND:
-            return self.envelope_slowest_u()
-
-        if self.zone(r, t) == ZONE_ENVELOPE:
-            b = min(r / t, self.envelope_fastest_beta)
-            u = b / (1.0 - b * b) ** 0.5
-            return u
-
-    def mass_rate_per_steradian(self, r: float, t: float) -> float:
-        if self.zone(r, t) == ZONE_WIND:
-            return self.wind_mdot
-
-        if self.zone(r, t) == ZONE_ENVELOPE:
-            y = self.envelope_psi
-            s = min(r / t, self.envelope_fastest_beta)
-            f = s ** (-1.0 / y) * (1.0 - s * s) ** (0.5 / y - 1.0)
-            return self.envelope_m1 / (4.0 * pi * y * t) * f
-
-    def comoving_mass_density(self, r: float, t: float) -> float:
-        return self.mass_rate_per_steradian(r, t) / (self.gamma_beta(r, t) * r * r)
+__all__ = ["EnvelopeShock"]
 
 
 class EnvelopeShock(Setup):
@@ -92,15 +30,16 @@ class EnvelopeShock(Setup):
         return self.polar_extent > 0.0
 
     def primitive(self, t, coord, primitive):
-        ambient = self.ambient
-        psi = ambient.envelope_psi
-        m1 = ambient.envelope_m1
+        envelope_fastest_beta = 0.999
+        psi = 0.25
+        m1 = 1.0
 
         r = coord[0] if self.polar else coord
-        s = min(r / t, ambient.envelope_fastest_beta)
-        u = s / (1.0 - s * s) ** 0.5
+        s = min(r / t, envelope_fastest_beta)
+        g = (1.0 - s * s) ** -0.5
+        u = s * g
         m = m1 * u ** (-1.0 / psi)
-        d = ambient.comoving_mass_density(r, t)
+        d = m * g / (4 * pi * r ** 3 * psi)
         p = 1e-6 * d
 
         def u_prof(m):
@@ -161,23 +100,91 @@ class EnvelopeShock(Setup):
         else:
             return 20000
 
-    def r_shell(self) -> float:
-        u = self.m_shell ** -0.25
-        s = u / (1.0 + u * u) ** 0.5
-        return self.t_start * s
 
-    @cached_property
-    def ambient(self):
-        return RelativisticEnvelope(
-            envelope_m1=1.0,
-            envelope_fastest_beta=0.999,
-            envelope_slowest_beta=0.00,
-            envelope_psi=0.25,
-            wind_mdot=100.0,
-        )
+# ---------------------------------------------------------
+# Code below can probably be removed
+# ---------------------------------------------------------
+#
+# from typing import NamedTuple
+# try:
+#     from functools import cached_property
+# except ImportError:
+#     # revert to ordinary property on Python < 3.8
+#     cached_property = property
 
-    def gamma_shell(self) -> float:
-        return (1.0 + self.u_shell ** 2) ** 0.5
+# def r_shell(self) -> float:
+#     u = self.m_shell ** -0.25
+#     s = u / (1.0 + u * u) ** 0.5
+#     return self.t_start * s
 
-    def shell_energy(self) -> float:
-        return self.w_shell * self.m_shell * (self.gamma_shell() - 1.0)
+# @cached_property
+# def ambient(self):
+#     return RelativisticEnvelope(
+#         envelope_m1=1.0,
+#         envelope_fastest_beta=0.999,
+#         envelope_slowest_beta=0.00,
+#         envelope_psi=0.25,
+#         wind_mdot=100.0,
+#     )
+
+# def gamma_shell(self) -> float:
+#     return (1.0 + self.u_shell ** 2) ** 0.5
+
+# def shell_energy(self) -> float:
+#     return self.w_shell * self.m_shell * (self.gamma_shell() - 1.0)
+
+
+# ZONE_ENVELOPE = 0
+# ZONE_WIND = 1
+
+
+# class RelativisticEnvelope(NamedTuple):
+#     """
+#     Describes a homologous expanding medium with power-law mass coordinate.
+#     """
+
+#     envelope_m1: float
+#     """ Mass coordinate of the u=1 shell """
+
+#     envelope_slowest_beta: float
+#     """ Beta (v/c) of the slowest envelope shell """
+
+#     envelope_fastest_beta: float
+#     """ Beta (v/c) of the outer shell """
+
+#     envelope_psi: float
+#     """ Index psi in u(m) ~ m^-psi """
+
+#     wind_mdot: float
+#     """ The mass loss rate for the wind """
+
+#     def zone(self, r: float, t: float) -> int:
+#         v_min = self.envelope_slowest_beta
+#         r_wind_envelop_interface = v_min * t
+
+#         if r > r_wind_envelop_interface:
+#             return ZONE_ENVELOPE
+#         else:
+#             return ZONE_WIND
+
+#     def gamma_beta(self, r: float, t: float) -> float:
+#         if self.zone(r, t) == ZONE_WIND:
+#             return self.envelope_slowest_u()
+
+#         if self.zone(r, t) == ZONE_ENVELOPE:
+#             b = min(r / t, self.envelope_fastest_beta)
+#             u = b / (1.0 - b * b) ** 0.5
+#             return u
+
+#     def mass_rate_per_steradian(self, r: float, t: float) -> float:
+#         if self.zone(r, t) == ZONE_WIND:
+#             return self.wind_mdot
+
+#         if self.zone(r, t) == ZONE_ENVELOPE:
+#             y = self.envelope_psi
+#             s = min(r / t, self.envelope_fastest_beta)
+#             f = s ** (-1.0 / y) * (1.0 - s * s) ** (0.5 / y - 1.0)
+#             return self.envelope_m1 / (4.0 * pi * y * t) * f
+
+#     def comoving_mass_density(self, r: float, t: float) -> float:
+#         return self.mass_rate_per_steradian(r, t) / (self.gamma_beta(r, t) * r * r)
