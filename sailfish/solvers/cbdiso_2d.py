@@ -48,13 +48,15 @@ class Physics(NamedTuple):
     kb_central_mass: float = 1.0
     kb_driving_rate: float = 1000.0
     kb_onset_width: float = 0.1
-    kb_mode: int = 0
+    kb_mode: int = 0 # 0: Default nothing
+                     # 1: Keplerian Buffer
     q: float = 1.0
     e: float = 0.0
     sink_rate: float = 10.0
     sink_radius: float = 0.05
-    mass_model1: int = 1
-    mass_model2: int = 1
+    mass_model1: int = 1 # 1: AccelerationFree
+    mass_model2: int = 1 # 2: TorqueFree
+                         # 3: ForceFree
     eos_model: int = 1 # 1: globally isothermal scenario 
                        # 2: locally isothermal
 
