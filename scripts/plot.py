@@ -110,6 +110,69 @@ def main_srhd_2d():
 
     plt.show()
 
+def main_cbdiso_2d():
+    import matplotlib.pyplot as plt
+    import numpy as np
+    import msgpack
+
+    fields = {
+        "dens": lambda p: 0,
+        "vx": lambda p: 1,
+        "vy": lambda p: 2,
+    }
+
+    parser = argparse.ArgumentParser()
+    parser.add_argument("checkpoints", type=str, nargs="+")
+    parser.add_argument(
+        "--field",
+        "-f",
+        type=str,
+        default="dens",
+        choices=fields.keys(),
+        help="which field to plot",
+    )
+    parser.add_argument(
+        "--log",
+        "-l",
+        default=False,
+        action="store_true",
+        help="use log scaling",
+    )
+    parser.add_argument(
+        "--vmin",
+        default=None,
+        type=float,
+        help="minimum value for colormap",
+    )
+    parser.add_argument(
+        "--vmax",
+        default=None,
+        type=float,
+        help="maximum value for colormap",
+    )
+
+    args = parser.parse_args()
+
+    for filename in args.checkpoints:
+        fig, ax = plt.subplots()
+        chkpt = load_checkpoint(filename, require_solver="cbdiso_2d")
+        mesh = chkpt["mesh"]
+        prim = chkpt["primitive"]
+        f = prim[:,:,fields[args.field](prim)].T
+        
+        if args.log:
+            f = np.log10(f)
+        
+        cm = ax.imshow(f, origin='lower',vmin=args.vmin,vmax=args.vmax, cmap='magma')
+
+        ax.set_aspect("equal")
+        # ax.set_xlim(0, 1.25)
+        # ax.set_ylim(0, 1.25)
+        fig.colorbar(cm)
+        fig.suptitle(filename)
+
+    plt.show()
+
 
 def main_srhd_1d():
     import matplotlib.pyplot as plt
@@ -149,3 +212,5 @@ if __name__ == "__main__":
                 main_srhd_1d()
             if chkpt["solver"] == "srhd_2d":
                 main_srhd_2d()
+            if chkpt["solver"] == "cbdiso_2d":
+                main_cbdiso_2d()
