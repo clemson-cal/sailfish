@@ -691,7 +691,7 @@ PUBLIC cbdgam_2d_wavespeed(
     }
 }
 
-PUBLIC cbdgam_2d_primtive_to_conserved(
+PUBLIC cbdgam_2d_primitive_to_conserved(
     int ni,
     int nj,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
