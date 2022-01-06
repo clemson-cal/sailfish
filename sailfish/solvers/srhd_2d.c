@@ -210,6 +210,19 @@ PRIVATE void primitive_to_outer_wavespeeds(const double *prim, double *wavespeed
     wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
 }
 
+PRIVATE void primitive_with_radial_boost(const double *prim, double *prim_boosted, double beta)
+{
+    double gw = 1.0 / sqrt(1.0 - beta * beta);
+    double u0 = primitive_to_lorentz_factor(prim);
+    double u1 = prim[1];
+    double u2 = prim[2];
+
+    prim_boosted[0] = prim[0];
+    prim_boosted[1] = u1 * gw - u0 * gw * beta;
+    prim_boosted[2] = u2;
+    prim_boosted[3] = prim[3];
+}
+
 PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux, int direction)
 {
     double ul[NCONS];
@@ -305,25 +318,27 @@ PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, 
 
 
 /**
- * Converts an array of primitive data to an array of conserved data.
+ * Converts an array of primitive data to an array of conserved data. Note:
+ * unlike srhd_1d_conserved_to_primitive, this function assumes there no guard
+ * zones on the input or output arrays. This is to be consistent with how this
+ * function is used by the Python solver class.
  */
 PUBLIC void srhd_2d_primitive_to_conserved(
     int ni,
     int nj,
     double *face_positions,  // :: $.shape == (ni + 1,)
-    double *primitive,       // :: $.shape == (ni + 4, nj, 4)
-    double *conserved,       // :: $.shape == (ni + 4, nj, 4)
+    double *primitive,       // :: $.shape == (ni, nj, 4)
+    double *conserved,       // :: $.shape == (ni, nj, 4)
     double polar_extent,
-    double scale_factor)     // :: $ > 0.0
+    double scale_factor)     // :: $ >= 0.0
 {
-    int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
     double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
 
     FOR_EACH_2D(ni, nj)
     {
-        int n = (i + ng) * si + j * sj;
+        int n = i * si + j * sj;
         double *p = &primitive[n];
         double *u = &conserved[n];
         double x0 = face_positions[i];
@@ -348,7 +363,7 @@ PUBLIC void srhd_2d_conserved_to_primitive(
     double *conserved,       // :: $.shape == (ni + 4, nj, 4)
     double *primitive,       // :: $.shape == (ni + 4, nj, 4)
     double polar_extent,
-    double scale_factor)     // :: $ > 0.0
+    double scale_factor)     // :: $ >= 0.0
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
@@ -368,6 +383,40 @@ PUBLIC void srhd_2d_conserved_to_primitive(
         double q1 = dq * (j + 1);
         double dv = cell_volume(r0, r1, q0, q1);
         conserved_to_primitive(u, p, dv, x0, q0);
+    }
+}
+
+
+/**
+ * Computes the maximum wavespeed in each zone.
+ */
+PUBLIC void srhd_2d_max_wavespeeds(
+    int ni,
+    int nj,
+    double *face_positions,  // :: $.shape == (ni + 1,)
+    double *primitive,       // :: $.shape == (ni + 4, nj, 4)
+    double *wavespeed,       // :: $.shape == (ni, nj)
+    double adot)             // :: $ >= 0.0
+{
+    int ng = 2; // number of guard zones in the radial direction
+    int si = NCONS * nj;
+    int sj = NCONS;
+    int ti = nj;
+    int tj = 1;
+
+    FOR_EACH_2D(ni, nj)
+    {
+        double *p = &primitive[(i + ng) * si + j * sj];
+        double *a = &wavespeed[(i +  0) * ti + j * tj];
+        double x0 = face_positions[i];
+        double x1 = face_positions[i + 1];
+        double p_boosted[NCONS];
+        double ai[2];
+        double aj[2];
+        primitive_with_radial_boost(p, p_boosted, 0.5 * (x0 + x1) * adot);
+        primitive_to_outer_wavespeeds(p_boosted, ai, 1);
+        primitive_to_outer_wavespeeds(p_boosted, aj, 2);
+        *a = max2(max2(fabs(ai[0]), fabs(ai[1])), max2(fabs(aj[0]), fabs(aj[1])));
     }
 }
 

@@ -86,6 +86,13 @@ class SolverBase(ABC):
         pass
 
     @property
+    def recommended_cfl(self):
+        """
+        Return a recommended CFL number to the driver, default to the maximum.
+        """
+        return self.maximum_cfl
+
+    @property
     @abstractmethod
     def maximum_cfl(self):
         """

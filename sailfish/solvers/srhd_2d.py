@@ -36,7 +36,7 @@ class Patch:
     def __init__(
         self,
         time,
-        primitive,
+        conserved,
         mesh,
         index_range,
         lib,
@@ -45,8 +45,8 @@ class Patch:
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
-        self.shape = (i1 - i0, mesh.shape[1])  # not including guard zones
-        self.faces = self.xp.array(mesh.faces(*index_range))
+        self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
+        self.faces = xp.array(mesh.faces(*index_range))
         self.polar_extent = mesh.polar_extent
 
         try:
@@ -60,26 +60,15 @@ class Patch:
         self.time = self.time0 = time
 
         with self.execution_context():
-            self.primitive1 = self.xp.array(primitive)
-            self.conserved0 = self.primitive_to_conserved(self.primitive1)
+            self.wavespeeds = xp.zeros(shape)
+            self.primitive1 = xp.zeros_like(conserved)
+            self.conserved0 = conserved
             self.conserved1 = self.conserved0.copy()
             self.conserved2 = self.conserved0.copy()
 
     def execution_context(self):
         """TODO: return a CUDA context for execution on the assigned device"""
         return nullcontext()
-
-    def primitive_to_conserved(self, primitive):
-        with self.execution_context():
-            conserved = self.xp.zeros_like(primitive)
-            self.lib.srhd_2d_primitive_to_conserved[self.shape](
-                self.faces,
-                primitive,
-                conserved,
-                self.polar_extent,
-                self.scale_factor,
-            )
-            return conserved
 
     def recompute_primitive(self):
         with self.execution_context():
@@ -110,12 +99,28 @@ class Patch:
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 
     @property
+    def maximum_wavespeed(self):
+        self.recompute_primitive()
+        with self.execution_context():
+            self.lib.srhd_2d_max_wavespeeds[self.shape](
+                self.faces,
+                self.primitive1,
+                self.wavespeeds,
+                self.scale_factor_derivative,
+            )
+            return self.wavespeeds.max()
+
+    @property
     def scale_factor(self):
         return self.scale_factor_initial + self.scale_factor_derivative * self.time
 
     def new_iteration(self):
         self.time0 = self.time
         self.conserved0[...] = self.conserved1[...]
+
+    @property
+    def conserved(self):
+        return self.conserved1
 
     @property
     def primitive(self):
@@ -144,7 +149,7 @@ class Solver(SolverBase):
         nq = 4  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        lib = Library(code, mode=mode, debug=True)
+        lib = Library(code, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
@@ -162,30 +167,39 @@ class Solver(SolverBase):
 
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
+            conserved = xp.zeros_like(primitive)
+            lib.srhd_2d_primitive_to_conserved[mesh.shape](
+                xp.array(mesh.faces()),
+                primitive,
+                conserved,
+                mesh.polar_extent,
+                mesh.scale_factor(time),
+            )
         else:
-            primitive = solution
+            conserved = solution
 
         for (a, b) in subdivide(mesh.shape[0], num_patches):
-            prim = xp.zeros([b - a + 2 * ng, mesh.shape[1], nq])
-            prim[ng:-ng] = primitive[a:b]
-            self.patches.append(Patch(time, prim, mesh, (a, b), lib, xp))
-
-        self.set_bc("primitive1")
+            cons = xp.zeros([b - a + 2 * ng, mesh.shape[1], nq])
+            cons[ng:-ng] = conserved[a:b]
+            self.patches.append(Patch(time, cons, mesh, (a, b), lib, xp))
 
     @property
     def solution(self):
-        return self.primitive
+        return self.reconstruct("conserved")
 
     @property
     def primitive(self):
+        return self.reconstruct("primitive")
+
+    def reconstruct(self, array):
         ni, nj = self.mesh.shape
         ng = self.num_guard
         nq = self.num_cons
         np = len(self.patches)
-        primitive = self.xp.zeros([ni, nj, nq])
+        result = self.xp.zeros([ni, nj, nq])
         for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            primitive[a:b] = patch.primitive[ng:-ng]
-        return primitive
+            result[a:b] = getattr(patch, array)[ng:-ng]
+        return result
 
     @property
     def time(self):
@@ -200,11 +214,21 @@ class Solver(SolverBase):
         return dict()
 
     @property
+    def recommended_cfl(self):
+        return 0.4
+
+    @property
     def maximum_cfl(self):
-        return 100.0
+        """
+        When the mesh is expanding, it's possible to use a CFL number
+        significantly larger than the theoretical max. I haven't seen
+        how this makes sense, but it works in practice.
+        """
+        return 16.0
 
     def maximum_wavespeed(self):
         return 1.0
+        # return max(patch.maximum_wavespeed for patch in self.patches)
 
     def advance(self, dt):
         bs_rk1 = [0 / 1]
