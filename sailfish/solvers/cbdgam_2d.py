@@ -46,7 +46,6 @@ logger = getLogger(__name__)
 
 
 class Physics(NamedTuple):
-    domain_radius: float = 12.0
     alpha: float = 0.1
     sink_rate: float = 10.0
     sink_radius: float = 0.05
@@ -57,7 +56,7 @@ class Physics(NamedTuple):
     e: float = 0.0
     gamma_law_index: float = 5.0 / 3.0
     cooling_coefficient: float = 0.0
-    constant_softening: inf = 1 # whether to use constant softening
+    constant_softening: int = 1 # whether to use constant softening
     kb_mode: int = 0 # [0,1]: [no buffer, Keplerian buffer]
 
 class Options(NamedTuple):
@@ -73,7 +72,7 @@ def initial_condition(setup, mesh, time):
     """
     import numpy as np
 
-    ni, nj = mesh.shape
+    ni, nj = mesh.shape()
     primitive = np.zeros([ni, nj, 4])
 
     for i in range(ni):
@@ -99,12 +98,16 @@ class Patch:
         options,
         lib,
         xp,
+        kb_surface_density,
+        kb_surface_pressure,
     ):
         i0, i1 = index_range
         self.lib = lib
+        self.mesh = mesh
         self.xp = xp
         self.time = self.time0 = time
-        self.shape = (i1 - i0, mesh.shape[1])  # not including guard zones
+        ni, nj = mesh.shape()
+        self.shape = (i1 - i0, nj)  # not including guard zones
         self.physics = physics
         self.options = options
         self.xl, self.yl = self.mesh.vertex_coordinates(i0, 0)
@@ -112,10 +115,8 @@ class Patch:
         self.domain_radius = abs(self.mesh.x1)
         self.kb_outer_radius = self.domain_radius
         self.kb_onset_width = 0.1
-        kb_state = self.xp.zeros((4))
-        setup.primitive(self.time, (self.domain_radius - self.kb_onset_width, 0.0), kb_state)
-        self.kb_surface_density = kb_state[0]
-        self.kb_surface_pressure = kb_state[3]
+        self.kb_surface_density = kb_surface_density
+        self.kb_surface_pressure = kb_surface_pressure
         self.kb_driving_rate = 1000.0
         self.kb_central_mass = 1.0
 
@@ -139,7 +140,7 @@ class Patch:
                 self.wavespeeds,
                 self.physics.gamma_law_index,
             )
-            return self.xp.max(self.wavespeeds[ng:-ng, ng:-ng])
+            return self.wavespeeds.max()
 
     def recompute_conserved(self):
         with self.execution_context():
@@ -252,6 +253,11 @@ class Solver(SolverBase):
         self.xp = xp
         self.patches = []
         ni, nj = mesh.shape()
+        self.domain_radius = self.mesh.x1
+        self.kb_onset_width = 0.1
+
+        kb_state = self.xp.zeros((4))
+        setup.primitive(time, [self.domain_radius - self.kb_onset_width, 0.0], kb_state)
 
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
@@ -262,7 +268,7 @@ class Solver(SolverBase):
             prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
             self.patches.append(
-                Patch(time, prim, mesh, (a, b), self._physics, self._options, lib, xp)
+                Patch(time, prim, mesh, (a, b), self._physics, self._options, lib, xp, kb_state[0], kb_state[3])
             )
 
         self.set_bc("primitive1")

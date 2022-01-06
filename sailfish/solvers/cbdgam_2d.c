@@ -532,20 +532,20 @@ PUBLIC cbdgam_2d_advance_rk(
         int nrl = (i + 1 + ng) * si + (j - 1 + ng) * sj;
         int nrr = (i + 1 + ng) * si + (j + 1 + ng) * sj;
 
-        double *un = conserved_rk[ncc];
-        double *pcc = primitive_rd[ncc];
-        double *pli = primitive_rd[nli];
-        double *pri = primitive_rd[nri];
-        double *plj = primitive_rd[nlj];
-        double *prj = primitive_rd[nrj];
-        double *pki = primitive_rd[nki];
-        double *pti = primitive_rd[nti];
-        double *pkj = primitive_rd[nkj];
-        double *ptj = primitive_rd[ntj];
-        double *pll = primitive_rd[nll];
-        double *plr = primitive_rd[nlr];
-        double *prl = primitive_rd[nrl];
-        double *prr = primitive_rd[nrr];
+        double *un = &conserved_rk[ncc];
+        double *pcc = &primitive_rd[ncc];
+        double *pli = &primitive_rd[nli];
+        double *pri = &primitive_rd[nri];
+        double *plj = &primitive_rd[nlj];
+        double *prj = &primitive_rd[nrj];
+        double *pki = &primitive_rd[nki];
+        double *pti = &primitive_rd[nti];
+        double *pkj = &primitive_rd[nkj];
+        double *ptj = &primitive_rd[ntj];
+        double *pll = &primitive_rd[nll];
+        double *plr = &primitive_rd[nlr];
+        double *prl = &primitive_rd[nrl];
+        double *prr = &primitive_rd[nrr];
 
         double plip[NCONS];
         double plim[NCONS];
@@ -660,7 +660,7 @@ PUBLIC cbdgam_2d_advance_rk(
             ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
         }
-        double *pout = primitive_wr[ncc];
+        double *pout = &primitive_wr[ncc];
         conserved_to_primitive(ucc, pout, velocity_ceiling, density_floor, pressure_floor, gamma_law_index);
 
     }
@@ -746,13 +746,13 @@ PUBLIC cbdgam_2d_point_mass_source_term(
     struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
     struct PointMassList mass_list = {{pointmass1, pointmass2}};
 
-    struct Pointmass pointmass;
+    struct PointMass pointmass;
     if (which_mass == 1) {
-        struct p = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
+        struct PointMass p = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
         pointmass = p;
     }
     if (which_mass == 2) {
-        struct p = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
+        struct PointMass p = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
         pointmass = p;
     }
 
