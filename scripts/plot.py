@@ -86,8 +86,8 @@ def main_srhd_2d():
         f = fields[args.field](prim).T
 
         if args.radial_coordinates == "comoving":
-            x /= mesh.scale_factor(t)
-            z /= mesh.scale_factor(t)
+            x[...] /= mesh.scale_factor(t)
+            z[...] /= mesh.scale_factor(t)
 
         if args.log:
             f = np.log10(f)
