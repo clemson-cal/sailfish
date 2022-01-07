@@ -10,6 +10,10 @@ EOS_TYPE_GLOBALLY_ISOTHERMAL = 1
 EOS_TYPE_LOCALLY_ISOTHERMAL = 2
 EOS_TYPE_GAMMA_LAW = 3
 
+VISCOSITY_MODEL_NONE = 0
+VISCOSITY_MODEL_CONSTANT_NU = 1
+VISCOSITY_MODEL_CONSTANT_ALPHA = 2
+
 
 class PointMass(NamedTuple):
     r"""
@@ -136,8 +140,14 @@ class Physics(NamedTuple):
     gamma_law_index: float = 5.0 / 3.0
     """ Adiabatic index, if the EOS type is globally isothermal """
 
+    viscosity_model: int = VISCOSITY_MODEL_NONE
+    """ Which viscosity model to use (none, nu, alpha) """
+
     viscosity_coefficient: float = 0.0
-    """ Kinematic viscosity value, in units of a^2 Omega """
+    """ Kinematic viscosity value (a^2 Omega) if viscosity is nu """
+
+    alpha: float = 0.0
+    """ Alpha parameter, if viscosity model is alpha """
 
     buffer_is_enabled: bool = False
     """ Whether the buffer zone is enabled """
@@ -150,6 +160,12 @@ class Physics(NamedTuple):
 
     point_mass_function: Callable[float, List[PointMass]] = None
     """ Callback function to supply point masses as a function of time """
+
+    cooling_coefficient: float = 0.0
+    """ Strength of the cooling term """
+
+    constant_softening: bool = True
+    """ If local disk height is ignored in gravitational softening """
 
     def point_masses(self, time):
         """

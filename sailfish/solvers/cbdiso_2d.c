@@ -1,8 +1,7 @@
 /*
 MODULE: cbdiso_2d
 
-DESCRIPTION:
-  Isothermal solver for a binary accretion problem in 2D planar
+DESCRIPTION: Isothermal solver for a binary accretion problem in 2D planar
   cartesian coordinates.
 */
 
@@ -106,27 +105,22 @@ PRIVATE void point_mass_source_term(
 {
     double x0 = mass->x;
     double y0 = mass->y;
-    double mp = mass->mass;
-    double rs = mass->softening_length;
     double sigma = prim[0];
-
     double dx = x1 - x0;
     double dy = y1 - y0;
     double r2 = dx * dx + dy * dy;
-    double r2_softened = r2 + rs * rs;
     double dr = sqrt(r2);
-    double mag = sigma * mp * pow(r2_softened, -1.5);
-    double fx = -mag * dx;
-    double fy = -mag * dy;
-    double sink_rate = 0.0;
+    double r_sink = mass->sink_radius;
+    double r_soft = mass->softening_length;
 
-    if (dr < 4.0 * rs)
-    {
-        sink_rate = mass->sink_rate * exp(-pow(dr / rs, 4.0));
-    }
+    double fgrav_numerator = sigma * mass->mass * pow(r2 + r_soft * r_soft, -1.5);
+    double fx = -fgrav_numerator * dx;
+    double fy = -fgrav_numerator * dy;
+    double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
     double mdot = sigma * sink_rate * -1.0;
 
-    switch (mass->sink_model) {
+    switch (mass->sink_model)
+    {
         case 1: // acceleration-free
         {
             delta_cons[0] = dt * mdot;
@@ -136,15 +130,15 @@ PRIVATE void point_mass_source_term(
         }
         case 2: // torque-free
         {
-            double vx        = prim[1];
-            double vy        = prim[2];
-            double vx0       = mass->vx;
-            double vy0       = mass->vy;
-            double rhatx     = dx / (dr + 1e-12);
-            double rhaty     = dy / (dr + 1e-12);
+            double vx = prim[1];
+            double vy = prim[2];
+            double vx0 = mass->vx;
+            double vy0 = mass->vy;
+            double rhatx = dx / (dr + 1e-12);
+            double rhaty = dy / (dr + 1e-12);
             double dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
-            double vxstar    = dvdotrhat * rhatx + vx0;
-            double vystar    = dvdotrhat * rhaty + vy0;
+            double vxstar = dvdotrhat * rhatx + vx0;
+            double vystar = dvdotrhat * rhaty + vy0;
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * vxstar + dt * fx;
             delta_cons[2] = dt * mdot * vystar + dt * fy;
@@ -234,7 +228,8 @@ PRIVATE void buffer_source_term(
             double u0[NCONS] = {surface_density, px, py};
 
             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-            double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+            // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+            double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -383,7 +378,7 @@ PRIVATE void riemann_hlle(
 PUBLIC void cbdiso_advance_rk(
     int ni,
     int nj,
-    double patch_xl, //Mesh
+    double patch_xl, // mesh
     double patch_xr,
     double patch_yl,
     double patch_yr,
@@ -559,27 +554,29 @@ PUBLIC void cbdiso_advance_rk(
         riemann_hlle(pljm, pljp, flj, cs2lj, 1);
         riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-        double sli[4];
-        double sri[4];
-        double slj[4];
-        double srj[4];
-        double scc[4];
+        if (nu > 0.0)
+        {
+            double sli[4];
+            double sri[4];
+            double slj[4];
+            double srj[4];
+            double scc[4];
 
-        shear_strain(gxli, gyli, dx, dy, sli);
-        shear_strain(gxri, gyri, dx, dy, sri);
-        shear_strain(gxlj, gylj, dx, dy, slj);
-        shear_strain(gxrj, gyrj, dx, dy, srj);
-        shear_strain(gxcc, gycc, dx, dy, scc);
+            shear_strain(gxli, gyli, dx, dy, sli);
+            shear_strain(gxri, gyri, dx, dy, sri);
+            shear_strain(gxlj, gylj, dx, dy, slj);
+            shear_strain(gxrj, gyrj, dx, dy, srj);
+            shear_strain(gxcc, gycc, dx, dy, scc);
 
-        fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-        fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-        fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-        fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-        flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-        flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-        frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-        frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
-
+            fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+            fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+            fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+            fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+            flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+            flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+            frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+            frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+        }
         primitive_to_conserved(pcc, ucc);
         buffer_source_term(&buffer, xc, yc, dt, ucc);
         point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
@@ -591,7 +588,6 @@ PUBLIC void cbdiso_advance_rk(
         }
         double *pout = &primitive_wr[ncc];
         conserved_to_primitive(ucc, pout, velocity_ceiling);
-
     }
 }
 

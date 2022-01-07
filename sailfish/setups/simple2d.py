@@ -95,7 +95,7 @@ class CylindricalExplosion(Setup):
 
     @property
     def default_end_time(self):
-        return 0.1
+        return 0.3
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:

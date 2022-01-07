@@ -8,7 +8,7 @@ from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.mesh import PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import PointMass, Physics
+from sailfish.physics.circumbinary import Physics
 from sailfish.solver import SolverBase
 from sailfish.subdivide import subdivide
 

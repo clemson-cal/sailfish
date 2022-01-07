@@ -1,63 +1,21 @@
 """
-Two-dimensional vertically integrated hydro with gamma-law EOS
-
-This solver is still a work-in-progress.
-
-Fill in more details about the physics here:
+Energy-conserving solver for the binary accretion problem in 2D.
 """
 
 from typing import NamedTuple
 from logging import getLogger
 from typing import NamedTuple
+from contextlib import nullcontext
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.solver import SolverBase
-from sailfish.physics.kepler import OrbitalElements
+from sailfish.physics.circumbinary import Physics
 
-try:
-    from contextlib import nullcontext
-
-except ImportError:
-    from contextlib import AbstractContextManager
-
-    class nullcontext(AbstractContextManager):
-        """
-        Scraped from contextlib source in Python >= 3.7 for backwards compatibility.
-        """
-
-        def __init__(self, enter_result=None):
-            self.enter_result = enter_result
-
-        def __enter__(self):
-            return self.enter_result
-
-        def __exit__(self, *excinfo):
-            pass
-
-        async def __aenter__(self):
-            return self.enter_result
-
-        async def __aexit__(self, *excinfo):
-            pass
 
 logger = getLogger(__name__)
 
-
-class Physics(NamedTuple):
-    alpha: float = 0.1
-    sink_rate: float = 10.0
-    sink_radius: float = 0.05
-    mass_model1: int = 1 # [0,1,2,3]: [Inactive, AccelerationFree, TorqueFree, ForceFree]
-    mass_model2: int = 1
-    soft_length: float = 0.05
-    q: float = 1.0
-    e: float = 0.0
-    gamma_law_index: float = 5.0 / 3.0
-    cooling_coefficient: float = 0.0
-    constant_softening: int = 1 # whether to use constant softening
-    kb_mode: int = 0 # [0,1]: [no buffer, Keplerian buffer]
 
 class Options(NamedTuple):
     pressure_floor: float = 1e-12
@@ -96,32 +54,26 @@ class Patch:
         index_range,
         physics,
         options,
-        kb_surface_density,
-        kb_surface_pressure,
+        buffer_outer_radius,
+        buffer_surface_density,
+        buffer_surface_pressure,
         lib,
         xp,
     ):
         i0, i1 = index_range
+        ni, nj = i1 - i0, mesh.shape[0]
         self.lib = lib
         self.mesh = mesh
         self.xp = xp
         self.time = self.time0 = time
-        ni, nj = mesh.shape()
         self.shape = (i1 - i0, nj)  # not including guard zones
         self.physics = physics
         self.options = options
-        self.xl, self.yl = self.mesh.vertex_coordinates(i0, 0)
-        self.xr, self.yr = self.xl + (i1 - i0) * self.mesh.dx, self.yl + nj * self.mesh.dy
-        self.domain_radius = abs(self.mesh.x1)
-        self.kb_outer_radius = self.domain_radius
-        self.kb_onset_width = 0.1
-        self.kb_surface_density = kb_surface_density
-        self.kb_surface_pressure = kb_surface_pressure
-        self.kb_driving_rate = 1000.0
-        self.kb_central_mass = 1.0
-
-        self.orbelement = OrbitalElements(1.0, 1.0, self.physics.q, self.physics.e)
-        orbstate = self.orbelement.orbital_state(self.time)
+        self.xl, self.yl = mesh.vertex_coordinates(i0, 0)
+        self.xr, self.yr = mesh.vertex_coordinates(i1, nj)
+        self.buffer_outer_radius = buffer_outer_radius
+        self.buffer_surface_density = buffer_surface_density
+        self.buffer_surface_pressure = buffer_surface_pressure
 
         with self.execution_context():
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
@@ -151,7 +103,11 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
-        orbstate = OrbitalElements(1.0, 1.0, self.physics.q, self.physics.e).orbital_state(self.time)
+        m1, m2 = self.physics.point_masses(self.time)
+        buffer_central_mass = m1.mass + m2.mass
+        buffer_surface_density = self.buffer_surface_density
+        buffer_surface_pressure = self.buffer_surface_pressure
+
         with self.execution_context():
             self.lib.cbdgam_2d_advance_rk[self.shape](
                 self.xl,
@@ -162,29 +118,31 @@ class Patch:
                 self.primitive1,
                 self.primitive2,
                 self.physics.gamma_law_index,
-                self.kb_surface_density,
-                self.kb_surface_pressure,
-                self.kb_central_mass,
-                self.kb_driving_rate,
-                self.kb_outer_radius,
-                self.kb_onset_width,
-                self.physics.kb_mode,
-                orbstate.primary.position_x,
-                orbstate.primary.position_y,
-                orbstate.primary.velocity_x,
-                orbstate.primary.velocity_y,
-                orbstate.primary.mass,
-                self.physics.sink_rate,
-                self.physics.sink_radius,
-                self.physics.mass_model1,
-                orbstate.secondary.position_x,
-                orbstate.secondary.position_y,
-                orbstate.secondary.velocity_x,
-                orbstate.secondary.velocity_y,
-                orbstate.secondary.mass,
-                self.physics.sink_rate,
-                self.physics.sink_radius,
-                self.physics.mass_model2,
+                buffer_surface_density,
+                buffer_surface_pressure,
+                buffer_central_mass,
+                self.physics.buffer_driving_rate,
+                self.buffer_outer_radius,
+                self.physics.buffer_onset_width,
+                int(self.physics.buffer_is_enabled),
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model,
                 self.physics.alpha,
                 rk_param,
                 dt,
@@ -193,9 +151,8 @@ class Patch:
                 self.options.mach_ceiling,
                 self.options.density_floor,
                 self.options.pressure_floor,
-                self.physics.constant_softening,
-                self.physics.soft_length,
-                )
+                int(self.physics.constant_softening),
+            )
 
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
@@ -231,8 +188,8 @@ class Solver(SolverBase):
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
-        self._physics = Physics(**physics)
-        self._options = Options(**options)
+        self._physics = physics = Physics(**physics)
+        self._options = options = Options(**options)
 
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
@@ -254,24 +211,46 @@ class Solver(SolverBase):
         self.patches = []
         ni, nj = mesh.shape
         self.domain_radius = self.mesh.x1
-        self.kb_onset_width = 0.1
-
-        kb_state = [0.0] * 4
-        setup.primitive(time, [self.domain_radius - self.kb_onset_width, 0.0], kb_state)
+        self.buffer_onset_width = 0.1
 
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
         else:
             primitive = solution
 
+        if physics.buffer_is_enabled:
+            # Here we sample the initial condition at the buffer onset radius
+            # to determine the disk surface density at the radius where the
+            # buffer begins to ramp up. This procedure makes sense as long as
+            # the initial condition is axisymmetric.
+            buffer_prim = [0.0] * 4
+            buffer_outer_radius = mesh.x1  # this assumes the mesh is a centered squared
+            buffer_onset_radius = buffer_outer_radius - physics.buffer_onset_width
+            setup.primitive(time, [buffer_onset_radius, 0.0], buffer_prim)
+            buffer_surface_density = buffer_prim[0]
+            buffer_surface_pressure = buffer_prim[3]
+        else:
+            buffer_outer_radius = 0.0
+            buffer_surface_density = 0.0
+            buffer_surface_pressure = 0.0
+
         for (a, b) in subdivide(ni, num_patches):
             prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
-            self.patches.append(
-                Patch(time, prim, mesh, (a, b), self._physics, self._options, kb_state[0], kb_state[3], lib, xp)
+            patch = Patch(
+                time,
+                prim,
+                mesh,
+                (a, b),
+                physics,
+                options,
+                buffer_outer_radius,
+                buffer_surface_density,
+                buffer_surface_pressure,
+                lib,
+                xp,
             )
-
-        self.set_bc("primitive1")
+            self.patches.append(patch)
 
     @property
     def solution(self):
