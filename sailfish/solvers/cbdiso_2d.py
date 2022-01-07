@@ -1,90 +1,19 @@
 """
-One-dimensional relativistic hydro solver supporting homologous mesh motion.
+Isothermal solver for the binary accretion problem in 2D planar coordinates.
 """
 
+from contextlib import nullcontext
 from logging import getLogger
-from sailfish.kernel.library import Library
 from typing import NamedTuple
+from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
-from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesian2DMesh
+from sailfish.physics.circumbinary import PointMass, Physics
 from sailfish.solver import SolverBase
-from sailfish.physics.kepler import OrbitalElements
-
-try:
-    from contextlib import nullcontext
-
-except ImportError:
-    from contextlib import AbstractContextManager
-
-    class nullcontext(AbstractContextManager):
-        """
-        Scraped from contextlib source in Python >= 3.7 for backwards compatibility.
-        """
-
-        def __init__(self, enter_result=None):
-            self.enter_result = enter_result
-
-        def __enter__(self):
-            return self.enter_result
-
-        def __exit__(self, *excinfo):
-            pass
-
-        async def __aenter__(self):
-            return self.enter_result
-
-        async def __aexit__(self, *excinfo):
-            pass
+from sailfish.subdivide import subdivide
 
 
 logger = getLogger(__name__)
-
-
-SINK_MODEL_ACCELERATION_FREE = 1
-SINK_MODEL_TORQUE_FREE = 2
-SINK_MODEL_FORCE_FREE = 3
-
-EOS_TYPE_LOCALLY_ISOTHERMAL = 1
-EOS_TYPE_GLOBALLY_ISOTHEMRAL = 2
-
-
-class Physics(NamedTuple):
-
-    sound_speed_squared: float = 1.0
-    """ Square of the sound speed, if EOS type is globally isothermal """
-
-    mach_number: float = 10.0
-    """ Square of the Mach number, if EOS type is locally isothermal """
-
-    viscosity_coefficient: float = 0.01
-    """ Kinematic viscosity value, in units of a^2 Omega """
-
-    buffer_is_enabled: bool = False
-    """ Whether the buffer zone is enabled """
-
-    buffer_surface_density: float = 1.0
-    """ Target surface density in the buffer zone, if it's enabled """
-
-    buffer_central_mass: float = 1.0
-    """ Used to determine the orbital velocity in the buffer region """
-
-    buffer_driving_rate: float = 1000.0
-    """ Rate of driving toward target solution in the buffer region """
-
-    buffer_onset_width: float = 0.1
-    """ Distance over which the buffer ramps up """
-
-    eos_type: int = EOS_TYPE_GLOBALLY_ISOTHEMRAL
-    """ EOS type: globally or locally isothermal """
-
-    q: float = 1.0
-    e: float = 0.0
-    sink_rate: float = 10.0
-    sink_radius: float = 0.05
-    sink_model1: int = SINK_MODEL_ACCELERATION_FREE
-    sink_model2: int = SINK_MODEL_ACCELERATION_FREE
-    softening_length: float = 0.01
 
 
 class Options(NamedTuple):
@@ -122,6 +51,8 @@ class Patch:
         index_range,
         physics,
         options,
+        buffer_outer_radius,
+        buffer_surface_density,
         lib,
         xp,
     ):
@@ -134,10 +65,10 @@ class Patch:
         self.shape = (i1 - i0, nj)  # not including guard zones
         self.physics = physics
         self.options = options
-        self.xl, self.yl = self.mesh.vertex_coordinates(i0, 0)
-        self.xr, self.yr = self.mesh.vertex_coordinates(i1, nj)
-        self.buffer_outer_radius = self.mesh.x1 - self.physics.buffer_onset_width
-        self.orbelement = OrbitalElements(1.0, 1.0, self.physics.q, self.physics.e)
+        self.xl, self.yl = mesh.vertex_coordinates(i0, 0)
+        self.xr, self.yr = mesh.vertex_coordinates(i1, nj)
+        self.buffer_outer_radius = buffer_outer_radius
+        self.buffer_surface_density = buffer_surface_density
 
         with self.execution_context():
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
@@ -150,34 +81,34 @@ class Patch:
         return nullcontext()
 
     def maximum_wavespeed(self):
-        m1, m2 = self.orbelement.orbital_state(self.time)
+        m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context():
             self.lib.cbdiso_wavespeed[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
                 self.yr,
-                self.physics.sound_speed_squared,
-                self.physics.mach_number ** 2.0,
+                self.physics.sound_speed ** 2,
+                self.physics.mach_number ** 2,
                 self.physics.eos_type,
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
                 m1.velocity_y,
                 m1.mass,
-                self.physics.softening_length,
-                self.physics.sink_rate,
-                self.physics.sink_radius,
-                self.physics.sink_model1,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
                 m2.velocity_y,
                 m2.mass,
-                self.physics.softening_length,
-                self.physics.sink_rate,
-                self.physics.sink_radius,
-                self.physics.sink_model2,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model,
                 self.primitive1,
                 self.wavespeeds,
             )
@@ -191,7 +122,10 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
-        m1, m2 = self.orbelement.orbital_state(self.time)
+        m1, m2 = self.physics.point_masses(self.time)
+        buffer_central_mass = m1.mass + m2.mass
+        buffer_surface_density = self.buffer_surface_density
+
         with self.execution_context():
             self.lib.cbdiso_advance_rk[self.shape](
                 self.xl,
@@ -201,8 +135,8 @@ class Patch:
                 self.conserved0,
                 self.primitive1,
                 self.primitive2,
-                self.physics.buffer_surface_density,
-                self.physics.buffer_central_mass,
+                buffer_surface_density,
+                buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
                 self.physics.buffer_onset_width,
@@ -212,21 +146,21 @@ class Patch:
                 m1.velocity_x,
                 m1.velocity_y,
                 m1.mass,
-                self.physics.softening_length,
-                self.physics.sink_rate,
-                self.physics.sink_radius,
-                self.physics.sink_model1,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
                 m2.velocity_y,
                 m2.mass,
-                self.physics.softening_length,
-                self.physics.sink_rate,
-                self.physics.sink_radius,
-                self.physics.sink_model2,
-                self.physics.sound_speed_squared,
-                self.physics.mach_number ** 2.0,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model,
+                self.physics.sound_speed ** 2,
+                self.physics.mach_number ** 2,
                 self.physics.eos_type,
                 self.physics.viscosity_coefficient,
                 rk_param,
@@ -267,8 +201,9 @@ class Solver(SolverBase):
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
-        self._physics = Physics(**physics)
-        self._options = Options(**options)
+        self._physics = physics = Physics(**physics)
+        self._options = options = Options(**options)
+
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 3  # number of conserved quantities
@@ -294,12 +229,36 @@ class Solver(SolverBase):
         else:
             primitive = solution
 
+        if physics.buffer_is_enabled:
+            # Here we sample the initial condition at the buffer onset radius
+            # to determine the disk surface density at the radius where the
+            # buffer begins to ramp up. This procedure makes sense as long as
+            # the initial condition is axisymmetric.
+            buffer_prim = [0.0] * 3
+            buffer_outer_radius = mesh.x1  # this assumes the mesh is a centered squared
+            buffer_onset_radius = buffer_outer_radius - physics.buffer_onset_width
+            setup.primitive(time, [buffer_onset_radius, 0.0], buffer_prim)
+            buffer_surface_density = buffer_prim[0]
+        else:
+            buffer_outer_radius = 0.0
+            buffer_surface_density = 0.0
+
         for (a, b) in subdivide(ni, num_patches):
             prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
-            self.patches.append(
-                Patch(time, prim, mesh, (a, b), self._physics, self._options, lib, xp)
+            patch = Patch(
+                time,
+                prim,
+                mesh,
+                (a, b),
+                physics,
+                options,
+                buffer_outer_radius,
+                buffer_surface_density,
+                lib,
+                xp,
             )
+            self.patches.append(patch)
 
     @property
     def solution(self):

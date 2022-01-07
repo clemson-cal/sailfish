@@ -240,6 +240,9 @@ class PlanarCartesian2DMesh(NamedTuple):
         return x, y
 
     def vertex_coordinates(self, i, j):
+        """
+        Return the position of the lower-left corner of zone (i, j).
+        """
         x = self.x0 + i * self.dx
         y = self.y0 + j * self.dy
         return x, y

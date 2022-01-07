@@ -96,10 +96,10 @@ class Patch:
         index_range,
         physics,
         options,
-        lib,
-        xp,
         kb_surface_density,
         kb_surface_pressure,
+        lib,
+        xp,
     ):
         i0, i1 = index_range
         self.lib = lib
@@ -256,7 +256,7 @@ class Solver(SolverBase):
         self.domain_radius = self.mesh.x1
         self.kb_onset_width = 0.1
 
-        kb_state = self.xp.zeros((4))
+        kb_state = [0.0] * 4
         setup.primitive(time, [self.domain_radius - self.kb_onset_width, 0.0], kb_state)
 
         if solution is None:
@@ -268,7 +268,7 @@ class Solver(SolverBase):
             prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
             self.patches.append(
-                Patch(time, prim, mesh, (a, b), self._physics, self._options, lib, xp, kb_state[0], kb_state[3])
+                Patch(time, prim, mesh, (a, b), self._physics, self._options, kb_state[0], kb_state[3], lib, xp)
             )
 
         self.set_bc("primitive1")

@@ -33,7 +33,7 @@ class CylindricalExplosion(Setup):
 
     @property
     def physics(self):
-        return dict(sound_speed_squared=1.0, sink_model1=0, sink_model2=0)
+        return dict(sound_speed=1.0)
 
     @property
     def solver(self):

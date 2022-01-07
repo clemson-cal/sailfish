@@ -88,9 +88,9 @@ PRIVATE double gravitational_potential(
             double dx = x1 - x0;
             double dy = y1 - y0;
             double r2 = dx * dx + dy * dy;
-            double r2_soft = r2 + rs * rs;
+            double r2_softened = r2 + rs * rs;
 
-            phi -= mp / sqrt(r2_soft);
+            phi -= mp / sqrt(r2_softened);
         }
     }
     return phi;
@@ -113,9 +113,9 @@ PRIVATE void point_mass_source_term(
     double dx = x1 - x0;
     double dy = y1 - y0;
     double r2 = dx * dx + dy * dy;
-    double r2_soft = r2 + rs * rs;
+    double r2_softened = r2 + rs * rs;
     double dr = sqrt(r2);
-    double mag = sigma * mp * pow(r2_soft, -1.5);
+    double mag = sigma * mp * pow(r2_softened, -1.5);
     double fx = -mag * dx;
     double fy = -mag * dy;
     double sink_rate = 0.0;
@@ -200,7 +200,7 @@ PRIVATE double sound_speed_squared(
 {
     switch (eos_type)
     {
-        case 1: // isothermal
+        case 1: // globally isothermal
             return cs2;
         case 2: // locally Isothermal
             return -gravitational_potential(mass_list, x, y) / mach_squared;
