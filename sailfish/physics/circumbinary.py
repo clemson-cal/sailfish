@@ -158,7 +158,7 @@ class Physics(NamedTuple):
     buffer_onset_width: float = 0.1
     """ Distance over which the buffer ramps up """
 
-    point_mass_function: Callable[float, List[PointMass]] = None
+    point_mass_function: Callable[[float], List[PointMass]] = None
     """ Callback function to supply point masses as a function of time """
 
     cooling_coefficient: float = 0.0
