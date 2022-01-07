@@ -33,6 +33,7 @@ sailfish.mesh.PlanarCartesianMesh
    .. autosummary::
    
       ~PlanarCartesianMesh.dx
+      ~PlanarCartesianMesh.num_total_zones
       ~PlanarCartesianMesh.num_zones
       ~PlanarCartesianMesh.shape
       ~PlanarCartesianMesh.x0

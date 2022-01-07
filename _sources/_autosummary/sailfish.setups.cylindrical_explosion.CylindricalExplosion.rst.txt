@@ -1,0 +1,48 @@
+sailfish.setups.cylindrical\_explosion.CylindricalExplosion
+===========================================================
+
+.. currentmodule:: sailfish.setups.cylindrical_explosion
+
+.. autoclass:: CylindricalExplosion
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~CylindricalExplosion.__init__
+      ~CylindricalExplosion.dash_case_class_name
+      ~CylindricalExplosion.default_model_parameters
+      ~CylindricalExplosion.describe_class
+      ~CylindricalExplosion.find_setup_class
+      ~CylindricalExplosion.has_model_parameters
+      ~CylindricalExplosion.immutable_parameter_keys
+      ~CylindricalExplosion.mesh
+      ~CylindricalExplosion.model_parameter_dict
+      ~CylindricalExplosion.model_parameters
+      ~CylindricalExplosion.primitive
+      ~CylindricalExplosion.print_model_parameters
+      ~CylindricalExplosion.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~CylindricalExplosion.boundary_condition
+      ~CylindricalExplosion.default_end_time
+      ~CylindricalExplosion.default_resolution
+      ~CylindricalExplosion.physics
+      ~CylindricalExplosion.solver
+      ~CylindricalExplosion.start_time
+   
+   

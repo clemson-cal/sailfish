@@ -60,8 +60,10 @@
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Solver.html">sailfish.solvers.cbdgam_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
@@ -119,17 +121,17 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Options.html#sailfish.solvers.cbdgam_2d.Options" title="sailfish.solvers.cbdgam_2d.Options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Options</span></code></a>(velocity_ceiling, mach_ceiling)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Options.html#sailfish.solvers.cbdgam_2d.Options" title="sailfish.solvers.cbdgam_2d.Options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Options</span></code></a>(pressure_floor, density_floor, ...)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Patch.html#sailfish.solvers.cbdgam_2d.Patch" title="sailfish.solvers.cbdgam_2d.Patch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Patch</span></code></a>(time, primitive, mesh, index_range, ...)</p></td>
 <td><p>Holds the array buffer state for the solution on a subset of the solution domain.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Physics.html#sailfish.solvers.cbdgam_2d.Physics" title="sailfish.solvers.cbdgam_2d.Physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Physics</span></code></a>(gamma_law_index, viscosity_coefficient)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Physics.html#sailfish.solvers.cbdgam_2d.Physics" title="sailfish.solvers.cbdgam_2d.Physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Physics</span></code></a>(alpha, sink_rate, sink_radius, ...)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Solver.html#sailfish.solvers.cbdgam_2d.Solver" title="sailfish.solvers.cbdgam_2d.Solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Solver</span></code></a>([setup, mesh, time, solution, ...])</p></td>
-<td><p>Adapter class to drive the srhd_1d C extension module.</p></td>
+<td><p>Adapter class to drive the cbdgam_2d C extension module.</p></td>
 </tr>
 </tbody>
 </table>

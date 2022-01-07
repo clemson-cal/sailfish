@@ -134,10 +134,13 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.primitive" title="sailfish.solver.SolverBase.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
 <td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.solution" title="sailfish.solver.SolverBase.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.recommended_cfl" title="sailfish.solver.SolverBase.recommended_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recommended_cfl</span></code></a></p></td>
+<td><p>Return a recommended CFL number to the driver, default to the maximum.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.solution" title="sailfish.solver.SolverBase.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
 <td><p>Return an object representing the solution state.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.time" title="sailfish.solver.SolverBase.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.time" title="sailfish.solver.SolverBase.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
 <td><p>Return the simulation time.</p></td>
 </tr>
 </tbody>
@@ -197,6 +200,12 @@ through the setup’s model parameters.</p>
 written to checkpoint files, but it might also be written to
 non-checkpoint output files for offline analysis, or passed along to
 runtime post-processing routines.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solver.SolverBase.recommended_cfl">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">recommended_cfl</span></span><a class="headerlink" href="#sailfish.solver.SolverBase.recommended_cfl" title="Permalink to this definition"></a></dt>
+<dd><p>Return a recommended CFL number to the driver, default to the maximum.</p>
 </dd></dl>
 
 <dl class="py property">

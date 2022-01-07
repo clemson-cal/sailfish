@@ -53,8 +53,8 @@
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a><ul class="current">
-<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html">sailfish.solvers.scdg_1d.dot</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html">sailfish.solvers.scdg_1d.rhs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html">sailfish.solvers.scdg_1d.CellData</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Options.html">sailfish.solvers.scdg_1d.Options</a></li>
@@ -63,6 +63,7 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
@@ -153,10 +154,13 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.primitive" title="sailfish.solvers.scdg_1d.Solver.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
 <td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.solution" title="sailfish.solvers.scdg_1d.Solver.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.recommended_cfl" title="sailfish.solvers.scdg_1d.Solver.recommended_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recommended_cfl</span></code></a></p></td>
+<td><p>Return a recommended CFL number to the driver, default to the maximum.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.solution" title="sailfish.solvers.scdg_1d.Solver.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
 <td><p>Return an object representing the solution state.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.time" title="sailfish.solvers.scdg_1d.Solver.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.time" title="sailfish.solvers.scdg_1d.Solver.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
 <td><p>Return the simulation time.</p></td>
 </tr>
 </tbody>
@@ -216,6 +220,12 @@ through the setup’s model parameters.</p>
 written to checkpoint files, but it might also be written to
 non-checkpoint output files for offline analysis, or passed along to
 runtime post-processing routines.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Solver.recommended_cfl">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">recommended_cfl</span></span><a class="headerlink" href="#sailfish.solvers.scdg_1d.Solver.recommended_cfl" title="Permalink to this definition"></a></dt>
+<dd><p>Return a recommended CFL number to the driver, default to the maximum.</p>
 </dd></dl>
 
 <dl class="py property">

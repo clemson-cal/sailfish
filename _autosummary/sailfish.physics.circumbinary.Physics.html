@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.physics.circumbinary.Physics &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.physics.circumbinary.PointMass" href="sailfish.physics.circumbinary.PointMass.html" />
+    <link rel="prev" title="sailfish.physics.circumbinary" href="sailfish.physics.circumbinary.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a><ul class="current">
+<li class="toctree-l3 current"><a class="reference internal" href="sailfish.physics.circumbinary.html">sailfish.physics.circumbinary</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.physics.circumbinary.Physics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.PointMass.html">sailfish.physics.circumbinary.PointMass</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.physics.kepler.html">sailfish.physics.kepler</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
+          <li><a href="sailfish.physics.html">sailfish.physics</a> &raquo;</li>
+          <li><a href="sailfish.physics.circumbinary.html">sailfish.physics.circumbinary</a> &raquo;</li>
+      <li>sailfish.physics.circumbinary.Physics</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.physics.circumbinary.Physics.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sailfish-physics-circumbinary-physics">
+<h1>sailfish.physics.circumbinary.Physics<a class="headerlink" href="#sailfish-physics-circumbinary-physics" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.physics.circumbinary.</span></span><span class="sig-name descname"><span class="pre">Physics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">eos_type</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sound_speed</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mach_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gamma_law_index</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.6666666666666667</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">viscosity_coefficient</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.01</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_is_enabled</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_driving_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_onset_width</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">point_mass_function</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="sailfish.physics.circumbinary.PointMass.html#sailfish.physics.circumbinary.PointMass" title="sailfish.physics.circumbinary.PointMass"><span class="pre">sailfish.physics.circumbinary.PointMass</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/physics/circumbinary.html#Physics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.circumbinary.Physics" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
+<p>Physics configuration for the binary accretion solvers</p>
+<p>Configuration categories are:</p>
+<ol class="arabic">
+<li><p>Equation of state: globally isothermal, locally isothermal, or
+gamma-law</p>
+<p>In globally isothermal mode, a uniform sound speed is specified. In
+globally isothermal mode, an orbital mach number is specified, and used
+to assign the sound speed based on the local gravitational potential
+(this option only makes sense when gravitating point masses are
+provided). In gamma-law mode, the sound speed is determined
+self-consistently from the internal energy. The cbdiso_2d solver only
+supports the former two modes, and the cbdgam_2d solver only upports
+the last mode.</p>
+</li>
+<li><p>Gravitating point masses</p>
+<p>Point masses can be optionally provided to model stars or black holes.
+The point mass properties include a point mass’s mass, and its x-y
+position. These properties fully determine the gravitational potential
+sourced by the particle. Point masses can also act as sinks of mass and
+momentum (see the <a class="reference internal" href="sailfish.physics.circumbinary.PointMass.html#sailfish.physics.circumbinary.PointMass" title="sailfish.physics.circumbinary.PointMass"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PointMass</span></code></a> struct above for details). The point
+masses are supplied to the solver implicitly through a callback
+function, mapping the simulation time to a sequence of particles.
+Currently, solvers support either zero, one, or two particles.</p>
+</li>
+<li><p>Viscosity model</p>
+<p>Two different viscosity models are nominally supported: constant-nu,
+and constant alpha. Currently the isothermal solver only supports
+constant-nu viscosity.</p>
+</li>
+<li><p>Thermal cooling</p>
+<p>Todo.</p>
+</li>
+<li><p>An outer buffer zone</p>
+<p>For binary accretion problems in a square domain, it can be useful to
+impose a wave-damping zone (or sponge layer) to avoid artifacts fromt
+the outer boundary on the orbiting gas. The buffer zone, if enabled,
+will drive the solution outside a “buffer onset radius” toward an
+appropriate hydrodynamic state. This should be gas with uniform gas
+pressure and density (which may be sampled from the initial condition),
+and that gas should be on circular Keplerian orbits. The
+<a class="reference internal" href="#sailfish.physics.circumbinary.Physics.buffer_driving_rate" title="sailfish.physics.circumbinary.Physics.buffer_driving_rate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">buffer_driving_rate</span></code></a> parameter controls how fast the solution is
+driven toward the smooth one. The buffer is applied in a region
+between the domain radius (the half-width of a square domain), extending
+inwards by an amount specified by the <a class="reference internal" href="#sailfish.physics.circumbinary.Physics.buffer_onset_width" title="sailfish.physics.circumbinary.Physics.buffer_onset_width"><code class="xref py py-obj docutils literal notranslate"><span class="pre">buffer_onset_width</span></code></a>
+parameter.</p>
+</li>
+</ol>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.__init__" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.__init__" title="sailfish.physics.circumbinary.Physics.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.count" title="sailfish.physics.circumbinary.Physics.count"><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code></a>(value, /)</p></td>
+<td><p>Return number of occurrences of value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.index" title="sailfish.physics.circumbinary.Physics.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
+<td><p>Return first index of value.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.point_masses" title="sailfish.physics.circumbinary.Physics.point_masses"><code class="xref py py-obj docutils literal notranslate"><span class="pre">point_masses</span></code></a>(time)</p></td>
+<td><p>Generate point masses from the simulation time and supplied callback.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.buffer_driving_rate" title="sailfish.physics.circumbinary.Physics.buffer_driving_rate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">buffer_driving_rate</span></code></a></p></td>
+<td><p>Rate of driving toward target solution in the buffer region</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.buffer_is_enabled" title="sailfish.physics.circumbinary.Physics.buffer_is_enabled"><code class="xref py py-obj docutils literal notranslate"><span class="pre">buffer_is_enabled</span></code></a></p></td>
+<td><p>Whether the buffer zone is enabled</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.buffer_onset_width" title="sailfish.physics.circumbinary.Physics.buffer_onset_width"><code class="xref py py-obj docutils literal notranslate"><span class="pre">buffer_onset_width</span></code></a></p></td>
+<td><p>Distance over which the buffer ramps up</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.eos_type" title="sailfish.physics.circumbinary.Physics.eos_type"><code class="xref py py-obj docutils literal notranslate"><span class="pre">eos_type</span></code></a></p></td>
+<td><p>EOS type: globally or locally isothermal</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.gamma_law_index" title="sailfish.physics.circumbinary.Physics.gamma_law_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gamma_law_index</span></code></a></p></td>
+<td><p>Adiabatic index, if the EOS type is globally isothermal</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.mach_number" title="sailfish.physics.circumbinary.Physics.mach_number"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mach_number</span></code></a></p></td>
+<td><p>Square of the Mach number, if EOS type is locally isothermal</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.point_mass_function" title="sailfish.physics.circumbinary.Physics.point_mass_function"><code class="xref py py-obj docutils literal notranslate"><span class="pre">point_mass_function</span></code></a></p></td>
+<td><p>Callback function to supply point masses as a function of time</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.sound_speed" title="sailfish.physics.circumbinary.Physics.sound_speed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sound_speed</span></code></a></p></td>
+<td><p>Isothermal sound speed, if EOS type is globally isothermal</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.circumbinary.Physics.viscosity_coefficient" title="sailfish.physics.circumbinary.Physics.viscosity_coefficient"><code class="xref py py-obj docutils literal notranslate"><span class="pre">viscosity_coefficient</span></code></a></p></td>
+<td><p>Kinematic viscosity value, in units of a^2 Omega</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.buffer_driving_rate">
+<span class="sig-name descname"><span class="pre">buffer_driving_rate</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.buffer_driving_rate" title="Permalink to this definition"></a></dt>
+<dd><p>Rate of driving toward target solution in the buffer region</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.buffer_is_enabled">
+<span class="sig-name descname"><span class="pre">buffer_is_enabled</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.buffer_is_enabled" title="Permalink to this definition"></a></dt>
+<dd><p>Whether the buffer zone is enabled</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.buffer_onset_width">
+<span class="sig-name descname"><span class="pre">buffer_onset_width</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.buffer_onset_width" title="Permalink to this definition"></a></dt>
+<dd><p>Distance over which the buffer ramps up</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.count">
+<span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.count" title="Permalink to this definition"></a></dt>
+<dd><p>Return number of occurrences of value.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.eos_type">
+<span class="sig-name descname"><span class="pre">eos_type</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.eos_type" title="Permalink to this definition"></a></dt>
+<dd><p>EOS type: globally or locally isothermal</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.gamma_law_index">
+<span class="sig-name descname"><span class="pre">gamma_law_index</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.gamma_law_index" title="Permalink to this definition"></a></dt>
+<dd><p>Adiabatic index, if the EOS type is globally isothermal</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.index">
+<span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9223372036854775807</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.index" title="Permalink to this definition"></a></dt>
+<dd><p>Return first index of value.</p>
+<p>Raises ValueError if the value is not present.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.mach_number">
+<span class="sig-name descname"><span class="pre">mach_number</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.mach_number" title="Permalink to this definition"></a></dt>
+<dd><p>Square of the Mach number, if EOS type is locally isothermal</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.point_mass_function">
+<span class="sig-name descname"><span class="pre">point_mass_function</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">Callable</span><span class="p"><span class="pre">[</span></span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">,</span></span><span class="w"> </span><span class="pre">List</span><span class="p"><span class="pre">[</span></span><a class="reference internal" href="sailfish.physics.circumbinary.PointMass.html#sailfish.physics.circumbinary.PointMass" title="sailfish.physics.circumbinary.PointMass"><span class="pre">sailfish.physics.circumbinary.PointMass</span></a><span class="p"><span class="pre">]</span></span><span class="p"><span class="pre">]</span></span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.point_mass_function" title="Permalink to this definition"></a></dt>
+<dd><p>Callback function to supply point masses as a function of time</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.point_masses">
+<span class="sig-name descname"><span class="pre">point_masses</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/physics/circumbinary.html#Physics.point_masses"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.point_masses" title="Permalink to this definition"></a></dt>
+<dd><p>Generate point masses from the simulation time and supplied callback.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.sound_speed">
+<span class="sig-name descname"><span class="pre">sound_speed</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.sound_speed" title="Permalink to this definition"></a></dt>
+<dd><p>Isothermal sound speed, if EOS type is globally isothermal</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.physics.circumbinary.Physics.viscosity_coefficient">
+<span class="sig-name descname"><span class="pre">viscosity_coefficient</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.Physics.viscosity_coefficient" title="Permalink to this definition"></a></dt>
+<dd><p>Kinematic viscosity value, in units of a^2 Omega</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.physics.circumbinary.html" class="btn btn-neutral float-left" title="sailfish.physics.circumbinary" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.physics.circumbinary.PointMass.html" class="btn btn-neutral float-right" title="sailfish.physics.circumbinary.PointMass" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

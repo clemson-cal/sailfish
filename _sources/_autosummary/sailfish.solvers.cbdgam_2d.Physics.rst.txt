@@ -28,7 +28,17 @@ sailfish.solvers.cbdgam\_2d.Physics
 
    .. autosummary::
    
+      ~Physics.alpha
+      ~Physics.constant_softening
+      ~Physics.cooling_coefficient
+      ~Physics.e
       ~Physics.gamma_law_index
-      ~Physics.viscosity_coefficient
+      ~Physics.kb_mode
+      ~Physics.mass_model1
+      ~Physics.mass_model2
+      ~Physics.q
+      ~Physics.sink_radius
+      ~Physics.sink_rate
+      ~Physics.soft_length
    
    

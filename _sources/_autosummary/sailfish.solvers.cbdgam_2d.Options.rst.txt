@@ -28,7 +28,9 @@ sailfish.solvers.cbdgam\_2d.Options
 
    .. autosummary::
    
+      ~Options.density_floor
       ~Options.mach_ceiling
+      ~Options.pressure_floor
       ~Options.velocity_ceiling
    
    

@@ -1,0 +1,275 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.physics.circumbinary &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.physics.circumbinary</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.physics.circumbinary</h1><div class="highlight"><pre>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Callable</span>
+
+
+<span class="n">SINK_MODEL_INACTIVE</span> <span class="o">=</span> <span class="mi">0</span>
+<span class="n">SINK_MODEL_ACCELERATION_FREE</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">SINK_MODEL_TORQUE_FREE</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">SINK_MODEL_FORCE_FREE</span> <span class="o">=</span> <span class="mi">3</span>
+
+<span class="n">EOS_TYPE_GLOBALLY_ISOTHERMAL</span> <span class="o">=</span> <span class="mi">1</span>
+<span class="n">EOS_TYPE_LOCALLY_ISOTHERMAL</span> <span class="o">=</span> <span class="mi">2</span>
+<span class="n">EOS_TYPE_GAMMA_LAW</span> <span class="o">=</span> <span class="mi">3</span>
+
+
+<div class="viewcode-block" id="PointMass"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.PointMass.html#sailfish.physics.circumbinary.PointMass">[docs]</a><span class="k">class</span> <span class="nc">PointMass</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Describes a gravitating point mass</span>
+
+<span class="sd">    The point mass&#39;s mass, x-y position, and softening length fully determine</span>
+<span class="sd">    the gravitational potential:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \phi = \frac{G M}{\sqrt{\Delta r^2 + r_{\rm soft}^2}} \, .</span>
+
+<span class="sd">    Here, :math:`\Delta r` is the distance from the particle to the field</span>
+<span class="sd">    point, and :math:`r_{\rm soft}` is the :obj:`softening_length` parameter</span>
+<span class="sd">    below. Note that the gravitational constant is assumed to be 1 by the</span>
+<span class="sd">    physics solvers.</span>
+
+<span class="sd">    Point masses can also act as sinks of mass and momentum. This behavior is</span>
+<span class="sd">    controlled by the sink model, sink rate, and a sink radius. If the sink</span>
+<span class="sd">    model has the value :obj:`SINK_MODEL_INACTIVE`, then that particle may</span>
+<span class="sd">    still be a source of gravitational potential, but it does model accretion</span>
+<span class="sd">    by subtracting mass or momentum. The acceleration-free and torque-free</span>
+<span class="sd">    modes are described in literature here:</span>
+
+<span class="sd">    - `Dittmann &amp; Ryan (2021) &lt;https://ui.adsabs.harvard.edu/abs/2021arXiv210205684D&gt;`_</span>
+<span class="sd">    - `Dempsey et. al (2020) &lt;https://ui.adsabs.harvard.edu/abs/arXiv:2002.05164&gt;`_</span>
+
+<span class="sd">    The acceleration-free sink model is there for logical completeness, but it</span>
+<span class="sd">    should not be used in practice.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">mass</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; The mass (really G * M since solvers assume G = 1) &quot;&quot;&quot;</span>
+
+    <span class="n">position_x</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; The x-position &quot;&quot;&quot;</span>
+
+    <span class="n">position_y</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; The y-position &quot;&quot;&quot;</span>
+
+    <span class="n">velocity_x</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; The x-velocity &quot;&quot;&quot;</span>
+
+    <span class="n">velocity_y</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; The y-velocity &quot;&quot;&quot;</span>
+
+    <span class="n">softening_length</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; Gravitational softening length &quot;&quot;&quot;</span>
+
+    <span class="n">sink_model</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">SINK_MODEL_INACTIVE</span>
+    <span class="sd">&quot;&quot;&quot; The equation used to control how momentum is subtracted &quot;&quot;&quot;</span>
+
+    <span class="n">sink_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; The sink rate: how fast mass and momentum are removed &quot;&quot;&quot;</span>
+
+    <span class="n">sink_radius</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; The sink radius: how far from the particle the sink extends &quot;&quot;&quot;</span></div>
+
+
+<div class="viewcode-block" id="Physics"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.Physics.html#sailfish.physics.circumbinary.Physics">[docs]</a><span class="k">class</span> <span class="nc">Physics</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Physics configuration for the binary accretion solvers</span>
+
+<span class="sd">    Configuration categories are:</span>
+
+<span class="sd">    1. Equation of state: globally isothermal, locally isothermal, or</span>
+<span class="sd">       gamma-law</span>
+
+<span class="sd">       In globally isothermal mode, a uniform sound speed is specified. In</span>
+<span class="sd">       globally isothermal mode, an orbital mach number is specified, and used</span>
+<span class="sd">       to assign the sound speed based on the local gravitational potential</span>
+<span class="sd">       (this option only makes sense when gravitating point masses are</span>
+<span class="sd">       provided). In gamma-law mode, the sound speed is determined</span>
+<span class="sd">       self-consistently from the internal energy. The cbdiso_2d solver only</span>
+<span class="sd">       supports the former two modes, and the cbdgam_2d solver only upports</span>
+<span class="sd">       the last mode.</span>
+
+<span class="sd">    2. Gravitating point masses</span>
+
+<span class="sd">       Point masses can be optionally provided to model stars or black holes.</span>
+<span class="sd">       The point mass properties include a point mass&#39;s mass, and its x-y</span>
+<span class="sd">       position. These properties fully determine the gravitational potential</span>
+<span class="sd">       sourced by the particle. Point masses can also act as sinks of mass and</span>
+<span class="sd">       momentum (see the :obj:`PointMass` struct above for details). The point</span>
+<span class="sd">       masses are supplied to the solver implicitly through a callback</span>
+<span class="sd">       function, mapping the simulation time to a sequence of particles.</span>
+<span class="sd">       Currently, solvers support either zero, one, or two particles.</span>
+
+<span class="sd">    3. Viscosity model</span>
+
+<span class="sd">       Two different viscosity models are nominally supported: constant-nu,</span>
+<span class="sd">       and constant alpha. Currently the isothermal solver only supports</span>
+<span class="sd">       constant-nu viscosity.</span>
+
+<span class="sd">    4. Thermal cooling</span>
+
+<span class="sd">       Todo.</span>
+
+<span class="sd">    5. An outer buffer zone</span>
+
+<span class="sd">       For binary accretion problems in a square domain, it can be useful to</span>
+<span class="sd">       impose a wave-damping zone (or sponge layer) to avoid artifacts fromt</span>
+<span class="sd">       the outer boundary on the orbiting gas. The buffer zone, if enabled,</span>
+<span class="sd">       will drive the solution outside a &quot;buffer onset radius&quot; toward an</span>
+<span class="sd">       appropriate hydrodynamic state. This should be gas with uniform gas</span>
+<span class="sd">       pressure and density (which may be sampled from the initial condition),</span>
+<span class="sd">       and that gas should be on circular Keplerian orbits. The</span>
+<span class="sd">       :obj:`buffer_driving_rate` parameter controls how fast the solution is</span>
+<span class="sd">       driven toward the smooth one. The buffer is applied in a region</span>
+<span class="sd">       between the domain radius (the half-width of a square domain), extending</span>
+<span class="sd">       inwards by an amount specified by the :obj:`buffer_onset_width`</span>
+<span class="sd">       parameter.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">eos_type</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">EOS_TYPE_GLOBALLY_ISOTHERMAL</span>
+    <span class="sd">&quot;&quot;&quot; EOS type: globally or locally isothermal &quot;&quot;&quot;</span>
+
+    <span class="n">sound_speed</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
+    <span class="sd">&quot;&quot;&quot; Isothermal sound speed, if EOS type is globally isothermal &quot;&quot;&quot;</span>
+
+    <span class="n">mach_number</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">10.0</span>
+    <span class="sd">&quot;&quot;&quot; Square of the Mach number, if EOS type is locally isothermal &quot;&quot;&quot;</span>
+
+    <span class="n">gamma_law_index</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span> <span class="o">/</span> <span class="mf">3.0</span>
+    <span class="sd">&quot;&quot;&quot; Adiabatic index, if the EOS type is globally isothermal &quot;&quot;&quot;</span>
+
+    <span class="n">viscosity_coefficient</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span>
+    <span class="sd">&quot;&quot;&quot; Kinematic viscosity value, in units of a^2 Omega &quot;&quot;&quot;</span>
+
+    <span class="n">buffer_is_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="sd">&quot;&quot;&quot; Whether the buffer zone is enabled &quot;&quot;&quot;</span>
+
+    <span class="n">buffer_driving_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1000.0</span>
+    <span class="sd">&quot;&quot;&quot; Rate of driving toward target solution in the buffer region &quot;&quot;&quot;</span>
+
+    <span class="n">buffer_onset_width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span>
+    <span class="sd">&quot;&quot;&quot; Distance over which the buffer ramps up &quot;&quot;&quot;</span>
+
+    <span class="n">point_mass_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">PointMass</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot; Callback function to supply point masses as a function of time &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Physics.point_masses"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.Physics.html#sailfish.physics.circumbinary.Physics.point_masses">[docs]</a>    <span class="k">def</span> <span class="nf">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate point masses from the simulation time and supplied callback.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">point_mass_function</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">PointMass</span><span class="p">(),</span> <span class="n">PointMass</span><span class="p">()</span>
+
+        <span class="n">masses</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">point_mass_function</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">masses</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">PointMass</span><span class="p">(),</span> <span class="n">PointMass</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">masses</span><span class="p">,</span> <span class="n">PointMass</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">masses</span><span class="p">,</span> <span class="n">PointMass</span><span class="p">()</span>
+
+        <span class="k">if</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">masses</span><span class="p">,</span> <span class="nb">tuple</span><span class="p">)</span> <span class="ow">or</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">masses</span><span class="p">,</span> <span class="nb">list</span><span class="p">):</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">masses</span><span class="p">)</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">masses</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">PointMass</span><span class="p">()</span>
+            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">masses</span><span class="p">)</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">masses</span>
+
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+            <span class="s2">&quot;point_mass_function returned an unsupported description of point masses&quot;</span>
+        <span class="p">)</span></div></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

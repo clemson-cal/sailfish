@@ -1,0 +1,41 @@
+sailfish.physics.circumbinary.PointMass
+=======================================
+
+.. currentmodule:: sailfish.physics.circumbinary
+
+.. autoclass:: PointMass
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~PointMass.__init__
+      ~PointMass.count
+      ~PointMass.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~PointMass.mass
+      ~PointMass.position_x
+      ~PointMass.position_y
+      ~PointMass.sink_model
+      ~PointMass.sink_radius
+      ~PointMass.sink_rate
+      ~PointMass.softening_length
+      ~PointMass.velocity_x
+      ~PointMass.velocity_y
+   
+   

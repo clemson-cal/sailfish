@@ -32,6 +32,7 @@ sailfish.solver.SolverBase
       ~SolverBase.options
       ~SolverBase.physics
       ~SolverBase.primitive
+      ~SolverBase.recommended_cfl
       ~SolverBase.solution
       ~SolverBase.time
    

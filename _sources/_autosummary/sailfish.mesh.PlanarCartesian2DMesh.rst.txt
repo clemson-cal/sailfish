@@ -22,8 +22,7 @@ sailfish.mesh.PlanarCartesian2DMesh
       ~PlanarCartesian2DMesh.centered_square
       ~PlanarCartesian2DMesh.count
       ~PlanarCartesian2DMesh.index
-      ~PlanarCartesian2DMesh.num_total_zones
-      ~PlanarCartesian2DMesh.shape
+      ~PlanarCartesian2DMesh.min_spacing
       ~PlanarCartesian2DMesh.sub_mesh
       ~PlanarCartesian2DMesh.vertex_coordinates
    
@@ -39,6 +38,8 @@ sailfish.mesh.PlanarCartesian2DMesh
       ~PlanarCartesian2DMesh.dy
       ~PlanarCartesian2DMesh.ni
       ~PlanarCartesian2DMesh.nj
+      ~PlanarCartesian2DMesh.num_total_zones
+      ~PlanarCartesian2DMesh.shape
       ~PlanarCartesian2DMesh.x0
       ~PlanarCartesian2DMesh.x1
       ~PlanarCartesian2DMesh.y0

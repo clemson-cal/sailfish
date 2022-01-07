@@ -127,17 +127,14 @@ non-square meshing if need be.</p>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.PlanarCartesian2DMesh.index" title="sailfish.mesh.PlanarCartesian2DMesh.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
 <td><p>Return first index of value.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_total_zones</span></code>()</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_spacing</span></code>([time])</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">shape</span></code>()</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.PlanarCartesian2DMesh.sub_mesh" title="sailfish.mesh.PlanarCartesian2DMesh.sub_mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sub_mesh</span></code></a>(di, dj)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.PlanarCartesian2DMesh.sub_mesh" title="sailfish.mesh.PlanarCartesian2DMesh.sub_mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sub_mesh</span></code></a>(di, dj)</p></td>
 <td><p>Return a new mesh that is a subset of this one.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">vertex_coordinates</span></code>(i, j)</p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.PlanarCartesian2DMesh.vertex_coordinates" title="sailfish.mesh.PlanarCartesian2DMesh.vertex_coordinates"><code class="xref py py-obj docutils literal notranslate"><span class="pre">vertex_coordinates</span></code></a>(i, j)</p></td>
+<td><p>Return the position of the lower-left corner of zone (i, j).</p></td>
 </tr>
 </tbody>
 </table>
@@ -159,6 +156,12 @@ non-square meshing if need be.</p>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.PlanarCartesian2DMesh.nj" title="sailfish.mesh.PlanarCartesian2DMesh.nj"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nj</span></code></a></p></td>
 <td><p>Alias for field number 5</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_total_zones</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">shape</span></code></p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.PlanarCartesian2DMesh.x0" title="sailfish.mesh.PlanarCartesian2DMesh.x0"><code class="xref py py-obj docutils literal notranslate"><span class="pre">x0</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
@@ -205,6 +208,12 @@ non-square meshing if need be.</p>
 <dd><p>Return a new mesh that is a subset of this one.</p>
 <p>The arguments di and dj are tuples, containing the lower and upper
 index range on this mesh.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.mesh.PlanarCartesian2DMesh.vertex_coordinates">
+<span class="sig-name descname"><span class="pre">vertex_coordinates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">j</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#PlanarCartesian2DMesh.vertex_coordinates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.PlanarCartesian2DMesh.vertex_coordinates" title="Permalink to this definition"></a></dt>
+<dd><p>Return the position of the lower-left corner of zone (i, j).</p>
 </dd></dl>
 
 <dl class="py attribute">

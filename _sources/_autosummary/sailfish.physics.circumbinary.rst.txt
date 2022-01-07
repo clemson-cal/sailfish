@@ -1,0 +1,31 @@
+sailfish.physics.circumbinary
+=============================
+
+.. automodule:: sailfish.physics.circumbinary
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Physics
+      PointMass
+   
+   
+
+   
+   
+   
+
+
+

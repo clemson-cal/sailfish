@@ -1,0 +1,30 @@
+sailfish.setups.simple2d
+========================
+
+.. automodule:: sailfish.setups.simple2d
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      UniformPolar
+   
+   
+
+   
+   
+   
+
+
+

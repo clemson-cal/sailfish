@@ -91,9 +91,9 @@
 <h1>sailfish.mesh.LogSphericalMesh<a class="headerlink" href="#sailfish-mesh-logsphericalmesh" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.mesh.</span></span><span class="sig-name descname"><span class="pre">LogSphericalMesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">r0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_zones_per_decade</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_factor_derivative</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.mesh.</span></span><span class="sig-name descname"><span class="pre">LogSphericalMesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">r0</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">r1</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">10.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_zones_per_decade</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_factor_derivative</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polar_grid</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">bool</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">polar_extent</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">3.141592653589793</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
-<p>A 1D mesh with logarithmic radial binning and homologous expansion.</p>
+<p>A 1D or 2D mesh with logarithmic radial binning and homologous expansion.</p>
 <p>The comoving coordinates are time-independent; proper distances are
 affected by the scale factor derivative.</p>
 <dl class="py method">
@@ -111,17 +111,23 @@ affected by the scale factor derivative.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.__init__" title="sailfish.mesh.LogSphericalMesh.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>()</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.count" title="sailfish.mesh.LogSphericalMesh.count"><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code></a>(value, /)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.cell_coordinates" title="sailfish.mesh.LogSphericalMesh.cell_coordinates"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cell_coordinates</span></code></a>(t, i, j)</p></td>
+<td><p>Return the 2D (r, theta) zone center proper coordinates at index (i, j).</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.count" title="sailfish.mesh.LogSphericalMesh.count"><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code></a>(value, /)</p></td>
 <td><p>Return number of occurrences of value.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.faces" title="sailfish.mesh.LogSphericalMesh.faces"><code class="xref py py-obj docutils literal notranslate"><span class="pre">faces</span></code></a>([i0, i1])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.faces" title="sailfish.mesh.LogSphericalMesh.faces"><code class="xref py py-obj docutils literal notranslate"><span class="pre">faces</span></code></a>([i0, i1])</p></td>
 <td><p>Return radial face positions for zone indexes in the given range.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.index" title="sailfish.mesh.LogSphericalMesh.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.index" title="sailfish.mesh.LogSphericalMesh.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
 <td><p>Return first index of value.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.min_spacing" title="sailfish.mesh.LogSphericalMesh.min_spacing"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_spacing</span></code></a>([time])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.min_spacing" title="sailfish.mesh.LogSphericalMesh.min_spacing"><code class="xref py py-obj docutils literal notranslate"><span class="pre">min_spacing</span></code></a>([time])</p></td>
 <td><p>Return the smallest grid spacing.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.radial_vertices" title="sailfish.mesh.LogSphericalMesh.radial_vertices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">radial_vertices</span></code></a>(time)</p></td>
+<td><p>Return a list of proper coordinates of the radial zone interfaces.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.scale_factor" title="sailfish.mesh.LogSphericalMesh.scale_factor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_factor</span></code></a>(time)</p></td>
 <td><p>Return the scale factor at a given time.</p></td>
@@ -141,23 +147,50 @@ affected by the scale factor derivative.</p>
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.num_zones_per_decade" title="sailfish.mesh.LogSphericalMesh.num_zones_per_decade"><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_zones_per_decade</span></code></a></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_polar_zones</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_radial_zones</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_total_zones</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.num_zones_per_decade" title="sailfish.mesh.LogSphericalMesh.num_zones_per_decade"><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_zones_per_decade</span></code></a></p></td>
 <td><p>Alias for field number 2</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.r0" title="sailfish.mesh.LogSphericalMesh.r0"><code class="xref py py-obj docutils literal notranslate"><span class="pre">r0</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.polar_extent" title="sailfish.mesh.LogSphericalMesh.polar_extent"><code class="xref py py-obj docutils literal notranslate"><span class="pre">polar_extent</span></code></a></p></td>
+<td><p>Alias for field number 5</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.polar_grid" title="sailfish.mesh.LogSphericalMesh.polar_grid"><code class="xref py py-obj docutils literal notranslate"><span class="pre">polar_grid</span></code></a></p></td>
+<td><p>Alias for field number 4</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">polar_spacing</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.polar_vertices" title="sailfish.mesh.LogSphericalMesh.polar_vertices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">polar_vertices</span></code></a></p></td>
+<td><p>A list of the polar angles of the polar mesh faces</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.r0" title="sailfish.mesh.LogSphericalMesh.r0"><code class="xref py py-obj docutils literal notranslate"><span class="pre">r0</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.r1" title="sailfish.mesh.LogSphericalMesh.r1"><code class="xref py py-obj docutils literal notranslate"><span class="pre">r1</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.r1" title="sailfish.mesh.LogSphericalMesh.r1"><code class="xref py py-obj docutils literal notranslate"><span class="pre">r1</span></code></a></p></td>
 <td><p>Alias for field number 1</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.scale_factor_derivative" title="sailfish.mesh.LogSphericalMesh.scale_factor_derivative"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_factor_derivative</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.mesh.LogSphericalMesh.scale_factor_derivative" title="sailfish.mesh.LogSphericalMesh.scale_factor_derivative"><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_factor_derivative</span></code></a></p></td>
 <td><p>Alias for field number 3</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">shape</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">shape</span></code></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
 </table>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.cell_coordinates">
+<span class="sig-name descname"><span class="pre">cell_coordinates</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">j</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh.cell_coordinates"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.cell_coordinates" title="Permalink to this definition"></a></dt>
+<dd><p>Return the 2D (r, theta) zone center proper coordinates at index (i, j).</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.count">
 <span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.count" title="Permalink to this definition"></a></dt>
@@ -196,6 +229,24 @@ is provided the result is the minimum comoving grid spacing.</p>
 </dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.polar_extent">
+<span class="sig-name descname"><span class="pre">polar_extent</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.polar_extent" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 5</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.polar_grid">
+<span class="sig-name descname"><span class="pre">polar_grid</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">bool</span></em><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.polar_grid" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.polar_vertices">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">polar_vertices</span></span><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.polar_vertices" title="Permalink to this definition"></a></dt>
+<dd><p>A list of the polar angles of the polar mesh faces</p>
+</dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.r0">
 <span class="sig-name descname"><span class="pre">r0</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.r0" title="Permalink to this definition"></a></dt>
 <dd><p>Alias for field number 0</p>
@@ -205,6 +256,12 @@ is provided the result is the minimum comoving grid spacing.</p>
 <dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.r1">
 <span class="sig-name descname"><span class="pre">r1</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.r1" title="Permalink to this definition"></a></dt>
 <dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.mesh.LogSphericalMesh.radial_vertices">
+<span class="sig-name descname"><span class="pre">radial_vertices</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/mesh.html#LogSphericalMesh.radial_vertices"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.mesh.LogSphericalMesh.radial_vertices" title="Permalink to this definition"></a></dt>
+<dd><p>Return a list of proper coordinates of the radial zone interfaces.</p>
 </dd></dl>
 
 <dl class="py method">

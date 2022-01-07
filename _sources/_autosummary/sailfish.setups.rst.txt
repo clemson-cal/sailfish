@@ -27,7 +27,10 @@
    :toctree:
    :recursive:
 
+   sailfish.setups.cylindrical_explosion
+   sailfish.setups.cylindrical_explosion_cbgdam_2d
    sailfish.setups.envelope_shock
    sailfish.setups.exploding_star
    sailfish.setups.simple1d
+   sailfish.setups.simple2d
 

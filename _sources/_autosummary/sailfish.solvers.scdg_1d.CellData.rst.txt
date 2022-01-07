@@ -18,6 +18,7 @@ sailfish.solvers.scdg\_1d.CellData
    
       ~CellData.__init__
       ~CellData.sample
+      ~CellData.sample_face
       ~CellData.to_weights
    
    

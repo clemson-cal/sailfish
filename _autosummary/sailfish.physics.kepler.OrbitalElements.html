@@ -47,6 +47,7 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="sailfish.physics.circumbinary.html">sailfish.physics.circumbinary</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.physics.kepler.html">sailfish.physics.kepler</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.clamp_between_zero_and_one.html">sailfish.physics.kepler.clamp_between_zero_and_one</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.kepler.solve_newton_rapheson.html">sailfish.physics.kepler.solve_newton_rapheson</a></li>
@@ -120,13 +121,13 @@
 <td><p>Return number of occurrences of value.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.kepler.OrbitalElements.eccentric_anomaly" title="sailfish.physics.kepler.OrbitalElements.eccentric_anomaly"><code class="xref py py-obj docutils literal notranslate"><span class="pre">eccentric_anomaly</span></code></a>(time_since_periapse)</p></td>
-<td><p>Compute the eccentric anomaly from the time since last periapse.</p></td>
+<td><p>Compute the eccentric anomaly from the time since any periapse.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.kepler.OrbitalElements.index" title="sailfish.physics.kepler.OrbitalElements.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
 <td><p>Return first index of value.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.physics.kepler.OrbitalElements.orbital_state" title="sailfish.physics.kepler.OrbitalElements.orbital_state"><code class="xref py py-obj docutils literal notranslate"><span class="pre">orbital_state</span></code></a>(time_since_periapse)</p></td>
-<td><p>Compute the orbital state vector from the time since last periapse.</p></td>
+<td><p>Compute the orbital state vector from the time since any periapse.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.physics.kepler.OrbitalElements.orbital_state_from_eccentric_anomaly" title="sailfish.physics.kepler.OrbitalElements.orbital_state_from_eccentric_anomaly"><code class="xref py py-obj docutils literal notranslate"><span class="pre">orbital_state_from_eccentric_anomaly</span></code></a>(...)</p></td>
 <td><p>Compute the orbital state, given the eccentric anomaly.</p></td>
@@ -181,7 +182,7 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.physics.kepler.OrbitalElements.eccentric_anomaly">
 <span class="sig-name descname"><span class="pre">eccentric_anomaly</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_since_periapse</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">float</span></span></span><a class="reference internal" href="../_modules/sailfish/physics/kepler.html#OrbitalElements.eccentric_anomaly"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.kepler.OrbitalElements.eccentric_anomaly" title="Permalink to this definition"></a></dt>
-<dd><p>Compute the eccentric anomaly from the time since last periapse.</p>
+<dd><p>Compute the eccentric anomaly from the time since any periapse.</p>
 </dd></dl>
 
 <dl class="py attribute">
@@ -212,7 +213,7 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.physics.kepler.OrbitalElements.orbital_state">
 <span class="sig-name descname"><span class="pre">orbital_state</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time_since_periapse</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><a class="reference internal" href="sailfish.physics.kepler.OrbitalState.html#sailfish.physics.kepler.OrbitalState" title="sailfish.physics.kepler.OrbitalState"><span class="pre">sailfish.physics.kepler.OrbitalState</span></a></span></span><a class="reference internal" href="../_modules/sailfish/physics/kepler.html#OrbitalElements.orbital_state"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.kepler.OrbitalElements.orbital_state" title="Permalink to this definition"></a></dt>
-<dd><p>Compute the orbital state vector from the time since last periapse.</p>
+<dd><p>Compute the orbital state vector from the time since any periapse.</p>
 </dd></dl>
 
 <dl class="py method">

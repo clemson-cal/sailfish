@@ -21,7 +21,6 @@ sailfish.solvers.cbdgam\_2d.Patch
       ~Patch.execution_context
       ~Patch.maximum_wavespeed
       ~Patch.new_iteration
-      ~Patch.primitive_to_conserved
       ~Patch.recompute_conserved
    
    

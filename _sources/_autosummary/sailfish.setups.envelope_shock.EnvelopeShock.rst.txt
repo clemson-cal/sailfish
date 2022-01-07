@@ -21,7 +21,6 @@ sailfish.setups.envelope\_shock.EnvelopeShock
       ~EnvelopeShock.default_model_parameters
       ~EnvelopeShock.describe_class
       ~EnvelopeShock.find_setup_class
-      ~EnvelopeShock.gamma_shell
       ~EnvelopeShock.has_model_parameters
       ~EnvelopeShock.immutable_parameter_keys
       ~EnvelopeShock.mesh
@@ -29,8 +28,6 @@ sailfish.setups.envelope\_shock.EnvelopeShock
       ~EnvelopeShock.model_parameters
       ~EnvelopeShock.primitive
       ~EnvelopeShock.print_model_parameters
-      ~EnvelopeShock.r_shell
-      ~EnvelopeShock.shell_energy
       ~EnvelopeShock.validate
    
    
@@ -41,13 +38,15 @@ sailfish.setups.envelope\_shock.EnvelopeShock
 
    .. autosummary::
    
-      ~EnvelopeShock.ambient
       ~EnvelopeShock.boundary_condition
       ~EnvelopeShock.default_end_time
       ~EnvelopeShock.default_resolution
       ~EnvelopeShock.expand
       ~EnvelopeShock.m_shell
       ~EnvelopeShock.physics
+      ~EnvelopeShock.polar
+      ~EnvelopeShock.polar_extent
+      ~EnvelopeShock.q_shell
       ~EnvelopeShock.r_inner
       ~EnvelopeShock.r_outer
       ~EnvelopeShock.solver

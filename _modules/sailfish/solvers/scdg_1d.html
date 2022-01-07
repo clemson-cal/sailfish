@@ -68,13 +68,17 @@
              
   <h1>Source code for sailfish.solvers.scdg_1d</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">An n-th order discontinuous Galerkin solver for 1D scalar advection.</span>
+<span class="sd">An n-th order discontinuous Galerkin solver for 1D scalar advection and inviscid Burgers eqn.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
-<span class="kn">from</span> <span class="nn">numpy.polynomial.legendre</span> <span class="kn">import</span> <span class="n">leggauss</span><span class="p">,</span> <span class="n">Legendre</span>
 <span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesianMesh</span>
 <span class="kn">from</span> <span class="nn">sailfish.solver</span> <span class="kn">import</span> <span class="n">SolverBase</span>
+<span class="kn">from</span> <span class="nn">sailfish.kernel.library</span> <span class="kn">import</span> <span class="n">Library</span>
+<span class="kn">from</span> <span class="nn">numpy.polynomial.legendre</span> <span class="kn">import</span> <span class="n">leggauss</span><span class="p">,</span> <span class="n">Legendre</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+<span class="n">NUM_CONS</span> <span class="o">=</span> <span class="mi">1</span>
 
 
 <div class="viewcode-block" id="CellData"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.scdg_1d.CellData.html#sailfish.solvers.scdg_1d.CellData">[docs]</a><span class="k">class</span> <span class="nc">CellData</span><span class="p">:</span>
@@ -85,8 +89,6 @@
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="CellData.__init__"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.scdg_1d.CellData.html#sailfish.solvers.scdg_1d.CellData.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">):</span>
-        <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-
         <span class="k">if</span> <span class="n">order</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;cell order must be at least 1&quot;</span><span class="p">)</span>
 
@@ -106,24 +108,83 @@
     <span class="k">def</span> <span class="nf">to_weights</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">ux</span><span class="p">):</span>
         <span class="n">w</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights</span>
         <span class="n">p</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_value</span>
-        <span class="n">o</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span>
-        <span class="k">return</span> <span class="p">[</span><span class="nb">sum</span><span class="p">(</span><span class="n">ux</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">o</span><span class="p">))</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">o</span><span class="p">)]</span>
+        <span class="n">uw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">NUM_CONS</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">])</span>
+
+        <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">NUM_CONS</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_points</span><span class="p">):</span>
+                    <span class="n">uw</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">+=</span> <span class="n">ux</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="mf">0.5</span>
+
+        <span class="k">return</span> <span class="n">uw</span>
 
     <span class="k">def</span> <span class="nf">sample</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uw</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
-        <span class="k">return</span> <span class="n">dot</span><span class="p">(</span><span class="n">uw</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_value</span><span class="p">[</span><span class="n">j</span><span class="p">])</span>
+        <span class="n">ux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">NUM_CONS</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">NUM_CONS</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">):</span>
+                <span class="n">ux</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">+=</span> <span class="n">uw</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_value</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">ux</span>
+
+    <span class="k">def</span> <span class="nf">sample_face</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">uw</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
+        <span class="n">ux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">NUM_CONS</span><span class="p">)</span>
+
+        <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">NUM_CONS</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">order</span><span class="p">):</span>
+                <span class="n">ux</span><span class="p">[</span><span class="n">q</span><span class="p">]</span> <span class="o">+=</span> <span class="n">uw</span><span class="p">[</span><span class="n">q</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">phi_faces</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">ux</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">num_points</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">order</span></div>
 
 
-<div class="viewcode-block" id="dot"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.scdg_1d.dot.html#sailfish.solvers.scdg_1d.dot">[docs]</a><span class="k">def</span> <span class="nf">dot</span><span class="p">(</span><span class="n">u</span><span class="p">,</span> <span class="n">p</span><span class="p">):</span>
-    <span class="k">return</span> <span class="nb">sum</span><span class="p">(</span><span class="n">u</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">u</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span></div>
+<span class="c1"># def limit_troubled_cells(u):</span>
+<span class="c1">#     def minmod(w1, w0l, w0, w0r):</span>
+
+<span class="c1">#         BETA_TVB = 1.0</span>
+<span class="c1">#         a = w1 * (3.0 ** 0.5)</span>
+<span class="c1">#         b = (w0 - w0l) * BETA_TVB</span>
+<span class="c1">#         c = (w0r - w0) * BETA_TVB</span>
+
+<span class="c1">#         return (</span>
+<span class="c1">#             (0.25 / (3.0 ** 0.5))</span>
+<span class="c1">#             * abs(np.sign(a) + np.sign(b))</span>
+<span class="c1">#             * (np.sign(a) + np.sign(c))</span>
+<span class="c1">#             * min(abs(a), abs(b), abs(c))</span>
+<span class="c1">#         )</span>
+
+<span class="c1">#     nz = u.shape[0]</span>
+
+<span class="c1">#     for i in range(nz):</span>
+<span class="c1">#         im1 = (i - 1 + nz) % nz</span>
+<span class="c1">#         ip1 = (i + 1 + nz) % nz</span>
+
+<span class="c1">#         # integrating polynomial extended from left zone into this zone</span>
+<span class="c1">#         a = (</span>
+<span class="c1">#             1.0 * u[im1, 0]</span>
+<span class="c1">#             + 2.0 * (3.0 ** 0.5) * u[im1, 1]</span>
+<span class="c1">#             + 5.0 * (5.0 ** 0.5) / 3.0 * u[im1, 2]</span>
+<span class="c1">#         )</span>
+
+<span class="c1">#         # integrating polynomial extended from right zone into this zone</span>
+<span class="c1">#         b = (</span>
+<span class="c1">#             1.0 * u[ip1, 0]</span>
+<span class="c1">#             - 2.0 * (3.0 ** 0.5) * u[ip1, 1]</span>
+<span class="c1">#             + 5.0 * (5.0 ** 0.5) / 3.0 * u[ip1, 2]</span>
+<span class="c1">#         )</span>
+
+<span class="c1">#         tci = (abs(u[i, 0] - a) + abs(u[i, 0] - b)) / max(</span>
+<span class="c1">#             abs(u[im1, 0]), abs(u[i, 0]), abs(u[ip1, 0])</span>
+<span class="c1">#         )</span>
+
+<span class="c1">#         if tci &gt; 0.1:</span>
+<span class="c1">#             w1t = minmod(u[i, 1], u[im1, 0], u[i, 0], u[ip1, 0])</span>
+<span class="c1">#             if u[i, 1] != w1t:</span>
+<span class="c1">#                 u[i, 1] = w1t</span>
+<span class="c1">#                 u[i, 2] = 0.0</span>
 
 
 <div class="viewcode-block" id="rhs"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.scdg_1d.rhs.html#sailfish.solvers.scdg_1d.rhs">[docs]</a><span class="k">def</span> <span class="nf">rhs</span><span class="p">(</span><span class="n">physics</span><span class="p">,</span> <span class="n">uw</span><span class="p">,</span> <span class="n">cell</span><span class="p">,</span> <span class="n">dx</span><span class="p">,</span> <span class="n">uwdot</span><span class="p">):</span>
-    <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-
     <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">equation</span> <span class="o">==</span> <span class="s2">&quot;advection&quot;</span><span class="p">:</span>
         <span class="n">wavespeed</span> <span class="o">=</span> <span class="n">physics</span><span class="o">.</span><span class="n">wavespeed</span>
 
@@ -139,45 +200,52 @@
     <span class="k">elif</span> <span class="n">physics</span><span class="o">.</span><span class="n">equation</span> <span class="o">==</span> <span class="s2">&quot;burgers&quot;</span><span class="p">:</span>
 
         <span class="k">def</span> <span class="nf">flux</span><span class="p">(</span><span class="n">ux</span><span class="p">):</span>
-            <span class="k">return</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">ux</span> <span class="o">*</span> <span class="n">ux</span>
+            <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">ux</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">ux</span><span class="p">[</span><span class="mi">0</span><span class="p">]])</span>
 
         <span class="k">def</span> <span class="nf">upwind</span><span class="p">(</span><span class="n">ul</span><span class="p">,</span> <span class="n">ur</span><span class="p">):</span>
-            <span class="n">al</span> <span class="o">=</span> <span class="n">ul</span>
-            <span class="n">ar</span> <span class="o">=</span> <span class="n">ur</span>
+            <span class="n">al</span> <span class="o">=</span> <span class="n">ul</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">ar</span> <span class="o">=</span> <span class="n">ur</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
 
             <span class="k">if</span> <span class="n">al</span> <span class="o">&gt;</span> <span class="mf">0.0</span> <span class="ow">and</span> <span class="n">ar</span> <span class="o">&gt;</span> <span class="mf">0.0</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">flux</span><span class="p">(</span><span class="n">ul</span><span class="p">)</span>
             <span class="k">elif</span> <span class="n">al</span> <span class="o">&lt;</span> <span class="mf">0.0</span> <span class="ow">and</span> <span class="n">ar</span> <span class="o">&lt;</span> <span class="mf">0.0</span><span class="p">:</span>
                 <span class="k">return</span> <span class="n">flux</span><span class="p">(</span><span class="n">ur</span><span class="p">)</span>
             <span class="k">else</span><span class="p">:</span>
-                <span class="k">return</span> <span class="mf">0.0</span>
+                <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="mf">0.0</span><span class="p">])</span>
 
     <span class="n">nz</span> <span class="o">=</span> <span class="n">uw</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
     <span class="n">pv</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">phi_value</span>
     <span class="n">pf</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">phi_faces</span>
     <span class="n">pd</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">phi_deriv</span>
     <span class="n">w</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">weights</span>
-    <span class="n">h</span> <span class="o">=</span> <span class="p">[</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">]</span>
+    <span class="n">nhat</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="o">-</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">])</span>
 
     <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nz</span><span class="p">):</span>
         <span class="n">im1</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">-</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">nz</span><span class="p">)</span> <span class="o">%</span> <span class="n">nz</span>
         <span class="n">ip1</span> <span class="o">=</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mi">1</span> <span class="o">+</span> <span class="n">nz</span><span class="p">)</span> <span class="o">%</span> <span class="n">nz</span>
 
-        <span class="n">uimh_l</span> <span class="o">=</span> <span class="n">dot</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">im1</span><span class="p">],</span> <span class="n">pf</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-        <span class="n">uimh_r</span> <span class="o">=</span> <span class="n">dot</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">pf</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
-        <span class="n">uiph_l</span> <span class="o">=</span> <span class="n">dot</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">pf</span><span class="p">[</span><span class="mi">1</span><span class="p">])</span>
-        <span class="n">uiph_r</span> <span class="o">=</span> <span class="n">dot</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">ip1</span><span class="p">],</span> <span class="n">pf</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+        <span class="n">uimh_l</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">sample_face</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">im1</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">uimh_r</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">sample_face</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">uiph_l</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">sample_face</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">uiph_r</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">sample_face</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">ip1</span><span class="p">],</span> <span class="mi">0</span><span class="p">)</span>
         <span class="n">fimh</span> <span class="o">=</span> <span class="n">upwind</span><span class="p">(</span><span class="n">uimh_l</span><span class="p">,</span> <span class="n">uimh_r</span><span class="p">)</span>
         <span class="n">fiph</span> <span class="o">=</span> <span class="n">upwind</span><span class="p">(</span><span class="n">uiph_l</span><span class="p">,</span> <span class="n">uiph_r</span><span class="p">)</span>
 
-        <span class="n">fs</span> <span class="o">=</span> <span class="p">[</span><span class="n">fimh</span><span class="p">,</span> <span class="n">fiph</span><span class="p">]</span>
-        <span class="n">ux</span> <span class="o">=</span> <span class="p">[</span><span class="n">cell</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">order</span><span class="p">)]</span>
-        <span class="n">fx</span> <span class="o">=</span> <span class="p">[</span><span class="n">flux</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">ux</span><span class="p">]</span>
+        <span class="n">fs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">fimh</span><span class="p">,</span> <span class="n">fiph</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
+        <span class="n">ux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">cell</span><span class="o">.</span><span class="n">sample</span><span class="p">(</span><span class="n">uw</span><span class="p">[</span><span class="n">i</span><span class="p">],</span> <span class="n">j</span><span class="p">)</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">order</span><span class="p">)])</span><span class="o">.</span><span class="n">T</span>
+        <span class="n">fx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">flux</span><span class="p">(</span><span class="n">u</span><span class="p">)</span> <span class="k">for</span> <span class="n">u</span> <span class="ow">in</span> <span class="n">ux</span><span class="o">.</span><span class="n">T</span><span class="p">])</span><span class="o">.</span><span class="n">T</span>
 
         <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">order</span><span class="p">):</span>
-            <span class="n">udot_s</span> <span class="o">=</span> <span class="o">-</span><span class="nb">sum</span><span class="p">(</span><span class="n">fs</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">pf</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="n">h</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">))</span> <span class="o">/</span> <span class="n">dx</span>
-            <span class="n">udot_v</span> <span class="o">=</span> <span class="o">+</span><span class="nb">sum</span><span class="p">(</span><span class="n">fx</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">pd</span><span class="p">[</span><span class="n">j</span><span class="p">][</span><span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">num_points</span><span class="p">))</span> <span class="o">/</span> <span class="n">dx</span>
-            <span class="n">uwdot</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">udot_s</span> <span class="o">+</span> <span class="n">udot_v</span></div>
+            <span class="n">udot_s</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="n">udot_v</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="p">):</span>
+                <span class="n">udot_s</span> <span class="o">-=</span> <span class="n">fs</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">pf</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="n">nhat</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">/</span> <span class="n">dx</span>
+
+            <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">num_points</span><span class="p">):</span>
+                <span class="n">udot_v</span> <span class="o">+=</span> <span class="n">fx</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="n">j</span><span class="p">]</span> <span class="o">*</span> <span class="n">pd</span><span class="p">[</span><span class="n">j</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="n">j</span><span class="p">]</span> <span class="o">/</span> <span class="n">dx</span>
+
+            <span class="n">uwdot</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">=</span> <span class="n">udot_s</span> <span class="o">+</span> <span class="n">udot_v</span></div>
 
 
 <div class="viewcode-block" id="Options"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.scdg_1d.Options.html#sailfish.solvers.scdg_1d.Options">[docs]</a><span class="k">class</span> <span class="nc">Options</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
@@ -213,8 +281,6 @@
         <span class="n">physics</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
         <span class="n">options</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
     <span class="p">):</span>
-        <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-
         <span class="n">options</span> <span class="o">=</span> <span class="n">Options</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
         <span class="n">physics</span> <span class="o">=</span> <span class="n">Physics</span><span class="p">(</span><span class="o">**</span><span class="n">physics</span><span class="p">)</span>
         <span class="n">cell</span> <span class="o">=</span> <span class="n">CellData</span><span class="p">(</span><span class="n">order</span><span class="o">=</span><span class="n">options</span><span class="o">.</span><span class="n">order</span><span class="p">)</span>
@@ -234,25 +300,42 @@
         <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">equation</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;advection&quot;</span><span class="p">,</span> <span class="s2">&quot;burgers&quot;</span><span class="p">]:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;physics.equation must be advection or burgers&quot;</span><span class="p">)</span>
 
-        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">integrator</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;rk1&quot;</span><span class="p">,</span> <span class="s2">&quot;rk2&quot;</span><span class="p">,</span> <span class="s2">&quot;rk3&quot;</span><span class="p">,</span> <span class="s2">&quot;rk3-sr02&quot;</span><span class="p">]:</span>
-            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;options.integrator must be rk1|rk2|rk3|rk3-sr02&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">integrator</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span>
+            <span class="s2">&quot;rk1&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;rk2&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;rk3&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;rk3-sr02&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SSPRK32&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SSPRK43&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SSPRK53&quot;</span><span class="p">,</span>
+            <span class="s2">&quot;SSPRK54&quot;</span><span class="p">,</span>
+        <span class="p">]:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                <span class="s2">&quot;options.integrator must be &quot;</span>
+                <span class="s2">&quot;rk1|rk2|rk3|rk3-sr02|SSPRK32|SSPRK43|SSPRK53|SSPRK54&quot;</span>
+            <span class="p">)</span>
 
         <span class="k">if</span> <span class="n">options</span><span class="o">.</span><span class="n">order</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;option.order must be greater than 0&quot;</span><span class="p">)</span>
 
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="vm">__file__</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.py&quot;</span><span class="p">,</span> <span class="s2">&quot;.c&quot;</span><span class="p">),</span> <span class="s2">&quot;r&quot;</span><span class="p">)</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">source</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">lib</span> <span class="o">=</span> <span class="n">Library</span><span class="p">(</span><span class="n">source</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
         <span class="k">if</span> <span class="n">solution</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">num_zones</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
             <span class="n">xf</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">num_zones</span><span class="p">)</span>  <span class="c1"># face coordinates</span>
-            <span class="n">px</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">num_zones</span><span class="p">,</span> <span class="n">cell</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
-            <span class="n">ux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">num_zones</span><span class="p">,</span> <span class="n">cell</span><span class="o">.</span><span class="n">num_points</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
-            <span class="n">uw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">num_zones</span><span class="p">,</span> <span class="n">cell</span><span class="o">.</span><span class="n">order</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+            <span class="n">px</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">num_zones</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">cell</span><span class="o">.</span><span class="n">num_points</span><span class="p">])</span>
+            <span class="n">ux</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">num_zones</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">cell</span><span class="o">.</span><span class="n">num_points</span><span class="p">])</span>
+            <span class="n">uw</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">num_zones</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">cell</span><span class="o">.</span><span class="n">order</span><span class="p">])</span>
             <span class="n">dx</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">dx</span>
 
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_zones</span><span class="p">):</span>
                 <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">cell</span><span class="o">.</span><span class="n">num_points</span><span class="p">):</span>
                     <span class="n">xsi</span> <span class="o">=</span> <span class="n">cell</span><span class="o">.</span><span class="n">gauss_points</span><span class="p">[</span><span class="n">j</span><span class="p">]</span>
                     <span class="n">xj</span> <span class="o">=</span> <span class="n">xf</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">+</span> <span class="p">(</span><span class="n">xsi</span> <span class="o">+</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">*</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">dx</span>
-                    <span class="n">setup</span><span class="o">.</span><span class="n">primitive</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">xj</span><span class="p">,</span> <span class="n">px</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">])</span>
+                    <span class="n">setup</span><span class="o">.</span><span class="n">primitive</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">xj</span><span class="p">,</span> <span class="n">px</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="p">:,</span> <span class="n">j</span><span class="p">])</span>
 
             <span class="n">ux</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="n">px</span><span class="p">[</span><span class="o">...</span><span class="p">]</span>  <span class="c1"># the conserved variable is also the primitive</span>
 
@@ -304,6 +387,14 @@
             <span class="k">return</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;rk3-sr02&quot;</span><span class="p">:</span>
             <span class="k">return</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK32&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># up to 2.2 / (2 * k + 1) seems to work</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK43&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># C = 1.683339717642499</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK53&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">2.387300839230550</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># C = 2.387300839230550</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK54&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mf">1.5</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>  <span class="c1"># up to 1.7 / (2 * k + 1) seems to work</span>
 
 <div class="viewcode-block" id="Solver.maximum_wavespeed"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.maximum_wavespeed">[docs]</a>    <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span><span class="o">.</span><span class="n">equation</span> <span class="o">==</span> <span class="s2">&quot;advection&quot;</span><span class="p">:</span>
@@ -312,11 +403,10 @@
             <span class="k">return</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conserved_w</span><span class="p">[:,</span> <span class="mi">0</span><span class="p">])</span><span class="o">.</span><span class="n">max</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Solver.advance"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.scdg_1d.Solver.html#sailfish.solvers.scdg_1d.Solver.advance">[docs]</a>    <span class="k">def</span> <span class="nf">advance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
-        <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-
         <span class="k">def</span> <span class="nf">udot</span><span class="p">(</span><span class="n">u</span><span class="p">):</span>
             <span class="n">udot</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
-            <span class="n">rhs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_physics</span><span class="p">,</span> <span class="n">u</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">cell</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dx</span><span class="p">,</span> <span class="n">udot</span><span class="p">)</span>
+            <span class="c1"># rhs(self._physics, u, self.cell, self.mesh.dx, udot)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">scdg_1d_udot</span><span class="p">[</span><span class="n">u</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]](</span><span class="n">u</span><span class="p">,</span> <span class="n">udot</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dx</span><span class="p">)</span>
             <span class="k">return</span> <span class="n">udot</span>
 
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;rk1&quot;</span><span class="p">:</span>
@@ -345,6 +435,391 @@
             <span class="n">u</span> <span class="o">=</span> <span class="n">u</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
             <span class="n">u</span> <span class="o">=</span> <span class="mf">2.0</span> <span class="o">/</span> <span class="mf">3.0</span> <span class="o">*</span> <span class="n">u0</span> <span class="o">+</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">3.0</span> <span class="o">*</span> <span class="p">(</span><span class="n">u</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot</span><span class="p">(</span><span class="n">u</span><span class="p">))</span>
             <span class="n">u</span> <span class="o">=</span> <span class="n">u</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot</span><span class="p">(</span><span class="n">u</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK32&quot;</span><span class="p">:</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            3-stage 2nd-order Strong Stability Preserving SSPRK(3,2) integrator in Shu-Osher form</span>
+<span class="sd">            Not a low storage integrator: requires 3 copies of the conserved array, plus 2 copies</span>
+<span class="sd">            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU</span>
+<span class="sd">            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 7</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span><span class="mf">1.000000000000000</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">],</span>
+                <span class="p">[</span><span class="mf">0.087353119859156</span><span class="p">,</span> <span class="mf">0.912646880140844</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">],</span>
+                <span class="p">[</span><span class="mf">0.344956917166841</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">,</span> <span class="mf">0.655043082833159</span><span class="p">],</span>
+            <span class="p">]</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span><span class="mf">0.528005024856522</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">],</span>
+                <span class="p">[</span><span class="mf">0.000000000000000</span><span class="p">,</span> <span class="mf">0.481882138633993</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">],</span>
+                <span class="p">[</span><span class="mf">0.022826837460491</span><span class="p">,</span> <span class="mf">0.000000000000000</span><span class="p">,</span> <span class="mf">0.345866039233415</span><span class="p">],</span>
+            <span class="p">]</span>
+
+            <span class="n">u</span> <span class="o">=</span> <span class="n">u0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved_w</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">udot_0</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u0</span><span class="p">)</span>
+            <span class="n">u1</span> <span class="o">=</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span> <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+            <span class="n">udot_1</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u1</span><span class="p">)</span>
+            <span class="n">u2</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+            <span class="p">)</span>
+            <span class="c1"># udot_2 = udot(u2)</span>
+            <span class="n">u</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot</span><span class="p">(</span><span class="n">u2</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK43&quot;</span><span class="p">:</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            4-stage 3rd-order Strong Stability Preserving SSPRK(4,3) integrator in Shu-Osher form</span>
+<span class="sd">            Not a low storage integrator: requires 4 copies of the conserved array, plus 3 copies</span>
+<span class="sd">            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU</span>
+<span class="sd">            C = 1.683339717642499</span>
+<span class="sd">            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 13</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span>
+                    <span class="mf">1.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.522361915162541</span><span class="p">,</span>
+                    <span class="mf">0.477638084837459</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.368530939472566</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.631469060527434</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.334082932462285</span><span class="p">,</span>
+                    <span class="mf">0.006966183666289</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.658950883871426</span><span class="p">,</span>
+                <span class="p">],</span>
+            <span class="p">]</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span>
+                    <span class="mf">0.594057152884440</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.283744320787718</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.000000038023030</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.375128712231540</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.116941419604231</span><span class="p">,</span>
+                    <span class="mf">0.004138311235266</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.391454485963345</span><span class="p">,</span>
+                <span class="p">],</span>
+            <span class="p">]</span>
+
+            <span class="n">u</span> <span class="o">=</span> <span class="n">u0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved_w</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">udot_0</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u0</span><span class="p">)</span>
+            <span class="n">u1</span> <span class="o">=</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span> <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+            <span class="n">udot_1</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u1</span><span class="p">)</span>
+            <span class="n">u2</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+            <span class="p">)</span>
+            <span class="n">udot_2</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u2</span><span class="p">)</span>
+            <span class="n">u3</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+            <span class="p">)</span>
+            <span class="c1"># udot_3 = udot(u3)</span>
+            <span class="n">u</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u3</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot</span><span class="p">(</span><span class="n">u3</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK53&quot;</span><span class="p">:</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            5-stage 3rd-order Strong Stability Preserving SSPRK(5,3) integrator in Shu-Osher form</span>
+<span class="sd">            Not a low storage integrator: requires 5 copies of the conserved array, plus 4 copies</span>
+<span class="sd">            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU</span>
+<span class="sd">            C = 2.387300839230550</span>
+<span class="sd">            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 18</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span>
+                    <span class="mf">1.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.495124140877703</span><span class="p">,</span>
+                    <span class="mf">0.504875859122297</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.105701991897526</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.894298008102474</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.411551205755676</span><span class="p">,</span>
+                    <span class="mf">0.011170516177380</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.577278278066944</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.186911123548222</span><span class="p">,</span>
+                    <span class="mf">0.013354480555382</span><span class="p">,</span>
+                    <span class="mf">0.012758264566319</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.786976131330077</span><span class="p">,</span>
+                <span class="p">],</span>
+            <span class="p">]</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span>
+                    <span class="mf">0.418883109982196</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.211483970024081</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.000000000612488</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.374606330884848</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.046744815663888</span><span class="p">,</span>
+                    <span class="mf">0.004679140556487</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.241812120441849</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.071938257223857</span><span class="p">,</span>
+                    <span class="mf">0.005593966347235</span><span class="p">,</span>
+                    <span class="mf">0.005344221539515</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.329651009373300</span><span class="p">,</span>
+                <span class="p">],</span>
+            <span class="p">]</span>
+
+            <span class="n">u</span> <span class="o">=</span> <span class="n">u0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved_w</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">udot_0</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u0</span><span class="p">)</span>
+            <span class="n">u1</span> <span class="o">=</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span> <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+            <span class="n">udot_1</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u1</span><span class="p">)</span>
+            <span class="n">u2</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+            <span class="p">)</span>
+            <span class="n">udot_2</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u2</span><span class="p">)</span>
+            <span class="n">u3</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+            <span class="p">)</span>
+            <span class="n">udot_3</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u3</span><span class="p">)</span>
+            <span class="n">u4</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u3</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_3</span>
+            <span class="p">)</span>
+            <span class="c1"># udot_4 = udot(u4)</span>
+            <span class="n">u</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u3</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_3</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">u4</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot</span><span class="p">(</span><span class="n">u4</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">integrator</span> <span class="o">==</span> <span class="s2">&quot;SSPRK54&quot;</span><span class="p">:</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            5-stage 4th-order Strong Stability Preserving SSPRK(5,4) integrator in Shu-Osher form</span>
+<span class="sd">            Not a low storage integrator: requires 5 copies of the conserved array, plus 4 copies</span>
+<span class="sd">            of its time derivative (optionally) which could instead be recomputed e.g. on a GPU</span>
+<span class="sd">            Reference: Kubatko+, J Sci Comput (2014) 60:313–344; Table 18</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">alpha</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span>
+                    <span class="mf">1.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.261216512493821</span><span class="p">,</span>
+                    <span class="mf">0.738783487506179</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.623613752757655</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.376386247242345</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.444745181201454</span><span class="p">,</span>
+                    <span class="mf">0.120932584902288</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.434322233896258</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.213357715199957</span><span class="p">,</span>
+                    <span class="mf">0.209928473023448</span><span class="p">,</span>
+                    <span class="mf">0.063353148180384</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.513360663596212</span><span class="p">,</span>
+                <span class="p">],</span>
+            <span class="p">]</span>
+            <span class="n">beta</span> <span class="o">=</span> <span class="p">[</span>
+                <span class="p">[</span>
+                    <span class="mf">0.605491839566400</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.447327372891397</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.000000844149769</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.227898801230261</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.002856233144485</span><span class="p">,</span>
+                    <span class="mf">0.073223693296006</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.262978568366434</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                <span class="p">],</span>
+                <span class="p">[</span>
+                    <span class="mf">0.002362549760441</span><span class="p">,</span>
+                    <span class="mf">0.127109977308333</span><span class="p">,</span>
+                    <span class="mf">0.038359814234063</span><span class="p">,</span>
+                    <span class="mf">0.000000000000000</span><span class="p">,</span>
+                    <span class="mf">0.310835692561898</span><span class="p">,</span>
+                <span class="p">],</span>
+            <span class="p">]</span>
+
+            <span class="n">u</span> <span class="o">=</span> <span class="n">u0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved_w</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
+            <span class="n">udot_0</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u0</span><span class="p">)</span>
+            <span class="n">u1</span> <span class="o">=</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span> <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">1</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+            <span class="n">udot_1</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u1</span><span class="p">)</span>
+            <span class="n">u2</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">2</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+            <span class="p">)</span>
+            <span class="n">udot_2</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u2</span><span class="p">)</span>
+            <span class="n">u3</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">3</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+            <span class="p">)</span>
+            <span class="n">udot_3</span> <span class="o">=</span> <span class="n">udot</span><span class="p">(</span><span class="n">u3</span><span class="p">)</span>
+            <span class="n">u4</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u3</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">4</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_3</span>
+            <span class="p">)</span>
+            <span class="c1"># udot_4 = udot(u4)</span>
+            <span class="n">u</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">u0</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_0</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">u1</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">1</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_1</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">u2</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">2</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_2</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">u3</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">3</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot_3</span>
+                <span class="o">+</span> <span class="n">alpha</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">u4</span>
+                <span class="o">+</span> <span class="n">beta</span><span class="p">[</span><span class="mi">5</span> <span class="o">-</span> <span class="mi">1</span><span class="p">][</span><span class="mi">4</span><span class="p">]</span> <span class="o">*</span> <span class="n">dt</span> <span class="o">*</span> <span class="n">udot</span><span class="p">(</span><span class="n">u4</span><span class="p">)</span>
+            <span class="p">)</span>
+
+        <span class="c1"># limit_troubled_cells(u)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">conserved_w</span> <span class="o">=</span> <span class="n">u</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">t</span> <span class="o">+=</span> <span class="n">dt</span></div></div>

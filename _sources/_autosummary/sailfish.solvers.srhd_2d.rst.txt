@@ -1,0 +1,38 @@
+sailfish.solvers.srhd\_2d
+=========================
+
+.. automodule:: sailfish.solvers.srhd_2d
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      initial_condition
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Patch
+      Solver
+   
+   
+
+   
+   
+   
+
+
+

@@ -1,0 +1,48 @@
+sailfish.setups.simple2d.UniformPolar
+=====================================
+
+.. currentmodule:: sailfish.setups.simple2d
+
+.. autoclass:: UniformPolar
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~UniformPolar.__init__
+      ~UniformPolar.dash_case_class_name
+      ~UniformPolar.default_model_parameters
+      ~UniformPolar.describe_class
+      ~UniformPolar.find_setup_class
+      ~UniformPolar.has_model_parameters
+      ~UniformPolar.immutable_parameter_keys
+      ~UniformPolar.mesh
+      ~UniformPolar.model_parameter_dict
+      ~UniformPolar.model_parameters
+      ~UniformPolar.primitive
+      ~UniformPolar.print_model_parameters
+      ~UniformPolar.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~UniformPolar.boundary_condition
+      ~UniformPolar.default_end_time
+      ~UniformPolar.default_resolution
+      ~UniformPolar.physics
+      ~UniformPolar.solver
+      ~UniformPolar.start_time
+   
+   

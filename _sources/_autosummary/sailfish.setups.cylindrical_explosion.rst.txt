@@ -1,0 +1,30 @@
+sailfish.setups.cylindrical\_explosion
+======================================
+
+.. automodule:: sailfish.setups.cylindrical_explosion
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      CylindricalExplosion
+   
+   
+
+   
+   
+   
+
+
+

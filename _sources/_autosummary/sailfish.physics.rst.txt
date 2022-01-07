@@ -27,5 +27,6 @@
    :toctree:
    :recursive:
 
+   sailfish.physics.circumbinary
    sailfish.physics.kepler
 

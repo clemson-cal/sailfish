@@ -60,8 +60,10 @@
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Solver.html">sailfish.solvers.cbdgam_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
@@ -100,7 +102,7 @@
 <h1>sailfish.solvers.cbdgam_2d.Physics<a class="headerlink" href="#sailfish-solvers-cbdgam-2d-physics" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdgam_2d.</span></span><span class="sig-name descname"><span class="pre">Physics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">gamma_law_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">viscosity_coefficient</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdgam_2d.html#Physics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdgam_2d.</span></span><span class="sig-name descname"><span class="pre">Physics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">alpha</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_rate</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_radius</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass_model1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mass_model2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">soft_length</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">e</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gamma_law_index</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cooling_coefficient</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">constant_softening</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">kb_mode</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdgam_2d.html#Physics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.__init__">
@@ -132,14 +134,62 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.gamma_law_index" title="sailfish.solvers.cbdgam_2d.Physics.gamma_law_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gamma_law_index</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.alpha" title="sailfish.solvers.cbdgam_2d.Physics.alpha"><code class="xref py py-obj docutils literal notranslate"><span class="pre">alpha</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.viscosity_coefficient" title="sailfish.solvers.cbdgam_2d.Physics.viscosity_coefficient"><code class="xref py py-obj docutils literal notranslate"><span class="pre">viscosity_coefficient</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.constant_softening" title="sailfish.solvers.cbdgam_2d.Physics.constant_softening"><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_softening</span></code></a></p></td>
+<td><p>Alias for field number 10</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.cooling_coefficient" title="sailfish.solvers.cbdgam_2d.Physics.cooling_coefficient"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cooling_coefficient</span></code></a></p></td>
+<td><p>Alias for field number 9</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.e" title="sailfish.solvers.cbdgam_2d.Physics.e"><code class="xref py py-obj docutils literal notranslate"><span class="pre">e</span></code></a></p></td>
+<td><p>Alias for field number 7</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.gamma_law_index" title="sailfish.solvers.cbdgam_2d.Physics.gamma_law_index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">gamma_law_index</span></code></a></p></td>
+<td><p>Alias for field number 8</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.kb_mode" title="sailfish.solvers.cbdgam_2d.Physics.kb_mode"><code class="xref py py-obj docutils literal notranslate"><span class="pre">kb_mode</span></code></a></p></td>
+<td><p>Alias for field number 11</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.mass_model1" title="sailfish.solvers.cbdgam_2d.Physics.mass_model1"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mass_model1</span></code></a></p></td>
+<td><p>Alias for field number 3</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.mass_model2" title="sailfish.solvers.cbdgam_2d.Physics.mass_model2"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mass_model2</span></code></a></p></td>
+<td><p>Alias for field number 4</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.q" title="sailfish.solvers.cbdgam_2d.Physics.q"><code class="xref py py-obj docutils literal notranslate"><span class="pre">q</span></code></a></p></td>
+<td><p>Alias for field number 6</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.sink_radius" title="sailfish.solvers.cbdgam_2d.Physics.sink_radius"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sink_radius</span></code></a></p></td>
+<td><p>Alias for field number 2</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.sink_rate" title="sailfish.solvers.cbdgam_2d.Physics.sink_rate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sink_rate</span></code></a></p></td>
 <td><p>Alias for field number 1</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Physics.soft_length" title="sailfish.solvers.cbdgam_2d.Physics.soft_length"><code class="xref py py-obj docutils literal notranslate"><span class="pre">soft_length</span></code></a></p></td>
+<td><p>Alias for field number 5</p></td>
 </tr>
 </tbody>
 </table>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.alpha">
+<span class="sig-name descname"><span class="pre">alpha</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.alpha" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.constant_softening">
+<span class="sig-name descname"><span class="pre">constant_softening</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.constant_softening" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 10</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.cooling_coefficient">
+<span class="sig-name descname"><span class="pre">cooling_coefficient</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.cooling_coefficient" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 9</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.count">
 <span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.count" title="Permalink to this definition"></a></dt>
@@ -147,9 +197,15 @@
 </dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.e">
+<span class="sig-name descname"><span class="pre">e</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.e" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 7</p>
+</dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.gamma_law_index">
 <span class="sig-name descname"><span class="pre">gamma_law_index</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.gamma_law_index" title="Permalink to this definition"></a></dt>
-<dd><p>Alias for field number 0</p>
+<dd><p>Alias for field number 8</p>
 </dd></dl>
 
 <dl class="py method">
@@ -160,9 +216,45 @@
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.viscosity_coefficient">
-<span class="sig-name descname"><span class="pre">viscosity_coefficient</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.viscosity_coefficient" title="Permalink to this definition"></a></dt>
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.kb_mode">
+<span class="sig-name descname"><span class="pre">kb_mode</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.kb_mode" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 11</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.mass_model1">
+<span class="sig-name descname"><span class="pre">mass_model1</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.mass_model1" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.mass_model2">
+<span class="sig-name descname"><span class="pre">mass_model2</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.mass_model2" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.q">
+<span class="sig-name descname"><span class="pre">q</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.q" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 6</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.sink_radius">
+<span class="sig-name descname"><span class="pre">sink_radius</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.sink_radius" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.sink_rate">
+<span class="sig-name descname"><span class="pre">sink_rate</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.sink_rate" title="Permalink to this definition"></a></dt>
 <dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Physics.soft_length">
+<span class="sig-name descname"><span class="pre">soft_length</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Physics.soft_length" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 5</p>
 </dd></dl>
 
 </dd></dl>

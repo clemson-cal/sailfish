@@ -32,6 +32,7 @@ sailfish.solvers.scdg\_1d.Solver
       ~Solver.options
       ~Solver.physics
       ~Solver.primitive
+      ~Solver.recommended_cfl
       ~Solver.solution
       ~Solver.time
    

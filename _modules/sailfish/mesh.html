@@ -71,7 +71,7 @@
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
-<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">log10</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">log</span><span class="p">,</span> <span class="n">log10</span><span class="p">,</span> <span class="n">pi</span>
 
 
 <div class="viewcode-block" id="PlanarCartesianMesh"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.PlanarCartesianMesh.html#sailfish.mesh.PlanarCartesianMesh">[docs]</a><span class="k">class</span> <span class="nc">PlanarCartesianMesh</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
@@ -84,7 +84,9 @@
     <span class="n">num_zones</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span>
 
     <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;planar cartesian (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x0</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x1</span><span class="si">}</span><span class="s2">), </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span><span class="si">}</span><span class="s2"> zones&quot;</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="sa">f</span><span class="s2">&quot;&lt;planar cartesian 1d: (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x0</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x1</span><span class="si">}</span><span class="s2">), </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span><span class="si">}</span><span class="s2"> zones&gt;&quot;</span>
+        <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">dx</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -96,6 +98,10 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span><span class="p">,)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">num_total_zones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span>
 
     <span class="k">def</span> <span class="nf">zone_center</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
         <span class="n">x0</span><span class="p">,</span> <span class="n">dx</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dx</span>
@@ -113,7 +119,7 @@
 
 <div class="viewcode-block" id="LogSphericalMesh"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh">[docs]</a><span class="k">class</span> <span class="nc">LogSphericalMesh</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    A 1D mesh with logarithmic radial binning and homologous expansion.</span>
+<span class="sd">    A 1D or 2D mesh with logarithmic radial binning and homologous expansion.</span>
 
 <span class="sd">    The comoving coordinates are time-independent; proper distances are</span>
 <span class="sd">    affected by the scale factor derivative.</span>
@@ -123,16 +129,18 @@
     <span class="n">r1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">10.0</span>
     <span class="n">num_zones_per_decade</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span>
     <span class="n">scale_factor_derivative</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">polar_grid</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="n">polar_extent</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="n">pi</span>
 
     <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale_factor_derivative</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
-            <span class="n">motion</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;fixed mesh&quot;</span>
+            <span class="n">motion</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;no expansion&quot;</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">motion</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;homologous with a-dot = </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">scale_factor_derivative</span><span class="si">:</span><span class="s2">0.2f</span><span class="si">}</span><span class="s2">&quot;</span>
-
         <span class="k">return</span> <span class="p">(</span>
-            <span class="sa">f</span><span class="s2">&quot;log spherical (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">r0</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">r1</span><span class="si">}</span><span class="s2">) </span><span class="si">{</span><span class="n">motion</span><span class="si">}</span><span class="s2">, &quot;</span>
-            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones_per_decade</span><span class="si">}</span><span class="s2"> zones per decade&quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;&lt;log spherical: (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">r0</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">r1</span><span class="si">}</span><span class="s2">), </span><span class="si">{</span><span class="n">motion</span><span class="si">}</span><span class="s2">, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones_per_decade</span><span class="si">}</span><span class="s2"> zones per decade, &quot;</span>
+            <span class="sa">f</span><span class="s2">&quot;shape </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
         <span class="p">)</span>
 
 <div class="viewcode-block" id="LogSphericalMesh.min_spacing"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.min_spacing">[docs]</a>    <span class="k">def</span> <span class="nf">min_spacing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
@@ -145,6 +153,10 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
         <span class="k">return</span> <span class="p">(</span><span class="n">r1</span> <span class="o">-</span> <span class="n">r0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale_factor</span><span class="p">(</span><span class="n">time</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">polar_spacing</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">polar_extent</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_polar_zones</span>
 
 <div class="viewcode-block" id="LogSphericalMesh.scale_factor"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.scale_factor">[docs]</a>    <span class="k">def</span> <span class="nf">scale_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -160,7 +172,17 @@
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="p">(</span><span class="nb">int</span><span class="p">(</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">r1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">r0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_zones_per_decade</span><span class="p">),)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">polar_grid</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_radial_zones</span><span class="p">,)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_radial_zones</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_polar_zones</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">num_total_zones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="n">tot</span> <span class="o">=</span> <span class="mi">1</span>
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">:</span>
+            <span class="n">tot</span> <span class="o">*=</span> <span class="n">n</span>
+        <span class="k">return</span> <span class="n">tot</span>
 
 <div class="viewcode-block" id="LogSphericalMesh.zone_center"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.zone_center">[docs]</a>    <span class="k">def</span> <span class="nf">zone_center</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">i</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
@@ -183,7 +205,39 @@
         <span class="k">if</span> <span class="n">i1</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">i1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">r0</span><span class="p">,</span> <span class="n">k</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">r0</span><span class="p">,</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_zones_per_decade</span>
-        <span class="k">return</span> <span class="p">[</span><span class="n">r0</span> <span class="o">*</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i0</span><span class="p">,</span> <span class="n">i1</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span></div></div>
+        <span class="k">return</span> <span class="p">[</span><span class="n">r0</span> <span class="o">*</span> <span class="mi">10</span> <span class="o">**</span> <span class="p">(</span><span class="n">i</span> <span class="o">*</span> <span class="n">k</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">i0</span><span class="p">,</span> <span class="n">i1</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span></div>
+
+<div class="viewcode-block" id="LogSphericalMesh.cell_coordinates"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.cell_coordinates">[docs]</a>    <span class="k">def</span> <span class="nf">cell_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the 2D (r, theta) zone center proper coordinates at index (i, j).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">zone_center</span><span class="p">(</span><span class="n">t</span><span class="p">,</span> <span class="n">i</span><span class="p">)</span>
+        <span class="n">q</span> <span class="o">=</span> <span class="p">(</span><span class="n">j</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">polar_spacing</span>
+        <span class="k">return</span> <span class="n">r</span><span class="p">,</span> <span class="n">q</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">num_radial_zones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="n">log10</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">r1</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">r0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_zones_per_decade</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">num_polar_zones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">polar_grid</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;only defined for a 2D spherical polar mesh&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones_per_decade</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">polar_extent</span> <span class="o">/</span> <span class="n">log</span><span class="p">(</span><span class="mi">10</span><span class="p">))</span>
+
+<div class="viewcode-block" id="LogSphericalMesh.radial_vertices"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.LogSphericalMesh.html#sailfish.mesh.LogSphericalMesh.radial_vertices">[docs]</a>    <span class="k">def</span> <span class="nf">radial_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a list of proper coordinates of the radial zone interfaces.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">scale_factor</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">r</span> <span class="o">*</span> <span class="n">a</span> <span class="k">for</span> <span class="n">r</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="p">()]</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">polar_vertices</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A list of the polar angles of the polar mesh faces</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="p">[</span><span class="n">j</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">polar_spacing</span> <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_polar_zones</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)]</span></div>
 
 
 <div class="viewcode-block" id="PlanarCartesian2DMesh"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.PlanarCartesian2DMesh.html#sailfish.mesh.PlanarCartesian2DMesh">[docs]</a><span class="k">class</span> <span class="nc">PlanarCartesian2DMesh</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
@@ -201,6 +255,9 @@
     <span class="n">y1</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
     <span class="n">ni</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span>
     <span class="n">nj</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1000</span>
+
+    <span class="k">def</span> <span class="fm">__str__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&lt;planar cartesian 2d: (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x0</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">x1</span><span class="si">}</span><span class="s2">) x (</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">y0</span><span class="si">}</span><span class="s2"> -&gt; </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">y1</span><span class="si">}</span><span class="s2">), shape </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="si">}</span><span class="s2">&gt;&quot;</span>
 
     <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">centered_square</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">domain_radius</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
@@ -234,21 +291,29 @@
     <span class="k">def</span> <span class="nf">dy</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">y1</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0</span><span class="p">)</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">nj</span>
 
-    <span class="k">def</span> <span class="nf">num_total_zones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ni</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">nj</span>
-
+    <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">shape</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ni</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">nj</span>
+
+    <span class="k">def</span> <span class="nf">min_spacing</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">min</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">dx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">dy</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">num_total_zones</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">ni</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">nj</span>
 
     <span class="k">def</span> <span class="nf">cell_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x0</span> <span class="o">+</span> <span class="p">(</span><span class="n">i</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">dx</span>
         <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0</span> <span class="o">+</span> <span class="p">(</span><span class="n">j</span> <span class="o">+</span> <span class="mf">0.5</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">dy</span>
         <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span>
 
-    <span class="k">def</span> <span class="nf">vertex_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
+<div class="viewcode-block" id="PlanarCartesian2DMesh.vertex_coordinates"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.PlanarCartesian2DMesh.html#sailfish.mesh.PlanarCartesian2DMesh.vertex_coordinates">[docs]</a>    <span class="k">def</span> <span class="nf">vertex_coordinates</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the position of the lower-left corner of zone (i, j).</span>
+<span class="sd">        &quot;&quot;&quot;</span>
         <span class="n">x</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">x0</span> <span class="o">+</span> <span class="n">i</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">dx</span>
         <span class="n">y</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">y0</span> <span class="o">+</span> <span class="n">j</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">dy</span>
-        <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span>
+        <span class="k">return</span> <span class="n">x</span><span class="p">,</span> <span class="n">y</span></div>
 
 <div class="viewcode-block" id="PlanarCartesian2DMesh.sub_mesh"><a class="viewcode-back" href="../../_autosummary/sailfish.mesh.PlanarCartesian2DMesh.html#sailfish.mesh.PlanarCartesian2DMesh.sub_mesh">[docs]</a>    <span class="k">def</span> <span class="nf">sub_mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">di</span><span class="p">,</span> <span class="n">dj</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>

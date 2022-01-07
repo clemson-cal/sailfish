@@ -21,6 +21,7 @@ sailfish.solvers.srhd\_1d.Solver
       ~Solver.advance_rk
       ~Solver.maximum_wavespeed
       ~Solver.new_iteration
+      ~Solver.reconstruct
       ~Solver.set_bc
       ~Solver.set_bc_patch
    
@@ -36,6 +37,7 @@ sailfish.solvers.srhd\_1d.Solver
       ~Solver.options
       ~Solver.physics
       ~Solver.primitive
+      ~Solver.recommended_cfl
       ~Solver.solution
       ~Solver.time
    

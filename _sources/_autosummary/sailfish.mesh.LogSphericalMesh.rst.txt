@@ -17,10 +17,12 @@ sailfish.mesh.LogSphericalMesh
    .. autosummary::
    
       ~LogSphericalMesh.__init__
+      ~LogSphericalMesh.cell_coordinates
       ~LogSphericalMesh.count
       ~LogSphericalMesh.faces
       ~LogSphericalMesh.index
       ~LogSphericalMesh.min_spacing
+      ~LogSphericalMesh.radial_vertices
       ~LogSphericalMesh.scale_factor
       ~LogSphericalMesh.zone_center
       ~LogSphericalMesh.zone_centers
@@ -33,7 +35,14 @@ sailfish.mesh.LogSphericalMesh
 
    .. autosummary::
    
+      ~LogSphericalMesh.num_polar_zones
+      ~LogSphericalMesh.num_radial_zones
+      ~LogSphericalMesh.num_total_zones
       ~LogSphericalMesh.num_zones_per_decade
+      ~LogSphericalMesh.polar_extent
+      ~LogSphericalMesh.polar_grid
+      ~LogSphericalMesh.polar_spacing
+      ~LogSphericalMesh.polar_vertices
       ~LogSphericalMesh.r0
       ~LogSphericalMesh.r1
       ~LogSphericalMesh.scale_factor_derivative

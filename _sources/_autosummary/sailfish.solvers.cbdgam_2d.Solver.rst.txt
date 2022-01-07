@@ -36,6 +36,7 @@ sailfish.solvers.cbdgam\_2d.Solver
       ~Solver.options
       ~Solver.physics
       ~Solver.primitive
+      ~Solver.recommended_cfl
       ~Solver.solution
       ~Solver.time
    

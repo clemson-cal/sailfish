@@ -60,8 +60,10 @@
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.Solver.html">sailfish.solvers.cbdgam_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
@@ -100,7 +102,7 @@
 <h1>sailfish.solvers.cbdgam_2d.Options<a class="headerlink" href="#sailfish-solvers-cbdgam-2d-options" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Options">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdgam_2d.</span></span><span class="sig-name descname"><span class="pre">Options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">velocity_ceiling</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mach_ceiling</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdgam_2d.html#Options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Options" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdgam_2d.</span></span><span class="sig-name descname"><span class="pre">Options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">pressure_floor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">density_floor</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">velocity_ceiling</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mach_ceiling</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdgam_2d.html#Options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Options" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Options.__init__">
@@ -132,11 +134,17 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Options.mach_ceiling" title="sailfish.solvers.cbdgam_2d.Options.mach_ceiling"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mach_ceiling</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Options.density_floor" title="sailfish.solvers.cbdgam_2d.Options.density_floor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">density_floor</span></code></a></p></td>
 <td><p>Alias for field number 1</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Options.velocity_ceiling" title="sailfish.solvers.cbdgam_2d.Options.velocity_ceiling"><code class="xref py py-obj docutils literal notranslate"><span class="pre">velocity_ceiling</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Options.mach_ceiling" title="sailfish.solvers.cbdgam_2d.Options.mach_ceiling"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mach_ceiling</span></code></a></p></td>
+<td><p>Alias for field number 3</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Options.pressure_floor" title="sailfish.solvers.cbdgam_2d.Options.pressure_floor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">pressure_floor</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Options.velocity_ceiling" title="sailfish.solvers.cbdgam_2d.Options.velocity_ceiling"><code class="xref py py-obj docutils literal notranslate"><span class="pre">velocity_ceiling</span></code></a></p></td>
+<td><p>Alias for field number 2</p></td>
 </tr>
 </tbody>
 </table>
@@ -144,6 +152,12 @@
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Options.count">
 <span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Options.count" title="Permalink to this definition"></a></dt>
 <dd><p>Return number of occurrences of value.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Options.density_floor">
+<span class="sig-name descname"><span class="pre">density_floor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Options.density_floor" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
 </dd></dl>
 
 <dl class="py method">
@@ -156,13 +170,19 @@
 <dl class="py attribute">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Options.mach_ceiling">
 <span class="sig-name descname"><span class="pre">mach_ceiling</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Options.mach_ceiling" title="Permalink to this definition"></a></dt>
-<dd><p>Alias for field number 1</p>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Options.pressure_floor">
+<span class="sig-name descname"><span class="pre">pressure_floor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Options.pressure_floor" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 0</p>
 </dd></dl>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Options.velocity_ceiling">
 <span class="sig-name descname"><span class="pre">velocity_ceiling</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Options.velocity_ceiling" title="Permalink to this definition"></a></dt>
-<dd><p>Alias for field number 0</p>
+<dd><p>Alias for field number 2</p>
 </dd></dl>
 
 </dd></dl>

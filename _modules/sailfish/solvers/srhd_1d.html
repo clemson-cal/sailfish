@@ -127,7 +127,7 @@
 <div class="viewcode-block" id="initial_condition"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.srhd_1d.initial_condition.html#sailfish.solvers.srhd_1d.initial_condition">[docs]</a><span class="k">def</span> <span class="nf">initial_condition</span><span class="p">(</span><span class="n">setup</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
     <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
 
-    <span class="n">faces</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]))</span>
+    <span class="n">faces</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">())</span>
     <span class="n">zones</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">faces</span><span class="p">[:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="n">faces</span><span class="p">[</span><span class="mi">1</span><span class="p">:])</span>
     <span class="n">primitive</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="nb">len</span><span class="p">(</span><span class="n">zones</span><span class="p">),</span> <span class="mi">4</span><span class="p">])</span>
 
@@ -146,7 +146,7 @@
 <div class="viewcode-block" id="Patch.__init__"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.srhd_1d.Patch.html#sailfish.solvers.srhd_1d.Patch.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
         <span class="bp">self</span><span class="p">,</span>
         <span class="n">time</span><span class="p">,</span>
-        <span class="n">primitive</span><span class="p">,</span>
+        <span class="n">conserved</span><span class="p">,</span>
         <span class="n">mesh</span><span class="p">,</span>
         <span class="n">index_range</span><span class="p">,</span>
         <span class="n">lib</span><span class="p">,</span>
@@ -155,9 +155,10 @@
         <span class="n">i0</span><span class="p">,</span> <span class="n">i1</span> <span class="o">=</span> <span class="n">index_range</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lib</span> <span class="o">=</span> <span class="n">lib</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">xp</span> <span class="o">=</span> <span class="n">xp</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span> <span class="o">=</span> <span class="n">index_range</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">index_range</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">faces</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="o">*</span><span class="n">index_range</span><span class="p">))</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span> <span class="o">=</span> <span class="n">num_zones</span> <span class="o">=</span> <span class="n">index_range</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">index_range</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">faces</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">(</span><span class="o">*</span><span class="n">index_range</span><span class="p">))</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">coordinates</span> <span class="o">=</span> <span class="n">COORDINATES_DICT</span><span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">mesh</span><span class="p">)]</span>
+
         <span class="k">try</span><span class="p">:</span>
             <span class="n">adot</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">scale_factor_derivative</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">scale_factor_initial</span> <span class="o">=</span> <span class="mf">0.0</span>
@@ -169,26 +170,15 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">=</span> <span class="n">time</span>
 
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">primitive</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">primitive_to_conserved</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">num_zones</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">conserved</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span> <span class="o">=</span> <span class="n">conserved</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">conserved1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">conserved2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span><span class="o">.</span><span class="n">copy</span><span class="p">()</span></div>
 
 <div class="viewcode-block" id="Patch.execution_context"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.srhd_1d.Patch.html#sailfish.solvers.srhd_1d.Patch.execution_context">[docs]</a>    <span class="k">def</span> <span class="nf">execution_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;TODO: return a CUDA context for execution on the assigned device&quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="n">nullcontext</span><span class="p">()</span></div>
-
-    <span class="k">def</span> <span class="nf">primitive_to_conserved</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
-            <span class="n">conserved</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">primitive</span><span class="p">)</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">srhd_1d_primitive_to_conserved</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span><span class="p">](</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="p">,</span>
-                <span class="n">primitive</span><span class="p">,</span>
-                <span class="n">conserved</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">scale_factor</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">coordinates</span><span class="p">,</span>
-            <span class="p">)</span>
-            <span class="k">return</span> <span class="n">conserved</span>
 
     <span class="k">def</span> <span class="nf">recompute_primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
@@ -215,9 +205,20 @@
                 <span class="n">dt</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">coordinates</span><span class="p">,</span>
             <span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">*</span> <span class="n">rk_param</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">+</span> <span class="n">dt</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">rk_param</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">*</span> <span class="n">rk_param</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">+</span> <span class="n">dt</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">rk_param</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">conserved1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved1</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">recompute_primitive</span><span class="p">()</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">srhd_1d_max_wavespeeds</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">num_zones</span><span class="p">](</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">faces</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">scale_factor_derivative</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">scale_factor</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -226,6 +227,10 @@
     <span class="k">def</span> <span class="nf">new_iteration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved1</span><span class="p">[</span><span class="o">...</span><span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">conserved</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">conserved1</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -280,30 +285,41 @@
 
         <span class="k">if</span> <span class="n">solution</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">primitive</span> <span class="o">=</span> <span class="n">initial_condition</span><span class="p">(</span><span class="n">setup</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
+            <span class="n">conserved</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">primitive</span><span class="p">)</span>
+            <span class="n">coordinates</span> <span class="o">=</span> <span class="n">COORDINATES_DICT</span><span class="p">[</span><span class="nb">type</span><span class="p">(</span><span class="n">mesh</span><span class="p">)]</span>
+
+            <span class="n">lib</span><span class="o">.</span><span class="n">srhd_1d_primitive_to_conserved</span><span class="p">[</span><span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
+                <span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">faces</span><span class="p">()),</span>
+                <span class="n">primitive</span><span class="p">,</span>
+                <span class="n">conserved</span><span class="p">,</span>
+                <span class="n">mesh</span><span class="o">.</span><span class="n">scale_factor</span><span class="p">(</span><span class="n">time</span><span class="p">),</span>
+                <span class="n">coordinates</span><span class="p">,</span>
+            <span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
-            <span class="n">primitive</span> <span class="o">=</span> <span class="n">solution</span>
+            <span class="n">conserved</span> <span class="o">=</span> <span class="n">solution</span>
 
         <span class="k">for</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">in</span> <span class="n">subdivide</span><span class="p">(</span><span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">num_patches</span><span class="p">):</span>
-            <span class="n">prim</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nq</span><span class="p">])</span>
-            <span class="n">prim</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">primitive</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Patch</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">prim</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="n">lib</span><span class="p">,</span> <span class="n">xp</span><span class="p">))</span>
-
-        <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;primitive1&quot;</span><span class="p">)</span></div>
+            <span class="n">cons</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nq</span><span class="p">])</span>
+            <span class="n">cons</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">conserved</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">Patch</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">cons</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="n">lib</span><span class="p">,</span> <span class="n">xp</span><span class="p">))</span></div>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">solution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">primitive</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="s2">&quot;conserved&quot;</span><span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">reconstruct</span><span class="p">(</span><span class="s2">&quot;primitive&quot;</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">reconstruct</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">array</span><span class="p">):</span>
         <span class="n">nz</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
         <span class="n">ng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span>
         <span class="n">nq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_cons</span>
         <span class="n">np</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">)</span>
-        <span class="n">primitive</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">nz</span><span class="p">,</span> <span class="n">nq</span><span class="p">])</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">nz</span><span class="p">,</span> <span class="n">nq</span><span class="p">])</span>
         <span class="k">for</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="n">patch</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">subdivide</span><span class="p">(</span><span class="n">nz</span><span class="p">,</span> <span class="n">np</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">):</span>
-            <span class="n">primitive</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">primitive</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">primitive</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">array</span><span class="p">)[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span>
+        <span class="k">return</span> <span class="n">result</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -318,11 +334,16 @@
         <span class="k">return</span> <span class="nb">dict</span><span class="p">()</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">maximum_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">recommended_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="mf">0.6</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">maximum_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">16.0</span>
 
 <div class="viewcode-block" id="Solver.maximum_wavespeed"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.maximum_wavespeed">[docs]</a>    <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="mf">1.0</span></div>
+        <span class="c1"># max(patch.maximum_wavespeed for patch in self.patches)</span>
 
 <div class="viewcode-block" id="Solver.advance"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.srhd_1d.Solver.html#sailfish.solvers.srhd_1d.Solver.advance">[docs]</a>    <span class="k">def</span> <span class="nf">advance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">new_iteration</span><span class="p">()</span>
@@ -330,7 +351,11 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span></div>
 
     <span class="k">def</span> <span class="nf">advance_rk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rk_param</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">:</span>
+            <span class="n">patch</span><span class="o">.</span><span class="n">recompute_primitive</span><span class="p">()</span>
+
         <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;primitive1&quot;</span><span class="p">)</span>
+
         <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">:</span>
             <span class="n">patch</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="n">rk_param</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
 

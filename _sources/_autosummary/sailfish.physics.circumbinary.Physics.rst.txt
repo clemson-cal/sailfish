@@ -1,0 +1,42 @@
+sailfish.physics.circumbinary.Physics
+=====================================
+
+.. currentmodule:: sailfish.physics.circumbinary
+
+.. autoclass:: Physics
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Physics.__init__
+      ~Physics.count
+      ~Physics.index
+      ~Physics.point_masses
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Physics.buffer_driving_rate
+      ~Physics.buffer_is_enabled
+      ~Physics.buffer_onset_width
+      ~Physics.eos_type
+      ~Physics.gamma_law_index
+      ~Physics.mach_number
+      ~Physics.point_mass_function
+      ~Physics.sound_speed
+      ~Physics.viscosity_coefficient
+   
+   

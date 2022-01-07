@@ -1,0 +1,38 @@
+sailfish.solvers.srhd\_2d.Patch
+===============================
+
+.. currentmodule:: sailfish.solvers.srhd_2d
+
+.. autoclass:: Patch
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Patch.__init__
+      ~Patch.advance_rk
+      ~Patch.execution_context
+      ~Patch.new_iteration
+      ~Patch.recompute_primitive
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Patch.conserved
+      ~Patch.maximum_wavespeed
+      ~Patch.primitive
+      ~Patch.scale_factor
+   
+   

@@ -18,8 +18,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.scdg_1d.dot" href="sailfish.solvers.scdg_1d.dot.html" />
-    <link rel="prev" title="sailfish.solvers.cbdgam_2d.Solver" href="sailfish.solvers.cbdgam_2d.Solver.html" /> 
+    <link rel="next" title="sailfish.solvers.scdg_1d.rhs" href="sailfish.solvers.scdg_1d.rhs.html" />
+    <link rel="prev" title="sailfish.solvers.cbdiso_2d.Solver" href="sailfish.solvers.cbdiso_2d.Solver.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -53,8 +53,8 @@
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.solvers.scdg_1d</a><ul>
-<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html">sailfish.solvers.scdg_1d.dot</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html">sailfish.solvers.scdg_1d.rhs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html">sailfish.solvers.scdg_1d.CellData</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.Options.html">sailfish.solvers.scdg_1d.Options</a></li>
@@ -63,6 +63,7 @@
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
@@ -98,7 +99,7 @@
              
   <section id="module-sailfish.solvers.scdg_1d">
 <span id="sailfish-solvers-scdg-1d"></span><h1>sailfish.solvers.scdg_1d<a class="headerlink" href="#module-sailfish.solvers.scdg_1d" title="Permalink to this headline"></a></h1>
-<p>An n-th order discontinuous Galerkin solver for 1D scalar advection.</p>
+<p>An n-th order discontinuous Galerkin solver for 1D scalar advection and inviscid Burgers eqn.</p>
 <p class="rubric">Functions</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -106,10 +107,7 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.dot.html#sailfish.solvers.scdg_1d.dot" title="sailfish.solvers.scdg_1d.dot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dot</span></code></a>(u, p)</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html#sailfish.solvers.scdg_1d.rhs" title="sailfish.solvers.scdg_1d.rhs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rhs</span></code></a>(physics, uw, cell, dx, uwdot)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html#sailfish.solvers.scdg_1d.rhs" title="sailfish.solvers.scdg_1d.rhs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rhs</span></code></a>(physics, uw, cell, dx, uwdot)</p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -141,8 +139,8 @@
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.solvers.cbdgam_2d.Solver.html" class="btn btn-neutral float-left" title="sailfish.solvers.cbdgam_2d.Solver" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.scdg_1d.dot.html" class="btn btn-neutral float-right" title="sailfish.solvers.scdg_1d.dot" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solvers.cbdiso_2d.Solver.html" class="btn btn-neutral float-left" title="sailfish.solvers.cbdiso_2d.Solver" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.solvers.scdg_1d.rhs.html" class="btn btn-neutral float-right" title="sailfish.solvers.scdg_1d.rhs" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

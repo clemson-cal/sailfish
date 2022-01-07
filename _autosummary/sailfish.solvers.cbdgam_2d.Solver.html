@@ -18,7 +18,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.scdg_1d" href="sailfish.solvers.scdg_1d.html" />
+    <link rel="next" title="sailfish.solvers.cbdiso_2d" href="sailfish.solvers.cbdiso_2d.html" />
     <link rel="prev" title="sailfish.solvers.cbdgam_2d.Physics" href="sailfish.solvers.cbdgam_2d.Physics.html" /> 
 </head>
 
@@ -60,8 +60,10 @@
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.cbdgam_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
@@ -102,7 +104,7 @@
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Solver">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdgam_2d.</span></span><span class="sig-name descname"><span class="pre">Solver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdgam_2d.html#Solver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Solver" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <a class="reference internal" href="sailfish.solver.SolverBase.html#sailfish.solver.SolverBase" title="sailfish.solver.SolverBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.solver.SolverBase</span></code></a></p>
-<p>Adapter class to drive the srhd_1d C extension module.</p>
+<p>Adapter class to drive the cbdgam_2d C extension module.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Solver.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdgam_2d.html#Solver.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Solver.__init__" title="Permalink to this definition"></a></dt>
@@ -157,10 +159,13 @@
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Solver.primitive" title="sailfish.solvers.cbdgam_2d.Solver.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
 <td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Solver.solution" title="sailfish.solvers.cbdgam_2d.Solver.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Solver.recommended_cfl" title="sailfish.solvers.cbdgam_2d.Solver.recommended_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recommended_cfl</span></code></a></p></td>
+<td><p>Return a recommended CFL number to the driver, default to the maximum.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Solver.solution" title="sailfish.solvers.cbdgam_2d.Solver.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
 <td><p>Return an object representing the solution state.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Solver.time" title="sailfish.solvers.cbdgam_2d.Solver.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdgam_2d.Solver.time" title="sailfish.solvers.cbdgam_2d.Solver.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
 <td><p>Return the simulation time.</p></td>
 </tr>
 </tbody>
@@ -223,6 +228,12 @@ runtime post-processing routines.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Solver.recommended_cfl">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">recommended_cfl</span></span><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Solver.recommended_cfl" title="Permalink to this definition"></a></dt>
+<dd><p>Return a recommended CFL number to the driver, default to the maximum.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdgam_2d.Solver.solution">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">solution</span></span><a class="headerlink" href="#sailfish.solvers.cbdgam_2d.Solver.solution" title="Permalink to this definition"></a></dt>
 <dd><p>Return an object representing the solution state.</p>
@@ -253,7 +264,7 @@ object from the setup and mesh instances.</p>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.solvers.cbdgam_2d.Physics.html" class="btn btn-neutral float-left" title="sailfish.solvers.cbdgam_2d.Physics" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.scdg_1d.html" class="btn btn-neutral float-right" title="sailfish.solvers.scdg_1d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solvers.cbdiso_2d.html" class="btn btn-neutral float-right" title="sailfish.solvers.cbdiso_2d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
