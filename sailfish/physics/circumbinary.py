@@ -136,7 +136,7 @@ class Physics(NamedTuple):
     gamma_law_index: float = 5.0 / 3.0
     """ Adiabatic index, if the EOS type is globally isothermal """
 
-    viscosity_coefficient: float = 0.01
+    viscosity_coefficient: float = 0.0
     """ Kinematic viscosity value, in units of a^2 Omega """
 
     buffer_is_enabled: bool = False
