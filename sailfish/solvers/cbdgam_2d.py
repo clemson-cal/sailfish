@@ -102,6 +102,39 @@ class Patch:
                 self.physics.gamma_law_index,
             )
 
+    def point_mass_source_term(self, which_mass):
+        m1, m2 = self.physics.point_masses(self.time)
+        with self.execution_context():
+            return self.lib.cbdgam_2d_point_mass_source_term[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model,
+                which_mass,
+                self.primitive1,
+                self.conserved0,
+                int(self.physics.constant_softening),
+                self.physics.gamma_law_index,
+            )
+
     def advance_rk(self, rk_param, dt):
         m1, m2 = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
