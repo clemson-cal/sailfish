@@ -103,9 +103,13 @@ class Patch:
             )
 
     def point_mass_source_term(self, which_mass):
+        if which_mass not in (1, 2):
+            raise ValueError("the mass must be either 1 or 2")
+
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context():
-            return self.lib.cbdgam_2d_point_mass_source_term[self.shape](
+            cons_rate = self.xp.zeros_like(self.conserved0)
+            self.lib.cbdgam_2d_point_mass_source_term[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
@@ -130,10 +134,11 @@ class Patch:
                 m2.sink_model,
                 which_mass,
                 self.primitive1,
-                self.conserved0,
+                cons_rate,
                 int(self.physics.constant_softening),
                 self.physics.gamma_law_index,
             )
+            return cons_rate
 
     def advance_rk(self, rk_param, dt):
         m1, m2 = self.physics.point_masses(self.time)
