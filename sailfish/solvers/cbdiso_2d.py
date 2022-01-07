@@ -40,6 +40,7 @@ except ImportError:
 
 logger = getLogger(__name__)
 
+
 class Physics(NamedTuple):
     sound_speed_squared: float = 1.0
     mach_number: float = 10.0
@@ -48,22 +49,25 @@ class Physics(NamedTuple):
     kb_central_mass: float = 1.0
     kb_driving_rate: float = 1000.0
     kb_onset_width: float = 0.1
-    kb_mode: int = 0 # 0: Default nothing
-                     # 1: Keplerian Buffer
+    kb_mode: int = 0  # 0: Default nothing
+    # 1: Keplerian Buffer
     q: float = 1.0
     e: float = 0.0
     sink_rate: float = 10.0
     sink_radius: float = 0.05
-    mass_model1: int = 1 # 1: AccelerationFree
-    mass_model2: int = 1 # 2: TorqueFree
-                         # 3: ForceFree
-    eos_model: int = 1 # 1: globally isothermal scenario 
-                       # 2: locally isothermal
+    mass_model1: int = 1  # 1: AccelerationFree
+    mass_model2: int = 1  # 2: TorqueFree
+    # 3: ForceFree
+    eos_model: int = 1  # 1: globally isothermal scenario
+    # 2: locally isothermal
+    softening_length: float = 0.01
+
 
 class Options(NamedTuple):
     velocity_ceiling: float = 1e12
     mach_ceiling: float = 1e12
- 
+
+
 def initial_condition(setup, mesh, time):
     """
     Generate a 2D array of primitive data from a mesh and a setup.
@@ -106,24 +110,23 @@ class Patch:
         self.shape = (i1 - i0, nj)  # not including guard zones
         self.physics = physics
         self.options = options
-        self.xl, self.yl = self.mesh.vertex_coordinates(i0,0)
-        self.xr, self.yr = self.xl + (i1-i0)*self.mesh.dx, self.yl + nj*self.mesh.dy
+        self.xl, self.yl = self.mesh.vertex_coordinates(i0, 0)
+        self.xr, self.yr = self.mesh.vertex_coordinates(i1, nj)
         self.kb_outer_radius = self.mesh.x1 - self.physics.kb_onset_width
-
-        self.orbelement =  OrbitalElements(1.0,1.0,self.physics.q,self.physics.e)
-        orbstate = self.orbelement.orbital_state(self.time)
+        self.orbelement = OrbitalElements(1.0, 1.0, self.physics.q, self.physics.e)
 
         with self.execution_context():
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
             self.primitive1 = self.xp.array(primitive)
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.xp.zeros(primitive.shape)
+
     def execution_context(self):
         """TODO: return a CUDA context for execution on the assigned device"""
         return nullcontext()
 
     def maximum_wavespeed(self):
-        orbstate = self.orbelement.orbital_state(self.time)
+        m1, m2 = self.orbelement.orbital_state(self.time)
         with self.execution_context():
             self.lib.cbdiso_wavespeed[self.shape](
                 self.xl,
@@ -131,21 +134,23 @@ class Patch:
                 self.yl,
                 self.yr,
                 self.physics.sound_speed_squared,
-                self.physics.mach_number**2.0,
+                self.physics.mach_number ** 2.0,
                 self.physics.eos_model,
-                orbstate.primary.position_x,
-                orbstate.primary.position_y,
-                orbstate.primary.velocity_x,
-                orbstate.primary.velocity_y,
-                orbstate.primary.mass,
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
                 self.physics.mass_model1,
-                orbstate.secondary.position_x,
-                orbstate.secondary.position_y,
-                orbstate.secondary.velocity_x,
-                orbstate.secondary.velocity_y,
-                orbstate.secondary.mass,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
                 self.physics.mass_model2,
@@ -162,7 +167,7 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
-        orbstate = self.orbelement.orbital_state(self.time)
+        m1, m2 = self.orbelement.orbital_state(self.time)
         with self.execution_context():
             self.lib.cbdiso_advance_rk[self.shape](
                 self.xl,
@@ -178,29 +183,32 @@ class Patch:
                 self.kb_outer_radius,
                 self.physics.kb_onset_width,
                 self.physics.kb_mode,
-                orbstate.primary.position_x,
-                orbstate.primary.position_y,
-                orbstate.primary.velocity_x,
-                orbstate.primary.velocity_y,
-                orbstate.primary.mass,
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
                 self.physics.mass_model1,
-                orbstate.secondary.position_x,
-                orbstate.secondary.position_y,
-                orbstate.secondary.velocity_x,
-                orbstate.secondary.velocity_y,
-                orbstate.secondary.mass,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
                 self.physics.mass_model2,
                 self.physics.sound_speed_squared,
-                self.physics.mach_number**2.0,
+                self.physics.mach_number ** 2.0,
                 self.physics.eos_model,
                 self.physics.viscosity_coefficient,
                 rk_param,
                 dt,
-                self.options.velocity_ceiling)
+                self.options.velocity_ceiling,
+            )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
@@ -268,8 +276,6 @@ class Solver(SolverBase):
             self.patches.append(
                 Patch(time, prim, mesh, (a, b), self._physics, self._options, lib, xp)
             )
-
-        self.set_bc("primitive1")
 
     @property
     def solution(self):

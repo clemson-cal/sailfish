@@ -2,7 +2,7 @@
 MODULE: cbdiso_2d
 
 DESCRIPTION:
-  Isothermal solver for a binary accretion problem in 2D planar 
+  Isothermal solver for a binary accretion problem in 2D planar
   cartesian coordinates.
 */
 
@@ -37,6 +37,7 @@ PRIVATE void plm_gradient(double *yl, double *y0, double *yr, double *g)
     }
 }
 
+
 // ============================ INTERNAL STRUCTS ==============================
 // ============================================================================
 struct PointMass {
@@ -45,9 +46,10 @@ struct PointMass {
     double vx;
     double vy;
     double mass;
-    double rate;
-    double radius;
-    int model;
+    double softening_length;
+    double sink_rate;
+    double sink_radius;
+    int sink_model;
 };
 
 struct PointMassList {
@@ -61,8 +63,9 @@ struct KeplerianBuffer {
     double driving_rate;
     double outer_radius;
     double onset_width;
-    int mode;
+    int is_enabled;
 };
+
 
 // ============================ GRAVITY =======================================
 // ============================================================================
@@ -75,12 +78,12 @@ PRIVATE double gravitational_potential(
 
     for (int p = 0; p < 2; ++p)
     {
-        if (mass_list->masses[p].model != 0)
+        if (mass_list->masses[p].mass > 0.0)
         {
             double x0 = mass_list->masses[p].x;
             double y0 = mass_list->masses[p].y;
             double mp = mass_list->masses[p].mass;
-            double rs = mass_list->masses[p].radius;
+            double rs = mass_list->masses[p].softening_length;
 
             double dx = x1 - x0;
             double dy = y1 - y0;
@@ -88,7 +91,8 @@ PRIVATE double gravitational_potential(
             double r2_soft = r2 + rs * rs;
 
             phi -= mp / sqrt(r2_soft);
-    }   }
+        }
+    }
     return phi;
 }
 
@@ -103,7 +107,7 @@ PRIVATE void point_mass_source_term(
     double x0 = mass->x;
     double y0 = mass->y;
     double mp = mass->mass;
-    double rs = mass->radius;
+    double rs = mass->softening_length;
     double sigma = prim[0];
 
     double dx = x1 - x0;
@@ -118,17 +122,19 @@ PRIVATE void point_mass_source_term(
 
     if (dr < 4.0 * rs)
     {
-        sink_rate = mass->rate * exp(-pow(dr / rs, 4.0));
+        sink_rate = mass->sink_rate * exp(-pow(dr / rs, 4.0));
     }
     double mdot = sigma * sink_rate * -1.0;
 
-    switch (mass->model) {
-        case 1: //AccelerationFree
+    switch (mass->sink_model) {
+        case 1: // acceleration-free
+        {
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
             break;
-        case 2: //TorqueFree
+        }
+        case 2: // torque-free
         {
             double vx        = prim[1];
             double vy        = prim[2];
@@ -144,16 +150,20 @@ PRIVATE void point_mass_source_term(
             delta_cons[2] = dt * mdot * vystar + dt * fy;
             break;
         }
-        case 3: //ForceFree
+        case 3: // force-free
+        {
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * fx;
             delta_cons[2] = dt * fy;
             break;
-        default:
+        }
+        default: // sink is inactive
+        {
             delta_cons[0] = 0.0;
             delta_cons[1] = 0.0;
             delta_cons[2] = 0.0;
             break;
+        }
     }
 }
 
@@ -182,71 +192,63 @@ PRIVATE void point_masses_source_term(
 // ============================================================================
 PRIVATE double sound_speed_squared(
     double cs2,
-    double mn2,
-    int model,
+    double mach_squared,
+    int eos_type,
     double x,
     double y,
     struct PointMassList *mass_list)
 {
-    switch (model)
+    switch (eos_type)
     {
-        case 1: //Isothermal
+        case 1: // isothermal
             return cs2;
-        case 2: //Locally Isothermal
-            return -gravitational_potential(mass_list, x, y) / mn2;
+        case 2: // locally Isothermal
+            return -gravitational_potential(mass_list, x, y) / mach_squared;
         default:
             return 1.0; // WARNING
     }
 }
 
 PRIVATE void buffer_source_term(
-    struct KeplerianBuffer *kb, 
+    struct KeplerianBuffer *buffer,
     double xc,
     double yc,
     double dt,
     double *cons)
 {
-    switch (kb->mode)
+    if (buffer->is_enabled)
     {
-        case 0:// Default
-            break;
+        double rc = sqrt(xc * xc + yc * yc);
+        double surface_density = buffer->surface_density;
+        double central_mass = buffer->central_mass;
+        double driving_rate = buffer->driving_rate;
+        double outer_radius = buffer->outer_radius;
+        double onset_width = buffer->onset_width;
+        double onset_radius = outer_radius - onset_width;
 
-        case 1:// KeplerianBuffer
+        if (rc > onset_radius)
         {
-            double rc = sqrt(xc * xc + yc * yc);
-            double surface_density = kb->surface_density;
-            double surface_pressure = kb->surface_pressure;
-            double central_mass = kb->central_mass;
-            double driving_rate = kb->driving_rate;
-            double outer_radius = kb->outer_radius;
-            double onset_width = kb->onset_width;
-            double onset_radius = outer_radius - onset_width;
+            double pf = surface_density * sqrt(central_mass / rc);
+            double px = pf * (-yc / rc);
+            double py = pf * ( xc / rc);
+            double u0[NCONS] = {surface_density, px, py};
 
-            if (rc > onset_radius)
+            double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
+            double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+
+            for (int q = 0; q < NCONS; ++q)
             {
-                double pf = surface_density * sqrt(central_mass / rc);
-                double px = pf * (-yc / rc);
-                double py = pf * ( xc / rc);
-                double u0[NCONS] = {surface_density, px, py};
-
-                double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-                double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
-                }
+                cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
             }
-            break;
         }
     }
 }
 
 PRIVATE void shear_strain(
-    const double *gx, 
-    const double *gy, 
-    double dx, 
-    double dy, 
+    const double *gx,
+    const double *gy,
+    double dx,
+    double dy,
     double *s)
 {
     double sxx = 4.0 / 3.0 * gx[1] / dx - 2.0 / 3.0 * gy[2] / dy;
@@ -263,8 +265,8 @@ PRIVATE void shear_strain(
 // ============================ HYDRO =========================================
 // ============================================================================
 PRIVATE void conserved_to_primitive(
-    const double *cons, 
-    double *prim, 
+    const double *cons,
+    double *prim,
     double velocity_ceiling)
 {
     double rho = cons[0];
@@ -279,7 +281,7 @@ PRIVATE void conserved_to_primitive(
 }
 
 PRIVATE void primitive_to_conserved(
-    const double *prim, 
+    const double *prim,
     double *cons)
 {
     double rho = prim[0];
@@ -294,7 +296,7 @@ PRIVATE void primitive_to_conserved(
 }
 
 PRIVATE double primitive_to_velocity(
-    const double *prim, 
+    const double *prim,
     int direction)
 {
     switch (direction)
@@ -334,7 +336,7 @@ PRIVATE void primitive_to_outer_wavespeeds(
 }
 
 PRIVATE double primitive_max_wavespeed(
-    const double *prim, 
+    const double *prim,
     double cs2)
 {
     double cs = sqrt(cs2);
@@ -346,10 +348,10 @@ PRIVATE double primitive_max_wavespeed(
 }
 
 PRIVATE void riemann_hlle(
-    const double *pl, 
-    const double *pr, 
-    double *flux, 
-    double cs2, 
+    const double *pl,
+    const double *pr,
+    double *flux,
+    double cs2,
     int direction)
 {
     double ul[NCONS];
@@ -375,9 +377,9 @@ PRIVATE void riemann_hlle(
     }
 }
 
+
 // ============================ PUBLIC API ====================================
 // ============================================================================
-
 PUBLIC void cbdiso_advance_rk(
     int ni,
     int nj,
@@ -388,45 +390,49 @@ PUBLIC void cbdiso_advance_rk(
     double *conserved_rk, // :: $.shape == (ni + 4, nj + 4, 3)
     double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, 3)
     double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, 3)
-    double kb_surface_density, // KeplerianBuffer
-    double kb_central_mass,
-    double kb_driving_rate,
-    double kb_outer_radius,
-    double kb_onset_width,
-    int kb_mode,
-    double x1, // PointMass*2
+    double buffer_surface_density,
+    double buffer_central_mass,
+    double buffer_driving_rate,
+    double buffer_outer_radius,
+    double buffer_onset_width,
+    int buffer_is_enabled,
+    double x1, // point mass 1
     double y1,
     double vx1,
     double vy1,
     double mass1,
-    double rate1,
-    double radius1,
-    int model1,
-    double x2,
+    double softening_length1,
+    double sink_rate1,
+    double sink_radius1,
+    int sink_model1,
+    double x2, // point mass 2
     double y2,
     double vx2,
     double vy2,
     double mass2,
-    double rate2,
-    double radius2,
-    int model2,
-    double cs2, //equation of state
-    double mn2,
-    int model,
-    double nu, // other
-    double a,
-    double dt,
+    double softening_length2,
+    double sink_rate2,
+    double sink_radius2,
+    int sink_model2,
+    double cs2, // equation of state
+    double mach_squared,
+    int eos_type,
+    double nu, // kinematic viscosity coefficient
+    double a, // RK parameter
+    double dt, // timestep
     double velocity_ceiling)
 {
-    struct KeplerianBuffer kb = {kb_surface_density,
-                                 kb_central_mass,
-                                 kb_driving_rate,
-                                 kb_outer_radius,
-                                 kb_onset_width,
-                                 kb_mode};
-    struct PointMass pointmass1 = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
-    struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
-    struct PointMassList mass_list = {{pointmass1, pointmass2}};
+    struct KeplerianBuffer buffer = {
+        buffer_surface_density,
+        buffer_central_mass,
+        buffer_driving_rate,
+        buffer_outer_radius,
+        buffer_onset_width,
+        buffer_is_enabled
+    };
+    struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
+    struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
+    struct PointMassList mass_list = {{m1, m2}};
 
     double dx = (patch_xr - patch_xl) / ni;
     double dy = (patch_yr - patch_yl) / nj;
@@ -543,10 +549,10 @@ PUBLIC void cbdiso_advance_rk(
         double frj[NCONS];
         double ucc[NCONS];
 
-        double cs2li = sound_speed_squared(cs2, mn2, model, xl, yc, &mass_list);
-        double cs2ri = sound_speed_squared(cs2, mn2, model, xr, yc, &mass_list);
-        double cs2lj = sound_speed_squared(cs2, mn2, model, xc, yl, &mass_list);
-        double cs2rj = sound_speed_squared(cs2, mn2, model, xc, yr, &mass_list);
+        double cs2li = sound_speed_squared(cs2, mach_squared, eos_type, xl, yc, &mass_list);
+        double cs2ri = sound_speed_squared(cs2, mach_squared, eos_type, xr, yc, &mass_list);
+        double cs2lj = sound_speed_squared(cs2, mach_squared, eos_type, xc, yl, &mass_list);
+        double cs2rj = sound_speed_squared(cs2, mach_squared, eos_type, xc, yr, &mass_list);
 
         riemann_hlle(plim, plip, fli, cs2li, 0);
         riemann_hlle(prim, prip, fri, cs2ri, 0);
@@ -575,7 +581,7 @@ PUBLIC void cbdiso_advance_rk(
         frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
 
         primitive_to_conserved(pcc, ucc);
-        buffer_source_term(&kb, xc, yc, dt, ucc);
+        buffer_source_term(&buffer, xc, yc, dt, ucc);
         point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
 
         for (int q = 0; q < NCONS; ++q)
@@ -613,43 +619,35 @@ PUBLIC void iso2d_primitive_to_conserved(
 PUBLIC void iso2d_point_mass_source_term(
     int ni,
     int nj,
-    double patch_xl, //Mesh
+    double patch_xl, // mesh
     double patch_xr,
     double patch_yl,
     double patch_yr,
-    double x1, // PointMass*2
+    double x1, // point mass 1
     double y1,
     double vx1,
     double vy1,
     double mass1,
-    double rate1,
-    double radius1,
-    int model1,
-    double x2,
+    double softening_length1,
+    double sink_rate1,
+    double sink_radius1,
+    int sink_model1,
+    double x2, // point mass 2
     double y2,
     double vx2,
     double vy2,
     double mass2,
-    double rate2,
-    double radius2,
-    int model2,
-    int which_mass,
+    double softening_length2,
+    double sink_rate2,
+    double sink_radius2,
+    int sink_model2,
+    int which_mass, // :: $ in [1, 2]
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
     double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 3)
 {
-    struct PointMass pointmass1 = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
-    struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
-    struct PointMassList mass_list = {{pointmass1, pointmass2}};
-
-    struct PointMass pointmass;
-    if (which_mass == 1) {
-        struct PointMass p = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
-        pointmass = p;
-    }
-    if (which_mass == 2) {
-        struct PointMass p = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
-        pointmass = p;
-    }
+    struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
+    struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
+    struct PointMassList mass_list = {{m1, m2}};
 
     int ng = 2; // number of guard zones
     int si = NCONS * (nj + 2 * ng);
@@ -666,43 +664,45 @@ PUBLIC void iso2d_point_mass_source_term(
         double yc = patch_yl + (j + 0.5) * dy;
         double *pc = &primitive[ncc];
         double *uc = &cons_rate[ncc];
-        point_mass_source_term(&pointmass, xc, yc, 1.0, pc, uc);
+        point_mass_source_term(&mass_list.masses[which_mass - 1], xc, yc, 1.0, pc, uc);
     }
 }
 
 
 PUBLIC void cbdiso_wavespeed(
-    int ni, //mesh
+    int ni, // mesh
     int nj,
     double patch_xl,
     double patch_xr,
     double patch_yl,
     double patch_yr,
-    double soundspeed2, //equation of state
-    double mn2,
-    int model,
-    double x1, // PointMass*2
+    double soundspeed2, // equation of state
+    double mach_squared,
+    int eos_type,
+    double x1, // point mass 1
     double y1,
     double vx1,
     double vy1,
     double mass1,
-    double rate1,
-    double radius1,
-    int model1,
-    double x2,
+    double softening_length1,
+    double sink_rate1,
+    double sink_radius1,
+    int sink_model1,
+    double x2, // point mass 2
     double y2,
     double vx2,
     double vy2,
     double mass2,
-    double rate2,
-    double radius2,
-    int model2,
+    double softening_length2,
+    double sink_rate2,
+    double sink_radius2,
+    int sink_model2,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
     double *wavespeed) // :: $.shape == (ni + 4, nj + 4)
 {
-    struct PointMass pointmass1 = {x1, y1, vx1, vy1, mass1, rate1, radius1, model1};
-    struct PointMass pointmass2 = {x2, y2, vx2, vy2, mass2, rate2, radius2, model2};
-    struct PointMassList mass_list = {{pointmass1, pointmass2}};
+    struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
+    struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
+    struct PointMassList mass_list = {{m1, m2}};
 
     int ng = 2; // number of guard zones
     int si = NCONS * (nj + 2 * ng);
@@ -721,7 +721,7 @@ PUBLIC void cbdiso_wavespeed(
         double y = patch_yl + (j + 0.5) * dy;
 
         double *pc = &primitive[np];
-        double cs2 = sound_speed_squared(soundspeed2, mn2, model, x, y, &mass_list);
+        double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
         double a = primitive_max_wavespeed(pc, cs2);
         wavespeed[na] = a;
     }
