@@ -6,7 +6,7 @@ from sailfish.setup import Setup, param
 from sailfish.mesh import PlanarCartesian2DMesh
 
 
-class CylindricalExplosion(Setup):
+class CylindricalExplosionGam(Setup):
     """
     A cylindrical explosion in 2D planar geometry; adiabatic hydro.
 
