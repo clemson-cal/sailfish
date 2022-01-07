@@ -229,6 +229,15 @@ class Solver(SolverBase):
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
+        if physics.viscosity_model not in (
+            ViscosityModel.NONE,
+            ViscosityModel.CONSTANT_ALPHA,
+        ):
+            raise ValueError("solver only supports constant-nu viscosity")
+
+        if physics.eos_type != EquationOfState.GAMMA_LAW:
+            raise ValueError("solver only supports isothermal equation of states")
+
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
