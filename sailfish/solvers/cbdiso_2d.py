@@ -171,8 +171,13 @@ class Patch:
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
     def point_mass_source_term(self, which_mass):
+        if which_mass not in (1, 2):
+            raise ValueError("the mass must be either 1 or 2")
+
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context():
+            cons_rate = self.xp.zeros_like(self.conserved0)
+
             self.lib.iso2d_point_mass_source_term[self.shape](
                 self.xl,
                 self.xr,
@@ -198,9 +203,9 @@ class Patch:
                 m2.sink_model,
                 which_mass,
                 self.primitive1,
-                self.conserved0,
+                cons_rate,
             )
-        return self.conserved0
+        return cons_rate
 
     def new_iteration(self):
         self.time0 = self.time
