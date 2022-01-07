@@ -3,7 +3,7 @@ Validation setups for various 2D solvers
 """
 
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import *
+from sailfish.physics.circumbinary import EquationOfState
 from sailfish.setup import Setup, param
 
 
@@ -78,9 +78,9 @@ class CylindricalExplosion(Setup):
     @property
     def physics(self):
         if self.is_isothermal:
-            return dict(eos_type=EOS_TYPE_GLOBALLY_ISOTHERMAL, sound_speed=1.0)
+            return dict(eos_type=EquationOfState.GLOBALLY_ISOTHERMAL, sound_speed=1.0)
         elif self.is_gamma_law:
-            return dict(eos_type=EOS_TYPE_GAMMA_LAW, gamma_law_index=5 / 3)
+            return dict(eos_type=EquationOfState.GAMMA_LAW, gamma_law_index=5 / 3)
 
     @property
     def solver(self):

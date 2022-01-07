@@ -8,7 +8,7 @@ from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.mesh import PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import Physics
+from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
 from sailfish.solver import SolverBase
 from sailfish.subdivide import subdivide
 
@@ -90,7 +90,7 @@ class Patch:
                 self.yr,
                 self.physics.sound_speed ** 2,
                 self.physics.mach_number ** 2,
-                self.physics.eos_type,
+                self.physics.eos_type.value,
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
@@ -99,7 +99,7 @@ class Patch:
                 m1.softening_length,
                 m1.sink_rate,
                 m1.sink_radius,
-                m1.sink_model,
+                m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -108,7 +108,7 @@ class Patch:
                 m2.softening_length,
                 m2.sink_rate,
                 m2.sink_radius,
-                m2.sink_model,
+                m2.sink_model.value,
                 self.primitive1,
                 self.wavespeeds,
             )
@@ -149,7 +149,7 @@ class Patch:
                 m1.softening_length,
                 m1.sink_rate,
                 m1.sink_radius,
-                m1.sink_model,
+                m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -158,10 +158,10 @@ class Patch:
                 m2.softening_length,
                 m2.sink_rate,
                 m2.sink_radius,
-                m2.sink_model,
+                m2.sink_model.value,
                 self.physics.sound_speed ** 2,
                 self.physics.mach_number ** 2,
-                self.physics.eos_type,
+                self.physics.eos_type.value,
                 self.physics.viscosity_coefficient,
                 rk_param,
                 dt,
@@ -195,14 +195,32 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
+        self._physics = physics = Physics(**physics)
+        self._options = options = Options(**options)
+
         if type(mesh) is not PlanarCartesian2DMesh:
             raise ValueError("solver only supports 2D cartesian mesh")
 
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
-        self._physics = physics = Physics(**physics)
-        self._options = options = Options(**options)
+        if physics.viscosity_model not in (
+            ViscosityModel.NONE,
+            ViscosityModel.CONSTANT_NU,
+        ):
+            raise ValueError("solver only supports constant-nu viscosity")
+
+        if physics.eos_type not in (
+            EquationOfState.GLOBALLY_ISOTHERMAL,
+            EquationOfState.LOCALLY_ISOTHERMAL,
+        ):
+            raise ValueError("solver only supports isothermal equation of states")
+
+        if physics.cooling_coefficient != 0.0:
+            raise ValueError("solver does not support thermal cooling")
+
+        if not physics.constant_softening:
+            raise ValueError("solver only supports constant gravitational softening")
 
         xp = get_array_module(mode)
         ng = 2  # number of guard zones

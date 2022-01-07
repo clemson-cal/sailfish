@@ -1,18 +1,24 @@
 from typing import NamedTuple, List, Callable
+from enum import Enum
 
 
-SINK_MODEL_INACTIVE = 0
-SINK_MODEL_ACCELERATION_FREE = 1
-SINK_MODEL_TORQUE_FREE = 2
-SINK_MODEL_FORCE_FREE = 3
+class SinkModel(Enum):
+    INACTIVE = 0
+    ACCELERATION_FREE = 1
+    TORQUE_FREE = 2
+    FORCE_FREE = 3
 
-EOS_TYPE_GLOBALLY_ISOTHERMAL = 1
-EOS_TYPE_LOCALLY_ISOTHERMAL = 2
-EOS_TYPE_GAMMA_LAW = 3
 
-VISCOSITY_MODEL_NONE = 0
-VISCOSITY_MODEL_CONSTANT_NU = 1
-VISCOSITY_MODEL_CONSTANT_ALPHA = 2
+class EquationOfState(Enum):
+    GLOBALLY_ISOTHERMAL = 1
+    LOCALLY_ISOTHERMAL = 2
+    GAMMA_LAW = 3
+
+
+class ViscosityModel(Enum):
+    NONE = 0
+    CONSTANT_NU = 1
+    CONSTANT_ALPHA = 2
 
 
 class PointMass(NamedTuple):
@@ -62,7 +68,7 @@ class PointMass(NamedTuple):
     softening_length: float = 0.0
     """ Gravitational softening length """
 
-    sink_model: int = SINK_MODEL_INACTIVE
+    sink_model: SinkModel = SinkModel.INACTIVE
     """ The equation used to control how momentum is subtracted """
 
     sink_rate: float = 0.0
@@ -125,10 +131,9 @@ class Physics(NamedTuple):
        between the domain radius (the half-width of a square domain), extending
        inwards by an amount specified by the :obj:`buffer_onset_width`
        parameter.
-
     """
 
-    eos_type: int = EOS_TYPE_GLOBALLY_ISOTHERMAL
+    eos_type: EquationOfState = EquationOfState.GLOBALLY_ISOTHERMAL
     """ EOS type: globally or locally isothermal """
 
     sound_speed: float = 1.0
@@ -140,7 +145,7 @@ class Physics(NamedTuple):
     gamma_law_index: float = 5.0 / 3.0
     """ Adiabatic index, if the EOS type is globally isothermal """
 
-    viscosity_model: int = VISCOSITY_MODEL_NONE
+    viscosity_model: ViscosityModel = ViscosityModel.NONE
     """ Which viscosity model to use (none, nu, alpha) """
 
     viscosity_coefficient: float = 0.0

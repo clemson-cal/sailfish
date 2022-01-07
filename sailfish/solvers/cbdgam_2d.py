@@ -10,8 +10,8 @@ from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesian2DMesh
+from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
 from sailfish.solver import SolverBase
-from sailfish.physics.circumbinary import Physics
 
 
 logger = getLogger(__name__)
@@ -122,7 +122,7 @@ class Patch:
                 m1.softening_length,
                 m1.sink_rate,
                 m1.sink_radius,
-                m1.sink_model,
+                m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -131,7 +131,7 @@ class Patch:
                 m2.softening_length,
                 m2.sink_rate,
                 m2.sink_radius,
-                m2.sink_model,
+                m2.sink_model.value,
                 which_mass,
                 self.primitive1,
                 cons_rate,
@@ -171,7 +171,7 @@ class Patch:
                 m1.softening_length,
                 m1.sink_rate,
                 m1.sink_radius,
-                m1.sink_model,
+                m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -180,7 +180,7 @@ class Patch:
                 m2.softening_length,
                 m2.sink_rate,
                 m2.sink_radius,
-                m2.sink_model,
+                m2.sink_model.value,
                 self.physics.alpha,
                 rk_param,
                 dt,
@@ -220,14 +220,14 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
+        self._physics = physics = Physics(**physics)
+        self._options = options = Options(**options)
+
         if type(mesh) is not PlanarCartesian2DMesh:
             raise ValueError("solver only supports 2D cartesian mesh")
 
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
-
-        self._physics = physics = Physics(**physics)
-        self._options = options = Options(**options)
 
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
