@@ -72,7 +72,7 @@ def initial_condition(setup, mesh, time):
     """
     import numpy as np
 
-    ni, nj = mesh.shape()
+    ni, nj = mesh.shape
     primitive = np.zeros([ni, nj, 4])
 
     for i in range(ni):
@@ -252,7 +252,7 @@ class Solver(SolverBase):
         self.num_cons = nq
         self.xp = xp
         self.patches = []
-        ni, nj = mesh.shape()
+        ni, nj = mesh.shape
         self.domain_radius = self.mesh.x1
         self.kb_onset_width = 0.1
 
@@ -279,7 +279,7 @@ class Solver(SolverBase):
 
     @property
     def primitive(self):
-        ni, nj = self.mesh.shape()
+        ni, nj = self.mesh.shape
         ng = self.num_guard
         nq = self.num_cons
         np = len(self.patches)
@@ -329,7 +329,7 @@ class Solver(SolverBase):
             self.set_bc_patch(pl, pc, pr, i0)
 
     def set_bc_patch(self, pl, pc, pr, patch_index):
-        ni, nj = self.mesh.shape()
+        ni, nj = self.mesh.shape
         ng = self.num_guard
 
         # 1. write to the guard zones of pc, the internal BC

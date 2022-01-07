@@ -223,6 +223,7 @@ class PlanarCartesian2DMesh(NamedTuple):
     def dy(self):
         return (self.y1 - self.y0) / self.nj
 
+    @property
     def shape(self):
         return self.ni, self.nj
 
