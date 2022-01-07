@@ -170,6 +170,38 @@ class Patch:
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
+    def point_mass_source_term(self, which_mass):
+        m1, m2 = self.physics.point_masses(self.time)
+        with self.execution_context():
+            self.lib.iso2d_point_mass_source_term[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model,
+                which_mass,
+                self.primitive1,
+                self.conserved0,
+            )
+        return self.conserved0
+
     def new_iteration(self):
         self.time0 = self.time
         self.recompute_conserved()
