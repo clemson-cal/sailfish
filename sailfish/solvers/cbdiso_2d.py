@@ -41,25 +41,49 @@ except ImportError:
 logger = getLogger(__name__)
 
 
+SINK_MODEL_ACCELERATION_FREE = 1
+SINK_MODEL_TORQUE_FREE = 2
+SINK_MODEL_FORCE_FREE = 3
+
+EOS_TYPE_LOCALLY_ISOTHERMAL = 1
+EOS_TYPE_GLOBALLY_ISOTHEMRAL = 2
+
+
 class Physics(NamedTuple):
+
     sound_speed_squared: float = 1.0
+    """ Square of the sound speed, if EOS type is globally isothermal """
+
     mach_number: float = 10.0
+    """ Square of the Mach number, if EOS type is locally isothermal """
+
     viscosity_coefficient: float = 0.01
-    kb_surface_density: float = 1.0
-    kb_central_mass: float = 1.0
-    kb_driving_rate: float = 1000.0
-    kb_onset_width: float = 0.1
-    kb_mode: int = 0  # 0: Default nothing
-    # 1: Keplerian Buffer
+    """ Kinematic viscosity value, in units of a^2 Omega """
+
+    buffer_is_enabled: bool = False
+    """ Whether the buffer zone is enabled """
+
+    buffer_surface_density: float = 1.0
+    """ Target surface density in the buffer zone, if it's enabled """
+
+    buffer_central_mass: float = 1.0
+    """ Used to determine the orbital velocity in the buffer region """
+
+    buffer_driving_rate: float = 1000.0
+    """ Rate of driving toward target solution in the buffer region """
+
+    buffer_onset_width: float = 0.1
+    """ Distance over which the buffer ramps up """
+
+    eos_type: int = EOS_TYPE_GLOBALLY_ISOTHEMRAL
+    """ EOS type: globally or locally isothermal """
+
     q: float = 1.0
     e: float = 0.0
     sink_rate: float = 10.0
     sink_radius: float = 0.05
-    mass_model1: int = 1  # 1: AccelerationFree
-    mass_model2: int = 1  # 2: TorqueFree
-    # 3: ForceFree
-    eos_model: int = 1  # 1: globally isothermal scenario
-    # 2: locally isothermal
+    sink_model1: int = SINK_MODEL_ACCELERATION_FREE
+    sink_model2: int = SINK_MODEL_ACCELERATION_FREE
     softening_length: float = 0.01
 
 
@@ -112,7 +136,7 @@ class Patch:
         self.options = options
         self.xl, self.yl = self.mesh.vertex_coordinates(i0, 0)
         self.xr, self.yr = self.mesh.vertex_coordinates(i1, nj)
-        self.kb_outer_radius = self.mesh.x1 - self.physics.kb_onset_width
+        self.buffer_outer_radius = self.mesh.x1 - self.physics.buffer_onset_width
         self.orbelement = OrbitalElements(1.0, 1.0, self.physics.q, self.physics.e)
 
         with self.execution_context():
@@ -135,7 +159,7 @@ class Patch:
                 self.yr,
                 self.physics.sound_speed_squared,
                 self.physics.mach_number ** 2.0,
-                self.physics.eos_model,
+                self.physics.eos_type,
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
@@ -144,7 +168,7 @@ class Patch:
                 self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
-                self.physics.mass_model1,
+                self.physics.sink_model1,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -153,7 +177,7 @@ class Patch:
                 self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
-                self.physics.mass_model2,
+                self.physics.sink_model2,
                 self.primitive1,
                 self.wavespeeds,
             )
@@ -177,12 +201,12 @@ class Patch:
                 self.conserved0,
                 self.primitive1,
                 self.primitive2,
-                self.physics.kb_surface_density,
-                self.physics.kb_central_mass,
-                self.physics.kb_driving_rate,
-                self.kb_outer_radius,
-                self.physics.kb_onset_width,
-                self.physics.kb_mode,
+                self.physics.buffer_surface_density,
+                self.physics.buffer_central_mass,
+                self.physics.buffer_driving_rate,
+                self.buffer_outer_radius,
+                self.physics.buffer_onset_width,
+                int(self.physics.buffer_is_enabled),
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
@@ -191,7 +215,7 @@ class Patch:
                 self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
-                self.physics.mass_model1,
+                self.physics.sink_model1,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -200,10 +224,10 @@ class Patch:
                 self.physics.softening_length,
                 self.physics.sink_rate,
                 self.physics.sink_radius,
-                self.physics.mass_model2,
+                self.physics.sink_model2,
                 self.physics.sound_speed_squared,
                 self.physics.mach_number ** 2.0,
-                self.physics.eos_model,
+                self.physics.eos_type,
                 self.physics.viscosity_coefficient,
                 rk_param,
                 dt,
