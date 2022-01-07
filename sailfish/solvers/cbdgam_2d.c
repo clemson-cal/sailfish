@@ -128,7 +128,7 @@ PRIVATE void point_mass_source_term(
     double r_sink = mass->sink_radius;
     double r_soft;
 
-    if (dr > r_sink && constant_softening)
+    if (constant_softening)
     {
         r_soft = mass->softening_length;
     }
