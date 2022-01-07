@@ -426,7 +426,7 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, doub
 
 
 
-PUBLIC cbdgam_2d_advance_rk(
+PUBLIC void cbdgam_2d_advance_rk(
     int ni,
     int nj,
     double patch_xl, //Mesh
@@ -666,7 +666,7 @@ PUBLIC cbdgam_2d_advance_rk(
     }
 }
 
-PUBLIC cbdgam_2d_wavespeed(
+PUBLIC void cbdgam_2d_wavespeed(
     int ni,
     int nj,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
@@ -691,7 +691,7 @@ PUBLIC cbdgam_2d_wavespeed(
     }
 }
 
-PUBLIC cbdgam_2d_primitive_to_conserved(
+PUBLIC void cbdgam_2d_primitive_to_conserved(
     int ni,
     int nj,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
@@ -712,7 +712,7 @@ PUBLIC cbdgam_2d_primitive_to_conserved(
     }
 }
 
-PUBLIC cbdgam_2d_point_mass_source_term(
+PUBLIC void cbdgam_2d_point_mass_source_term(
     int ni,
     int nj,
     double patch_xl, //Mesh

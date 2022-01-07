@@ -153,7 +153,7 @@ class Patch:
     def advance_rk(self, rk_param, dt):
         orbstate = OrbitalElements(1.0, 1.0, self.physics.q, self.physics.e).orbital_state(self.time)
         with self.execution_context():
-            self.lib.cbdgam_advance_rk[self.shape](
+            self.lib.cbdgam_2d_advance_rk[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
