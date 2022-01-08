@@ -38,12 +38,12 @@ class CircumbinaryDisk(Setup):
     """
 
     eos = param("isothermal", "EOS type: either isothermal or gamma-law")
-    initial_sigma = param(1.0, "initial disk surface density at r=a")
+    initial_sigma = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     domain_radius = param(12.0, "half side length of the square computational domain")
     mach_number = param(10.0, "orbital Mach number (isothermal)", mutable=True)
     eccentricity = param(0.0, "orbital eccentricity of the binary", mutable=True)
-    mass_ratio = param(1.0, "component mass ratio m2 / m1", mutable=True)
+    mass_ratio = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
     sink_rate = param(10.0, "component sink rate", mutable=True)
     sink_radius = param(0.05, "component sink radius", mutable=True)
     softening_length = param(0.05, "gravitational softening length", mutable=True)
