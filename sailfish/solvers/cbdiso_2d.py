@@ -343,8 +343,12 @@ class Solver(SolverBase):
         return self._physics._asdict()
 
     @property
+    def recommended_cfl(self):
+        return 0.3
+
+    @property
     def maximum_cfl(self):
-        return 0.1
+        return 0.4
 
     def maximum_wavespeed(self):
         return max(patch.maximum_wavespeed() for patch in self.patches)

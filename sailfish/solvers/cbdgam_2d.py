@@ -2,10 +2,9 @@
 Energy-conserving solver for the binary accretion problem in 2D.
 """
 
+from contextlib import nullcontext
 from typing import NamedTuple
 from logging import getLogger
-from typing import NamedTuple
-from contextlib import nullcontext
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
@@ -229,6 +228,15 @@ class Solver(SolverBase):
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
+        if physics.viscosity_model not in (
+            ViscosityModel.NONE,
+            ViscosityModel.CONSTANT_ALPHA,
+        ):
+            raise ValueError("solver only supports constant-nu viscosity")
+
+        if physics.eos_type != EquationOfState.GAMMA_LAW:
+            raise ValueError("solver only supports isothermal equation of states")
+
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
         nq = 4  # number of conserved quantities
@@ -318,8 +326,12 @@ class Solver(SolverBase):
         return self._physics._asdict()
 
     @property
-    def maximum_cfl(self):
+    def recommended_cfl(self):
         return 0.1
+
+    @property
+    def maximum_cfl(self):
+        return 0.4
 
     def maximum_wavespeed(self):
         return max(patch.maximum_wavespeed() for patch in self.patches)
