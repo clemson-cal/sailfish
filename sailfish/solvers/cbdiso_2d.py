@@ -57,7 +57,7 @@ class Patch:
         xp,
     ):
         i0, i1 = index_range
-        ni, nj = i1 - i0, mesh.shape[0]
+        ni, nj = i1 - i0, mesh.shape[1]
         self.lib = lib
         self.mesh = mesh
         self.xp = xp
