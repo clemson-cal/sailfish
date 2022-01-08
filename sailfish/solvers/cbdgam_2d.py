@@ -10,8 +10,8 @@ from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesian2DMesh
+from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
 from sailfish.solver import SolverBase
-from sailfish.physics.circumbinary import Physics
 
 
 logger = getLogger(__name__)
@@ -103,9 +103,13 @@ class Patch:
             )
 
     def point_mass_source_term(self, which_mass):
+        if which_mass not in (1, 2):
+            raise ValueError("the mass must be either 1 or 2")
+
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context():
-            return self.lib.cbdgam_2d_point_mass_source_term[self.shape](
+            cons_rate = self.xp.zeros_like(self.conserved0)
+            self.lib.cbdgam_2d_point_mass_source_term[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
@@ -118,7 +122,7 @@ class Patch:
                 m1.softening_length,
                 m1.sink_rate,
                 m1.sink_radius,
-                m1.sink_model,
+                m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -127,13 +131,14 @@ class Patch:
                 m2.softening_length,
                 m2.sink_rate,
                 m2.sink_radius,
-                m2.sink_model,
+                m2.sink_model.value,
                 which_mass,
                 self.primitive1,
-                self.conserved0,
+                cons_rate,
                 int(self.physics.constant_softening),
                 self.physics.gamma_law_index,
             )
+            return cons_rate
 
     def advance_rk(self, rk_param, dt):
         m1, m2 = self.physics.point_masses(self.time)
@@ -166,7 +171,7 @@ class Patch:
                 m1.softening_length,
                 m1.sink_rate,
                 m1.sink_radius,
-                m1.sink_model,
+                m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -175,7 +180,7 @@ class Patch:
                 m2.softening_length,
                 m2.sink_rate,
                 m2.sink_radius,
-                m2.sink_model,
+                m2.sink_model.value,
                 self.physics.alpha,
                 rk_param,
                 dt,
@@ -215,14 +220,23 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
+        self._physics = physics = Physics(**physics)
+        self._options = options = Options(**options)
+
         if type(mesh) is not PlanarCartesian2DMesh:
             raise ValueError("solver only supports 2D cartesian mesh")
 
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
-        self._physics = physics = Physics(**physics)
-        self._options = options = Options(**options)
+        if physics.viscosity_model not in (
+            ViscosityModel.NONE,
+            ViscosityModel.CONSTANT_ALPHA,
+        ):
+            raise ValueError("solver only supports constant-nu viscosity")
+
+        if physics.eos_type != EquationOfState.GAMMA_LAW:
+            raise ValueError("solver only supports isothermal equation of states")
 
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
@@ -313,8 +327,12 @@ class Solver(SolverBase):
         return self._physics._asdict()
 
     @property
-    def maximum_cfl(self):
+    def recommended_cfl(self):
         return 0.1
+
+    @property
+    def maximum_cfl(self):
+        return 0.4
 
     def maximum_wavespeed(self):
         return max(patch.maximum_wavespeed() for patch in self.patches)
