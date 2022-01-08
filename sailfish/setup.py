@@ -143,7 +143,7 @@ class Setup(ABC):
         if self.has_model_parameters():
             _p("model parameters:\n")
             for name, val, about in self.model_parameters():
-                _p(f"{name:.<16s} {str(val):<8} {about}")
+                _p(f"{name:.<20s} {str(val):<12} {about}")
         else:
             _p("setup has no model parameters")
         if newlines:
