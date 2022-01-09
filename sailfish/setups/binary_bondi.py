@@ -1,9 +1,17 @@
 """
-For simulating bondi-hoyle-lyttleton accretion in a binary in a wind setup.
+Binary in a wind setup: This code setups up a pair of binary black holes in 
+a wind of uniform density and mach number to inspect the accretion rates of 
+matter on to the binary based on changing their parameters. The accretion
+in such scenarios is generally the Bondi-Hoyle-Lyttleton accretion. For literature on 
+such accretion:
+
+.. _Comerford & Izzard (2019): https://arxiv.org/abs/1910.13353
+.. _Soker (2004): https://academic.oup.com/mnras/article/350/4/1366/986224
+
 """
 from typing import Callable
 from sailfish.mesh import PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import SinkModel, PointMass
+from sailfish.physics.circumbinary import SinkModel, PointMass, EquationOfState
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup import Setup, param
 
@@ -15,11 +23,16 @@ class BinaryBondi(Setup):
     x_bin = param(
         0.0, "horizontal position of binary COM (with respect to domain centroid)"
     )
+    eos = param(
+        EquationOfState.GLOBALLY_ISOTHERMAL,
+        "EOS type: either globally isothermal or locally isothermal",
+    )
+    sound_speed = param(1.0, "speed of sound")
     mach_number = param(10.0, "orbital Mach number (isothermal)", mutable=True)
     bh_sep = param(0.25, "black hole separation")
     bh_mass = param(1.0, "black hole's mass")
     sink_radius = param(5e-2, "black hole's (sink) radius")
-    sink_model = param(SinkModel.ACCELERATION_FREE, "sink prescription")
+    sink_model = param("ACCELERATION_FREE", "sink prescription")
     sink_rate = param(1e2, "sink rate")
     mass_ratio = param(1.0, "system mass ratio: [0.0-1.0]")
     eccentricity = param(0.0, "eccentricity")
@@ -27,7 +40,7 @@ class BinaryBondi(Setup):
 
     def primitive(self, t, coords, primitive):
         primitive[0] = 1.0
-        primitive[1] = self.mach_number
+        primitive[1] = self.mach_number * self.sound_speed
         primitive[2] = 0.0
 
     def mesh(self, resolution):
@@ -42,6 +55,8 @@ class BinaryBondi(Setup):
     @property
     def physics(self):
         return dict(
+            eos_type=self.eos,
+            sound_speed=self.sound_speed,
             mach_number=self.mach_number,
             point_mass_function=self.point_masses,
         )
@@ -72,14 +87,14 @@ class BinaryBondi(Setup):
             m1._replace(
                 position_x=m1.position_x + self.x_bin,
                 softening_length=self.softening_length,
-                sink_model=self.sink_model,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
             ),
             m2._replace(
                 position_x=m2.position_x + self.x_bin,
                 softening_length=self.softening_length,
-                sink_model=self.sink_model,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
             ),
