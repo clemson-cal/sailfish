@@ -1,15 +1,15 @@
 """
-Binary in a wind setup: This code setups up a pair of binary black holes in 
-a wind of uniform density and mach number to inspect the accretion rates of 
-matter on to the binary based on changing their parameters. The accretion
-in such scenarios is generally the Bondi-Hoyle-Lyttleton accretion. For literature on 
-such accretion:
+Orbiting binary embedded in a wind
+
+This code sets up a binary black hole in a wind of uniform density and Mach
+number, to inspect the accretion rate of matter onto the binary under
+different conditions. The accretion process in such scenarios is referred to
+as Bondi-Hoyle-Lyttleton accretion. Some references below:
 
 .. _Comerford & Izzard (2019): https://arxiv.org/abs/1910.13353
 .. _Soker (2004): https://academic.oup.com/mnras/article/350/4/1366/986224
-
 """
-from typing import Callable
+
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import SinkModel, PointMass, EquationOfState
 from sailfish.physics.kepler import OrbitalElements
@@ -17,22 +17,21 @@ from sailfish.setup import Setup, param
 
 
 class BinaryBondi(Setup):
+    """
+    Simulates Bondi-Hoyle-Lyttleton type accretion in a binary system.
 
-    aspect = param(1, "aspect ratio for domain")
-    height = param(1.0, "length of the Y-axis of domain")
-    x_bin = param(
-        0.0, "horizontal position of binary COM (with respect to domain centroid)"
-    )
-    eos = param(
-        EquationOfState.GLOBALLY_ISOTHERMAL,
-        "EOS type: either globally isothermal or locally isothermal",
-    )
-    sound_speed = param(1.0, "speed of sound")
-    mach_number = param(10.0, "orbital Mach number (isothermal)", mutable=True)
-    bh_sep = param(0.25, "black hole separation")
-    bh_mass = param(1.0, "black hole's mass")
-    sink_radius = param(5e-2, "black hole's (sink) radius")
-    sink_model = param("ACCELERATION_FREE", "sink prescription")
+    The gas is isothermal with uniform sound speed.
+    """
+
+    aspect = param(1, "aspect ratio of the domain, width / height")
+    height = param(1.0, "domain height in units of the binary separation")
+    x_bin = param(0.0, "horizontal offset of binary COM from domain center")
+    sound_speed = param(1.0, "speed of sound (uniform)")
+    wind_vel = param(1.0, "horizontal speed of the background flow")
+    bh_sep = param(0.25, "black hole semi-major axis")
+    bh_mass = param(1.0, "mass of the primary")
+    sink_radius = param(0.05, "black hole sink radius")
+    sink_model = param("acceleration_free", "sink prescription")
     sink_rate = param(1e2, "sink rate")
     mass_ratio = param(1.0, "system mass ratio: [0.0-1.0]")
     eccentricity = param(0.0, "eccentricity")
@@ -40,7 +39,7 @@ class BinaryBondi(Setup):
 
     def primitive(self, t, coords, primitive):
         primitive[0] = 1.0
-        primitive[1] = self.mach_number * self.sound_speed
+        primitive[1] = self.wind_vel
         primitive[2] = 0.0
 
     def mesh(self, resolution):
@@ -55,9 +54,8 @@ class BinaryBondi(Setup):
     @property
     def physics(self):
         return dict(
-            eos_type=self.eos,
+            eos_type=EquationOfState.GLOBALLY_ISOTHERMAL,
             sound_speed=self.sound_speed,
-            mach_number=self.mach_number,
             point_mass_function=self.point_masses,
         )
 
@@ -76,7 +74,7 @@ class BinaryBondi(Setup):
     def point_masses(self, time):
         elements = OrbitalElements(
             semimajor_axis=self.bh_sep,
-            total_mass=self.bh_mass * (1 + self.mass_ratio),
+            total_mass=self.bh_mass * (1.0 + self.mass_ratio),
             mass_ratio=self.mass_ratio,
             eccentricity=self.eccentricity,
         )
