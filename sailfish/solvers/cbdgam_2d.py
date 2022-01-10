@@ -304,11 +304,13 @@ class Solver(SolverBase):
 
     @property
     def primitive(self):
+        import numpy
+
         ni, nj = self.mesh.shape
         ng = self.num_guard
         nq = self.num_cons
         np = len(self.patches)
-        primitive = self.xp.zeros([ni, nj, nq])
+        primitive = numpy.zeros([ni, nj, nq])
         for (a, b), patch in zip(subdivide(ni, np), self.patches):
             primitive[a:b] = patch.primitive[ng:-ng, ng:-ng]
         return primitive

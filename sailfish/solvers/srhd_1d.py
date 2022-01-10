@@ -228,11 +228,13 @@ class Solver(SolverBase):
         return self.reconstruct("primitive")
 
     def reconstruct(self, array):
+        import numpy
+
         nz = self.mesh.shape[0]
         ng = self.num_guard
         nq = self.num_cons
         np = len(self.patches)
-        result = self.xp.zeros([nz, nq])
+        result = numpy.zeros([nz, nq])
         for (a, b), patch in zip(subdivide(nz, np), self.patches):
             result[a:b] = getattr(patch, array)[ng:-ng]
         return result
