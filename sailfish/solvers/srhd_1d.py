@@ -78,9 +78,9 @@ class Patch:
         with self.execution_context:
             self.wavespeeds = xp.zeros(num_zones)
             self.primitive1 = xp.zeros_like(conserved)
-            self.conserved0 = conserved
-            self.conserved1 = self.conserved0.copy()
-            self.conserved2 = self.conserved0.copy()
+            self.conserved0 = conserved.copy()
+            self.conserved1 = conserved.copy()
+            self.conserved2 = conserved.copy()
 
     def recompute_primitive(self):
         with self.execution_context:

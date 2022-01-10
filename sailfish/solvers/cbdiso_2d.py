@@ -72,10 +72,10 @@ class Patch:
         self.buffer_surface_density = buffer_surface_density
 
         with self.execution_context:
-            self.wavespeeds = self.xp.zeros(primitive.shape[:2])
-            self.primitive1 = self.xp.array(primitive)
-            self.primitive2 = self.xp.array(primitive)
-            self.conserved0 = self.xp.zeros(primitive.shape)
+            self.wavespeeds = xp.zeros(primitive.shape[:2])
+            self.primitive1 = xp.array(primitive)
+            self.primitive2 = xp.array(primitive)
+            self.conserved0 = xp.zeros(primitive.shape)
 
     def maximum_wavespeed(self):
         m1, m2 = self.physics.point_masses(self.time)
@@ -229,6 +229,8 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
+        import numpy as np
+
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
 
@@ -296,7 +298,7 @@ class Solver(SolverBase):
             buffer_surface_density = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
-            prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
+            prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
             patch = Patch(
                 time,

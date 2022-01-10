@@ -348,7 +348,7 @@ def simulate(driver):
         with measure_time() as fold_time:
             for _ in range(fold):
                 dx = mesh.min_spacing(solver.time)
-                dt = dx / solver.maximum_wavespeed() * cfl_number
+                dt = float(dx / solver.maximum_wavespeed() * cfl_number)
                 solver.advance(dt)
                 iteration += 1
 

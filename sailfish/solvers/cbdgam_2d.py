@@ -216,6 +216,8 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
+        import numpy as np
+
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
 
@@ -278,7 +280,7 @@ class Solver(SolverBase):
             buffer_surface_pressure = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
-            prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
+            prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
             patch = Patch(
                 time,
