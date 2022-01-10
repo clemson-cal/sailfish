@@ -88,7 +88,7 @@ class Patch:
                 self.wavespeeds,
                 self.physics.gamma_law_index,
             )
-            return self.wavespeeds.max()
+            return float(self.wavespeeds.max())
 
     def recompute_conserved(self):
         with self.execution_context:

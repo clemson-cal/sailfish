@@ -109,7 +109,7 @@ class Patch:
                 self.primitive1,
                 self.wavespeeds,
             )
-            return self.wavespeeds.max()
+            return float(self.wavespeeds.max())
 
     def recompute_conserved(self):
         with self.execution_context:
@@ -378,24 +378,25 @@ class Solver(SolverBase):
         ni, nj = self.mesh.shape
         ng = self.num_guard
 
-        # 1. write to the guard zones of pc, the internal BC
-        pc[:+ng] = pl[-2 * ng : -ng]
-        pc[-ng:] = pr[+ng : +2 * ng]
+        with self.patches[patch_index].execution_context:
+            # 1. write to the guard zones of pc, the internal BC
+            pc[:+ng] = pl[-2 * ng : -ng]
+            pc[-ng:] = pr[+ng : +2 * ng]
 
-        # 2. Set outflow BC on the left/right patch edges
-        if patch_index == 0:
+            # 2. Set outflow BC on the left/right patch edges
+            if patch_index == 0:
+                for i in range(ng):
+                    pc[i] = pc[ng]
+            if patch_index == len(self.patches) - 1:
+                for i in range(pc.shape[0] - ng, pc.shape[0]):
+                    pc[i] = pc[-ng - 1]
+
+            # 3. Set outflow BC on bottom and top edges
             for i in range(ng):
-                pc[i] = pc[ng]
-        if patch_index == len(self.patches) - 1:
-            for i in range(pc.shape[0] - ng, pc.shape[0]):
-                pc[i] = pc[-ng - 1]
+                pc[:, i] = pc[:, ng]
 
-        # 3. Set outflow BC on bottom and top edges
-        for i in range(ng):
-            pc[:, i] = pc[:, ng]
-
-        for i in range(pc.shape[1] - ng, pc.shape[1]):
-            pc[:, i] = pc[:, -ng - 1]
+            for i in range(pc.shape[1] - ng, pc.shape[1]):
+                pc[:, i] = pc[:, -ng - 1]
 
     def new_iteration(self):
         for patch in self.patches:

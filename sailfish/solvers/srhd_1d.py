@@ -120,7 +120,7 @@ class Patch:
                 self.wavespeeds,
                 self.scale_factor_derivative,
             )
-            return self.wavespeeds.max()
+            return float(self.wavespeeds.max())
 
     @property
     def scale_factor(self):
