@@ -4,37 +4,10 @@ One-dimensional relativistic hydro solver supporting homologous mesh motion.
 
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import get_array_module
-from sailfish.subdivide import subdivide
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
+from sailfish.subdivide import subdivide, concat_on_host
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
-
-try:
-    from contextlib import nullcontext
-
-except ImportError:
-    from contextlib import AbstractContextManager
-
-    class nullcontext(AbstractContextManager):
-        """
-        Scraped from contextlib source in Python >= 3.7 for backwards compatibility.
-        """
-
-        def __init__(self, enter_result=None):
-            self.enter_result = enter_result
-
-        def __enter__(self):
-            return self.enter_result
-
-        def __exit__(self, *excinfo):
-            pass
-
-        async def __aenter__(self):
-            return self.enter_result
-
-        async def __aexit__(self, *excinfo):
-            pass
-
 
 logger = getLogger(__name__)
 
@@ -82,6 +55,7 @@ class Patch:
         index_range,
         lib,
         xp,
+        execution_context,
     ):
         i0, i1 = index_range
         self.lib = lib
@@ -89,6 +63,7 @@ class Patch:
         self.num_zones = num_zones = index_range[1] - index_range[0]
         self.faces = xp.array(mesh.faces(*index_range))
         self.coordinates = COORDINATES_DICT[type(mesh)]
+        self.execution_context = execution_context
 
         try:
             adot = float(mesh.scale_factor_derivative)
@@ -100,19 +75,15 @@ class Patch:
 
         self.time = self.time0 = time
 
-        with self.execution_context():
+        with self.execution_context:
             self.wavespeeds = xp.zeros(num_zones)
             self.primitive1 = xp.zeros_like(conserved)
-            self.conserved0 = conserved
-            self.conserved1 = self.conserved0.copy()
-            self.conserved2 = self.conserved0.copy()
-
-    def execution_context(self):
-        """TODO: return a CUDA context for execution on the assigned device"""
-        return nullcontext()
+            self.conserved0 = conserved.copy()
+            self.conserved1 = conserved.copy()
+            self.conserved2 = conserved.copy()
 
     def recompute_primitive(self):
-        with self.execution_context():
+        with self.execution_context:
             self.lib.srhd_1d_conserved_to_primitive[self.num_zones](
                 self.faces,
                 self.conserved1,
@@ -122,7 +93,7 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
-        with self.execution_context():
+        with self.execution_context:
             self.lib.srhd_1d_advance_rk[self.num_zones](
                 self.faces,
                 self.conserved0,
@@ -142,14 +113,14 @@ class Patch:
     @property
     def maximum_wavespeed(self):
         self.recompute_primitive()
-        with self.execution_context():
+        with self.execution_context:
             self.lib.srhd_1d_max_wavespeeds[self.num_zones](
                 self.faces,
                 self.primitive1,
                 self.wavespeeds,
                 self.scale_factor_derivative,
             )
-            return self.wavespeeds.max()
+            return float(self.wavespeeds.max())
 
     @property
     def scale_factor(self):
@@ -215,42 +186,46 @@ class Solver(SolverBase):
         self.patches = []
 
         if solution is None:
-            primitive = initial_condition(setup, mesh, time)
+            primitive = xp.array(initial_condition(setup, mesh, time))
             conserved = xp.zeros_like(primitive)
             coordinates = COORDINATES_DICT[type(mesh)]
+
+            try:
+                scale_factor = mesh.scale_factor(time)
+            except AttributeError:
+                scale_factor = 1.0
 
             lib.srhd_1d_primitive_to_conserved[mesh.shape](
                 xp.array(mesh.faces()),
                 primitive,
                 conserved,
-                mesh.scale_factor(time),
+                scale_factor,
                 coordinates,
             )
         else:
             conserved = solution
 
-        for (a, b) in subdivide(mesh.shape[0], num_patches):
+        for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
             cons = xp.zeros([b - a + 2 * ng, nq])
             cons[ng:-ng] = conserved[a:b]
-            self.patches.append(Patch(time, cons, mesh, (a, b), lib, xp))
+            patch = Patch(
+                time,
+                cons,
+                mesh,
+                (a, b),
+                lib,
+                xp,
+                execution_context(mode, device_id=n % num_devices(mode)),
+            )
+            self.patches.append(patch)
 
     @property
     def solution(self):
-        return self.reconstruct("conserved")
+        return concat_on_host([p.conserved for p in self.patches], self.num_guard)
 
     @property
     def primitive(self):
-        return self.reconstruct("primitive")
-
-    def reconstruct(self, array):
-        nz = self.mesh.shape[0]
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        result = self.xp.zeros([nz, nq])
-        for (a, b), patch in zip(subdivide(nz, np), self.patches):
-            result[a:b] = getattr(patch, array)[ng:-ng]
-        return result
+        return concat_on_host([p.primitive for p in self.patches], self.num_guard)
 
     @property
     def time(self):

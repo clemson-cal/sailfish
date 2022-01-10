@@ -162,6 +162,7 @@ class DriverArgs(NamedTuple):
     resolution: int = None
     num_patches: int = None
     events: Dict[str, Recurrence] = dict()
+    new_timestep_cadence: int = None
 
     def from_namespace(args):
         """
@@ -284,6 +285,7 @@ def simulate(driver):
     fold = driver.fold or 10
     mesh = setup.mesh(driver.resolution)
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
+    new_timestep_cadence = driver.new_timestep_cadence or 1
 
     solver = solvers.make_solver(
         setup.solver,
@@ -311,6 +313,7 @@ def simulate(driver):
 
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
+    logger.info(f"recompute dt every {new_timestep_cadence} iterations")
     setup.print_model_parameters(newlines=True, logger=main_logger)
 
     def grab_state():
@@ -347,8 +350,9 @@ def simulate(driver):
 
         with measure_time() as fold_time:
             for _ in range(fold):
-                dx = mesh.min_spacing(solver.time)
-                dt = dx / solver.maximum_wavespeed() * cfl_number
+                if iteration % new_timestep_cadence == 0:
+                    dx = mesh.min_spacing(solver.time)
+                    dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
 
@@ -475,6 +479,12 @@ def main():
         metavar="F",
         type=int,
         help="iterations between messages and side effects",
+    )
+    parser.add_argument(
+        "--new-timestep-cadence",
+        metavar="C",
+        type=int,
+        help="iterations between recomputing the timestep dt",
     )
     parser.add_argument(
         "--events",

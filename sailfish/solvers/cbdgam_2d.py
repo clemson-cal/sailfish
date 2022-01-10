@@ -2,15 +2,14 @@
 Energy-conserving solver for the binary accretion problem in 2D.
 """
 
-from contextlib import nullcontext
 from typing import NamedTuple
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import get_array_module
-from sailfish.subdivide import subdivide
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
 from sailfish.solver import SolverBase
+from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 
 
 logger = getLogger(__name__)
@@ -58,12 +57,14 @@ class Patch:
         buffer_surface_pressure,
         lib,
         xp,
+        execution_context,
     ):
         i0, i1 = index_range
-        ni, nj = i1 - i0, mesh.shape[0]
+        ni, nj = i1 - i0, mesh.shape[1]
         self.lib = lib
         self.mesh = mesh
         self.xp = xp
+        self.execution_context = execution_context
         self.time = self.time0 = time
         self.shape = (i1 - i0, nj)  # not including guard zones
         self.physics = physics
@@ -74,39 +75,18 @@ class Patch:
         self.buffer_surface_density = buffer_surface_density
         self.buffer_surface_pressure = buffer_surface_pressure
 
-        with self.execution_context():
+        with self.execution_context:
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
             self.primitive1 = self.xp.array(primitive)
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.xp.zeros(primitive.shape)
-
-    def execution_context(self):
-        """TODO: return a CUDA context for execution on the assigned device"""
-        return nullcontext()
-
-    def maximum_wavespeed(self):
-        with self.execution_context():
-            self.lib.cbdgam_2d_wavespeed[self.shape](
-                self.primitive1,
-                self.wavespeeds,
-                self.physics.gamma_law_index,
-            )
-            return self.wavespeeds.max()
-
-    def recompute_conserved(self):
-        with self.execution_context():
-            return self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
-                self.primitive1,
-                self.conserved0,
-                self.physics.gamma_law_index,
-            )
 
     def point_mass_source_term(self, which_mass):
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
         m1, m2 = self.physics.point_masses(self.time)
-        with self.execution_context():
+        with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
             self.lib.cbdgam_2d_point_mass_source_term[self.shape](
                 self.xl,
@@ -139,13 +119,30 @@ class Patch:
             )
             return cons_rate
 
+    def maximum_wavespeed(self):
+        with self.execution_context:
+            self.lib.cbdgam_2d_wavespeed[self.shape](
+                self.primitive1,
+                self.wavespeeds,
+                self.physics.gamma_law_index,
+            )
+            return self.wavespeeds.max()
+
+    def recompute_conserved(self):
+        with self.execution_context:
+            return self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
+                self.primitive1,
+                self.conserved0,
+                self.physics.gamma_law_index,
+            )
+
     def advance_rk(self, rk_param, dt):
         m1, m2 = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
         buffer_surface_density = self.buffer_surface_density
         buffer_surface_pressure = self.buffer_surface_pressure
 
-        with self.execution_context():
+        with self.execution_context:
             self.lib.cbdgam_2d_advance_rk[self.shape](
                 self.xl,
                 self.xr,
@@ -219,6 +216,8 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
+        import numpy as np
+
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
 
@@ -280,8 +279,8 @@ class Solver(SolverBase):
             buffer_surface_density = 0.0
             buffer_surface_pressure = 0.0
 
-        for (a, b) in subdivide(ni, num_patches):
-            prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
+        for n, (a, b) in enumerate(subdivide(ni, num_patches)):
+            prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
             patch = Patch(
                 time,
@@ -295,6 +294,7 @@ class Solver(SolverBase):
                 buffer_surface_pressure,
                 lib,
                 xp,
+                execution_context(mode, device_id=n % num_devices(mode)),
             )
             self.patches.append(patch)
 
@@ -304,14 +304,9 @@ class Solver(SolverBase):
 
     @property
     def primitive(self):
-        ni, nj = self.mesh.shape
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        primitive = self.xp.zeros([ni, nj, nq])
-        for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            primitive[a:b] = patch.primitive[ng:-ng, ng:-ng]
-        return primitive
+        return concat_on_host(
+            [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
+        )
 
     @property
     def time(self):
@@ -334,7 +329,12 @@ class Solver(SolverBase):
         return 0.4
 
     def maximum_wavespeed(self):
-        return max(patch.maximum_wavespeed() for patch in self.patches)
+        return lazy_reduce(
+            max,
+            float,
+            (patch.maximum_wavespeed for patch in self.patches),
+            (patch.execution_context for patch in self.patches),
+        )
 
     def advance(self, dt):
         self.new_iteration()
