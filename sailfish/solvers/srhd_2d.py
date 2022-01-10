@@ -161,7 +161,7 @@ class Solver(SolverBase):
         self.patches = []
 
         if solution is None:
-            primitive = initial_condition(setup, mesh, time)
+            primitive = xp.array(initial_condition(setup, mesh, time))
             conserved = xp.zeros_like(primitive)
             lib.srhd_2d_primitive_to_conserved[mesh.shape](
                 xp.array(mesh.faces()),

@@ -309,7 +309,7 @@ class Solver(SolverBase):
                 buffer_surface_density,
                 lib,
                 xp,
-                execution_context(mode, device_id=n % get_num_devices(mode)),
+                execution_context(mode, device_id=n % num_devices(mode)),
             )
             self.patches.append(patch)
 

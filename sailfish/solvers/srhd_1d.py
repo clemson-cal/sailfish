@@ -186,7 +186,7 @@ class Solver(SolverBase):
         self.patches = []
 
         if solution is None:
-            primitive = initial_condition(setup, mesh, time)
+            primitive = xp.array(initial_condition(setup, mesh, time))
             conserved = xp.zeros_like(primitive)
             coordinates = COORDINATES_DICT[type(mesh)]
 
