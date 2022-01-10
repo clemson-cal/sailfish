@@ -38,8 +38,6 @@ class CircumbinaryDisk(Setup):
     """
 
     eos = param("isothermal", "EOS type: either isothermal or gamma-law")
-    initial_sigma = param(1.0, "initial disk surface density at r=a (gamma-law)")
-    initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     domain_radius = param(12.0, "half side length of the square computational domain")
     mach_number = param(10.0, "orbital Mach number (isothermal)", mutable=True)
     eccentricity = param(0.0, "orbital eccentricity of the binary", mutable=True)
@@ -47,6 +45,15 @@ class CircumbinaryDisk(Setup):
     sink_rate = param(10.0, "component sink rate", mutable=True)
     sink_radius = param(0.05, "component sink radius", mutable=True)
     softening_length = param(0.05, "gravitational softening length", mutable=True)
+    buffer_is_enabled = param(True, "Whether the buffer zone is enabled")
+    sink_model = param(SinkModel.TORQUE_FREE, "Type of sink")
+
+    initial_sigma = param(1.0, "initial disk surface density at r=a (gamma-law)")
+    initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
+    cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
+    alpha = param(0.1, "strength of alpha-viscosity (gamma-law)")
+    constant_softening = param(True, "Whether to use constant softening (gamma-law)")
+    gamma_law_index = param(5.0 / 3.0, "Adiabatic index (gamma-law)")
 
     @property
     def is_isothermal(self):
@@ -131,13 +138,13 @@ class CircumbinaryDisk(Setup):
         return (
             m1._replace(
                 softening_length=self.softening_length,
-                sink_model=SinkModel.TORQUE_FREE,
+                sink_model=self.sink_model,
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
             ),
             m2._replace(
                 softening_length=self.softening_length,
-                sink_model=SinkModel.TORQUE_FREE,
+                sink_model=self.sink_model,
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
             ),
