@@ -89,13 +89,6 @@ def get_array_module(mode):
         raise ValueError(f"unknown execution mode {mode}, must be [cpu|omp|gpu]")
 
 
-def to_host(array):
-    try:
-        return array.get()
-    except AttributeError:
-        return array
-
-
 def execution_context(mode, device_id=None):
     """
     Return a context manager appropriate for the given exuction mode.

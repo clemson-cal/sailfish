@@ -4,13 +4,8 @@ One-dimensional relativistic hydro solver supporting homologous mesh motion.
 
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import (
-    get_array_module,
-    execution_context,
-    num_devices,
-    to_host,
-)
-from sailfish.subdivide import subdivide
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
+from sailfish.subdivide import subdivide, concat_on_host
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
 
@@ -226,23 +221,11 @@ class Solver(SolverBase):
 
     @property
     def solution(self):
-        return self.reconstruct("conserved")
+        return concat_on_host([p.conserved for p in self.patches], self.num_guard)
 
     @property
     def primitive(self):
-        return self.reconstruct("primitive")
-
-    def reconstruct(self, array):
-        import numpy
-
-        nz = self.mesh.shape[0]
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        result = numpy.zeros([nz, nq])
-        for (a, b), patch in zip(subdivide(nz, np), self.patches):
-            result[a:b] = to_host(getattr(patch, array)[ng:-ng])
-        return result
+        return concat_on_host([p.primitive for p in self.patches], self.num_guard)
 
     @property
     def time(self):

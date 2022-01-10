@@ -5,16 +5,11 @@ Energy-conserving solver for the binary accretion problem in 2D.
 from typing import NamedTuple
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import (
-    get_array_module,
-    execution_context,
-    num_devices,
-    to_host,
-)
-from sailfish.subdivide import subdivide
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
 from sailfish.solver import SolverBase
+from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 
 
 logger = getLogger(__name__)
@@ -86,23 +81,6 @@ class Patch:
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.xp.zeros(primitive.shape)
 
-    def maximum_wavespeed(self):
-        with self.execution_context:
-            self.lib.cbdgam_2d_wavespeed[self.shape](
-                self.primitive1,
-                self.wavespeeds,
-                self.physics.gamma_law_index,
-            )
-            return float(self.wavespeeds.max())
-
-    def recompute_conserved(self):
-        with self.execution_context:
-            return self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
-                self.primitive1,
-                self.conserved0,
-                self.physics.gamma_law_index,
-            )
-
     def point_mass_source_term(self, which_mass):
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
@@ -140,6 +118,23 @@ class Patch:
                 self.physics.gamma_law_index,
             )
             return cons_rate
+
+    def maximum_wavespeed(self):
+        with self.execution_context:
+            self.lib.cbdgam_2d_wavespeed[self.shape](
+                self.primitive1,
+                self.wavespeeds,
+                self.physics.gamma_law_index,
+            )
+            return self.wavespeeds.max()
+
+    def recompute_conserved(self):
+        with self.execution_context:
+            return self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
+                self.primitive1,
+                self.conserved0,
+                self.physics.gamma_law_index,
+            )
 
     def advance_rk(self, rk_param, dt):
         m1, m2 = self.physics.point_masses(self.time)
@@ -309,16 +304,9 @@ class Solver(SolverBase):
 
     @property
     def primitive(self):
-        import numpy
-
-        ni, nj = self.mesh.shape
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        primitive = numpy.zeros([ni, nj, nq])
-        for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            primitive[a:b] = to_host(patch.primitive[ng:-ng, ng:-ng])
-        return primitive
+        return concat_on_host(
+            [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
+        )
 
     @property
     def time(self):
@@ -341,7 +329,12 @@ class Solver(SolverBase):
         return 0.4
 
     def maximum_wavespeed(self):
-        return max(patch.maximum_wavespeed() for patch in self.patches)
+        return lazy_reduce(
+            max,
+            float,
+            (patch.maximum_wavespeed for patch in self.patches),
+            (patch.execution_context for patch in self.patches),
+        )
 
     def advance(self, dt):
         self.new_iteration()

@@ -4,13 +4,8 @@ One-dimensional relativistic hydro solver supporting homologous mesh motion.
 
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import (
-    get_array_module,
-    execution_context,
-    num_devices,
-    to_host,
-)
-from sailfish.subdivide import subdivide
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
+from sailfish.subdivide import subdivide, concat_on_host
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
 
@@ -45,6 +40,7 @@ class Patch:
         index_range,
         lib,
         xp,
+        execution_context,
     ):
         i0, i1 = index_range
         self.lib = lib
@@ -52,6 +48,7 @@ class Patch:
         self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
         self.faces = xp.array(mesh.faces(*index_range))
         self.polar_extent = mesh.polar_extent
+        self.execution_context = execution_context
 
         try:
             adot = float(mesh.scale_factor_derivative)
@@ -194,23 +191,11 @@ class Solver(SolverBase):
 
     @property
     def solution(self):
-        return self.reconstruct("conserved")
+        return concat_on_host([p.conserved for p in self.patches], (self.num_guard, 0))
 
     @property
     def primitive(self):
-        return self.reconstruct("primitive")
-
-    def reconstruct(self, array):
-        import numpy
-
-        ni, nj = self.mesh.shape
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        result = numpy.zeros([ni, nj, nq])
-        for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            result[a:b] = to_host(getattr(patch, array)[ng:-ng])
-        return result
+        return concat_on_host([p.primitive for p in self.patches], (self.num_guard, 0))
 
     @property
     def time(self):

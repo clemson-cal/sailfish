@@ -5,16 +5,11 @@ Isothermal solver for the binary accretion problem in 2D planar coordinates.
 from logging import getLogger
 from typing import NamedTuple
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import (
-    get_array_module,
-    execution_context,
-    num_devices,
-    to_host,
-)
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
 from sailfish.solver import SolverBase
-from sailfish.subdivide import subdivide
+from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 
 
 logger = getLogger(__name__)
@@ -82,6 +77,43 @@ class Patch:
             self.primitive2 = xp.array(primitive)
             self.conserved0 = xp.zeros(primitive.shape)
 
+    def point_mass_source_term(self, which_mass):
+        if which_mass not in (1, 2):
+            raise ValueError("the mass must be either 1 or 2")
+
+        m1, m2 = self.physics.point_masses(self.time)
+        with self.execution_context:
+            cons_rate = self.xp.zeros_like(self.conserved0)
+
+            self.lib.cbdiso_2d_point_mass_source_term[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model,
+                which_mass,
+                self.primitive1,
+                cons_rate,
+            )
+        return cons_rate
+
     def maximum_wavespeed(self):
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context:
@@ -114,7 +146,7 @@ class Patch:
                 self.primitive1,
                 self.wavespeeds,
             )
-            return float(self.wavespeeds.max())
+            return self.wavespeeds.max()
 
     def recompute_conserved(self):
         with self.execution_context:
@@ -171,43 +203,6 @@ class Patch:
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
-
-    def point_mass_source_term(self, which_mass):
-        if which_mass not in (1, 2):
-            raise ValueError("the mass must be either 1 or 2")
-
-        m1, m2 = self.physics.point_masses(self.time)
-        with self.execution_context:
-            cons_rate = self.xp.zeros_like(self.conserved0)
-
-            self.lib.cbdiso_2d_point_mass_source_term[self.shape](
-                self.xl,
-                self.xr,
-                self.yl,
-                self.yr,
-                m1.position_x,
-                m1.position_y,
-                m1.velocity_x,
-                m1.velocity_y,
-                m1.mass,
-                m1.softening_length,
-                m1.sink_rate,
-                m1.sink_radius,
-                m1.sink_model,
-                m2.position_x,
-                m2.position_y,
-                m2.velocity_x,
-                m2.velocity_y,
-                m2.mass,
-                m2.softening_length,
-                m2.sink_rate,
-                m2.sink_radius,
-                m2.sink_model,
-                which_mass,
-                self.primitive1,
-                cons_rate,
-            )
-        return cons_rate
 
     def new_iteration(self):
         self.time0 = self.time
@@ -326,16 +321,9 @@ class Solver(SolverBase):
 
     @property
     def primitive(self):
-        import numpy
-
-        ni, nj = self.mesh.shape
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        primitive = numpy.zeros([ni, nj, nq])
-        for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            primitive[a:b] = to_host(patch.primitive[ng:-ng, ng:-ng])
-        return primitive
+        return concat_on_host(
+            [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
+        )
 
     @property
     def time(self):
@@ -358,7 +346,12 @@ class Solver(SolverBase):
         return 0.4
 
     def maximum_wavespeed(self):
-        return max(patch.maximum_wavespeed() for patch in self.patches)
+        return lazy_reduce(
+            max,
+            float,
+            (patch.maximum_wavespeed for patch in self.patches),
+            (patch.execution_context for patch in self.patches),
+        )
 
     def advance(self, dt):
         self.new_iteration()
