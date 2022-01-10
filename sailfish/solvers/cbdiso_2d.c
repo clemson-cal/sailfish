@@ -375,7 +375,7 @@ PRIVATE void riemann_hlle(
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-PUBLIC void cbdiso_advance_rk(
+PUBLIC void cbdiso_2d_advance_rk(
     int ni,
     int nj,
     double patch_xl, // mesh
@@ -591,7 +591,7 @@ PUBLIC void cbdiso_advance_rk(
     }
 }
 
-PUBLIC void iso2d_primitive_to_conserved(
+PUBLIC void cbdiso_2d_primitive_to_conserved(
     int ni,
     int nj,
     double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
@@ -612,7 +612,7 @@ PUBLIC void iso2d_primitive_to_conserved(
 
 }
 
-PUBLIC void iso2d_point_mass_source_term(
+PUBLIC void cbdiso_2d_point_mass_source_term(
     int ni,
     int nj,
     double patch_xl, // mesh
@@ -665,7 +665,7 @@ PUBLIC void iso2d_point_mass_source_term(
 }
 
 
-PUBLIC void cbdiso_wavespeed(
+PUBLIC void cbdiso_2d_wavespeed(
     int ni, // mesh
     int nj,
     double patch_xl,

@@ -85,7 +85,7 @@ class Patch:
     def maximum_wavespeed(self):
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context:
-            self.lib.cbdiso_wavespeed[self.shape](
+            self.lib.cbdiso_2d_wavespeed[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
@@ -118,7 +118,7 @@ class Patch:
 
     def recompute_conserved(self):
         with self.execution_context:
-            return self.lib.iso2d_primitive_to_conserved[self.shape](
+            return self.lib.cbdiso_2d_primitive_to_conserved[self.shape](
                 self.primitive1,
                 self.conserved0,
             )
@@ -129,7 +129,7 @@ class Patch:
         buffer_surface_density = self.buffer_surface_density
 
         with self.execution_context:
-            self.lib.cbdiso_advance_rk[self.shape](
+            self.lib.cbdiso_2d_advance_rk[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
@@ -180,7 +180,7 @@ class Patch:
         with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
 
-            self.lib.iso2d_point_mass_source_term[self.shape](
+            self.lib.cbdiso_2d_point_mass_source_term[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
