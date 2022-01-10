@@ -5,7 +5,12 @@ Energy-conserving solver for the binary accretion problem in 2D.
 from typing import NamedTuple
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import get_array_module, execution_context, num_devices
+from sailfish.kernel.system import (
+    get_array_module,
+    execution_context,
+    num_devices,
+    to_host,
+)
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
@@ -312,7 +317,7 @@ class Solver(SolverBase):
         np = len(self.patches)
         primitive = numpy.zeros([ni, nj, nq])
         for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            primitive[a:b] = patch.primitive[ng:-ng, ng:-ng]
+            primitive[a:b] = to_host(patch.primitive[ng:-ng, ng:-ng])
         return primitive
 
     @property

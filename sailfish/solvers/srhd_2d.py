@@ -4,7 +4,12 @@ One-dimensional relativistic hydro solver supporting homologous mesh motion.
 
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import get_array_module, execution_context, num_devices
+from sailfish.kernel.system import (
+    get_array_module,
+    execution_context,
+    num_devices,
+    to_host,
+)
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
@@ -204,7 +209,7 @@ class Solver(SolverBase):
         np = len(self.patches)
         result = numpy.zeros([ni, nj, nq])
         for (a, b), patch in zip(subdivide(ni, np), self.patches):
-            result[a:b] = getattr(patch, array)[ng:-ng]
+            result[a:b] = to_host(getattr(patch, array)[ng:-ng])
         return result
 
     @property
