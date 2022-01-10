@@ -4,8 +4,7 @@ One-dimensional relativistic hydro solver supporting homologous mesh motion.
 
 from logging import getLogger
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import get_array_module
-from sailfish.kernel.system import execution_context, num_devices
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.subdivide import subdivide
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
@@ -191,26 +190,34 @@ class Solver(SolverBase):
             conserved = xp.zeros_like(primitive)
             coordinates = COORDINATES_DICT[type(mesh)]
 
+            try:
+                scale_factor = mesh.scale_factor(time)
+            except AttributeError:
+                scale_factor = 1.0
+
             lib.srhd_1d_primitive_to_conserved[mesh.shape](
                 xp.array(mesh.faces()),
                 primitive,
                 conserved,
-                mesh.scale_factor(time),
+                scale_factor,
                 coordinates,
             )
         else:
             conserved = solution
 
-        device_id = 0
-
-        for (a, b) in subdivide(mesh.shape[0], num_patches):
-            context = execution_context(mode, device_id=device_id)
+        for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
             cons = xp.zeros([b - a + 2 * ng, nq])
             cons[ng:-ng] = conserved[a:b]
-            self.patches.append(Patch(time, cons, mesh, (a, b), lib, xp, context))
-
-            device_id += 1
-            device_id %= num_devices(mode)
+            patch = Patch(
+                time,
+                cons,
+                mesh,
+                (a, b),
+                lib,
+                xp,
+                execution_context(mode, device_id=n % num_devices(mode)),
+            )
+            self.patches.append(patch)
 
     @property
     def solution(self):

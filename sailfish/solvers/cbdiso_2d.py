@@ -2,11 +2,10 @@
 Isothermal solver for the binary accretion problem in 2D planar coordinates.
 """
 
-from contextlib import nullcontext
 from logging import getLogger
 from typing import NamedTuple
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import get_array_module
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
 from sailfish.solver import SolverBase
@@ -55,12 +54,14 @@ class Patch:
         buffer_surface_density,
         lib,
         xp,
+        execution_context,
     ):
         i0, i1 = index_range
         ni, nj = i1 - i0, mesh.shape[1]
         self.lib = lib
         self.mesh = mesh
         self.xp = xp
+        self.execution_context = execution_context
         self.time = self.time0 = time
         self.shape = (i1 - i0, nj)  # not including guard zones
         self.physics = physics
@@ -70,19 +71,15 @@ class Patch:
         self.buffer_outer_radius = buffer_outer_radius
         self.buffer_surface_density = buffer_surface_density
 
-        with self.execution_context():
+        with self.execution_context:
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
             self.primitive1 = self.xp.array(primitive)
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.xp.zeros(primitive.shape)
 
-    def execution_context(self):
-        """TODO: return a CUDA context for execution on the assigned device"""
-        return nullcontext()
-
     def maximum_wavespeed(self):
         m1, m2 = self.physics.point_masses(self.time)
-        with self.execution_context():
+        with self.execution_context:
             self.lib.cbdiso_wavespeed[self.shape](
                 self.xl,
                 self.xr,
@@ -115,7 +112,7 @@ class Patch:
             return self.wavespeeds.max()
 
     def recompute_conserved(self):
-        with self.execution_context():
+        with self.execution_context:
             return self.lib.iso2d_primitive_to_conserved[self.shape](
                 self.primitive1,
                 self.conserved0,
@@ -126,7 +123,7 @@ class Patch:
         buffer_central_mass = m1.mass + m2.mass
         buffer_surface_density = self.buffer_surface_density
 
-        with self.execution_context():
+        with self.execution_context:
             self.lib.cbdiso_advance_rk[self.shape](
                 self.xl,
                 self.xr,
@@ -175,7 +172,7 @@ class Patch:
             raise ValueError("the mass must be either 1 or 2")
 
         m1, m2 = self.physics.point_masses(self.time)
-        with self.execution_context():
+        with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
 
             self.lib.iso2d_point_mass_source_term[self.shape](
@@ -298,7 +295,7 @@ class Solver(SolverBase):
             buffer_outer_radius = 0.0
             buffer_surface_density = 0.0
 
-        for (a, b) in subdivide(ni, num_patches):
+        for n, (a, b) in enumerate(subdivide(ni, num_patches)):
             prim = xp.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
             prim[ng:-ng, ng:-ng] = primitive[a:b]
             patch = Patch(
@@ -312,6 +309,7 @@ class Solver(SolverBase):
                 buffer_surface_density,
                 lib,
                 xp,
+                execution_context(mode, device_id=n % get_num_devices(mode)),
             )
             self.patches.append(patch)
 
