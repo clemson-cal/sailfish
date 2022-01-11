@@ -284,13 +284,13 @@ if __name__ == "__main__":
             chkpt = load_checkpoint(arg)
             if chkpt["solver"] == "srhd_1d":
                 print("plotting for srhd_1d solver")
-                main_srhd_1d()
+                exit(main_srhd_1d())
             if chkpt["solver"] == "srhd_2d":
                 print("plotting for srhd_2d solver")
-                main_srhd_2d()
+                exit(main_srhd_2d())
             if chkpt["solver"] == "cbdiso_2d":
                 print("plotting for cbdiso_2d solver")
-                main_cbdiso_2d()
+                exit(main_cbdiso_2d())
             if chkpt["solver"] == "cbdgam_2d":
                 print("plotting for cbdgam_2d solver")
-                main_cbdgam_2d()
+                exit(main_cbdgam_2d())

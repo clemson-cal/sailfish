@@ -16,6 +16,7 @@ DESCRIPTION:
 #define NCONS 4
 #define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
+#define NOMINAL_FOUR_PI 1.0
 
 
 // ============================ MATH ==========================================
@@ -258,7 +259,7 @@ PRIVATE double face_area(int coords, double x)
 {
     switch (coords) {
         case COORDS_CARTESIAN: return 1.0;
-        case COORDS_SPHERICAL: return x * x;
+        case COORDS_SPHERICAL: return x * x * NOMINAL_FOUR_PI;
     }
     return 0.0;
 }
@@ -267,7 +268,7 @@ PRIVATE double cell_volume(int coords, double x0, double x1)
 {
     switch (coords) {
         case COORDS_CARTESIAN: return x1 - x0;
-        case COORDS_SPHERICAL: return (pow(x1, 3.0) - pow(x0, 3.0)) / 3.0;
+        case COORDS_SPHERICAL: return (pow(x1, 3.0) - pow(x0, 3.0)) * NOMINAL_FOUR_PI / 3.0;
     }
     return 0.0;
 }
@@ -278,7 +279,7 @@ PRIVATE void geometric_source_terms(int coords, double x0, double x1, const doub
         case COORDS_SPHERICAL: {
             double p = prim[2];
             source[0] = 0.0;
-            source[1] = p * (x1 * x1 - x0 * x0);
+            source[1] = p * (x1 * x1 - x0 * x0) * NOMINAL_FOUR_PI;
             source[2] = 0.0;
             source[3] = 0.0;
             break;
