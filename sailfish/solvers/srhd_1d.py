@@ -1,11 +1,24 @@
 """
 One-dimensional relativistic hydro solver supporting homologous mesh motion.
+
+The solver configuration is:
+
+- Planar cartesian, or spherical coordinate system in 1d
+- Possible homologous radial expansion in spherical coordinates mode
+- Four conserved quantities: D, Sr, tau, s (scalar lab-frame mass density)
+- Four primitive quantities: rho, ur, p, x (scalar concentration)
+- Gamma-law index of 4/3
+
+The Python code assumes RK2 time stepping, although coefficients are written
+below for RK1 and low-storage RK3 as well. The C code hard-codes a PLM theta
+value of 2.0.
 """
 
 from logging import getLogger
+from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
-from sailfish.subdivide import subdivide, concat_on_host
+from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
 
@@ -31,22 +44,29 @@ COORDINATES_DICT = {
 }
 
 
-def initial_condition(setup, mesh, i0, i1, time):
-    import numpy as np
-
-    primitive = np.zeros([i1 - i0, NUM_CONS])
+def initial_condition(setup, mesh, i0, i1, time, xp):
+    primitive = xp.zeros([i1 - i0, NUM_CONS])
 
     for i in range(i0, i1):
         r = mesh.zone_center(time, i)
         setup.primitive(time, r, primitive[i - i0])
-
     return primitive
+
+
+class Options(NamedTuple):
+    compute_wavespeed: bool = False
+
+
+class Physics(NamedTuple):
+    pass
 
 
 class Patch:
     """
-    Holds the array buffer state for the solution on a subset of the
-    solution domain.
+    Buffers for the solution on a subset of the solution domain.
+
+    This class also takes care of generating initial conditions if needed, and
+    issuing calls to the solver kernel functions.
     """
 
     def __init__(
@@ -84,7 +104,7 @@ class Patch:
             faces = xp.array(mesh.faces(*index_range))
 
             if conserved is None:
-                primitive = xp.array(initial_condition(setup, mesh, i0, i1, time))
+                primitive = initial_condition(setup, mesh, i0, i1, time, xp)
                 conserved = xp.zeros_like(primitive)
 
                 lib.srhd_1d_primitive_to_conserved[num_zones](
@@ -132,7 +152,6 @@ class Patch:
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 
-    @property
     def maximum_wavespeed(self):
         self.recompute_primitive()
         with self.execution_context:
@@ -184,6 +203,9 @@ class Solver(SolverBase):
         xp = get_array_module(mode)
         lib = Library(code, mode=mode, debug=True)
 
+        self._physics = physics = Physics(**physics)
+        self._options = options = Options(**options)
+
         try:
             bcl, bcr = setup.boundary_condition
         except ValueError:
@@ -234,11 +256,11 @@ class Solver(SolverBase):
 
     @property
     def options(self):
-        return dict()
+        return self._options._asdict()
 
     @property
     def physics(self):
-        return dict()
+        return self._physics._asdict()
 
     @property
     def recommended_cfl(self):
@@ -249,13 +271,25 @@ class Solver(SolverBase):
         return 16.0
 
     def maximum_wavespeed(self):
-        return 1.0
-        # max(patch.maximum_wavespeed for patch in self.patches)
+        if self._options.compute_wavespeed:
+            return lazy_reduce(
+                max,
+                float,
+                (patch.maximum_wavespeed for patch in self.patches),
+                (patch.execution_context for patch in self.patches),
+            )
+        else:
+            return 1.0
 
     def advance(self, dt):
+        bs_rk1 = [0 / 1]
+        bs_rk2 = [0 / 1, 1 / 2]
+        bs_rk3 = [0 / 1, 3 / 4, 1 / 3]
+
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-        self.advance_rk(0.5, dt)
+
+        for b in bs_rk2:
+            self.advance_rk(b, dt)
 
     def advance_rk(self, rk_param, dt):
         for patch in self.patches:
@@ -269,13 +303,13 @@ class Solver(SolverBase):
     def set_bc(self, array):
         ng = self.num_guard
         num_patches = len(self.patches)
-        for i0 in range(num_patches):
-            il = (i0 + num_patches - 1) % num_patches
-            ir = (i0 + num_patches + 1) % num_patches
+        for ic in range(num_patches):
+            il = (ic + num_patches - 1) % num_patches
+            ir = (ic + num_patches + 1) % num_patches
             pl = getattr(self.patches[il], array)
-            p0 = getattr(self.patches[i0], array)
+            pc = getattr(self.patches[ic], array)
             pr = getattr(self.patches[ir], array)
-            self.set_bc_patch(pl, p0, pr, i0)
+            self.set_bc_patch(pl, pc, pr, ic)
 
     def set_bc_patch(self, al, ac, ar, patch_index):
         t = self.time

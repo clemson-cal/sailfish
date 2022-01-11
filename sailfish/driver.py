@@ -7,6 +7,7 @@ from typing import NamedTuple, Dict
 
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
+from sailfish.solvers import SolverInitializationError
 from sailfish import setups
 
 logger = logging.getLogger(__name__)
@@ -72,44 +73,54 @@ def update_where_none(new, old, frozen=[]):
     return type(new)(**new_dict)
 
 
-def asdict(t):
-    """
-    Convert named tuple instances to dictionaries.
-
-    This function operates recursively on the data members of a dictionary or
-    named tuple. Each object that is a named tuple is mapped to its dictionary
-    representation, with an additional `_type` key to indicate the named tuple
-    subclass. This mapping is applied to the simulation state before pickling,
-    so that `sailfish` module is not required to unpickle the checkpoint
-    files.
-    """
-    if type(t) is dict:
-        return {k: asdict(v) for k, v in t.items()}
-    if isinstance(t, tuple):
-        d = {k: asdict(v) for k, v in t._asdict().items()}
-        d["_type"] = ".".join([type(t).__module__, type(t).__name__])
-        return d
-    return t
+# The functions below were written to allow state to be written in terms of
+# builtin Python objects (no sailfish application classes). That would be good
+# practice because then pickle files can be opened on systems that don't have
+# sailfish installed, so these functions should possibly be restored at some
+# point. However in practice it's more convenient for post-processing to have
+# immediate access to the sailfish objects after unpickling. It's also tedious
+# to ensure that all sailfish objects have been removed in `asdict`, and are
+# properly restored in `fromdict`.
 
 
-def fromdict(d):
-    """
-    Convert from dictionaries to named tuples.
+# def asdict(t):
+#     """
+#     Convert named tuple instances to dictionaries.
 
-    This function performs the inverse of the `asdict` method, and is applied
-    to pickled simulation states.
-    """
-    import sailfish
+#     This function operates recursively on the data members of a dictionary or
+#     named tuple. Each object that is a named tuple is mapped to its dictionary
+#     representation, with an additional `_type` key to indicate the named tuple
+#     subclass. This mapping is applied to the simulation state before pickling,
+#     so that `sailfish` module is not required to unpickle the checkpoint
+#     files.
+#     """
+#     if type(t) is dict:
+#         return {k: asdict(v) for k, v in t.items()}
+#     if isinstance(t, tuple):
+#         d = {k: asdict(v) for k, v in t._asdict().items()}
+#         d["_type"] = ".".join([type(t).__module__, type(t).__name__])
+#         return d
+#     return t
 
-    if type(d) is dict:
-        if "_type" in d:
-            cls = eval(d["_type"])
-            del d["_type"]
-            return cls(**{k: fromdict(v) for k, v in d.items()})
-        else:
-            return {k: fromdict(v) for k, v in d.items()}
-    else:
-        return d
+
+# def fromdict(d):
+#     """
+#     Convert from dictionaries to named tuples.
+
+#     This function performs the inverse of the `asdict` method, and is applied
+#     to pickled simulation states.
+#     """
+#     import sailfish
+
+#     if type(d) is dict:
+#         if "_type" in d:
+#             cls = eval(d["_type"])
+#             del d["_type"]
+#             return cls(**{k: fromdict(v) for k, v in d.items()})
+#         else:
+#             return {k: fromdict(v) for k, v in d.items()}
+#     else:
+#         return d
 
 
 def write_checkpoint(number, outdir, state):
@@ -608,6 +619,9 @@ def main():
 
     except ParseRecurrenceError as e:
         print(f"parse error: {e}")
+
+    except SolverInitializationError as e:
+        print(f"solver initialization error: {e}")
 
     except OSError as e:
         print(f"file system error: {e}")
