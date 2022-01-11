@@ -2,7 +2,7 @@
 2D disk setups for binary problems.
 """
 
-from math import sqrt
+from math import sqrt, exp
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import EquationOfState, PointMass, SinkModel
 from sailfish.physics.kepler import OrbitalElements
@@ -78,10 +78,12 @@ class CircumbinaryDisk(Setup):
 
         elif self.is_gamma_law:
             # See eq. (A2) from Goodman (2003)
-            primitive[0] = self.initial_sigma * r_softened ** (-3.0 / 5.0)
+            primitive[0] = self.initial_sigma * r_softened ** (-3.0 / 5.0) \
+                           * (0.0001 + 0.9999 * exp(-(1.0 / r_softened)**30))
             primitive[1] = GM / sqrt(r_softened) * phi_hat_x
             primitive[2] = GM / sqrt(r_softened) * phi_hat_y
-            primitive[3] = self.initial_pressure * r_softened ** (-3.0 / 2.0)
+            primitive[3] = self.initial_pressure * r_softened ** (-3.0 / 2.0) \
+                           * (0.0001 + 0.9999 * exp(-(1.0 / r_softened)**30))
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -102,8 +104,11 @@ class CircumbinaryDisk(Setup):
         elif self.is_gamma_law:
             return dict(
                 eos_type=EquationOfState.GAMMA_LAW,
-                gamma_law_index=5 / 3,
+                gamma_law_index=self.gamma_law_index,
                 point_mass_function=self.point_masses,
+                buffer_is_enabled=self.buffer_is_enabled,
+                cooling_coefficient=self.cooling_coefficient,
+                constant_softening=self.constant_softening,
             )
 
     @property
