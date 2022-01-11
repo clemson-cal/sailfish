@@ -45,15 +45,15 @@ class CircumbinaryDisk(Setup):
     sink_rate = param(10.0, "component sink rate", mutable=True)
     sink_radius = param(0.05, "component sink radius", mutable=True)
     softening_length = param(0.05, "gravitational softening length", mutable=True)
-    buffer_is_enabled = param(True, "Whether the buffer zone is enabled")
-    sink_model = param(SinkModel.TORQUE_FREE, "Type of sink")
+    buffer_is_enabled = param(True, "whether the buffer zone is enabled")
+    sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
 
     initial_sigma = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
-    alpha = param(0.1, "strength of alpha-viscosity (gamma-law)")
-    constant_softening = param(True, "Whether to use constant softening (gamma-law)")
-    gamma_law_index = param(5.0 / 3.0, "Adiabatic index (gamma-law)")
+    alpha = param(0.1, "alpha-viscosity parameter (gamma-law)")
+    constant_softening = param(True, "whether to use constant softening (gamma-law)")
+    gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
 
     @property
     def is_isothermal(self):
@@ -78,12 +78,18 @@ class CircumbinaryDisk(Setup):
 
         elif self.is_gamma_law:
             # See eq. (A2) from Goodman (2003)
-            primitive[0] = self.initial_sigma * r_softened ** (-3.0 / 5.0) \
-                           * (0.0001 + 0.9999 * exp(-(1.0 / r_softened)**30))
+            primitive[0] = (
+                self.initial_sigma
+                * r_softened ** (-3.0 / 5.0)
+                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+            )
             primitive[1] = GM / sqrt(r_softened) * phi_hat_x
             primitive[2] = GM / sqrt(r_softened) * phi_hat_y
-            primitive[3] = self.initial_pressure * r_softened ** (-3.0 / 2.0) \
-                           * (0.0001 + 0.9999 * exp(-(1.0 / r_softened)**30))
+            primitive[3] = (
+                self.initial_pressure
+                * r_softened ** (-3.0 / 2.0)
+                * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
+            )
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -130,27 +136,31 @@ class CircumbinaryDisk(Setup):
         if not self.is_isothermal and not self.is_gamma_law:
             raise ValueError(f"eos must be isothermal or gamma-law, got {self.eos}")
 
-    def point_masses(self, time):
-        elements = OrbitalElements(
+    @property
+    def orbital_elements(self):
+        return OrbitalElements(
             semimajor_axis=1.0,
             total_mass=1.0,
             mass_ratio=self.mass_ratio,
             eccentricity=self.eccentricity,
         )
-        m1, m2 = elements.orbital_state(time)
-        m1 = PointMass(**m1._asdict())
-        m2 = PointMass(**m2._asdict())
+
+    def point_masses(self, time):
+        m1, m2 = self.orbital_elements.orbital_state(time)
+
         return (
-            m1._replace(
+            PointMass(
                 softening_length=self.softening_length,
-                sink_model=self.sink_model,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
+                **m1._asdict(),
             ),
-            m2._replace(
+            PointMass(
                 softening_length=self.softening_length,
-                sink_model=self.sink_model,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
+                **m2._asdict(),
             ),
         )

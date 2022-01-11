@@ -71,29 +71,32 @@ class BinaryBondi(Setup):
     def default_end_time(self):
         return 10.0
 
-    def point_masses(self, time):
-        elements = OrbitalElements(
-            semimajor_axis=self.bh_sep,
-            total_mass=self.bh_mass * (1.0 + self.mass_ratio),
+    @property
+    def orbital_elements(self):
+        return OrbitalElements(
+            semimajor_axis=1.0,
+            total_mass=1.0,
             mass_ratio=self.mass_ratio,
             eccentricity=self.eccentricity,
         )
-        m1, m2 = elements.orbital_state(time)
-        m1 = PointMass(**m1._asdict())
-        m2 = PointMass(**m2._asdict())
+
+    def point_masses(self, time):
+        m1, m2 = self.orbital_elements.orbital_state(time)
+        m1 = m1._replace(position_x=m1.position_x + self.x_bin)
+        m2 = m2._replace(position_x=m2.position_x + self.x_bin)
         return (
-            m1._replace(
-                position_x=m1.position_x + self.x_bin,
+            PointMass(
                 softening_length=self.softening_length,
                 sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
+                **m1._asdict(),
             ),
-            m2._replace(
-                position_x=m2.position_x + self.x_bin,
+            PointMass(
                 softening_length=self.softening_length,
                 sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate,
                 sink_radius=self.sink_radius,
+                **m2._asdict(),
             ),
         )
