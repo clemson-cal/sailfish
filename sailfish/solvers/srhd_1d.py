@@ -282,33 +282,34 @@ class Solver(SolverBase):
         ng = self.num_guard
         bcl, bcr = self.boundary_condition
 
-        a0[:+ng] = al[-2 * ng : -ng]
-        a0[-ng:] = ar[+ng : +2 * ng]
+        with self.patches[patch_index].execution_context:
+            a0[:+ng] = al[-2 * ng : -ng]
+            a0[-ng:] = ar[+ng : +2 * ng]
 
-        def negative_vel(p):
-            return [p[0], -p[1], p[2], p[3]]
+            def negative_vel(p):
+                return [p[0], -p[1], p[2], p[3]]
 
-        if patch_index == 0:
-            if bcl == BC_OUTFLOW:
-                a0[:+ng] = a0[+ng : +2 * ng]
-            elif bcl == BC_INFLOW:
-                for i in range(-ng, 0):
-                    x = self.mesh.zone_center(t, i)
-                    self.setup.primitive(t, x, a0[i + ng])
-            elif bcl == BC_REFLECT:
-                a0[0] = negative_vel(a0[3])
-                a0[1] = negative_vel(a0[2])
+            if patch_index == 0:
+                if bcl == BC_OUTFLOW:
+                    a0[:+ng] = a0[+ng : +2 * ng]
+                elif bcl == BC_INFLOW:
+                    for i in range(-ng, 0):
+                        x = self.mesh.zone_center(t, i)
+                        self.setup.primitive(t, x, a0[i + ng])
+                elif bcl == BC_REFLECT:
+                    a0[0] = negative_vel(a0[3])
+                    a0[1] = negative_vel(a0[2])
 
-        if patch_index == len(self.patches) - 1:
-            if bcr == BC_OUTFLOW:
-                a0[-ng:] = a0[-2 * ng : -ng]
-            elif bcr == BC_INFLOW:
-                for i in range(nz, nz + ng):
-                    x = self.mesh.zone_center(t, i)
-                    self.setup.primitive(t, x, a0[i + ng])
-            elif bcr == BC_REFLECT:
-                a0[-2] = negative_vel(a0[-3])
-                a0[-1] = negative_vel(a0[-4])
+            if patch_index == len(self.patches) - 1:
+                if bcr == BC_OUTFLOW:
+                    a0[-ng:] = a0[-2 * ng : -ng]
+                elif bcr == BC_INFLOW:
+                    for i in range(nz, nz + ng):
+                        x = self.mesh.zone_center(t, i)
+                        self.setup.primitive(t, x, a0[i + ng])
+                elif bcr == BC_REFLECT:
+                    a0[-2] = negative_vel(a0[-3])
+                    a0[-1] = negative_vel(a0[-4])
 
     def new_iteration(self):
         for patch in self.patches:
