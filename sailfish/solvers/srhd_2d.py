@@ -15,6 +15,7 @@ value of 2.0.
 """
 
 from logging import getLogger
+from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
@@ -36,6 +37,14 @@ def initial_condition(setup, mesh, i0, i1, j0, j1, time, xp):
             setup.primitive(time, (r, q), primitive[i - i0, j - j0])
 
     return primitive
+
+
+class Options(NamedTuple):
+    compute_wavespeed: bool = False
+
+
+class Physics(NamedTuple):
+    pass
 
 
 class Patch:
