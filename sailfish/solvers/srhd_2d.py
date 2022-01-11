@@ -12,16 +12,19 @@ from sailfish.solver import SolverBase
 
 logger = getLogger(__name__)
 
+NUM_GUARD = 2
+NUM_CONS = 4
 
-def initial_condition(setup, mesh, time):
+
+def initial_condition(setup, mesh, i0, i1, j0, j1, time):
     import numpy as np
 
-    primitive = np.zeros(mesh.shape + (4,))
+    primitive = np.zeros([i1 - i0, j1 - j0, NUM_CONS])
 
-    for i in range(mesh.shape[0]):
-        for j in range(mesh.shape[1]):
+    for i in range(i0, i1):
+        for j in range(j0, j1):
             r, q = mesh.cell_coordinates(time, i, j)
-            setup.primitive(time, (r, q), primitive[i, j])
+            setup.primitive(time, (r, q), primitive[i - i0, j - j0])
 
     return primitive
 
@@ -34,6 +37,7 @@ class Patch:
 
     def __init__(
         self,
+        setup,
         time,
         conserved,
         mesh,
@@ -43,12 +47,15 @@ class Patch:
         execution_context,
     ):
         i0, i1 = index_range
+        nj = mesh.shape[1]
+        ng = NUM_GUARD
+        nq = NUM_CONS
         self.lib = lib
         self.xp = xp
         self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
-        self.faces = xp.array(mesh.faces(*index_range))
         self.polar_extent = mesh.polar_extent
         self.execution_context = execution_context
+        self.time = self.time0 = time
 
         try:
             adot = float(mesh.scale_factor_derivative)
@@ -58,14 +65,31 @@ class Patch:
             self.scale_factor_initial = 1.0
             self.scale_factor_derivative = 0.0
 
-        self.time = self.time0 = time
-
         with self.execution_context:
+            faces = xp.array(mesh.faces(*index_range))
+
+            if conserved is None:
+                primitive = xp.array(
+                    initial_condition(setup, mesh, i0, i1, 0, nj, time)
+                )
+                conserved = xp.zeros_like(primitive)
+
+                lib.srhd_2d_primitive_to_conserved[shape](
+                    faces,
+                    primitive,
+                    conserved,
+                    mesh.polar_extent,
+                    mesh.scale_factor(time),
+                )
+                conserved_with_guard = xp.zeros([shape[0] + 2 * ng, nj, nq])
+                conserved_with_guard[ng:-ng] = conserved
+
+            self.faces = faces
             self.wavespeeds = xp.zeros(shape)
-            self.primitive1 = xp.zeros_like(conserved)
-            self.conserved0 = conserved.copy()
-            self.conserved1 = conserved.copy()
-            self.conserved2 = conserved.copy()
+            self.primitive1 = xp.zeros_like(conserved_with_guard)
+            self.conserved0 = conserved_with_guard.copy()
+            self.conserved1 = conserved_with_guard.copy()
+            self.conserved2 = conserved_with_guard.copy()
 
     def recompute_primitive(self):
         with self.execution_context:
@@ -141,12 +165,11 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
-        xp = get_array_module(mode)
-        ng = 2  # number of guard zones
-        nq = 4  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        lib = Library(code, mode=mode, debug=False)
+
+        xp = get_array_module(mode)
+        lib = Library(code, mode=mode, debug=True)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
@@ -155,39 +178,27 @@ class Solver(SolverBase):
         if setup.boundary_condition != "outflow":
             raise ValueError(f"srhd_2d solver only supports outflow radial boundaries")
 
-        self.mesh = mesh
-        self.setup = setup
-        self.num_guard = ng
-        self.num_cons = nq
-        self.xp = xp
-        self.patches = []
-
-        if solution is None:
-            primitive = xp.array(initial_condition(setup, mesh, time))
-            conserved = xp.zeros_like(primitive)
-            lib.srhd_2d_primitive_to_conserved[mesh.shape](
-                xp.array(mesh.faces()),
-                primitive,
-                conserved,
-                mesh.polar_extent,
-                mesh.scale_factor(time),
-            )
-        else:
-            conserved = solution
+        patches = list()
 
         for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
-            cons = xp.zeros([b - a + 2 * ng, mesh.shape[1], nq])
-            cons[ng:-ng] = conserved[a:b]
             patch = Patch(
+                setup,
                 time,
-                cons,
+                solution[a:b] if solution else None,
                 mesh,
                 (a, b),
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
             )
-            self.patches.append(patch)
+            patches.append(patch)
+
+        self.mesh = mesh
+        self.setup = setup
+        self.num_guard = NUM_GUARD
+        self.num_cons = NUM_CONS
+        self.xp = xp
+        self.patches = patches
 
     @property
     def solution(self):
