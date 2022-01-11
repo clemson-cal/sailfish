@@ -87,6 +87,7 @@ class Patch:
 
         with self.execution_context:
             faces = xp.array(mesh.faces(*index_range))
+            conserved_with_guard = xp.zeros([shape[0] + 2 * ng, nj, nq])
 
             if conserved is None:
                 primitive = initial_condition(setup, mesh, i0, i1, 0, nj, time, xp)
@@ -99,8 +100,9 @@ class Patch:
                     mesh.polar_extent,
                     mesh.scale_factor(time),
                 )
-                conserved_with_guard = xp.zeros([shape[0] + 2 * ng, nj, nq])
                 conserved_with_guard[ng:-ng] = conserved
+            else:
+                conserved_with_guard[ng:-ng] = xp.array(conserved)
 
             self.faces = faces
             self.wavespeeds = xp.zeros(shape)
@@ -204,7 +206,7 @@ class Solver(SolverBase):
             patch = Patch(
                 setup,
                 time,
-                solution[a:b] if solution else None,
+                solution[a:b] if solution is not None else None,
                 mesh,
                 (a, b),
                 lib,
