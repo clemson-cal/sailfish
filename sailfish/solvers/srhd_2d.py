@@ -41,6 +41,7 @@ def initial_condition(setup, mesh, i0, i1, j0, j1, time, xp):
 
 class Options(NamedTuple):
     compute_wavespeed: bool = False
+    rk_order: int = 2
 
 
 class Physics(NamedTuple):
@@ -198,7 +199,10 @@ class Solver(SolverBase):
         logger.info(f"mesh is {mesh}")
 
         if setup.boundary_condition != "outflow":
-            raise ValueError(f"srhd_2d solver only supports outflow radial boundaries")
+            raise ValueError(f"solver only supports outflow radial boundaries")
+
+        if options.rk_order not in (1, 2, 3):
+            raise ValueError("solver only supports rk_order in 1, 2, 3")
 
         patches = list()
 
@@ -270,10 +274,11 @@ class Solver(SolverBase):
         bs_rk1 = [0 / 1]
         bs_rk2 = [0 / 1, 1 / 2]
         bs_rk3 = [0 / 1, 3 / 4, 1 / 3]
+        bs = (bs_rk1, bs_rk2, bs_rk3)[self._options.rk_order - 1]
 
         self.new_iteration()
 
-        for b in bs_rk2:
+        for b in bs:
             self.advance_rk(b, dt)
 
     def advance_rk(self, rk_param, dt):

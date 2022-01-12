@@ -21,5 +21,5 @@ def make_solver(name, physics, options, **kwargs):
         return globals()[name].Solver(
             physics=physics or dict(), options=options or dict(), **kwargs
         )
-    except TypeError as e:
+    except (TypeError, ValueError) as e:
         raise SolverInitializationError(e)
