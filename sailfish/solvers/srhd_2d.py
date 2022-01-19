@@ -31,10 +31,12 @@ NUM_CONS = 4
 def initial_condition(setup, mesh, i0, i1, j0, j1, time, xp):
     primitive = xp.zeros([i1 - i0, j1 - j0, NUM_CONS])
 
-    for i in range(i0, i1):
-        for j in range(j0, j1):
-            r, q = mesh.cell_coordinates(time, i, j)
-            setup.primitive(time, (r, q), primitive[i - i0, j - j0])
+    r_list = [mesh.cell_coordinates(time, i, 0)[0] for i in range(i0, i1)]
+    q_list = [mesh.cell_coordinates(time, 0, j)[1] for j in range(j0, j1)]
+
+    for i, r in enumerate(r_list):
+        for j, q in enumerate(q_list):
+            setup.primitive(time, (r, q), primitive[i, j])
 
     return primitive
 
