@@ -3,7 +3,7 @@ Contains classes for different mesh geometries and dimensionalities.
 """
 
 from typing import NamedTuple
-from math import log10
+from math import log, log10, pi
 
 
 class PlanarCartesianMesh(NamedTuple):
@@ -16,7 +16,9 @@ class PlanarCartesianMesh(NamedTuple):
     num_zones: int = 1000
 
     def __str__(self):
-        return f"planar cartesian ({self.x0} -> {self.x1}), {self.num_zones} zones"
+        return (
+            f"<planar cartesian 1d: ({self.x0} -> {self.x1}), {self.num_zones} zones>"
+        )
 
     @property
     def dx(self):
@@ -28,6 +30,10 @@ class PlanarCartesianMesh(NamedTuple):
     @property
     def shape(self):
         return (self.num_zones,)
+
+    @property
+    def num_total_zones(self):
+        return self.num_zones
 
     def zone_center(self, t, i):
         x0, dx = self.x0, self.dx
@@ -45,7 +51,7 @@ class PlanarCartesianMesh(NamedTuple):
 
 class LogSphericalMesh(NamedTuple):
     """
-    A 1D mesh with logarithmic radial binning and homologous expansion.
+    A 1D or 2D mesh with logarithmic radial binning and homologous expansion.
 
     The comoving coordinates are time-independent; proper distances are
     affected by the scale factor derivative.
@@ -55,16 +61,18 @@ class LogSphericalMesh(NamedTuple):
     r1: float = 10.0
     num_zones_per_decade: int = 1000
     scale_factor_derivative: float = None
+    polar_grid: bool = False
+    polar_extent: float = pi
 
     def __str__(self):
         if self.scale_factor_derivative is None:
-            motion = f"fixed mesh"
+            motion = f"no expansion"
         else:
             motion = f"homologous with a-dot = {self.scale_factor_derivative:0.2f}"
-
         return (
-            f"log spherical ({self.r0} -> {self.r1}) {motion}, "
-            f"{self.num_zones_per_decade} zones per decade"
+            f"<log spherical: ({self.r0} -> {self.r1}), {motion}, "
+            f"{self.num_zones_per_decade} zones per decade, "
+            f"shape {self.shape}>"
         )
 
     def min_spacing(self, time=None):
@@ -77,6 +85,10 @@ class LogSphericalMesh(NamedTuple):
         """
         r0, r1 = self.faces(0, 1)
         return (r1 - r0) * self.scale_factor(time)
+
+    @property
+    def polar_spacing(self):
+        return self.polar_extent / self.num_polar_zones
 
     def scale_factor(self, time):
         """
@@ -92,7 +104,17 @@ class LogSphericalMesh(NamedTuple):
 
     @property
     def shape(self):
-        return (int(log10(self.r1 / self.r0) * self.num_zones_per_decade),)
+        if not self.polar_grid:
+            return (self.num_radial_zones,)
+        else:
+            return (self.num_radial_zones, self.num_polar_zones)
+
+    @property
+    def num_total_zones(self):
+        tot = 1
+        for n in self.shape:
+            tot *= n
+        return tot
 
     def zone_center(self, t, i):
         """
@@ -116,3 +138,124 @@ class LogSphericalMesh(NamedTuple):
             i1 = self.shape[0]
         r0, k = self.r0, 1.0 / self.num_zones_per_decade
         return [r0 * 10 ** (i * k) for i in range(i0, i1 + 1)]
+
+    def cell_coordinates(self, t, i, j):
+        """
+        Return the 2D (r, theta) zone center proper coordinates at index (i, j).
+        """
+        r = self.zone_center(t, i)
+        q = (j + 0.5) * self.polar_spacing
+        return r, q
+
+    @property
+    def num_radial_zones(self):
+        return int(log10(self.r1 / self.r0) * self.num_zones_per_decade)
+
+    @property
+    def num_polar_zones(self):
+        if not self.polar_grid:
+            raise ValueError("only defined for a 2D spherical polar mesh")
+        return int(self.num_zones_per_decade * self.polar_extent / log(10))
+
+    def radial_vertices(self, time):
+        """
+        Return a list of proper coordinates of the radial zone interfaces.
+        """
+        a = self.scale_factor(time)
+        return [r * a for r in self.faces()]
+
+    @property
+    def polar_vertices(self):
+        """
+        A list of the polar angles of the polar mesh faces
+        """
+        return [j * self.polar_spacing for j in range(self.num_polar_zones + 1)]
+
+
+class PlanarCartesian2DMesh(NamedTuple):
+    """
+    A 2D mesh with rectangular binning.
+
+    The length of the domain is related to height by an aspect ratio. The
+    minimum demarcations along an axis is also variable allowing for
+    non-square meshing if need be.
+    """
+
+    x0: float = 0.0
+    y0: float = 0.0
+    x1: float = 1.0
+    y1: float = 1.0
+    ni: int = 1000
+    nj: int = 1000
+
+    def __str__(self):
+        return f"<planar cartesian 2d: ({self.x0} -> {self.x1}) x ({self.y0} -> {self.y1}), shape {self.shape}>"
+
+    @classmethod
+    def centered_square(cls, domain_radius, resolution):
+        x0 = -domain_radius
+        y0 = -domain_radius
+        x1 = +domain_radius
+        y1 = +domain_radius
+        ni = resolution
+        nj = resolution
+        dx = 2.0 * domain_radius / resolution
+        dy = 2.0 * domain_radius / resolution
+        return PlanarCartesian2DMesh(x0, y0, x1, y1, ni, nj)
+
+    @classmethod
+    def centered_rectangle(cls, height, resolution, aspect: int):
+        if type(aspect) is not int:
+            raise ValueError("centered_rectangle requires aspect to be int")
+        x0 = -0.5 * height * aspect
+        y0 = -0.5 * height
+        x1 = +0.5 * height * aspect
+        y1 = +0.5 * height
+        ni = resolution * aspect
+        nj = resolution
+        return PlanarCartesian2DMesh(x0, y0, x1, y1, ni, nj)
+
+    @property
+    def dx(self):
+        return (self.x1 - self.x0) / self.ni
+
+    @property
+    def dy(self):
+        return (self.y1 - self.y0) / self.nj
+
+    @property
+    def shape(self):
+        return self.ni, self.nj
+
+    def min_spacing(self, time=None):
+        return min(self.dx, self.dy)
+
+    @property
+    def num_total_zones(self):
+        return self.ni * self.nj
+
+    def cell_coordinates(self, i, j):
+        x = self.x0 + (i + 0.5) * self.dx
+        y = self.y0 + (j + 0.5) * self.dy
+        return x, y
+
+    def vertex_coordinates(self, i, j):
+        """
+        Return the position of the lower-left corner of zone (i, j).
+        """
+        x = self.x0 + i * self.dx
+        y = self.y0 + j * self.dy
+        return x, y
+
+    def sub_mesh(self, di, dj):
+        """
+        Return a new mesh that is a subset of this one.
+
+        The arguments di and dj are tuples, containing the lower and upper
+        index range on this mesh.
+        """
+        x0, y0 = self.vertex_coordinates(di[0], dj[0])
+        x1, y1 = self.vertex_coordinates(di[1], dj[1])
+        ni = di[1] - di[0]
+        nj = dj[1] - dj[0]
+        return PlanarCartesian2DMesh(x0, y0, x1, y1, ni, nj)

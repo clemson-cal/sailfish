@@ -33,6 +33,8 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("sedov", setup_builder!(Sedov)),
         ("shocktube", setup_builder!(Shocktube)),
         ("wind", setup_builder!(Wind)),
+        ("bondi", setup_builder!(Bondi)),
+        ("BinaryBondi", setup_builder!(BinaryBondi)),
     ]
 }
 
@@ -332,6 +334,7 @@ pub struct BinaryWithThermodynamics {
     pub sink_rate1: f64,
     pub sink_rate2: f64,
     pub sink_model: SinkModel,
+    pub soft_length: f64,
     pub gamma_law_index: f64,
     pub cooling_coefficient: f64,
     pub pressure_floor: f64,
@@ -357,6 +360,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("sink_radius",      "0.05", "sink kernel radii (a)")
             .item("sink_model",         "af", "sink prescription: [none|af|tf|ff]")
             .item("sink_rate",        "10.0", "rate(s) of mass subtraction in the sink (Omega)")
+            .item("soft_length",        0.05, "gravitational softening length (a)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
             .item("gamma_law_index",     1.666666666666666, "adiabatic index")
@@ -369,7 +373,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
             .item("test_model",        false, "use test model")
             .item("one_body",          false, "use one point mass")
-            .item("constant_softening",false, "use constant gravitational softening = sink_radius")
+            .item("constant_softening",false, "use constant gravitational softening = soft length")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -387,6 +391,7 @@ impl FromStr for BinaryWithThermodynamics {
             sink_rate1: srate1.unwrap(),
             sink_rate2: srate2.or(srate1).unwrap(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
+            soft_length: form.get("soft_length").into(),
             gamma_law_index: form.get("gamma_law_index").into(),
             cooling_coefficient: form.get("cooling_coefficient").into(),
             pressure_floor: form.get("pressure_floor").into(),
@@ -584,6 +589,10 @@ impl Setup for BinaryWithThermodynamics {
         Some(self.constant_softening)
     }
 
+    fn soft_length(&self) -> Option<f64> {
+        Some(self.soft_length)
+    }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
@@ -595,6 +604,230 @@ impl Setup for BinaryWithThermodynamics {
         Coordinates::Cartesian
     }
 }
+
+pub struct Bondi{
+    pub bh_rad: f64,
+    pub sink_rate: f64,
+    pub bh_mass: f64,
+    pub fluid_vel_x: f64,
+    pub aspect: f64,
+    pub height: f64,
+    form: kind_config::Form,
+}
+
+
+impl FromStr for Bondi {
+    type Err = error::Error;
+
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        #[rustfmt::skip]
+        let form = kind_config::Form::new()
+            .item("bh_rad",      5e-2, "black hole's radius")
+            .item("sink_rate",        1e2, "rate of mass subtraction in the sink (Omega)")
+            .item("bh_mass",                   1.0, "black hole's mass")
+            .item("fluid_vel_x",                1.0, "background fluid velocity")
+            .item("aspect",                    2.0, "aspect ratio for domain")
+            .item("height",                    1.0, "height")
+            .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        Ok(Self {
+            bh_rad: form.get("bh_rad").into(),
+            sink_rate: form.get("sink_rate").into(),
+            bh_mass: form.get("bh_mass").into(),
+            fluid_vel_x: form.get("fluid_vel_x").into(),
+            aspect: form.get("aspect").into(),
+            height: form.get("height").into(),
+            form,
+        })
+    }
+}
+
+impl Setup for Bondi {
+    fn num_primitives(&self) -> usize {
+        3
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
+    }
+
+    fn initial_primitive(&self, _x: f64, _y: f64, primitive: &mut [f64]) {
+        primitive[0] = 1.0;
+        primitive[1] = self.fluid_vel_x; // vx.
+        primitive[2] = 0.0; // vy.
+    }
+
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::Isothermal {
+            sound_speed_squared: 1.0
+        }
+    }
+
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let asp_int = self.aspect as u32;
+        Mesh::Structured(StructuredMesh::centered_rectangle(
+            self.height, resolution, asp_int,
+        ))
+    }
+
+    fn masses(&self, _time: f64) -> PointMassList {
+        let roy_oj287 = PointMass {
+            x: -0.5*self.height*self.aspect + 0.12,
+            y: 0.0,
+            vx: 0.0,
+            vy: 0.0,
+            mass: self.bh_mass,
+            rate: self.sink_rate,
+            radius: self.bh_rad,
+            model: SinkModel::AccelerationFree
+        };
+        PointMassList::from_slice(&[roy_oj287])
+    }
+
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+
+    fn end_time(&self) -> Option<f64> {
+        None
+    }
+}
+
+/// Binary setup for bondi accretion.
+pub struct BinaryBondi{
+    pub bh_rad: f64,
+    pub sink_rate: f64,
+    pub bh_mass: f64,
+    pub fluid_vel_x: f64,
+    pub x_bin: f64,
+    pub aspect: i64,
+    pub height: f64,
+    pub bh_sep: f64,
+    pub sink_model: SinkModel,
+    form: kind_config::Form,
+}
+
+impl FromStr for BinaryBondi {
+    type Err = error::Error;
+
+    fn from_str(parameters: &str) -> Result<Self, Self::Err> {
+        #[rustfmt::skip]
+        let form = kind_config::Form::new()
+            .item("bh_rad",        5e-2, "black hole's radius")
+            .item("sink_rate",      1e2, "rate of mass subtraction in the sink (Omega)")
+            .item("bh_mass",        1.0, "black hole's mass")
+            .item("fluid_vel_x",    1.0, "background fluid velocity")
+            .item("x_bin",          0.0, "horizontal position of binary COM (with respect to domain centroid)")
+            .item("aspect",           2, "aspect ratio for domain")
+            .item("height",         1.0, "height")
+            .item("bh_sep",         1.0, "black hole separation")
+            .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
+            .item("q",              1.0, "system mass ratio: [0-1]")
+            .item("e",              0.0, "orbital eccentricity: [0-1]")
+            .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
+            .map_err(|e| InvalidSetup(format!("{}", e)))?;
+
+        Ok(Self {
+            bh_rad: form.get("bh_rad").into(),
+            sink_rate: form.get("sink_rate").into(),
+            bh_mass: form.get("bh_mass").into(),
+            fluid_vel_x: form.get("fluid_vel_x").into(),
+            x_bin: form.get("x_bin").into(),
+            aspect: form.get("aspect").into(),
+            height: form.get("height").into(),
+            bh_sep: form.get("bh_sep").into(),
+            sink_model: SinkModel::from_str(form.get("sink_model").into())?,
+            form,
+        })
+    }
+}
+
+impl Setup for BinaryBondi {
+    fn num_primitives(&self) -> usize {
+        3
+    }
+
+    fn model_parameter_string(&self) -> String {
+        self.form
+            .iter()
+            .map(|(a, b)| format!("{}={}", a, b))
+            .collect::<Vec<_>>()
+            .join(":")
+    }
+
+    fn solver_name(&self) -> String {
+        "iso2d".to_owned()
+    }
+
+    fn initial_primitive(&self, _x: f64, _y: f64, primitive: &mut [f64]) {
+        primitive[0] = 1.0;
+        primitive[1] = self.fluid_vel_x; // vx.
+        primitive[2] = 0.0; // vy.
+    }
+
+    fn equation_of_state(&self) -> EquationOfState {
+        EquationOfState::Isothermal {
+            sound_speed_squared: 1.0
+        }
+    }
+
+    fn mesh(&self, resolution: u32) -> Mesh {
+        let asp_int = self.aspect as u32;
+        Mesh::Structured(StructuredMesh::centered_rectangle(
+            self.height, resolution, asp_int,
+        ))
+    }
+
+    fn masses(&self, time: f64) -> PointMassList {
+        let a: f64 = self.bh_sep;
+        let m: f64 = self.bh_mass;
+        let q: f64 = self.form.get("q").into();
+        let e: f64 = self.form.get("e").into();
+        let binary = OrbitalElements(a, m, q, e);
+        let OrbitalState(mass1, mass2) = binary.orbital_state_from_time(time);
+        let mass1 = PointMass {
+            x: mass1.position_x() + self.x_bin,
+            y: mass1.position_y(),
+            vx: mass1.velocity_x(),
+            vy: mass1.velocity_y(),
+            mass: mass1.mass(),
+            rate: self.sink_rate,
+            radius: self.bh_rad,
+            model: self.sink_model,
+        };
+        let mass2 = PointMass {
+            x: mass2.position_x() + self.x_bin,
+            y: mass2.position_y(),
+            vx: mass2.velocity_x(),
+            vy: mass2.velocity_y(),
+            mass: mass2.mass(),
+            rate: self.sink_rate,
+            radius: self.bh_rad,
+            model: self.sink_model,
+        };
+        PointMassList::from_slice(&[mass1, mass2])
+    }
+
+    fn coordinate_system(&self) -> Coordinates {
+        Coordinates::Cartesian
+    }
+
+    fn end_time(&self) -> Option<f64> {
+        None
+    }
+}
+
+
+                                                     
 
 /// Sedov-Taylor explosion setup, with tabulated initial condition.
 ///

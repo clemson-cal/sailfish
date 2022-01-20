@@ -3,7 +3,7 @@ Code to solve the Kepler two-body problem, and its inverse.
 """
 
 from typing import NamedTuple
-from math import sin, cos, sqrt, atan2
+from math import sin, cos, sqrt, atan2, pi, floor
 
 """
 Newton's gravitational constant is G=1.0, so mass M really means G M.
@@ -304,14 +304,14 @@ class OrbitalElements(NamedTuple):
         """
         m = self.total_mass
         a = self.semimajor_axis
-        return sqrt(G * m / a / a / a)
+        return sqrt(NEWTON_G * m / a / a / a)
 
     @property
     def period(self) -> float:
         """
         The orbital period
         """
-        return 2.0 * PI / self.omega
+        return 2.0 * pi / self.omega
 
     @property
     def angular_momentum(self) -> float:
@@ -355,10 +355,10 @@ class OrbitalElements(NamedTuple):
 
     def eccentric_anomaly(self, time_since_periapse: float) -> float:
         """
-        Compute the eccentric anomaly from the time since last periapse.
+        Compute the eccentric anomaly from the time since any periapse.
         """
         p = self.period
-        t = t - self.period * floor(t / p)
+        t = time_since_periapse - self.period * floor(time_since_periapse / p)
         e = self.eccentricity
         n = self.omega * t  # n := mean anomaly M
         f = lambda k: k - e * sin(k) - n  # k := eccentric anomaly E
@@ -367,9 +367,9 @@ class OrbitalElements(NamedTuple):
 
     def orbital_state(self, time_since_periapse: float) -> OrbitalState:
         """
-        Compute the orbital state vector from the time since last periapse.
+        Compute the orbital state vector from the time since any periapse.
         """
-        E = self.eccentric_anomaoly(time_since_periapse)
+        E = self.eccentric_anomaly(time_since_periapse)
         return self.orbital_state_from_eccentric_anomaly(E)
 
     def orbital_state_with_orientation(
@@ -379,7 +379,7 @@ class OrbitalElements(NamedTuple):
         Compute the orbital state from an absolute time and orientation.
         """
         t = absolute_time - orientation.periapse_time
-        E = self.eccentric_anomaoly(t)
+        E = self.eccentric_anomaly(t)
         state = self.orbital_state_from_eccentric_anomaly(E)
 
         m1 = state[0].mass
