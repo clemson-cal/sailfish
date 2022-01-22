@@ -8,6 +8,33 @@ import multiprocessing
 import platform
 import time
 
+try:
+    from contextlib import nullcontext
+
+except ImportError:
+    from contextlib import AbstractContextManager
+
+    class nullcontext(AbstractContextManager):
+        """
+        Scraped from contextlib source in Python >= 3.7 for backwards compatibility.
+        """
+
+        def __init__(self, enter_result=None):
+            self.enter_result = enter_result
+
+        def __enter__(self):
+            return self.enter_result
+
+        def __exit__(self, *excinfo):
+            pass
+
+        async def __aenter__(self):
+            return self.enter_result
+
+        async def __aexit__(self, *excinfo):
+            pass
+
+
 logger = logging.getLogger(__name__)
 
 
@@ -60,6 +87,32 @@ def get_array_module(mode):
         return cupy
     else:
         raise ValueError(f"unknown execution mode {mode}, must be [cpu|omp|gpu]")
+
+
+def execution_context(mode, device_id=None):
+    """
+    Return a context manager appropriate for the given exuction mode.
+
+    If `mode` is "gpu", then a specific device id may be provided to specify
+    the GPU onto which kernel launches should be spawned.
+    """
+    if mode in ["cpu", "omp"]:
+        return nullcontext()
+
+    elif mode == "gpu":
+        import cupy
+
+        return cupy.cuda.Device(device_id)
+
+
+def num_devices(mode):
+    if mode in ["cpu", "omp"]:
+        return 1
+
+    elif mode == "gpu":
+        from cupy.cuda.runtime import getDeviceCount
+
+        return getDeviceCount()
 
 
 def log_system_info(mode):

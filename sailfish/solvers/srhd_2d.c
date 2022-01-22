@@ -13,6 +13,7 @@ DESCRIPTION:
 #define NCONS 4
 #define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
+#define PI 3.141592653589793
 
 
 // ============================ MATH ==========================================
@@ -278,12 +279,12 @@ PRIVATE double face_area(double r0, double r1, double q0, double q1)
     double z1 = r1 * cos(q1);
     double dR = R1 - R0;
     double dz = z1 - z0;
-    return M_PI * (R0 + R1) * sqrt(dR * dR + dz * dz);
+    return PI * (R0 + R1) * sqrt(dR * dR + dz * dz);
 }
 
 PRIVATE double cell_volume(double r0, double r1, double q0, double q1)
 {
-    return -(r1 * r1 * r1 - r0 * r0 * r0) * (cos(q1) - cos(q0)) * 2.0 * M_PI / 3.0;
+    return -(r1 * r1 * r1 - r0 * r0 * r0) * (cos(q1) - cos(q0)) * 2.0 * PI / 3.0;
 }
 
 PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, const double *prim, double *source)
@@ -302,8 +303,8 @@ PRIVATE void geometric_source_terms(double r0, double r1, double q0, double q1, 
     // over the cell volume with finite radial and polar extent.
     // 
     // https://iopscience.iop.org/article/10.1086/500792/pdf
-    double srdot = -M_PI * dr2 * dcosq * (rhoh * (uq * uq + up * up) + 2 * pg);
-    double sqdot = +M_PI * dr2 * (dcosq * rhoh * ur * uq + dsinq * (pg + rhoh * up * up));
+    double srdot = -PI * dr2 * dcosq * (rhoh * (uq * uq + up * up) + 2 * pg);
+    double sqdot = +PI * dr2 * (dcosq * rhoh * ur * uq + dsinq * (pg + rhoh * up * up));
 
     source[0] = 0.0;
     source[1] = srdot;

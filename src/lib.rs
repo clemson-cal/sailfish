@@ -3,12 +3,12 @@ pub mod error;
 pub mod euler1d;
 pub mod euler2d;
 pub mod iso2d;
-pub mod sr1d;
 pub mod lookup_table;
 pub mod mesh;
 pub mod parse;
 pub mod patch;
 pub mod setups;
+pub mod sr1d;
 pub mod state;
 pub mod traits;
 
@@ -46,7 +46,7 @@ pub enum ExecutionMode {
 }
 
 /// Description of sink model to model accretion onto a gravitating object.
-/// 
+///
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -83,9 +83,9 @@ impl FromStr for SinkModel {
 }
 
 /// Description of basic equations of state supported by various solvers.
-/// 
+///
 /// C equivalent is defined in sailfish.h.
-/// 
+///
 /// Note: some solvers might be hard-coded to use a particular equation of
 /// state.
 #[repr(C)]
@@ -97,7 +97,7 @@ pub enum EquationOfState {
 }
 
 /// A gravitating point mass.
-/// 
+///
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, serde::Serialize, serde::Deserialize)]
@@ -128,7 +128,7 @@ impl Default for PointMass {
 }
 
 /// A fixed-length list of 0, 1, or 2 point masses.
-/// 
+///
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -159,7 +159,7 @@ impl Default for PointMassList {
 
 /// A description of a wave-damping (or buffer) zone to be used in
 /// context-specific solver code.
-/// 
+///
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy)]
@@ -177,7 +177,7 @@ pub enum BoundaryCondition {
 }
 
 /// A logically cartesian 2d mesh with uniform grid spacing.
-/// 
+///
 /// C equivalent is defined in sailfish.h.
 #[repr(C)]
 #[derive(Debug, Clone, Copy, PartialOrd, PartialEq, serde::Serialize, serde::Deserialize)]
@@ -207,6 +207,17 @@ impl StructuredMesh {
             nj: resolution as i64,
             dx: 2.0 * domain_radius / resolution as f64,
             dy: 2.0 * domain_radius / resolution as f64,
+        }
+    }
+
+    pub fn centered_rectangle(height: f64, resolution: u32, aspect: u32) -> Self {
+        Self {
+            x0: -0.5 * height * aspect as f64,
+            y0: -0.5 * height,
+            ni: resolution as i64 * aspect as i64,
+            nj: resolution as i64,
+            dx: height / resolution as f64,
+            dy: height / resolution as f64,
         }
     }
 
@@ -263,9 +274,9 @@ impl StructuredMesh {
 }
 
 /// Describes a st of curvilinear coordinates to use.
-/// 
+///
 /// C equivalent is defined in sailfish.h.
-/// 
+///
 /// Note: some solvers might be hard-coded to use a particular coordinate
 /// system.
 #[repr(C)]

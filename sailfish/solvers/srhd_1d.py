@@ -1,42 +1,31 @@
 """
 One-dimensional relativistic hydro solver supporting homologous mesh motion.
+
+The solver configuration is:
+
+- Planar cartesian, or spherical coordinate system in 1d
+- Possible homologous radial expansion in spherical coordinates mode
+- Four conserved quantities: D, Sr, tau, s (scalar lab-frame mass density)
+- Four primitive quantities: rho, ur, p, x (scalar concentration)
+- Gamma-law index of 4/3
+
+The Python code assumes RK2 time stepping, although coefficients are written
+below for RK1 and low-storage RK3 as well. The C code hard-codes a PLM theta
+value of 2.0.
 """
 
 from logging import getLogger
+from typing import NamedTuple
 from sailfish.kernel.library import Library
-from sailfish.kernel.system import get_array_module
-from sailfish.subdivide import subdivide
+from sailfish.kernel.system import get_array_module, execution_context, num_devices
+from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 from sailfish.solver import SolverBase
 
-try:
-    from contextlib import nullcontext
-
-except ImportError:
-    from contextlib import AbstractContextManager
-
-    class nullcontext(AbstractContextManager):
-        """
-        Scraped from contextlib source in Python >= 3.7 for backwards compatibility.
-        """
-
-        def __init__(self, enter_result=None):
-            self.enter_result = enter_result
-
-        def __enter__(self):
-            return self.enter_result
-
-        def __exit__(self, *excinfo):
-            pass
-
-        async def __aenter__(self):
-            return self.enter_result
-
-        async def __aexit__(self, *excinfo):
-            pass
-
-
 logger = getLogger(__name__)
+
+NUM_GUARD = 2
+NUM_CONS = 4
 
 BC_PERIODIC = 0
 BC_OUTFLOW = 1
@@ -55,40 +44,54 @@ COORDINATES_DICT = {
 }
 
 
-def initial_condition(setup, mesh, time):
-    import numpy as np
+def initial_condition(setup, mesh, i0, i1, time, xp):
+    primitive = xp.zeros([i1 - i0, NUM_CONS])
 
-    faces = np.array(mesh.faces())
-    zones = 0.5 * (faces[:-1] + faces[1:])
-    primitive = np.zeros([len(zones), 4])
-
-    for x, p in zip(zones, primitive):
-        setup.primitive(time, x, p)
-
+    for i in range(i0, i1):
+        r = mesh.zone_center(time, i)
+        setup.primitive(time, r, primitive[i - i0])
     return primitive
+
+
+class Options(NamedTuple):
+    compute_wavespeed: bool = False
+    rk_order: int = 2
+
+
+class Physics(NamedTuple):
+    pass
 
 
 class Patch:
     """
-    Holds the array buffer state for the solution on a subset of the
-    solution domain.
+    Buffers for the solution on a subset of the solution domain.
+
+    This class also takes care of generating initial conditions if needed, and
+    issuing calls to the solver kernel functions.
     """
 
     def __init__(
         self,
+        setup,
         time,
         conserved,
         mesh,
         index_range,
         lib,
         xp,
+        execution_context,
     ):
+        import numpy as np
+
+        ng = NUM_GUARD
+        nq = NUM_CONS
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
         self.num_zones = num_zones = index_range[1] - index_range[0]
-        self.faces = xp.array(mesh.faces(*index_range))
-        self.coordinates = COORDINATES_DICT[type(mesh)]
+        self.coordinates = coordinates = COORDINATES_DICT[type(mesh)]
+        self.time = self.time0 = time
+        self.execution_context = execution_context
 
         try:
             adot = float(mesh.scale_factor_derivative)
@@ -98,21 +101,34 @@ class Patch:
             self.scale_factor_initial = 1.0
             self.scale_factor_derivative = 0.0
 
-        self.time = self.time0 = time
+        with execution_context:
+            faces = xp.array(mesh.faces(*index_range))
+            conserved_with_guard = xp.zeros([num_zones + 2 * ng, nq])
 
-        with self.execution_context():
+            if conserved is None:
+                primitive = initial_condition(setup, mesh, i0, i1, time, xp)
+                conserved = xp.zeros_like(primitive)
+
+                lib.srhd_1d_primitive_to_conserved[num_zones](
+                    faces,
+                    primitive,
+                    conserved,
+                    self.scale_factor,
+                    coordinates,
+                )
+                conserved_with_guard[ng:-ng] = conserved
+            else:
+                conserved_with_guard[ng:-ng] = np.array(conserved)
+
+            self.faces = faces
             self.wavespeeds = xp.zeros(num_zones)
-            self.primitive1 = xp.zeros_like(conserved)
-            self.conserved0 = conserved
-            self.conserved1 = self.conserved0.copy()
-            self.conserved2 = self.conserved0.copy()
-
-    def execution_context(self):
-        """TODO: return a CUDA context for execution on the assigned device"""
-        return nullcontext()
+            self.primitive1 = xp.zeros_like(conserved_with_guard)
+            self.conserved0 = conserved_with_guard.copy()
+            self.conserved1 = conserved_with_guard.copy()
+            self.conserved2 = conserved_with_guard.copy()
 
     def recompute_primitive(self):
-        with self.execution_context():
+        with self.execution_context:
             self.lib.srhd_1d_conserved_to_primitive[self.num_zones](
                 self.faces,
                 self.conserved1,
@@ -122,7 +138,7 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
-        with self.execution_context():
+        with self.execution_context:
             self.lib.srhd_1d_advance_rk[self.num_zones](
                 self.faces,
                 self.conserved0,
@@ -139,17 +155,16 @@ class Patch:
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 
-    @property
     def maximum_wavespeed(self):
         self.recompute_primitive()
-        with self.execution_context():
+        with self.execution_context:
             self.lib.srhd_1d_max_wavespeeds[self.num_zones](
                 self.faces,
                 self.primitive1,
                 self.wavespeeds,
                 self.scale_factor_derivative,
             )
-            return self.wavespeeds.max()
+            return float(self.wavespeeds.max())
 
     @property
     def scale_factor(self):
@@ -185,6 +200,15 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
+        with open(__file__.replace(".py", ".c")) as f:
+            code = f.read()
+
+        xp = get_array_module(mode)
+        lib = Library(code, mode=mode, debug=True)
+
+        self._physics = physics = Physics(**physics)
+        self._options = options = Options(**options)
+
         try:
             bcl, bcr = setup.boundary_condition
         except ValueError:
@@ -195,62 +219,42 @@ class Solver(SolverBase):
         except KeyError:
             raise ValueError(f"bad boundary condition {bcl}/{bcr}")
 
-        xp = get_array_module(mode)
-        ng = 2  # number of guard zones
-        nq = 4  # number of conserved quantities
-        with open(__file__.replace(".py", ".c")) as f:
-            code = f.read()
-        lib = Library(code, mode=mode, debug=False)
+        if options.rk_order not in (1, 2, 3):
+            raise ValueError("solver only supports rk_order in 1, 2, 3")
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
         logger.info(f"mesh is {mesh}")
         logger.info(f"boundary condition is {bcl}/{bcr}")
+        patches = list()
+
+        for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
+            patch = Patch(
+                setup,
+                time,
+                solution[a:b] if solution is not None else None,
+                mesh,
+                (a, b),
+                lib,
+                xp,
+                execution_context(mode, device_id=n % num_devices(mode)),
+            )
+            patches.append(patch)
 
         self.mesh = mesh
         self.setup = setup
-        self.num_guard = ng
-        self.num_cons = nq
+        self.num_guard = NUM_GUARD
+        self.num_cons = NUM_CONS
         self.xp = xp
-        self.patches = []
-
-        if solution is None:
-            primitive = initial_condition(setup, mesh, time)
-            conserved = xp.zeros_like(primitive)
-            coordinates = COORDINATES_DICT[type(mesh)]
-
-            lib.srhd_1d_primitive_to_conserved[mesh.shape](
-                xp.array(mesh.faces()),
-                primitive,
-                conserved,
-                mesh.scale_factor(time),
-                coordinates,
-            )
-        else:
-            conserved = solution
-
-        for (a, b) in subdivide(mesh.shape[0], num_patches):
-            cons = xp.zeros([b - a + 2 * ng, nq])
-            cons[ng:-ng] = conserved[a:b]
-            self.patches.append(Patch(time, cons, mesh, (a, b), lib, xp))
+        self.patches = patches
 
     @property
     def solution(self):
-        return self.reconstruct("conserved")
+        return concat_on_host([p.conserved for p in self.patches], self.num_guard)
 
     @property
     def primitive(self):
-        return self.reconstruct("primitive")
-
-    def reconstruct(self, array):
-        nz = self.mesh.shape[0]
-        ng = self.num_guard
-        nq = self.num_cons
-        np = len(self.patches)
-        result = self.xp.zeros([nz, nq])
-        for (a, b), patch in zip(subdivide(nz, np), self.patches):
-            result[a:b] = getattr(patch, array)[ng:-ng]
-        return result
+        return concat_on_host([p.primitive for p in self.patches], self.num_guard)
 
     @property
     def time(self):
@@ -258,11 +262,11 @@ class Solver(SolverBase):
 
     @property
     def options(self):
-        return dict()
+        return self._options._asdict()
 
     @property
     def physics(self):
-        return dict()
+        return self._physics._asdict()
 
     @property
     def recommended_cfl(self):
@@ -273,13 +277,26 @@ class Solver(SolverBase):
         return 16.0
 
     def maximum_wavespeed(self):
-        return 1.0
-        # max(patch.maximum_wavespeed for patch in self.patches)
+        if self._options.compute_wavespeed:
+            return lazy_reduce(
+                max,
+                float,
+                (patch.maximum_wavespeed for patch in self.patches),
+                (patch.execution_context for patch in self.patches),
+            )
+        else:
+            return 1.0
 
     def advance(self, dt):
+        bs_rk1 = [0 / 1]
+        bs_rk2 = [0 / 1, 1 / 2]
+        bs_rk3 = [0 / 1, 3 / 4, 1 / 3]
+        bs = (bs_rk1, bs_rk2, bs_rk3)[self._options.rk_order - 1]
+
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-        self.advance_rk(0.5, dt)
+
+        for b in bs:
+            self.advance_rk(b, dt)
 
     def advance_rk(self, rk_param, dt):
         for patch in self.patches:
@@ -293,47 +310,48 @@ class Solver(SolverBase):
     def set_bc(self, array):
         ng = self.num_guard
         num_patches = len(self.patches)
-        for i0 in range(num_patches):
-            il = (i0 + num_patches - 1) % num_patches
-            ir = (i0 + num_patches + 1) % num_patches
+        for ic in range(num_patches):
+            il = (ic + num_patches - 1) % num_patches
+            ir = (ic + num_patches + 1) % num_patches
             pl = getattr(self.patches[il], array)
-            p0 = getattr(self.patches[i0], array)
+            pc = getattr(self.patches[ic], array)
             pr = getattr(self.patches[ir], array)
-            self.set_bc_patch(pl, p0, pr, i0)
+            self.set_bc_patch(pl, pc, pr, ic)
 
-    def set_bc_patch(self, al, a0, ar, patch_index):
+    def set_bc_patch(self, al, ac, ar, patch_index):
         t = self.time
         nz = self.mesh.shape[0]
         ng = self.num_guard
         bcl, bcr = self.boundary_condition
 
-        a0[:+ng] = al[-2 * ng : -ng]
-        a0[-ng:] = ar[+ng : +2 * ng]
+        with self.patches[patch_index].execution_context:
+            ac[:+ng] = al[-2 * ng : -ng]
+            ac[-ng:] = ar[+ng : +2 * ng]
 
-        def negative_vel(p):
-            return [p[0], -p[1], p[2], p[3]]
+            def negative_vel(p):
+                return [p[0], -p[1], p[2], p[3]]
 
-        if patch_index == 0:
-            if bcl == BC_OUTFLOW:
-                a0[:+ng] = a0[+ng : +2 * ng]
-            elif bcl == BC_INFLOW:
-                for i in range(-ng, 0):
-                    x = self.mesh.zone_center(t, i)
-                    self.setup.primitive(t, x, a0[i + ng])
-            elif bcl == BC_REFLECT:
-                a0[0] = negative_vel(a0[3])
-                a0[1] = negative_vel(a0[2])
+            if patch_index == 0:
+                if bcl == BC_OUTFLOW:
+                    ac[:+ng] = ac[+ng : +2 * ng]
+                elif bcl == BC_INFLOW:
+                    for i in range(-ng, 0):
+                        x = self.mesh.zone_center(t, i)
+                        self.setup.primitive(t, x, ac[i + ng])
+                elif bcl == BC_REFLECT:
+                    ac[0] = negative_vel(ac[3])
+                    ac[1] = negative_vel(ac[2])
 
-        if patch_index == len(self.patches) - 1:
-            if bcr == BC_OUTFLOW:
-                a0[-ng:] = a0[-2 * ng : -ng]
-            elif bcr == BC_INFLOW:
-                for i in range(nz, nz + ng):
-                    x = self.mesh.zone_center(t, i)
-                    self.setup.primitive(t, x, a0[i + ng])
-            elif bcr == BC_REFLECT:
-                a0[-2] = negative_vel(a0[-3])
-                a0[-1] = negative_vel(a0[-4])
+            if patch_index == len(self.patches) - 1:
+                if bcr == BC_OUTFLOW:
+                    ac[-ng:] = ac[-2 * ng : -ng]
+                elif bcr == BC_INFLOW:
+                    for i in range(nz, nz + ng):
+                        x = self.mesh.zone_center(t, i)
+                        self.setup.primitive(t, x, ac[i + ng])
+                elif bcr == BC_REFLECT:
+                    ac[-2] = negative_vel(ac[-3])
+                    ac[-1] = negative_vel(ac[-4])
 
     def new_iteration(self):
         for patch in self.patches:

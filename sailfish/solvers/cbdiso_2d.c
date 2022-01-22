@@ -1,17 +1,13 @@
 /*
-MODULE: cbdgam_2d
+MODULE: cbdiso_2d
 
-DESCRIPTION: Energy-conserving solver for a binary accretion problem in 2D
-  planar cartesian coordinates.
-
-TODO:
-    + add plm_theta as a solver option (currently it's hard-coded)
+DESCRIPTION: Isothermal solver for a binary accretion problem in 2D planar
+  cartesian coordinates.
 */
-
 
 // ============================ PHYSICS =======================================
 // ============================================================================
-#define NCONS 4
+#define NCONS 3
 #define PLM_THETA 1.5
 
 
@@ -72,17 +68,12 @@ struct KeplerianBuffer {
 
 // ============================ GRAVITY =======================================
 // ============================================================================
-PRIVATE double disk_height(
+PRIVATE double gravitational_potential(
     struct PointMassList *mass_list,
     double x1,
-    double y1,
-    double *prim)
+    double y1)
 {
-    if (mass_list->masses[0].mass == 0.0 && mass_list->masses[1].mass == 0.0)
-    {
-        return 1.0;
-    }
-    double omegatilde2 = 0.0;
+    double phi = 0.0;
 
     for (int p = 0; p < 2; ++p)
     {
@@ -91,18 +82,17 @@ PRIVATE double disk_height(
             double x0 = mass_list->masses[p].x;
             double y0 = mass_list->masses[p].y;
             double mp = mass_list->masses[p].mass;
+            double rs = mass_list->masses[p].softening_length;
 
             double dx = x1 - x0;
             double dy = y1 - y0;
-            double r2 = dx * dx + dy * dy + 1e-12;
-            double r  = sqrt(r2);
-            omegatilde2 += mp * pow(r, -3.0);
+            double r2 = dx * dx + dy * dy;
+            double r2_softened = r2 + rs * rs;
+
+            phi -= mp / sqrt(r2_softened);
         }
     }
-    double sigma = prim[0];
-    double pres  = prim[3];
-
-    return sqrt(pres / sigma) / sqrt(omegatilde2);
+    return phi;
 }
 
 PRIVATE void point_mass_source_term(
@@ -111,57 +101,31 @@ PRIVATE void point_mass_source_term(
     double y1,
     double dt,
     double *prim,
-    double h,
-    double *delta_cons,
-    int constant_softening,
-    double gamma_law_index)
+    double *delta_cons)
 {
     double x0 = mass->x;
     double y0 = mass->y;
     double sigma = prim[0];
-    double pres  = prim[3];
-    double eps = pres / sigma / (gamma_law_index - 1.0);
     double dx = x1 - x0;
     double dy = y1 - y0;
     double r2 = dx * dx + dy * dy;
     double dr = sqrt(r2);
     double r_sink = mass->sink_radius;
-    double r_soft;
+    double r_soft = mass->softening_length;
 
-    if (constant_softening)
-    {
-        r_soft = mass->softening_length;
-    }
-    else if (dr > r_sink)
-    {
-        r_soft = 0.5 * h;
-    }
-    else
-    {
-        double transition = pow(1.0 - pow(dr / r_sink, 2.0), 2.0);
-        r_soft = transition * r_sink + (1.0 - transition) * 0.5 * h;
-    }
-    // if (dr < 1.0 * r_sink)
-    // {
-    //     sink_rate = mass->sink_rate * pow(1.0 - pow(dr / r_sink, 2.0), 2.0);
-    // }
-
-    double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
     double fgrav_numerator = sigma * mass->mass * pow(r2 + r_soft * r_soft, -1.5);
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
+    double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
     double mdot = sigma * sink_rate * -1.0;
 
     switch (mass->sink_model)
     {
         case 1: // acceleration-free
         {
-            double vx = prim[1];
-            double vy = prim[2];
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * prim[1] + dt * fx;
             delta_cons[2] = dt * mdot * prim[2] + dt * fy;
-            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vx * vx + vy * vy)) + dt * (fx * vx + fy * vy);
             break;
         }
         case 2: // torque-free
@@ -178,17 +142,13 @@ PRIVATE void point_mass_source_term(
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * mdot * vxstar + dt * fx;
             delta_cons[2] = dt * mdot * vystar + dt * fy;
-            delta_cons[3] = dt * (mdot * eps + 0.5 * mdot * (vxstar * vxstar + vystar * vystar)) + dt * (fx * vx + fy * vy);
             break;
         }
         case 3: // force-free
         {
-            double vx = prim[1];
-            double vy = prim[2];
             delta_cons[0] = dt * mdot;
             delta_cons[1] = dt * fx;
             delta_cons[2] = dt * fy;
-            delta_cons[3] = dt * (fx * vx + fy * vy);
             break;
         }
         default: // sink is inactive
@@ -196,7 +156,6 @@ PRIVATE void point_mass_source_term(
             delta_cons[0] = 0.0;
             delta_cons[1] = 0.0;
             delta_cons[2] = 0.0;
-            delta_cons[3] = 0.0;
             break;
         }
     }
@@ -208,15 +167,12 @@ PRIVATE void point_masses_source_term(
     double y1,
     double dt,
     double *prim,
-    double h,
-    double *cons,
-    int constant_softening,
-    double gamma_law_index)
+    double *cons)
 {
     for (int p = 0; p < 2; ++p)
     {
         double delta_cons[NCONS];
-        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, h, delta_cons, constant_softening, gamma_law_index);
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -229,10 +185,22 @@ PRIVATE void point_masses_source_term(
 // ============================ EOS AND BUFFER ================================
 // ============================================================================
 PRIVATE double sound_speed_squared(
-    double gamma_law_index,
-    double *prim)
+    double cs2,
+    double mach_squared,
+    int eos_type,
+    double x,
+    double y,
+    struct PointMassList *mass_list)
 {
-    return prim[3] / prim[0] * gamma_law_index;
+    switch (eos_type)
+    {
+        case 1: // globally isothermal
+            return cs2;
+        case 2: // locally Isothermal
+            return -gravitational_potential(mass_list, x, y) / mach_squared;
+        default:
+            return 1.0; // WARNING
+    }
 }
 
 PRIVATE void buffer_source_term(
@@ -240,14 +208,12 @@ PRIVATE void buffer_source_term(
     double xc,
     double yc,
     double dt,
-    double *cons,
-    double gamma_law_index)
+    double *cons)
 {
     if (buffer->is_enabled)
     {
         double rc = sqrt(xc * xc + yc * yc);
         double surface_density = buffer->surface_density;
-        double surface_pressure = buffer->surface_pressure;
         double central_mass = buffer->central_mass;
         double driving_rate = buffer->driving_rate;
         double outer_radius = buffer->outer_radius;
@@ -259,12 +225,10 @@ PRIVATE void buffer_source_term(
             double pf = surface_density * sqrt(central_mass / rc);
             double px = pf * (-yc / rc);
             double py = pf * ( xc / rc);
-            double kinetic_energy = 0.5 * (px * px + py * py) / surface_density;
-            double energy = surface_pressure / (gamma_law_index - 1.0) + kinetic_energy;
-            double u0[NCONS] = {surface_density, px, py, energy};
+            double u0[NCONS] = {surface_density, px, py};
 
             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-            //double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+            // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
             double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
             for (int q = 0; q < NCONS; ++q)
@@ -295,73 +259,40 @@ PRIVATE void shear_strain(
 
 // ============================ HYDRO =========================================
 // ============================================================================
-PRIVATE void cooling_term(
-    double cooling_coefficient,
-    double mach_ceiling,
-    double dt,
-    double *prim,
-    double *cons,
-    double gamma_law_index)
-{
-    double gamma = gamma_law_index;
-    double sigma = prim[0];
-    double eps = prim[3] / prim[0] / (gamma - 1.0);
-    double eps_cooled = eps * pow(1.0 + 3.0 * cooling_coefficient * pow(sigma, -2.0) * pow(eps, 3.0) * dt, -1.0 / 3.0);
-    double vx = prim[1];
-    double vy = prim[2];
-
-    double ek = 0.5 * (vx * vx + vy * vy);
-    eps_cooled = max2(eps_cooled, 2.0 * ek / gamma / (gamma - 1.0) * pow(mach_ceiling, -2.0));
-
-    cons[3] += sigma * (eps_cooled - eps);
-}
-
 PRIVATE void conserved_to_primitive(
     const double *cons,
     double *prim,
-    double velocity_ceiling,
-    double density_floor,
-    double pressure_floor,
-    double gamma_law_index)
+    double velocity_ceiling)
 {
-    double gamma = gamma_law_index;
-    double pres  = max2(pressure_floor, (cons[3] - 0.5 * (cons[1] * cons[1] + cons[2] * cons[2]) / cons[0]) * (gamma - 1.0));
-    double vx = sign(cons[1]) * min2(fabs(cons[1] / cons[0]), velocity_ceiling);
-    double vy = sign(cons[2]) * min2(fabs(cons[2] / cons[0]), velocity_ceiling);
     double rho = cons[0];
-
-    if (cons[0] < density_floor)
-    {
-        rho = density_floor;
-        vx = 0.0;
-        vy = 0.0;
-        pres = pressure_floor;
-    }
+    double px = cons[1];
+    double py = cons[2];
+    double vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
+    double vy = sign(py) * min2(fabs(py / rho), velocity_ceiling);
 
     prim[0] = rho;
     prim[1] = vx;
     prim[2] = vy;
-    prim[3] = pres;
 }
 
-PRIVATE void primitive_to_conserved(const double *prim, double *cons, double gamma_law_index)
+PRIVATE void primitive_to_conserved(
+    const double *prim,
+    double *cons)
 {
-    double gamma = gamma_law_index;
     double rho = prim[0];
     double vx = prim[1];
     double vy = prim[2];
-    double pres = prim[3];
     double px = vx * rho;
     double py = vy * rho;
-    double en = pres / (gamma - 1.0) + 0.5 * rho * (vx * vx + vy * vy);
 
     cons[0] = rho;
     cons[1] = px;
     cons[2] = py;
-    cons[3] = en;
 }
 
-PRIVATE double primitive_to_velocity(const double *prim, int direction)
+PRIVATE double primitive_to_velocity(
+    const double *prim,
+    int direction)
 {
     switch (direction)
     {
@@ -375,15 +306,16 @@ PRIVATE void primitive_to_flux(
     const double *prim,
     const double *cons,
     double *flux,
+    double cs2,
     int direction)
 {
     double vn = primitive_to_velocity(prim, direction);
-    double pressure = prim[3];
+    double rho = prim[0];
+    double pressure = rho * cs2;
 
     flux[0] = vn * cons[0];
     flux[1] = vn * cons[1] + pressure * (direction == 0);
     flux[2] = vn * cons[2] + pressure * (direction == 1);
-    flux[3] = vn * (cons[3] + pressure);
 }
 
 PRIVATE void primitive_to_outer_wavespeeds(
@@ -398,7 +330,9 @@ PRIVATE void primitive_to_outer_wavespeeds(
     wavespeeds[1] = vn + cs;
 }
 
-PRIVATE double primitive_max_wavespeed(const double *prim, double cs2)
+PRIVATE double primitive_max_wavespeed(
+    const double *prim,
+    double cs2)
 {
     double cs = sqrt(cs2);
     double vx = prim[1];
@@ -408,7 +342,12 @@ PRIVATE double primitive_max_wavespeed(const double *prim, double cs2)
     return max2(ax, ay);
 }
 
-PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, double cs2, int direction, double gamma_law_index)
+PRIVATE void riemann_hlle(
+    const double *pl,
+    const double *pr,
+    double *flux,
+    double cs2,
+    int direction)
 {
     double ul[NCONS];
     double ur[NCONS];
@@ -417,10 +356,10 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, doub
     double al[2];
     double ar[2];
 
-    primitive_to_conserved(pl, ul, gamma_law_index);
-    primitive_to_conserved(pr, ur, gamma_law_index);
-    primitive_to_flux(pl, ul, fl, direction);
-    primitive_to_flux(pr, ur, fr, direction);
+    primitive_to_conserved(pl, ul);
+    primitive_to_conserved(pr, ur);
+    primitive_to_flux(pl, ul, fl, cs2, direction);
+    primitive_to_flux(pr, ur, fr, cs2, direction);
     primitive_to_outer_wavespeeds(pl, al, cs2, direction);
     primitive_to_outer_wavespeeds(pr, ar, cs2, direction);
 
@@ -436,19 +375,17 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double *flux, doub
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-PUBLIC void cbdgam_2d_advance_rk(
+PUBLIC void cbdiso_2d_advance_rk(
     int ni,
     int nj,
     double patch_xl, // mesh
     double patch_xr,
     double patch_yl,
     double patch_yr,
-    double *conserved_rk, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, 4)
-    double gamma_law_index,
+    double *conserved_rk, // :: $.shape == (ni + 4, nj + 4, 3)
+    double *primitive_rd, // :: $.shape == (ni + 4, nj + 4, 3)
+    double *primitive_wr, // :: $.shape == (ni + 4, nj + 4, 3)
     double buffer_surface_density,
-    double buffer_surface_pressure,
     double buffer_central_mass,
     double buffer_driving_rate,
     double buffer_outer_radius,
@@ -472,19 +409,16 @@ PUBLIC void cbdgam_2d_advance_rk(
     double sink_rate2,
     double sink_radius2,
     int sink_model2,
-    double alpha, // other
-    double a,
-    double dt,
-    double velocity_ceiling,
-    double cooling_coefficient,
-    double mach_ceiling,
-    double density_floor,
-    double pressure_floor,
-    int constant_softening)
+    double cs2, // equation of state
+    double mach_squared,
+    int eos_type,
+    double nu, // kinematic viscosity coefficient
+    double a, // RK parameter
+    double dt, // timestep
+    double velocity_ceiling)
 {
     struct KeplerianBuffer buffer = {
         buffer_surface_density,
-        buffer_surface_pressure,
         buffer_central_mass,
         buffer_driving_rate,
         buffer_outer_radius,
@@ -610,18 +544,17 @@ PUBLIC void cbdgam_2d_advance_rk(
         double frj[NCONS];
         double ucc[NCONS];
 
-        double cs2li = sound_speed_squared(gamma_law_index, pli);
-        double cs2ri = sound_speed_squared(gamma_law_index, pri);
-        double cs2lj = sound_speed_squared(gamma_law_index, plj);
-        double cs2rj = sound_speed_squared(gamma_law_index, prj);
-        double hcc = disk_height(&mass_list, xc, yc, pcc);
+        double cs2li = sound_speed_squared(cs2, mach_squared, eos_type, xl, yc, &mass_list);
+        double cs2ri = sound_speed_squared(cs2, mach_squared, eos_type, xr, yc, &mass_list);
+        double cs2lj = sound_speed_squared(cs2, mach_squared, eos_type, xc, yl, &mass_list);
+        double cs2rj = sound_speed_squared(cs2, mach_squared, eos_type, xc, yr, &mass_list);
 
-        riemann_hlle(plim, plip, fli, cs2li, 0, gamma_law_index);
-        riemann_hlle(prim, prip, fri, cs2ri, 0, gamma_law_index);
-        riemann_hlle(pljm, pljp, flj, cs2lj, 1, gamma_law_index);
-        riemann_hlle(prjm, prjp, frj, cs2rj, 1, gamma_law_index);
+        riemann_hlle(plim, plip, fli, cs2li, 0);
+        riemann_hlle(prim, prip, fri, cs2ri, 0);
+        riemann_hlle(pljm, pljp, flj, cs2lj, 1);
+        riemann_hlle(prjm, prjp, frj, cs2rj, 1);
 
-        if (alpha > 0.0)
+        if (nu > 0.0)
         {
             double sli[4];
             double sri[4];
@@ -635,84 +568,34 @@ PUBLIC void cbdgam_2d_advance_rk(
             shear_strain(gxrj, gyrj, dx, dy, srj);
             shear_strain(gxcc, gycc, dx, dy, scc);
 
-            double cs2cc = sound_speed_squared(gamma_law_index, pcc);
-            double hli = disk_height(&mass_list, xl, yc, pli);
-            double hri = disk_height(&mass_list, xr, yc, pri);
-            double hlj = disk_height(&mass_list, xc, yl, plj);
-            double hrj = disk_height(&mass_list, xc, yr, prj);
-
-            double nucc = alpha * hcc * sqrt(cs2cc);
-            double nuli = alpha * hli * sqrt(cs2li);
-            double nuri = alpha * hri * sqrt(cs2ri);
-            double nulj = alpha * hlj * sqrt(cs2lj);
-            double nurj = alpha * hrj * sqrt(cs2rj);
-
-            fli[1] -= 0.5 * (nuli * pli[0] * sli[0] + nucc * pcc[0] * scc[0]); // x-x
-            fli[2] -= 0.5 * (nuli * pli[0] * sli[1] + nucc * pcc[0] * scc[1]); // x-y
-            fri[1] -= 0.5 * (nucc * pcc[0] * scc[0] + nuri * pri[0] * sri[0]); // x-x
-            fri[2] -= 0.5 * (nucc * pcc[0] * scc[1] + nuri * pri[0] * sri[1]); // x-y
-            flj[1] -= 0.5 * (nulj * plj[0] * slj[2] + nucc * pcc[0] * scc[2]); // y-x
-            flj[2] -= 0.5 * (nulj * plj[0] * slj[3] + nucc * pcc[0] * scc[3]); // y-y
-            frj[1] -= 0.5 * (nucc * pcc[0] * scc[2] + nurj * prj[0] * srj[2]); // y-x
-            frj[2] -= 0.5 * (nucc * pcc[0] * scc[3] + nurj * prj[0] * srj[3]); // y-y
-
-            fli[3] -= 0.5 * (nuli * pli[0] * sli[0] * pli[1] + nucc * pcc[0] * scc[0] * pcc[1]); // v^x \tau^x_x
-            fri[3] -= 0.5 * (nucc * pcc[0] * scc[0] * pcc[1] + nuri * pri[0] * sri[0] * pri[1]);
-            fli[3] -= 0.5 * (nuli * pli[0] * sli[1] * pli[2] + nucc * pcc[0] * scc[1] * pcc[2]); // v^y \tau^x_y
-            fri[3] -= 0.5 * (nucc * pcc[0] * scc[1] * pcc[2] + nuri * pri[0] * sri[1] * pri[2]);
-            flj[3] -= 0.5 * (nulj * plj[0] * slj[2] * plj[1] + nucc * pcc[0] * scc[2] * pcc[1]); // v^x \tau^y_x
-            frj[3] -= 0.5 * (nucc * pcc[0] * scc[2] * pcc[1] + nurj * prj[0] * srj[2] * prj[1]);
-            flj[3] -= 0.5 * (nulj * plj[0] * slj[3] * plj[2] + nucc * pcc[0] * scc[3] * pcc[2]); // v^y \tau^y_y
-            frj[3] -= 0.5 * (nucc * pcc[0] * scc[3] * pcc[2] + nurj * prj[0] * srj[3] * prj[2]);
+            fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+            fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+            fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+            fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+            flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+            flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+            frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+            frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
         }
-
-        primitive_to_conserved(pcc, ucc, gamma_law_index);
-        buffer_source_term(&buffer, xc, yc, dt, ucc, gamma_law_index);
-        point_masses_source_term(&mass_list, xc, yc, dt, pcc, hcc, ucc, constant_softening, gamma_law_index);
-        cooling_term(cooling_coefficient, mach_ceiling, dt, pcc, ucc, gamma_law_index);
+        primitive_to_conserved(pcc, ucc);
+        buffer_source_term(&buffer, xc, yc, dt, ucc);
+        point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
 
         for (int q = 0; q < NCONS; ++q)
         {
             ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
             ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
         }
-
         double *pout = &primitive_wr[ncc];
-        conserved_to_primitive(ucc, pout, velocity_ceiling, density_floor, pressure_floor, gamma_law_index);
+        conserved_to_primitive(ucc, pout, velocity_ceiling);
     }
 }
 
-PUBLIC void cbdgam_2d_wavespeed(
+PUBLIC void cbdiso_2d_primitive_to_conserved(
     int ni,
     int nj,
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *wavespeed, // :: $.shape == (ni + 4, nj + 4)
-    double gamma_law_index)
-{
-    int ng = 2; // number of guard zones
-    int si = NCONS * (nj + 2 * ng);
-    int sj = NCONS;
-    int ti = nj + 2 * ng;
-    int tj = 1;
-
-    FOR_EACH_2D(ni, nj)
-    {
-        int np = (i + ng) * si + (j + ng) * sj;
-        int na = (i + ng) * ti + (j + ng) * tj;
-
-        double *pc = &primitive[np];
-        double cs2 = sound_speed_squared(gamma_law_index, pc);
-        double a = primitive_max_wavespeed(pc, cs2);
-        wavespeed[na] = a;
-    }
-}
-
-PUBLIC void cbdgam_2d_primitive_to_conserved(
-    int ni,
-    int nj,
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *conserved, // :: $.shape == (ni + 4, nj + 4, 4)
-    double gamma_law_index)
+    double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
+    double *conserved) // :: $.shape == (ni + 4, nj + 4, 3)
 {
     int ng = 2; // number of guard zones
     int si = NCONS * (nj + 2 * ng);
@@ -724,11 +607,12 @@ PUBLIC void cbdgam_2d_primitive_to_conserved(
 
         double *pc = &primitive[n];
         double *uc = &conserved[n];
-        primitive_to_conserved(pc, uc, gamma_law_index);
+        primitive_to_conserved(pc, uc);
     }
+
 }
 
-PUBLIC void cbdgam_2d_point_mass_source_term(
+PUBLIC void cbdiso_2d_point_mass_source_term(
     int ni,
     int nj,
     double patch_xl, // mesh
@@ -754,10 +638,8 @@ PUBLIC void cbdgam_2d_point_mass_source_term(
     double sink_radius2,
     int sink_model2,
     int which_mass, // :: $ in [1, 2]
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 4)
-    double *cons_rate, // :: $.shape == (ni + 4, nj + 4, 4)
-    int constant_softening,
-    double gamma_law_index)
+    double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
+    double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 3)
 {
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
@@ -778,7 +660,65 @@ PUBLIC void cbdgam_2d_point_mass_source_term(
         double yc = patch_yl + (j + 0.5) * dy;
         double *pc = &primitive[ncc];
         double *uc = &cons_rate[ncc];
-        double h = disk_height(&mass_list, xc, yc, pc);
-        point_mass_source_term(&mass_list.masses[which_mass - 1], xc, yc, 1.0, pc, h, uc, constant_softening, gamma_law_index);
+        point_mass_source_term(&mass_list.masses[which_mass - 1], xc, yc, 1.0, pc, uc);
+    }
+}
+
+
+PUBLIC void cbdiso_2d_wavespeed(
+    int ni, // mesh
+    int nj,
+    double patch_xl,
+    double patch_xr,
+    double patch_yl,
+    double patch_yr,
+    double soundspeed2, // equation of state
+    double mach_squared,
+    int eos_type,
+    double x1, // point mass 1
+    double y1,
+    double vx1,
+    double vy1,
+    double mass1,
+    double softening_length1,
+    double sink_rate1,
+    double sink_radius1,
+    int sink_model1,
+    double x2, // point mass 2
+    double y2,
+    double vx2,
+    double vy2,
+    double mass2,
+    double softening_length2,
+    double sink_rate2,
+    double sink_radius2,
+    int sink_model2,
+    double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
+    double *wavespeed) // :: $.shape == (ni + 4, nj + 4)
+{
+    struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
+    struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
+    struct PointMassList mass_list = {{m1, m2}};
+
+    int ng = 2; // number of guard zones
+    int si = NCONS * (nj + 2 * ng);
+    int sj = NCONS;
+    int ti = nj + 2 * ng;
+    int tj = 1;
+    double dx = (patch_xr - patch_xl)/ni;
+    double dy = (patch_yr - patch_yl)/nj;
+
+    FOR_EACH_2D(ni, nj)
+    {
+        int np = (i + ng) * si + (j + ng) * sj;
+        int na = (i + ng) * ti + (j + ng) * tj;
+
+        double x = patch_xl + (i + 0.5) * dx;
+        double y = patch_yl + (j + 0.5) * dy;
+
+        double *pc = &primitive[np];
+        double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+        double a = primitive_max_wavespeed(pc, cs2);
+        wavespeed[na] = a;
     }
 }

@@ -18,6 +18,7 @@ else:
 
 gpu = str(input("Use GPU? [y/n]"))
 
+subprocess.run(["rm", "-r", "./tempdir_residual_test/"])
 subprocess.run(["mkdir", "-p", "./tempdir_residual_test/low_res"])
 subprocess.run(["mkdir", "-p", "./tempdir_residual_test/high_res"])
 

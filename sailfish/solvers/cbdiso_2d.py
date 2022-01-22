@@ -1,9 +1,9 @@
 """
-Energy-conserving solver for the binary accretion problem in 2D.
+Isothermal solver for the binary accretion problem in 2D planar coordinates.
 """
 
-from typing import NamedTuple
 from logging import getLogger
+from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
@@ -16,10 +16,8 @@ logger = getLogger(__name__)
 
 
 class Options(NamedTuple):
-    pressure_floor: float = 1e-12
-    density_floor: float = 1e-10
-    velocity_ceiling: float = 1e16
-    mach_ceiling: float = 1e5
+    velocity_ceiling: float = 1e12
+    mach_ceiling: float = 1e12
 
 
 def initial_condition(setup, mesh, time):
@@ -29,7 +27,7 @@ def initial_condition(setup, mesh, time):
     import numpy as np
 
     ni, nj = mesh.shape
-    primitive = np.zeros([ni, nj, 4])
+    primitive = np.zeros([ni, nj, 3])
 
     for i in range(ni):
         for j in range(nj):
@@ -54,7 +52,6 @@ class Patch:
         options,
         buffer_outer_radius,
         buffer_surface_density,
-        buffer_surface_pressure,
         lib,
         xp,
         execution_context,
@@ -73,13 +70,12 @@ class Patch:
         self.xr, self.yr = mesh.vertex_coordinates(i1, nj)
         self.buffer_outer_radius = buffer_outer_radius
         self.buffer_surface_density = buffer_surface_density
-        self.buffer_surface_pressure = buffer_surface_pressure
 
         with self.execution_context:
-            self.wavespeeds = self.xp.zeros(primitive.shape[:2])
-            self.primitive1 = self.xp.array(primitive)
-            self.primitive2 = self.xp.array(primitive)
-            self.conserved0 = self.xp.zeros(primitive.shape)
+            self.wavespeeds = xp.zeros(primitive.shape[:2])
+            self.primitive1 = xp.array(primitive)
+            self.primitive2 = xp.array(primitive)
+            self.conserved0 = xp.zeros(primitive.shape)
 
     def point_mass_source_term(self, which_mass):
         if which_mass not in (1, 2):
@@ -88,11 +84,47 @@ class Patch:
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
-            self.lib.cbdgam_2d_point_mass_source_term[self.shape](
+
+            self.lib.cbdiso_2d_point_mass_source_term[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
                 self.yr,
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model,
+                which_mass,
+                self.primitive1,
+                cons_rate,
+            )
+        return cons_rate
+
+    def maximum_wavespeed(self):
+        m1, m2 = self.physics.point_masses(self.time)
+        with self.execution_context:
+            self.lib.cbdiso_2d_wavespeed[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.physics.sound_speed ** 2,
+                self.physics.mach_number ** 2,
+                self.physics.eos_type.value,
                 m1.position_x,
                 m1.position_y,
                 m1.velocity_x,
@@ -111,39 +143,25 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                which_mass,
-                self.primitive1,
-                cons_rate,
-                int(self.physics.constant_softening),
-                self.physics.gamma_law_index,
-            )
-            return cons_rate
-
-    def maximum_wavespeed(self):
-        with self.execution_context:
-            self.lib.cbdgam_2d_wavespeed[self.shape](
                 self.primitive1,
                 self.wavespeeds,
-                self.physics.gamma_law_index,
             )
             return self.wavespeeds.max()
 
     def recompute_conserved(self):
         with self.execution_context:
-            return self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
+            return self.lib.cbdiso_2d_primitive_to_conserved[self.shape](
                 self.primitive1,
                 self.conserved0,
-                self.physics.gamma_law_index,
             )
 
     def advance_rk(self, rk_param, dt):
         m1, m2 = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
         buffer_surface_density = self.buffer_surface_density
-        buffer_surface_pressure = self.buffer_surface_pressure
 
         with self.execution_context:
-            self.lib.cbdgam_2d_advance_rk[self.shape](
+            self.lib.cbdiso_2d_advance_rk[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
@@ -151,9 +169,7 @@ class Patch:
                 self.conserved0,
                 self.primitive1,
                 self.primitive2,
-                self.physics.gamma_law_index,
                 buffer_surface_density,
-                buffer_surface_pressure,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
@@ -177,17 +193,14 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                self.physics.alpha,
+                self.physics.sound_speed ** 2,
+                self.physics.mach_number ** 2,
+                self.physics.eos_type.value,
+                self.physics.viscosity_coefficient,
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
-                self.physics.cooling_coefficient,
-                self.options.mach_ceiling,
-                self.options.density_floor,
-                self.options.pressure_floor,
-                int(self.physics.constant_softening),
             )
-
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
 
@@ -202,7 +215,7 @@ class Patch:
 
 class Solver(SolverBase):
     """
-    Adapter class to drive the cbdgam_2d C extension module.
+    Adapter class to drive the iso_2d C extension module.
     """
 
     def __init__(
@@ -229,16 +242,25 @@ class Solver(SolverBase):
 
         if physics.viscosity_model not in (
             ViscosityModel.NONE,
-            ViscosityModel.CONSTANT_ALPHA,
+            ViscosityModel.CONSTANT_NU,
         ):
             raise ValueError("solver only supports constant-nu viscosity")
 
-        if physics.eos_type != EquationOfState.GAMMA_LAW:
+        if physics.eos_type not in (
+            EquationOfState.GLOBALLY_ISOTHERMAL,
+            EquationOfState.LOCALLY_ISOTHERMAL,
+        ):
             raise ValueError("solver only supports isothermal equation of states")
+
+        if physics.cooling_coefficient != 0.0:
+            raise ValueError("solver does not support thermal cooling")
+
+        if not physics.constant_softening:
+            raise ValueError("solver only supports constant gravitational softening")
 
         xp = get_array_module(mode)
         ng = 2  # number of guard zones
-        nq = 4  # number of conserved quantities
+        nq = 3  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
         lib = Library(code, mode=mode, debug=True)
@@ -255,8 +277,6 @@ class Solver(SolverBase):
         self.xp = xp
         self.patches = []
         ni, nj = mesh.shape
-        self.domain_radius = self.mesh.x1
-        self.buffer_onset_width = 0.1
 
         if solution is None:
             primitive = initial_condition(setup, mesh, time)
@@ -268,16 +288,14 @@ class Solver(SolverBase):
             # to determine the disk surface density at the radius where the
             # buffer begins to ramp up. This procedure makes sense as long as
             # the initial condition is axisymmetric.
-            buffer_prim = [0.0] * 4
+            buffer_prim = [0.0] * 3
             buffer_outer_radius = mesh.x1  # this assumes the mesh is a centered squared
             buffer_onset_radius = buffer_outer_radius - physics.buffer_onset_width
             setup.primitive(time, [buffer_onset_radius, 0.0], buffer_prim)
             buffer_surface_density = buffer_prim[0]
-            buffer_surface_pressure = buffer_prim[3]
         else:
             buffer_outer_radius = 0.0
             buffer_surface_density = 0.0
-            buffer_surface_pressure = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
             prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
@@ -291,7 +309,6 @@ class Solver(SolverBase):
                 options,
                 buffer_outer_radius,
                 buffer_surface_density,
-                buffer_surface_pressure,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
@@ -322,7 +339,7 @@ class Solver(SolverBase):
 
     @property
     def recommended_cfl(self):
-        return 0.1
+        return 0.3
 
     @property
     def maximum_cfl(self):

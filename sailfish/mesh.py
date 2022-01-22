@@ -223,9 +223,14 @@ class PlanarCartesian2DMesh(NamedTuple):
     def dy(self):
         return (self.y1 - self.y0) / self.nj
 
+    @property
     def shape(self):
         return self.ni, self.nj
 
+    def min_spacing(self, time=None):
+        return min(self.dx, self.dy)
+
+    @property
     def num_total_zones(self):
         return self.ni * self.nj
 
@@ -235,6 +240,9 @@ class PlanarCartesian2DMesh(NamedTuple):
         return x, y
 
     def vertex_coordinates(self, i, j):
+        """
+        Return the position of the lower-left corner of zone (i, j).
+        """
         x = self.x0 + i * self.dx
         y = self.y0 + j * self.dy
         return x, y

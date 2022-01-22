@@ -2,10 +2,10 @@
 Contains a setup for studying a relativistic type-II shockwave.
 """
 
+from functools import lru_cache
 from math import pi, exp, log10
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
-
 
 __all__ = ["EnvelopeShock"]
 
@@ -30,27 +30,12 @@ class EnvelopeShock(Setup):
         return self.polar_extent > 0.0
 
     def primitive(self, t, coord, primitive):
-        envelope_fastest_beta = 0.999
-        psi = 0.25
-        m1 = 1.0
-
         r = coord[0] if self.polar else coord
-        s = min(r / t, envelope_fastest_beta)
-        g = (1.0 - s * s) ** -0.5
-        u = s * g
-        m = m1 * u ** (-1.0 / psi)
-        d = m * g / (4 * pi * r ** 3 * psi)
-        p = 1e-6 * d
-
-        def u_prof(m):
-            if m < self.m_shell:
-                return 0.0
-            else:
-                return exp(-(m / self.m_shell - 1.0) / self.w_shell)
+        m, d, u, p = self.envelope_state(t, r)
 
         if not self.polar:
             primitive[0] = d
-            primitive[1] = u + u_prof(m) * self.u_shell
+            primitive[1] = u + self.shell_u_profile_mass(m)
             primitive[2] = p
 
             if m > self.m_shell and m < self.m_shell * (1.0 + self.w_shell):
@@ -58,9 +43,11 @@ class EnvelopeShock(Setup):
             else:
                 primitive[3] = 0.0
         else:
-            q_bar = coord[1] / self.q_shell
+            q = coord[1]
             primitive[0] = d
-            primitive[1] = u + u_prof(m) * self.u_shell * exp(-(q_bar ** 2.0))
+            primitive[1] = u + self.shell_u_profile_mass(
+                m
+            ) * self.shell_u_profile_polar(q)
             primitive[2] = 0.0
             primitive[3] = p
 
@@ -99,6 +86,31 @@ class EnvelopeShock(Setup):
             return 800
         else:
             return 20000
+
+    @lru_cache
+    def shell_u_profile_polar(self, q):
+        return exp(-((q / self.q_shell) ** 2))
+
+    @lru_cache
+    def shell_u_profile_mass(self, m):
+        if m < self.m_shell:
+            return 0.0
+        else:
+            return self.u_shell * exp(-(m / self.m_shell - 1.0) / self.w_shell)
+
+    @lru_cache
+    def envelope_state(self, t, r):
+        envelope_fastest_beta = 0.999
+        psi = 0.25
+        m1 = 1.0
+
+        s = min(r / t, envelope_fastest_beta)
+        g = (1.0 - s * s) ** -0.5
+        u = s * g
+        m = m1 * u ** (-1.0 / psi)
+        d = m * g / (4 * pi * r ** 3 * psi)
+        p = 1e-6 * d
+        return m, d, u, p
 
 
 # ---------------------------------------------------------
