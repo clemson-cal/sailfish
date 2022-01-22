@@ -4,7 +4,8 @@ Library functions and command-line access to the simulation driver.
 
 import os, pickle, pathlib, logging
 from typing import NamedTuple, Dict
-
+import numpy as np
+from sailfish import solvers
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
 from sailfish.solvers import SolverInitializationError
@@ -15,6 +16,17 @@ logger = logging.getLogger(__name__)
 
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
+
+
+class DriverState(NamedTuple):
+    "To initialise the parameters required for the run and post-processing."
+    iteration: int = 0
+    driver: object = None
+    mesh: list = None
+    timeseries: list = []
+    event_states: list = []
+    solver: object = None
+    setup: object = None
 
 
 def keyed_event(item):
@@ -136,12 +148,26 @@ def write_checkpoint(number, outdir, state):
         pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(outdir, filename)
 
+    state_derived_info = dict(
+        iteration=state.iteration,
+        time=state.solver.time,
+        solution=state.solver.solution,
+        primitive=state.solver.primitive,
+        solver=state.setup.solver,
+        solver_options=state.solver.options,
+        event_states=state.event_states,
+        driver=state.driver,
+        model_parameters=state.setup.model_parameters_dict(),
+        setup_name=state.setup.dash_case_class_name(),
+        mesh=state.mesh,
+    )
+
     with open(filename, "wb") as chkpt:
         if logger is not None:
             logger.info(f"write checkpoint {chkpt.name}")
         # TODO: make it an option whether to strip class info from checkpoints
         # pickle.dump(asdict(state), chkpt)
-        pickle.dump(state, chkpt)
+        pickle.dump(state_derived_info, chkpt)
 
 
 def load_checkpoint(chkpt_file):
@@ -155,6 +181,14 @@ def load_checkpoint(chkpt_file):
             return pickle.load(file)
     except FileNotFoundError:
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
+
+
+def append_timeseries(state):
+    """
+    To append to the timeseires for post-processing
+    """
+    print(state.timeseries)
+    state.timeseries.append(state.solver.timeseries)
 
 
 class DriverArgs(NamedTuple):
@@ -310,6 +344,8 @@ def simulate(driver):
         mode=mode,
     )
 
+    timeseries = []
+
     if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
         raise ConfigurationError(
             f"cfl number {driver.cfl_number} "
@@ -332,19 +368,29 @@ def simulate(driver):
         Collect items from the driver and solver state, as well as run
         details, sufficient for restarts and post processing.
         """
+
+        driver_state_info = dict(
+            iteration=iteration,
+            driver=driver,
+            mesh=mesh,
+            timeseries=timeseries,
+            event_states=event_states,
+            solver=solver,
+            setup=setup,
+        )
+
+        """
         return dict(
             iteration=iteration,
-            time=solver.time,
-            solution=solver.solution,
-            primitive=solver.primitive,
-            solver=setup.solver,
-            solver_options=solver.options,
-            event_states=event_states,
             driver=driver,
-            model_parameters=setup.model_parameter_dict(),
-            setup_name=setup.dash_case_class_name(),
             mesh=mesh,
+            timeseries=timeseries,
+            event_states=event_states,
+            solver=solver,
+            setup=setup,
         )
+        """
+        return DriverState(**driver_state_info)
 
     while end_time is None or end_time > solver.time:
         """
@@ -357,7 +403,7 @@ def simulate(driver):
             state = event_states[name]
             if event_states[name].is_due(solver.time, event):
                 event_states[name] = state.next(solver.time, event)
-                yield name, state.number, grab_state()
+                yield name, state.number, grab_state(**dict())
 
         with measure_time() as fold_time:
             for _ in range(fold):
@@ -372,7 +418,7 @@ def simulate(driver):
             f"[{iteration:04d}] t={solver.time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )
 
-    yield "end", None, grab_state()
+    yield "end", None, grab_state(**dict())
 
 
 def run(setup_name, quiet=True, **kwargs):
@@ -602,9 +648,10 @@ def main():
                 or (driver.chkpt_file and os.path.dirname(driver.chkpt_file))
                 or "."
             )
-
             for name, number, state in simulate(driver):
-                if name == "checkpoint":
+                if name == "timeseries":
+                    append_timeseries(state)
+                elif name == "checkpoint":
                     write_checkpoint(number, outdir, state)
                 elif name == "end":
                     write_checkpoint("final", outdir, state)
