@@ -39,31 +39,50 @@ logger = logging.getLogger(__name__)
 
 
 build_config = {
+    "enable_openmp": True,
     "extra_compile_args": [],
     "extra_link_args": [],
 }
 
 
-def configure_build():
+def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args=None):
     """
     Initiate the `build_config` module-level variable.
 
-    The build configuration is presently inferred from a crude check to see
-    whether we're on Linux or MacOS. This procedure can be easily generalized
-    to accommodate other or more specific platforms, check for hardware or
-    software availability, or read a bulid configuration from a user or
-    site-specified machine file.
+    A default build configuration is inferred on MacOS or Linux. Defaults for
+    Windows platforms and specific Linux flavors should be added soon. The
+    keyword arguemnts may be Python objects, or strings to facilitate passing
+    values right from a configparser instance.
     """
+
+    if type(enable_openmp) is str:
+        enable_openmp = {"True": True, "False": False}[enable_openmp]
+
+    if type(extra_compile_args) is str:
+        extra_compile_args = extra_compile_args.split()
+
+    if type(extra_link_args) is str:
+        extra_link_args = extra_link_args.split()
+
     if platform.system() == "Darwin":
         logger.info("configure JIT build for MacOS")
-        build_config["extra_compile_args"] = ["-Xpreprocessor", "-fopenmp"]
-        build_config["extra_link_args"] = ["-lomp"]
+        sys_compile_args = ["-Xpreprocessor", "-fopenmp"]
+        sys_link_args = ["-lomp"]
+
     elif platform.system() == "Linux":
         logger.info("configure JIT build for Linux")
-        build_config["extra_compile_args"] = ["-fopenmp"]
-        build_config["extra_link_args"] = ["-fopenmp"]
+        sys_compile_args = ["-fopenmp"]
+        sys_link_args = ["-fopenmp"]
     else:
         logger.info("configure JIT build for unknown system")
+        sys_compile_args = []
+        sys_link_args = []
+
+    if enable_openmp:
+        build_config["extra_compile_args"] = extra_compile_args or sys_compile_args
+        build_config["extra_link_args"] = extra_link_args or sys_link_args
+
+    logger.info(f"OpenMP is {'enabled' if enable_openmp else 'disabled'}")
 
 
 def get_array_module(mode):
@@ -100,9 +119,9 @@ def execution_context(mode, device_id=None):
         return nullcontext()
 
     elif mode == "gpu":
-        import cupy
+        from cupy.cuda import Device
 
-        return cupy.cuda.Device(device_id)
+        return Device(device_id)
 
 
 def num_devices(mode):

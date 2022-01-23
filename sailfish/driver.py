@@ -2,20 +2,28 @@
 Library functions and command-line access to the simulation driver.
 """
 
-import os, pickle, pathlib, logging
+import os, pickle, pathlib
 from typing import NamedTuple, Dict
-from sailfish import solvers
+from logging import getLogger
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
-from sailfish.solvers import SolverInitializationError
 from sailfish.solver import SolverBase
-from sailfish import setups
+from sailfish.solvers import (
+    SolverInitializationError,
+    register_solver_extension,
+    make_solver,
+)
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
+user_build_config = dict()
 
 
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
+
+
+class ExtensionError(Exception):
+    """An invalid extension was specified"""
 
 
 def keyed_event(item):
@@ -274,7 +282,7 @@ def simulate(driver):
     should also be extensible by a system-specific rc-style configuration
     file.
     """
-    configure_build()
+    configure_build(**user_build_config)
     log_system_info(driver.execution_mode or "cpu")
 
     if driver.setup_name:
@@ -344,7 +352,7 @@ def simulate(driver):
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
     new_timestep_cadence = driver.new_timestep_cadence or 1
 
-    solver = solvers.make_solver(
+    solver = make_solver(
         setup.solver,
         setup.physics,
         driver.solver_options,
@@ -426,6 +434,8 @@ def run(setup_name, quiet=True, **kwargs):
     result themselves. Event monitoring is not supported. If `quiet=True`
     (default) then logging is suppressed.
     """
+    import sailfish.setups
+
     if "events" in kwargs:
         raise ValueError("events are not supported")
 
@@ -433,6 +443,8 @@ def run(setup_name, quiet=True, **kwargs):
 
     if not quiet:
         init_logging()
+
+    load_user_config()
 
     return next(simulate(driver))[2]
 
@@ -472,11 +484,47 @@ def init_logging():
     root_logger.setLevel(INFO)
 
 
+def load_user_config():
+    """
+    Initialize user extensions: setups and solvers outside the main codebase.
+
+    This function is called by the :pyobj:`main` entry point and the
+    :pyobj:`run` API function to load custom setups provided by the user.
+    Extensions are defined in the `extensions` section of the .sailfish
+    file. The .sailfish file is loaded from the current working directory.
+    """
+    from configparser import ConfigParser, ParsingError
+    from importlib import import_module
+
+    try:
+        config = ConfigParser()
+        config.read(".sailfish")
+
+        for setup_extension in config["extensions"]["setups"].split():
+            import_module(setup_extension)
+
+        for solver_extension in config["extensions"]["solvers"].split():
+            register_solver_extension(solver_extension)
+
+        for key, val in config["build"].items():
+            user_build_config[key] = val
+
+    except ModuleNotFoundError as e:
+        raise ExtensionError(e)
+
+    except ParsingError as e:
+        raise ConfigurationError(e)
+
+    except KeyError:
+        pass
+
+
 def main():
     """
     General-purpose command line interface.
     """
     import argparse
+    import sailfish.setups
 
     class MakeDict(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
@@ -489,11 +537,10 @@ def main():
 
         return AddDictEntry
 
-    init_logging()
-
     parser = argparse.ArgumentParser(
         prog="sailfish",
-        description="gpu-accelerated astrophysical gasdynamics code",
+        usage=argparse.SUPPRESS,
+        description="sailfish is a gpu-accelerated astrophysical gasdynamics code",
     )
     parser.add_argument(
         "command",
@@ -626,6 +673,9 @@ def main():
     )
 
     try:
+        init_logging()
+        load_user_config()
+
         args = parser.parse_args()
 
         if args.describe and args.command is not None:
@@ -656,6 +706,9 @@ def main():
 
     except ConfigurationError as e:
         print(f"bad configuration: {e}")
+
+    except ExtensionError as e:
+        print(f"bad extension: {e}")
 
     except SetupError as e:
         print(f"setup error: {e}")

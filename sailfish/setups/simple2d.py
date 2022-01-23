@@ -6,10 +6,12 @@ from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import EquationOfState
 from sailfish.setup import Setup, param
 
+__all__ = ["UniformPolar", "CylindricalExplosion"]
+
 
 class UniformPolar(Setup):
     """
-    Tests the srhd_2d solver goemtrical source terms.
+    Tests the srhd_2d solver geometrical source terms.
     """
 
     def primitive(self, t, _, primitive):
@@ -42,6 +44,9 @@ class CylindricalExplosion(Setup):
     A circular region of high density and pressure is initiated at the center
     of a square domain. In isothermal mode, the sound speed is set to 1
     everywhere. In gamma-law mode, the adiabatic index is 5/3.
+
+    Currently this setup can specify either the `cbdiso_2d` or `cbdgam_2d`
+    solvers.
     """
 
     eos = param("isothermal", "EOS type: either isothermal or gamma-law")
