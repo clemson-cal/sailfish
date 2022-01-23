@@ -22,13 +22,13 @@ class DriverState(NamedTuple):
 
     "To initialise the parameters required for the run and post-processing."
 
-    iteration: int = 0
-    driver: object = None
-    mesh: list = None
-    timeseries: list = []
-    event_states: list = []
-    solver: object = None
-    setup: Setup = None
+    iteration: int
+    driver: "DriverArgs"
+    mesh: object
+    timeseries: list
+    event_states: list
+    solver: "SolverBase"
+    setup: Setup
 
 
 def keyed_event(item):
@@ -290,6 +290,7 @@ def simulate(driver):
         time = setup.start_time
         event_states = {name: RecurringEvent() for name in driver.events}
         solution = None
+        timeseries = []
 
     elif driver.chkpt_file:
         """
@@ -326,6 +327,8 @@ def simulate(driver):
             if event not in event_states:
                 event_states[event] = RecurringEvent()
 
+        timeseries = chkpt["timeseries"]
+
     else:
         raise ConfigurationError("driver args must specify setup_name or chkpt_file")
 
@@ -346,8 +349,6 @@ def simulate(driver):
         num_patches=driver.num_patches or 1,
         mode=mode,
     )
-
-    timeseries = []
 
     if driver.cfl_number is not None and driver.cfl_number > solver.maximum_cfl:
         raise ConfigurationError(

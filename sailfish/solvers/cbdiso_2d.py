@@ -353,7 +353,12 @@ class Solver(SolverBase):
         Reduce conserved quatities on the mesh for
         post-processing and diagnostics of the run.
         """
-        return [1, 2, 3]
+        return lazy_reduce(
+            sum,
+            lambda a: a.get(),
+            (lambda: patch.point_mass_source_term(1) for patch in self.patches),
+            (patch.execution_context for patch in self.patches),
+        )
 
     @property
     def time(self):
