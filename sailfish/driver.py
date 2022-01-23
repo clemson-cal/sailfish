@@ -4,11 +4,11 @@ Library functions and command-line access to the simulation driver.
 
 import os, pickle, pathlib, logging
 from typing import NamedTuple, Dict
-import numpy as np
 from sailfish import solvers
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
 from sailfish.solvers import SolverInitializationError
+from sailfish.solver import SolverBase
 from sailfish import setups
 
 logger = logging.getLogger(__name__)
@@ -16,19 +16,6 @@ logger = logging.getLogger(__name__)
 
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
-
-
-class DriverState(NamedTuple):
-
-    "To initialise the parameters required for the run and post-processing."
-
-    iteration: int
-    driver: "DriverArgs"
-    mesh: object
-    timeseries: list
-    event_states: list
-    solver: "SolverBase"
-    setup: Setup
 
 
 def keyed_event(item):
@@ -150,11 +137,12 @@ def write_checkpoint(number, outdir, state):
         pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(outdir, filename)
 
-    state_derived_info = dict(
+    state_checkpoint_dict = dict(
         iteration=state.iteration,
         time=state.solver.time,
         solution=state.solver.solution,
         primitive=state.solver.primitive,
+        timeseries=state.timeseries,
         solver=state.setup.solver,
         solver_options=state.solver.options,
         event_states=state.event_states,
@@ -165,11 +153,8 @@ def write_checkpoint(number, outdir, state):
     )
 
     with open(filename, "wb") as chkpt:
-        if logger is not None:
-            logger.info(f"write checkpoint {chkpt.name}")
-        # TODO: make it an option whether to strip class info from checkpoints
-        # pickle.dump(asdict(state), chkpt)
-        pickle.dump(state_derived_info, chkpt)
+        logger.info(f"write checkpoint {chkpt.name}")
+        pickle.dump(state_checkpoint_dict, chkpt)
 
 
 def load_checkpoint(chkpt_file):
@@ -178,8 +163,6 @@ def load_checkpoint(chkpt_file):
     """
     try:
         with open(chkpt_file, "rb") as file:
-            # TODO: make it an option whether to strip class info from checkpoints
-            # return fromdict(pickle.load(file))
             return pickle.load(file)
     except FileNotFoundError:
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
@@ -187,11 +170,15 @@ def load_checkpoint(chkpt_file):
 
 def append_timeseries(state):
     """
-    To append to the timeseires for post-processing
+    Append to the driver state timeseries for post-processing.
     """
-    if str(state.setup.solver[:]) != "cbdiso_2d":  # Add other options
-        raise ConfigurationError("Timeseries not applicable for current solver")
-    state.timeseries.append(state.solver.reductions)
+    try:
+        state.timeseries.append(state.solver.reductions())
+        logger.info(f"record timeseries event {len(state.timeseries)}")
+    except AttributeError:
+        logger.warning(
+            "timeseries event ignored because solver does not provide reductions"
+        )
 
 
 class DriverArgs(NamedTuple):
@@ -239,6 +226,23 @@ class DriverArgs(NamedTuple):
             chkpt_file=chkpt_file,
             model_parameters=model_parameters,
         )
+
+
+class DriverState(NamedTuple):
+    """
+    Contains the stateful variables in use by the :pyobj:`simulate` function.
+
+    An instance of this class is yielded by :pyobj:`simulate` each time an
+    event takes place.
+    """
+
+    iteration: int
+    driver: DriverArgs
+    mesh: object
+    timeseries: list
+    event_states: list
+    solver: SolverBase
+    setup: Setup
 
 
 def simulate(driver):
@@ -290,7 +294,7 @@ def simulate(driver):
         time = setup.start_time
         event_states = {name: RecurringEvent() for name in driver.events}
         solution = None
-        timeseries = []
+        timeseries = list()
 
     elif driver.chkpt_file:
         """
@@ -322,12 +326,14 @@ def simulate(driver):
         time = chkpt["time"]
         event_states = chkpt["event_states"]
         solution = chkpt["solution"]
+        try:
+            timeseries = chkpt["timeseries"]
+        except KeyError:
+            logger.warning("older checkpoint version: no timeseries")
 
         for event in driver.events:
             if event not in event_states:
                 event_states[event] = RecurringEvent()
-
-        timeseries = chkpt["timeseries"]
 
     else:
         raise ConfigurationError("driver args must specify setup_name or chkpt_file")
@@ -372,8 +378,7 @@ def simulate(driver):
         Collect items from the driver and solver state, as well as run
         details, sufficient for restarts and post processing.
         """
-
-        driver_state_info = dict(
+        return DriverState(
             iteration=iteration,
             driver=driver,
             mesh=mesh,
@@ -382,8 +387,6 @@ def simulate(driver):
             solver=solver,
             setup=setup,
         )
-
-        return DriverState(**driver_state_info)
 
     while end_time is None or end_time > solver.time:
         """

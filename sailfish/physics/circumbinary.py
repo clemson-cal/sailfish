@@ -172,9 +172,17 @@ class Physics(NamedTuple):
     constant_softening: bool = True
     """ If local disk height is ignored in gravitational softening """
 
+    @property
+    def num_particles(self):
+        if self.point_mass_function is None:
+            return 0
+        else:
+            return len(self.point_mass_function(0.0))
+
     def point_masses(self, time):
         """
-        Generate point masses from the simulation time and supplied callback.
+        Generate two point masses from the simulation time and supplied
+        callback.
         """
         if self.point_mass_function is None:
             return PointMass(), PointMass()

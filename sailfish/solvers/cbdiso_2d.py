@@ -3,7 +3,6 @@ Isothermal solver for the binary accretion problem in 2D planar coordinates.
 """
 
 from logging import getLogger
-import numpy as np
 from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
@@ -172,9 +171,8 @@ class Patch:
         """
         Passes required parameters for time evolution of the setup.
 
-        Calls the C-module function responsible for performing
-        time evolution using a RK algorithm to update the
-        parameters of the setup.
+        Calls the C-module function responsible for performing time evolution
+        using a RK algorithm to update the parameters of the setup.
         """
         m1, m2 = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
@@ -345,20 +343,39 @@ class Solver(SolverBase):
             [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
         )
 
-    @property
     def reductions(self):
         """
-        Perform reductions of conserved quantities.
+        Generate runtime reductions on the solution data for time series.
 
-        Reduce conserved quatities on the mesh for
-        post-processing and diagnostics of the run.
+        As of now, the reductions generated are the rates of mass accretion,
+        and of x and y momentum (combined gravitational and accretion)
+        resulting from each of the point masses. If there are 2 point masses,
+        then the result of this function is a 7-element list: :pyobj:`[time,
+        mdot1, fx1, fy1, mdot2, fx2, fy2]`.
         """
-        return lazy_reduce(
-            sum,
-            lambda a: a.get(),
-            (lambda: patch.point_mass_source_term(1) for patch in self.patches),
-            (patch.execution_context for patch in self.patches),
-        )
+
+        def to_host(a):
+            try:
+                return a.get()
+            except AttributeError:
+                return a
+
+        def patch_reduction(patch, which):
+            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+
+        da = self.mesh.dx * self.mesh.dy
+        point_mass_reductions = [self.time]
+
+        for n in range(self._physics.num_particles):
+            point_mass_reductions.extend(
+                lazy_reduce(
+                    sum,
+                    to_host,
+                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
+                    (patch.execution_context for patch in self.patches),
+                )
+            )
+        return point_mass_reductions
 
     @property
     def time(self):
