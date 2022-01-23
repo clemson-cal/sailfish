@@ -19,14 +19,16 @@ class ConfigurationError(Exception):
 
 
 class DriverState(NamedTuple):
+
     "To initialise the parameters required for the run and post-processing."
+
     iteration: int = 0
     driver: object = None
     mesh: list = None
     timeseries: list = []
     event_states: list = []
     solver: object = None
-    setup: object = None
+    setup: Setup = None
 
 
 def keyed_event(item):
@@ -157,7 +159,7 @@ def write_checkpoint(number, outdir, state):
         solver_options=state.solver.options,
         event_states=state.event_states,
         driver=state.driver,
-        model_parameters=state.setup.model_parameters_dict(),
+        model_parameters=state.setup.model_parameter_dict(),
         setup_name=state.setup.dash_case_class_name(),
         mesh=state.mesh,
     )
@@ -187,8 +189,9 @@ def append_timeseries(state):
     """
     To append to the timeseires for post-processing
     """
-    print(state.timeseries)
-    state.timeseries.append(state.solver.timeseries)
+    if str(state.setup.solver[:]) != "cbdiso_2d":  # Add other options
+        raise ConfigurationError("Timeseries not applicable for current solver")
+    state.timeseries.append(state.solver.reductions)
 
 
 class DriverArgs(NamedTuple):
@@ -379,17 +382,6 @@ def simulate(driver):
             setup=setup,
         )
 
-        """
-        return dict(
-            iteration=iteration,
-            driver=driver,
-            mesh=mesh,
-            timeseries=timeseries,
-            event_states=event_states,
-            solver=solver,
-            setup=setup,
-        )
-        """
         return DriverState(**driver_state_info)
 
     while end_time is None or end_time > solver.time:
