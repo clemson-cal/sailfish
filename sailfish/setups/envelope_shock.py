@@ -2,7 +2,7 @@
 Contains a setup for studying a relativistic type-II shockwave.
 """
 
-from functools import cache
+from functools import lru_cache
 from math import pi, exp, log10
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
@@ -35,7 +35,7 @@ class EnvelopeShock(Setup):
 
         if not self.polar:
             primitive[0] = d
-            primitive[1] = u + self.shell_u(m)
+            primitive[1] = u + self.shell_u_profile_mass(m)
             primitive[2] = p
 
             if m > self.m_shell and m < self.m_shell * (1.0 + self.w_shell):
@@ -87,18 +87,18 @@ class EnvelopeShock(Setup):
         else:
             return 20000
 
-    @cache
+    @lru_cache
     def shell_u_profile_polar(self, q):
         return exp(-((q / self.q_shell) ** 2))
 
-    @cache
+    @lru_cache
     def shell_u_profile_mass(self, m):
         if m < self.m_shell:
             return 0.0
         else:
             return self.u_shell * exp(-(m / self.m_shell - 1.0) / self.w_shell)
 
-    @cache
+    @lru_cache
     def envelope_state(self, t, r):
         envelope_fastest_beta = 0.999
         psi = 0.25
