@@ -16,6 +16,10 @@ logger = getLogger(__name__)
 
 
 class Options(NamedTuple):
+    """
+    Contains parameters which are solver specific options.
+    """
+
     velocity_ceiling: float = 1e12
     mach_ceiling: float = 1e12
 
@@ -78,6 +82,10 @@ class Patch:
             self.conserved0 = xp.zeros(primitive.shape)
 
     def point_mass_source_term(self, which_mass):
+        """
+        Returns an array of conserved quantities over a patch.
+        """
+        ng = 2  # number of guard cells
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
@@ -98,7 +106,7 @@ class Patch:
                 m1.softening_length,
                 m1.sink_rate,
                 m1.sink_radius,
-                m1.sink_model,
+                m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
@@ -107,14 +115,17 @@ class Patch:
                 m2.softening_length,
                 m2.sink_rate,
                 m2.sink_radius,
-                m2.sink_model,
+                m2.sink_model.value,
                 which_mass,
                 self.primitive1,
                 cons_rate,
             )
-        return cons_rate
+        return cons_rate[ng:-ng, ng:-ng]
 
     def maximum_wavespeed(self):
+        """
+        Returns the maximum wavespeed over a given patch.
+        """
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context:
             self.lib.cbdiso_2d_wavespeed[self.shape](
@@ -149,6 +160,7 @@ class Patch:
             return self.wavespeeds.max()
 
     def recompute_conserved(self):
+        "Converts the most recent primitive array to conserved"
         with self.execution_context:
             return self.lib.cbdiso_2d_primitive_to_conserved[self.shape](
                 self.primitive1,
@@ -156,6 +168,12 @@ class Patch:
             )
 
     def advance_rk(self, rk_param, dt):
+        """
+        Passes required parameters for time evolution of the setup.
+
+        Calls the C-module function responsible for performing time evolution
+        using a RK algorithm to update the parameters of the setup.
+        """
         m1, m2 = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
         buffer_surface_density = self.buffer_surface_density
@@ -325,6 +343,40 @@ class Solver(SolverBase):
             [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
         )
 
+    def reductions(self):
+        """
+        Generate runtime reductions on the solution data for time series.
+
+        As of now, the reductions generated are the rates of mass accretion,
+        and of x and y momentum (combined gravitational and accretion)
+        resulting from each of the point masses. If there are 2 point masses,
+        then the result of this function is a 7-element list: :pyobj:`[time,
+        mdot1, fx1, fy1, mdot2, fx2, fy2]`.
+        """
+
+        def to_host(a):
+            try:
+                return a.get()
+            except AttributeError:
+                return a
+
+        def patch_reduction(patch, which):
+            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+
+        da = self.mesh.dx * self.mesh.dy
+        point_mass_reductions = [self.time]
+
+        for n in range(self._physics.num_particles):
+            point_mass_reductions.extend(
+                lazy_reduce(
+                    sum,
+                    to_host,
+                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
+                    (patch.execution_context for patch in self.patches),
+                )
+            )
+        return point_mass_reductions
+
     @property
     def time(self):
         return self.patches[0].time
@@ -346,6 +398,8 @@ class Solver(SolverBase):
         return 0.4
 
     def maximum_wavespeed(self):
+        "Returns the global maximum wavespeed over the whole domain."
+
         return lazy_reduce(
             max,
             float,

@@ -308,6 +308,63 @@ class Solver(SolverBase):
             [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
         )
 
+    def reductions(self):
+        """
+        Generate runtime reductions on the solution data for time series.
+
+        As of now, the reductions generated are the rates of mass accretion,
+        and of x and y momentum (combined gravitational and accretion)
+        resulting from each of the point masses. If there are 2 point masses,
+        then the result of this function is a 9-element list: :pyobj:`[time,
+        mdot1, fx1, fy1, edot1, mdot2, fx2, fy2, edot2]`.
+        """
+
+        def to_host(a):
+            try:
+                return a.get()
+            except AttributeError:
+                return a
+
+        def patch_reduction(patch, which):
+            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+
+        da = self.mesh.dx * self.mesh.dy
+        point_mass_reductions = [self.time]
+
+        for n in range(self._physics.num_particles):
+            point_mass_reductions.extend(
+                lazy_reduce(
+                    sum,
+                    to_host,
+                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
+                    (patch.execution_context for patch in self.patches),
+                )
+            )
+        return point_mass_reductions
+
+        def to_host(a):
+            try:
+                return a.get()
+            except AttributeError:
+                return a
+
+        def patch_reduction(patch, which):
+            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+
+        da = self.mesh.dx * self.mesh.dy
+        point_mass_reductions = list()
+
+        for n in range(self._physics.num_particles):
+            point_mass_reductions.extend(
+                lazy_reduce(
+                    sum,
+                    to_host,
+                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
+                    (patch.execution_context for patch in self.patches),
+                )
+            )
+        return point_mass_reductions
+
     @property
     def time(self):
         return self.patches[0].time

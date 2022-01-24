@@ -609,7 +609,6 @@ PUBLIC void cbdiso_2d_primitive_to_conserved(
         double *uc = &conserved[n];
         primitive_to_conserved(pc, uc);
     }
-
 }
 
 PUBLIC void cbdiso_2d_point_mass_source_term(

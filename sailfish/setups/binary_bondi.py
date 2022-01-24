@@ -74,8 +74,8 @@ class BinaryBondi(Setup):
     @property
     def orbital_elements(self):
         return OrbitalElements(
-            semimajor_axis=1.0,
-            total_mass=1.0,
+            semimajor_axis=self.bh_sep,
+            total_mass=self.bh_mass * (1 + self.mass_ratio),
             mass_ratio=self.mass_ratio,
             eccentricity=self.eccentricity,
         )
