@@ -185,6 +185,9 @@ class Library:
         import cffi
         import numpy
 
+        if mode == "omp" and not build_config["enable_openmp"]:
+            raise ValueError("need enable_openmp=True to compile with mode=omp")
+
         define_macros = [("EXEC_MODE", dict(cpu=0, omp=1)[mode])]
         ffi = cffi.FFI()
         ffi.set_source(

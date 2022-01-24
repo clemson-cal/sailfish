@@ -82,6 +82,7 @@ def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args
         build_config["extra_compile_args"] = extra_compile_args or sys_compile_args
         build_config["extra_link_args"] = extra_link_args or sys_link_args
 
+    build_config["enable_openmp"] = enable_openmp
     logger.info(f"OpenMP is {'enabled' if enable_openmp else 'disabled'}")
 
 
