@@ -191,7 +191,7 @@ class Solver(SolverBase):
             code = f.read()
 
         xp = get_array_module(mode)
-        lib = Library(code, mode=mode, debug=True)
+        lib = Library(code, mode=mode, debug=False)
 
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)

@@ -177,18 +177,18 @@ class EnvelopeShock(Setup):
         else:
             return 20000
 
-    @lru_cache
+    @lru_cache(maxsize=None)
     def shell_u_profile_polar(self, q):
         return exp(-((q / self.q_shell) ** 2))
 
-    @lru_cache
+    @lru_cache(maxsize=None)
     def shell_u_profile_mass(self, m):
         if m < self.m_shell:
             return 0.0
         else:
             return self.u_shell * exp(-(m / self.m_shell - 1.0) / self.w_shell)
 
-    @lru_cache
+    @lru_cache(maxsize=None)
     def envelope_state(self, r, t):
         # These expressions are for the pure-envelope case, with no attached
         # wind:
