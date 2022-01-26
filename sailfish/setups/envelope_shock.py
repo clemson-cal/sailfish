@@ -12,33 +12,21 @@ __all__ = ["EnvelopeShock"]
 t_delay = 1.0
 m1 = 1.0
 psi = 0.25
-m_wind = 1e4
 m_cloud = 1e5
+u_wind = 0.1
 mdot_wind = m_cloud / t_delay
-cutoff_k = 1.0
 
 
 def shell_time_m(m):
-    n = 0
-    k = cutoff_k / m_wind
-    return (
-        pi * m
-        + 2 * (m - m_wind) * atan(k * (m - m_wind))
-        - 2 * (n + m_wind) * atan(k * (n + m_wind))
-    ) / (2 * pi * mdot_wind)
+    return m / mdot_wind
 
 
 def shell_time_mprime(m):
-    k = cutoff_k / m_wind
-    return (
-        pi
-        + 2 * k * (m - m_wind) / (1 + k ** 2 * (m - m_wind) ** 2)
-        + 2 * atan(k * (m - m_wind))
-    ) / (2 * pi * mdot_wind)
+    return 1.0 / mdot_wind
 
 
 def shell_gamma_beta_m(m):
-    return (m / m1) ** (-psi)
+    return u_wind + (m / m1) ** (-psi)
 
 
 def shell_gamma_beta_mprime(m):
