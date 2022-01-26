@@ -350,6 +350,7 @@ def simulate(driver):
     fold = driver.fold or 10
     mesh = setup.mesh(driver.resolution)
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
+    reference_time = setup.reference_time_scale
     new_timestep_cadence = driver.new_timestep_cadence or 1
 
     solver = make_solver(
@@ -378,6 +379,7 @@ def simulate(driver):
 
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
+    logger.info(f"simulation time / user time is {reference_time:0.4f}")
     logger.info(f"recompute dt every {new_timestep_cadence} iterations")
     setup.print_model_parameters(newlines=True, logger=main_logger)
 
@@ -396,7 +398,13 @@ def simulate(driver):
             setup=setup,
         )
 
-    while end_time is None or end_time > solver.time:
+    while True:
+        siml_time = solver.time
+        user_time = siml_time / reference_time
+
+        if end_time is not None and user_time > end_time:
+            break
+
         """
         Run the main simulation loop. Iterations are grouped according the
         the fold parameter. Side effects including the iteration message are
@@ -405,21 +413,21 @@ def simulate(driver):
 
         for name, event in driver.events.items():
             state = event_states[name]
-            if event_states[name].is_due(solver.time, event):
-                event_states[name] = state.next(solver.time, event)
+            if event_states[name].is_due(user_time, event):
+                event_states[name] = state.next(user_time, event)
                 yield name, state.number, grab_state(**dict())
 
         with measure_time() as fold_time:
             for _ in range(fold):
                 if iteration % new_timestep_cadence == 0:
-                    dx = mesh.min_spacing(solver.time)
+                    dx = mesh.min_spacing(siml_time)
                     dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
 
         Mzps = mesh.num_total_zones / fold_time() * 1e-6 * fold
         main_logger.info(
-            f"[{iteration:04d}] t={solver.time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
+            f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )
 
     yield "end", None, grab_state(**dict())

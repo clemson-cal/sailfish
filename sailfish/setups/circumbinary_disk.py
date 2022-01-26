@@ -2,7 +2,7 @@
 2D disk setups for binary problems.
 """
 
-from math import sqrt, exp
+from math import sqrt, exp, pi
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import EquationOfState, PointMass, SinkModel
 from sailfish.physics.kepler import OrbitalElements
@@ -131,6 +131,10 @@ class CircumbinaryDisk(Setup):
     @property
     def default_end_time(self):
         return 1000.0
+
+    @property
+    def reference_time_scale(self):
+        return 2.0 * pi
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:

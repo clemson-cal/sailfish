@@ -223,9 +223,26 @@ class Setup(ABC):
     @property
     def start_time(self):
         """
-        Provide a start time for the simulation. This is 0.0 by default.
+        The start time for the simulation. This is 0.0 by default.
         """
         return 0.0
+
+    @property
+    def reference_time_scale(self):
+        """
+        The time scale used to convert raw simulation time to user time.
+
+        Typically the reference time can be 1.0, meaning that raw simulation
+        time and user time are the same. However it sometimes makes sense for
+        the user time to be something else, like the orbital period of 2 pi
+        for example. The `start_time` and `default_time_time` properties are
+        in uner time, not raw simulation time. Similarly, messages written to
+        stdout, and event recurrences are both in user time, i.e. if the
+        reference time is 2 pi and `--checkpoint=1.0`, you'll get one
+        checkpoint written per orbital period. The "time" field of the
+        checkpoint file contains the raw simulation time, not the user time.
+        """
+        return 1.0
 
     @property
     def default_end_time(self):
