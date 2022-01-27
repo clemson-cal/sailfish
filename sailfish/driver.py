@@ -158,6 +158,7 @@ def write_checkpoint(number, outdir, state):
         model_parameters=state.setup.model_parameter_dict(),
         setup_name=state.setup.dash_case_class_name(),
         mesh=state.mesh,
+        **state.setup.checkpoint_diagnostics(state.solver.time),
     )
 
     with open(filename, "wb") as chkpt:

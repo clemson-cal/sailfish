@@ -270,3 +270,12 @@ class Setup(ABC):
         `SetupError` exception.
         """
         pass
+
+    def checkpoint_diagnostics(self, time):
+        """
+        Return a dict of post-processing data to include in checkpoint files.
+
+        An example use case is to record the positions of point masses (with
+        prescribed trajectory) in a gravitating hydrodynmics problem.
+        """
+        return dict()

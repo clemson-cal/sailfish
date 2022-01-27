@@ -168,3 +168,6 @@ class CircumbinaryDisk(Setup):
                 **m2._asdict(),
             ),
         )
+
+    def checkpoint_diagnostics(self, time):
+        return dict(point_masses=self.point_masses(time))
