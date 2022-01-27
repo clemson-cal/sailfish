@@ -118,7 +118,7 @@ class Patch:
                 )
                 conserved_with_guard[ng:-ng] = conserved
             else:
-                conserved_with_guard[ng:-ng] = np.array(conserved)
+                conserved_with_guard[ng:-ng] = xp.array(conserved)
 
             self.faces = faces
             self.wavespeeds = xp.zeros(num_zones)
