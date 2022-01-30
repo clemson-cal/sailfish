@@ -3,11 +3,89 @@ Contains a setup for studying a relativistic type-II shockwave.
 """
 
 from functools import lru_cache
-from math import pi, exp, log10
+from math import pi, exp, atan, log10
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
 
 __all__ = ["EnvelopeShock"]
+
+t_delay = 1.0
+m1 = 1.0
+psi = 0.25
+m_cloud = 1e5
+u_wind = 0.1
+mdot_wind = m_cloud / t_delay
+
+
+def shell_time_m(m):
+    return m / mdot_wind
+
+
+def shell_time_mprime(m):
+    return 1.0 / mdot_wind
+
+
+def shell_gamma_beta_m(m):
+    return u_wind + (m / m1) ** (-psi)
+
+
+def shell_gamma_beta_mprime(m):
+    return -((m / m1) ** (-psi)) * psi / m
+
+
+def shell_speed_m(m):
+    u = shell_gamma_beta_m(m)
+    return u / (1 + u ** 2) ** 0.5
+
+
+def shell_speed_mprime(m):
+    u = shell_gamma_beta_m(m)
+    du_dm = shell_gamma_beta_mprime(m)
+    dv_du = (1 + u ** 2) ** (-3 / 2)
+    return dv_du * du_dm
+
+
+def shell_radius_mt(m, t):
+    v = shell_speed_m(m)
+    t0 = shell_time_m(m)
+    return v * (t - t0)
+
+
+def shell_density_mt(m, t):
+    t0 = shell_time_m(m)
+    t0_prime = shell_time_mprime(m)
+    u = shell_gamma_beta_m(m)
+    u_prime = shell_gamma_beta_mprime(m)
+    mdot_inverse = t0_prime - u_prime / u * (t - t0) / (1 + u ** 2)
+    r = shell_radius_mt(m, t)
+    return 1.0 / (4 * pi * r ** 2 * u * mdot_inverse)
+
+
+def shell_mass_rt(r, t):
+    def f(m):
+        return r - shell_radius_mt(m, t)
+
+    def g(m):
+        v = shell_speed_m(m)
+        t0 = shell_time_m(m)
+        dv = shell_speed_mprime(m)
+        dt0 = shell_time_mprime(m)
+        return -(dv * (t - t0) - v * dt0)
+
+    m = 1e-12
+    n = 0
+
+    while True:
+        fm = f(m)
+        gm = g(m)
+        m -= fm / gm
+
+        if abs(fm) < 1e-10:
+            return m
+        if n > 200:
+            raise ValueError("too many iterations")
+
+        n += 1
 
 
 class EnvelopeShock(Setup):
@@ -31,7 +109,7 @@ class EnvelopeShock(Setup):
 
     def primitive(self, t, coord, primitive):
         r = coord[0] if self.polar else coord
-        m, d, u, p = self.envelope_state(t, r)
+        m, d, u, p = self.envelope_state(r, t)
 
         if not self.polar:
             primitive[0] = d
@@ -74,7 +152,7 @@ class EnvelopeShock(Setup):
 
     @property
     def boundary_condition(self):
-        return "outflow"
+        return "inflow", "outflow"
 
     @property
     def default_end_time(self):
@@ -87,28 +165,31 @@ class EnvelopeShock(Setup):
         else:
             return 20000
 
-    @lru_cache
+    @lru_cache(maxsize=None)
     def shell_u_profile_polar(self, q):
         return exp(-((q / self.q_shell) ** 2))
 
-    @lru_cache
+    @lru_cache(maxsize=None)
     def shell_u_profile_mass(self, m):
         if m < self.m_shell:
             return 0.0
         else:
             return self.u_shell * exp(-(m / self.m_shell - 1.0) / self.w_shell)
 
-    @lru_cache
-    def envelope_state(self, t, r):
-        envelope_fastest_beta = 0.999
-        psi = 0.25
-        m1 = 1.0
+    @lru_cache(maxsize=None)
+    def envelope_state(self, r, t):
+        # These expressions are for the pure-envelope case, with no attached
+        # wind:
+        #
+        # s = r / t
+        # g = (1.0 - s * s) ** -0.5
+        # u = s * g
+        # m = m1 * u ** (-1.0 / psi)
+        # d = m * g / (4 * pi * r ** 3 * psi)
 
-        s = min(r / t, envelope_fastest_beta)
-        g = (1.0 - s * s) ** -0.5
-        u = s * g
-        m = m1 * u ** (-1.0 / psi)
-        d = m * g / (4 * pi * r ** 3 * psi)
+        m = shell_mass_rt(r, t)
+        d = shell_density_mt(m, t)
+        u = shell_gamma_beta_m(m)
         p = 1e-6 * d
         return m, d, u, p
 

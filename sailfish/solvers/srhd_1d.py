@@ -88,6 +88,7 @@ class Patch:
         i0, i1 = index_range
         self.lib = lib
         self.xp = xp
+        self.index_range = index_range
         self.num_zones = num_zones = index_range[1] - index_range[0]
         self.coordinates = coordinates = COORDINATES_DICT[type(mesh)]
         self.time = self.time0 = time
@@ -118,7 +119,7 @@ class Patch:
                 )
                 conserved_with_guard[ng:-ng] = conserved
             else:
-                conserved_with_guard[ng:-ng] = np.array(conserved)
+                conserved_with_guard[ng:-ng] = xp.array(conserved)
 
             self.faces = faces
             self.wavespeeds = xp.zeros(num_zones)
@@ -204,7 +205,7 @@ class Solver(SolverBase):
             code = f.read()
 
         xp = get_array_module(mode)
-        lib = Library(code, mode=mode, debug=True)
+        lib = Library(code, mode=mode, debug=False)
 
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
@@ -318,40 +319,41 @@ class Solver(SolverBase):
             pr = getattr(self.patches[ir], array)
             self.set_bc_patch(pl, pc, pr, ic)
 
-    def set_bc_patch(self, al, ac, ar, patch_index):
+    def set_bc_patch(self, pl, pc, pr, patch_index):
         t = self.time
-        nz = self.mesh.shape[0]
+        ni = self.mesh.shape[0]
         ng = self.num_guard
         bcl, bcr = self.boundary_condition
 
         with self.patches[patch_index].execution_context:
-            ac[:+ng] = al[-2 * ng : -ng]
-            ac[-ng:] = ar[+ng : +2 * ng]
+            pc[:+ng] = pl[-2 * ng : -ng]
+            pc[-ng:] = pr[+ng : +2 * ng]
 
             def negative_vel(p):
                 return [p[0], -p[1], p[2], p[3]]
 
             if patch_index == 0:
                 if bcl == BC_OUTFLOW:
-                    ac[:+ng] = ac[+ng : +2 * ng]
+                    pc[:+ng] = pc[+ng : +2 * ng]
                 elif bcl == BC_INFLOW:
                     for i in range(-ng, 0):
                         x = self.mesh.zone_center(t, i)
-                        self.setup.primitive(t, x, ac[i + ng])
+                        self.setup.primitive(t, x, pc[i + ng])
                 elif bcl == BC_REFLECT:
-                    ac[0] = negative_vel(ac[3])
-                    ac[1] = negative_vel(ac[2])
+                    pc[0] = negative_vel(pc[3])
+                    pc[1] = negative_vel(pc[2])
 
             if patch_index == len(self.patches) - 1:
                 if bcr == BC_OUTFLOW:
-                    ac[-ng:] = ac[-2 * ng : -ng]
+                    pc[-ng:] = pc[-2 * ng : -ng]
                 elif bcr == BC_INFLOW:
-                    for i in range(nz, nz + ng):
+                    i0 = self.patches[patch_index].index_range[0]
+                    for i in range(ni, ni + ng):
                         x = self.mesh.zone_center(t, i)
-                        self.setup.primitive(t, x, ac[i + ng])
+                        self.setup.primitive(t, x, pc[i - i0 + ng])
                 elif bcr == BC_REFLECT:
-                    ac[-2] = negative_vel(ac[-3])
-                    ac[-1] = negative_vel(ac[-4])
+                    pc[-2] = negative_vel(pc[-3])
+                    pc[-1] = negative_vel(pc[-4])
 
     def new_iteration(self):
         for patch in self.patches:
