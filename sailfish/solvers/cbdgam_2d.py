@@ -241,7 +241,7 @@ class Solver(SolverBase):
         nq = 4  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        lib = Library(code, mode=mode, debug=True)
+        lib = Library(code, mode=mode, debug=False)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
