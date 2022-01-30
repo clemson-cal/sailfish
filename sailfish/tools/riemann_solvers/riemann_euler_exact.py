@@ -6,6 +6,7 @@ Calculate exact solution to the Riemann problem for the Euler equations.
 
 from scipy import optimize
 from matplotlib import pyplot as plt
+import math
 import numpy as np
 
 g = 7.0 / 5.0
@@ -21,12 +22,12 @@ primr = [0.125, 0.0, 0.1]
 # left state
 u4 = priml[1]
 p4 = priml[2]
-a4 = np.sqrt(g * priml[2] / priml[0])
+a4 = math.sqrt(g * priml[2] / priml[0])
 
 # right state
 u1 = primr[1]
 p1 = primr[2]
-a1 = np.sqrt(g * primr[2] / primr[0])
+a1 = math.sqrt(g * primr[2] / primr[0])
 
 # pressure ratio across initial discontinuity
 p41 = priml[2] / primr[2]
@@ -57,7 +58,7 @@ def f(p21):
                 - a1
                 / g
                 * (p21 - 1.0)
-                / np.sqrt((g + 1.0) / (2.0 * g) * (p21 - 1.0) + 1.0)
+                / math.sqrt((g + 1.0) / (2.0 * g) * (p21 - 1.0) + 1.0)
             )
         )
         ** (-2.0 * g / (g - 1.0))
@@ -74,14 +75,14 @@ print("Root finder # of iterations: ", result[1].iterations)
 
 # state 2
 p2 = p21 * p1
-a2 = a4 * np.sqrt(
+a2 = a4 * math.sqrt(
     p21 * (((g + 1.0) / (g - 1.0)) + p21) / (1.0 + (g + 1.0) / (g - 1.0) * p21)
 )
 u2 = u4 + 2.0 * a4 / (g - 1.0) * (1.0 - (p21 / p41) ** ((g - 1.0) / (2.0 * g)))
 rho2 = g * p2 / a2 ** 2
 
 # shock speed separating states 1 and 2
-u_shock = u4 + a4 * np.sqrt((g + 1.0) / (2.0 * g) * (p21 - 1.0) + 1.0)
+u_shock = u4 + a4 * math.sqrt((g + 1.0) / (2.0 * g) * (p21 - 1.0) + 1.0)
 
 # contact discontinuity between states 2 and 3
 u_cd = u2
