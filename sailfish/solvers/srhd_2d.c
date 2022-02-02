@@ -450,88 +450,89 @@ PUBLIC void srhd_2d_advance_rk(
 
     FOR_EACH_2D(ni, nj)
     {
-        if ((fix_i0 && i == 0) || (fix_i1 && i == ni))
+        int fixed_zone = (fix_i0 && i == 0) || (fix_i1 && i == ni - 1);
+
+        if (!fixed_zone)
         {
-            continue;
-        }
 
-        double x0 = face_positions[i];
-        double x1 = face_positions[i + 1];
-        double r0 = x0 * (a0 + adot * time);
-        double r1 = x1 * (a0 + adot * time);
-        double q0 = dq * (j + 0);
-        double q1 = dq * (j + 1);
+            double x0 = face_positions[i];
+            double x1 = face_positions[i + 1];
+            double r0 = x0 * (a0 + adot * time);
+            double r1 = x1 * (a0 + adot * time);
+            double q0 = dq * (j + 0);
+            double q1 = dq * (j + 1);
 
-        double *urk = &conserved_rk[(i + 0 + ng) * si + (j + 0) * sj];
-        double *urd = &conserved_rd[(i + 0 + ng) * si + (j + 0) * sj];
-        double *uwr = &conserved_wr[(i + 0 + ng) * si + (j + 0) * sj];
-        double *pcc = &primitive_rd[(i + 0 + ng) * si + (j + 0) * sj];
-        double *pli = &primitive_rd[(i - 1 + ng) * si + (j + 0) * sj];
-        double *pri = &primitive_rd[(i + 1 + ng) * si + (j + 0) * sj];
-        double *pki = &primitive_rd[(i - 2 + ng) * si + (j + 0) * sj];
-        double *pti = &primitive_rd[(i + 2 + ng) * si + (j + 0) * sj];
-        double *plj = &primitive_rd[(i + 0 + ng) * si + max2(j - 1, 0) * sj];
-        double *prj = &primitive_rd[(i + 0 + ng) * si + min2(j + 1, nj - 1) * sj];
-        double *pkj = &primitive_rd[(i + 0 + ng) * si + max2(j - 2, 0) * sj];
-        double *ptj = &primitive_rd[(i + 0 + ng) * si + min2(j + 2, nj - 1) * sj];
+            double *urk = &conserved_rk[(i + 0 + ng) * si + (j + 0) * sj];
+            double *urd = &conserved_rd[(i + 0 + ng) * si + (j + 0) * sj];
+            double *uwr = &conserved_wr[(i + 0 + ng) * si + (j + 0) * sj];
+            double *pcc = &primitive_rd[(i + 0 + ng) * si + (j + 0) * sj];
+            double *pli = &primitive_rd[(i - 1 + ng) * si + (j + 0) * sj];
+            double *pri = &primitive_rd[(i + 1 + ng) * si + (j + 0) * sj];
+            double *pki = &primitive_rd[(i - 2 + ng) * si + (j + 0) * sj];
+            double *pti = &primitive_rd[(i + 2 + ng) * si + (j + 0) * sj];
+            double *plj = &primitive_rd[(i + 0 + ng) * si + max2(j - 1, 0) * sj];
+            double *prj = &primitive_rd[(i + 0 + ng) * si + min2(j + 1, nj - 1) * sj];
+            double *pkj = &primitive_rd[(i + 0 + ng) * si + max2(j - 2, 0) * sj];
+            double *ptj = &primitive_rd[(i + 0 + ng) * si + min2(j + 2, nj - 1) * sj];
 
-        double plip[NCONS];
-        double plim[NCONS];
-        double prip[NCONS];
-        double prim[NCONS];
-        double pljp[NCONS];
-        double pljm[NCONS];
-        double prjp[NCONS];
-        double prjm[NCONS];
-        double grli[NCONS];
-        double grri[NCONS];
-        double grcc[NCONS];
-        double gqlj[NCONS];
-        double gqrj[NCONS];
-        double gqcc[NCONS];
-        double fli[NCONS];
-        double fri[NCONS];
-        double flj[NCONS];
-        double frj[NCONS];
-        double sources[NCONS];
+            double plip[NCONS];
+            double plim[NCONS];
+            double prip[NCONS];
+            double prim[NCONS];
+            double pljp[NCONS];
+            double pljm[NCONS];
+            double prjp[NCONS];
+            double prjm[NCONS];
+            double grli[NCONS];
+            double grri[NCONS];
+            double grcc[NCONS];
+            double gqlj[NCONS];
+            double gqrj[NCONS];
+            double gqcc[NCONS];
+            double fli[NCONS];
+            double fri[NCONS];
+            double flj[NCONS];
+            double frj[NCONS];
+            double sources[NCONS];
 
-        plm_gradient(pki, pli, pcc, grli);
-        plm_gradient(pli, pcc, pri, grcc);
-        plm_gradient(pcc, pri, pti, grri);
-        plm_gradient(pkj, plj, pcc, gqlj);
-        plm_gradient(plj, pcc, prj, gqcc);
-        plm_gradient(pcc, prj, ptj, gqrj);
+            plm_gradient(pki, pli, pcc, grli);
+            plm_gradient(pli, pcc, pri, grcc);
+            plm_gradient(pcc, pri, pti, grri);
+            plm_gradient(pkj, plj, pcc, gqlj);
+            plm_gradient(plj, pcc, prj, gqcc);
+            plm_gradient(pcc, prj, ptj, gqrj);
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            plim[q] = pli[q] + 0.5 * grli[q];
-            plip[q] = pcc[q] - 0.5 * grcc[q];
-            prim[q] = pcc[q] + 0.5 * grcc[q];
-            prip[q] = pri[q] - 0.5 * grri[q];
-            pljm[q] = plj[q] + 0.5 * gqlj[q];
-            pljp[q] = pcc[q] - 0.5 * gqcc[q];
-            prjm[q] = pcc[q] + 0.5 * gqcc[q];
-            prjp[q] = prj[q] - 0.5 * gqrj[q];
-        }
+            for (int q = 0; q < NCONS; ++q)
+            {
+                plim[q] = pli[q] + 0.5 * grli[q];
+                plip[q] = pcc[q] - 0.5 * grcc[q];
+                prim[q] = pcc[q] + 0.5 * grcc[q];
+                prip[q] = pri[q] - 0.5 * grri[q];
+                pljm[q] = plj[q] + 0.5 * gqlj[q];
+                pljp[q] = pcc[q] - 0.5 * gqcc[q];
+                prjm[q] = pcc[q] + 0.5 * gqcc[q];
+                prjp[q] = prj[q] - 0.5 * gqrj[q];
+            }
 
-        double da_r0 = face_area(r0, r0, q0, q1);
-        double da_r1 = face_area(r1, r1, q0, q1);
-        double da_q0 = face_area(r0, r1, q0, q0);
-        double da_q1 = face_area(r0, r1, q1, q1);
+            double da_r0 = face_area(r0, r0, q0, q1);
+            double da_r1 = face_area(r1, r1, q0, q1);
+            double da_q0 = face_area(r0, r1, q0, q0);
+            double da_q1 = face_area(r0, r1, q1, q1);
 
-        riemann_hlle(plim, plip, x0 * adot, fli, 1);
-        riemann_hlle(prim, prip, x1 * adot, fri, 1);
-        riemann_hlle(pljm, pljp, 0.0, flj, 2);
-        riemann_hlle(prjm, prjp, 0.0, frj, 2);
-        geometric_source_terms(r0, r1, q0, q1, pcc, sources);
+            riemann_hlle(plim, plip, x0 * adot, fli, 1);
+            riemann_hlle(prim, prip, x1 * adot, fri, 1);
+            riemann_hlle(pljm, pljp, 0.0, flj, 2);
+            riemann_hlle(prjm, prjp, 0.0, frj, 2);
+            geometric_source_terms(r0, r1, q0, q1, pcc, sources);
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uwr[q] = urd[q] + (
-                fli[q] * da_r0 - fri[q] * da_r1 +
-                flj[q] * da_q0 - frj[q] * da_q1 + sources[q]
-            ) * dt;
-            uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uwr[q] = urd[q] + (
+                    fli[q] * da_r0 - fri[q] * da_r1 +
+                    flj[q] * da_q0 - frj[q] * da_q1 + sources[q]
+                ) * dt;
+                uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            }
         }
     }
 }

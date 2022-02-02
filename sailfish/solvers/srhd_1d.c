@@ -405,59 +405,59 @@ PUBLIC void srhd_1d_advance_rk(
 
     FOR_EACH_1D(num_zones)
     {
-        if ((fix_i0 && i == 0) || (fix_i1 && i == num_zones))
+        int fixed_zone = (fix_i0 && i == 0) || (fix_i1 && i == num_zones - 1);
+
+        if (!fixed_zone)
         {
-            continue;
-        }
+            double yl = face_positions[i];
+            double yr = face_positions[i + 1];
+            double xl = yl * (a0 + adot * time);
+            double xr = yr * (a0 + adot * time);
 
-        double yl = face_positions[i];
-        double yr = face_positions[i + 1];
-        double xl = yl * (a0 + adot * time);
-        double xr = yr * (a0 + adot * time);
+            double *urk = &conserved_rk[NCONS * (i + ng)];
+            double *urd = &conserved_rd[NCONS * (i + ng)];
+            double *uwr = &conserved_wr[NCONS * (i + ng)];
+            double *prd = &primitive_rd[NCONS * (i + ng)];
+            double *pli = &primitive_rd[NCONS * (i + ng - 1)];
+            double *pri = &primitive_rd[NCONS * (i + ng + 1)];
+            double *pki = &primitive_rd[NCONS * (i + ng - 2)];
+            double *pti = &primitive_rd[NCONS * (i + ng + 2)];
 
-        double *urk = &conserved_rk[NCONS * (i + ng)];
-        double *urd = &conserved_rd[NCONS * (i + ng)];
-        double *uwr = &conserved_wr[NCONS * (i + ng)];
-        double *prd = &primitive_rd[NCONS * (i + ng)];
-        double *pli = &primitive_rd[NCONS * (i + ng - 1)];
-        double *pri = &primitive_rd[NCONS * (i + ng + 1)];
-        double *pki = &primitive_rd[NCONS * (i + ng - 2)];
-        double *pti = &primitive_rd[NCONS * (i + ng + 2)];
+            double plip[NCONS];
+            double plim[NCONS];
+            double prip[NCONS];
+            double prim[NCONS];
+            double gxli[NCONS];
+            double gxri[NCONS];
+            double gxcc[NCONS];
 
-        double plip[NCONS];
-        double plim[NCONS];
-        double prip[NCONS];
-        double prim[NCONS];
-        double gxli[NCONS];
-        double gxri[NCONS];
-        double gxcc[NCONS];
+            plm_gradient(pki, pli, prd, gxli);
+            plm_gradient(pli, prd, pri, gxcc);
+            plm_gradient(prd, pri, pti, gxri);
 
-        plm_gradient(pki, pli, prd, gxli);
-        plm_gradient(pli, prd, pri, gxcc);
-        plm_gradient(prd, pri, pti, gxri);
+            for (int q = 0; q < NCONS; ++q)
+            {
+                plim[q] = pli[q] + 0.5 * gxli[q];
+                plip[q] = prd[q] - 0.5 * gxcc[q];
+                prim[q] = prd[q] + 0.5 * gxcc[q];
+                prip[q] = pri[q] - 0.5 * gxri[q];
+            }
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            plim[q] = pli[q] + 0.5 * gxli[q];
-            plip[q] = prd[q] - 0.5 * gxcc[q];
-            prim[q] = prd[q] + 0.5 * gxcc[q];
-            prip[q] = pri[q] - 0.5 * gxri[q];
-        }
+            double fli[NCONS];
+            double fri[NCONS];
+            double sources[NCONS];
+            double dal = face_area(coords, xl);
+            double dar = face_area(coords, xr);
 
-        double fli[NCONS];
-        double fri[NCONS];
-        double sources[NCONS];
-        double dal = face_area(coords, xl);
-        double dar = face_area(coords, xr);
+            riemann_hlle(plim, plip, yl * adot, fli);
+            riemann_hlle(prim, prip, yr * adot, fri);
+            geometric_source_terms(coords, xl, xr, prd, sources);
 
-        riemann_hlle(plim, plip, yl * adot, fli);
-        riemann_hlle(prim, prip, yr * adot, fri);
-        geometric_source_terms(coords, xl, xr, prd, sources);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
-            uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
+                uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            }
         }
     }
 }
