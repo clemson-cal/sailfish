@@ -335,7 +335,7 @@ PUBLIC void srhd_2d_primitive_to_conserved(
 {
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing
 
     FOR_EACH_2D(ni, nj)
     {
@@ -369,7 +369,7 @@ PUBLIC void srhd_2d_conserved_to_primitive(
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing
 
     FOR_EACH_2D(ni, nj)
     {
@@ -439,15 +439,22 @@ PUBLIC void srhd_2d_advance_rk(
     double adot,            // scale factor derivative
     double time,            // current time
     double rk_param,        // runge-kutta parameter
-    double dt)              // timestep size
+    double dt,              // timestep size
+    int fix_i0,             // don't evolve the first radial zone in the patch
+    int fix_i1)             // don't evolve the final radial zone in the patch
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
     int sj = NCONS;
-    double dq = polar_extent / nj; // polar zone spacing (domain is pole-to-pole)
+    double dq = polar_extent / nj; // polar zone spacing
 
     FOR_EACH_2D(ni, nj)
     {
+        if ((fix_i0 && i == 0) || (fix_i1 && i == ni))
+        {
+            continue;
+        }
+
         double x0 = face_positions[i];
         double x1 = face_positions[i + 1];
         double r0 = x0 * (a0 + adot * time);

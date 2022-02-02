@@ -31,12 +31,14 @@ BC_PERIODIC = 0
 BC_OUTFLOW = 1
 BC_INFLOW = 2
 BC_REFLECT = 3
+BC_FIXED = 4
 
 BC_DICT = {
     "periodic": BC_PERIODIC,
     "outflow": BC_OUTFLOW,
     "inflow": BC_INFLOW,
     "reflect": BC_REFLECT,
+    "fixed": BC_FIXED,
 }
 
 
@@ -77,6 +79,8 @@ class Patch:
         conserved,
         mesh,
         index_range,
+        fix_i0,
+        fix_i1,
         lib,
         xp,
         execution_context,
@@ -88,6 +92,8 @@ class Patch:
         self.lib = lib
         self.xp = xp
         self.index_range = index_range
+        self.fix_i0 = fix_i0
+        self.fix_i1 = fix_i1
         self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
         self.polar_extent = mesh.polar_extent
         self.time = self.time0 = time
@@ -151,6 +157,8 @@ class Patch:
                 self.time,
                 rk_param,
                 dt,
+                int(self.fix_i0),
+                int(self.fix_i1),
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
@@ -223,21 +231,22 @@ class Solver(SolverBase):
         logger.info(f"subdivide grid over {num_patches} patches")
         logger.info(f"mesh is {mesh}")
 
-        # if setup.boundary_condition != "outflow":
-        #     raise ValueError(f"solver only supports outflow radial boundaries")
-
         if options.rk_order not in (1, 2, 3):
             raise ValueError("solver only supports rk_order in 1, 2, 3")
 
         patches = list()
 
         for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
+            fix_i0 = self.boundary_condition[0] == BC_FIXED and n == 0
+            fix_i1 = self.boundary_condition[1] == BC_FIXED and n == num_patches - 1
             patch = Patch(
                 setup,
                 time,
                 solution[a:b] if solution is not None else None,
                 mesh,
                 (a, b),
+                fix_i0,
+                fix_i1,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
@@ -366,22 +375,6 @@ class Solver(SolverBase):
                     for j in range(nj):
                         pc[-2, j] = negative_vel(pc[-3, j])
                         pc[-1, j] = negative_vel(pc[-4, j])
-
-        # ni, nj = self.mesh.shape
-        # ng = self.num_guard
-
-        # with self.patches[patch_index].execution_context:
-        #     # 1. write to the guard zones of pc, the internal BC
-        #     pc[:+ng] = pl[-2 * ng : -ng]
-        #     pc[-ng:] = pr[+ng : +2 * ng]
-
-        #     # 2. Set outflow BC on the inner and outer patch edges
-        #     if patch_index == 0:
-        #         for i in range(ng):
-        #             pc[i] = pc[ng]
-        #     if patch_index == len(self.patches) - 1:
-        #         for i in range(pc.shape[0] - ng, pc.shape[0]):
-        #             pc[i] = pc[-ng - 1]
 
     def new_iteration(self):
         for patch in self.patches:

@@ -397,12 +397,19 @@ PUBLIC void srhd_1d_advance_rk(
     double time,            // current time
     double rk_param,        // runge-kutta parameter
     double dt,              // timestep size
+    int fix_i0,             // don't evolve the first zone in the patch
+    int fix_i1,             // don't evolve the final zone in the patch
     int coords)             // :: $ in [0, 1]
 {
     int ng = 2; // number of guard zones
 
     FOR_EACH_1D(num_zones)
     {
+        if ((fix_i0 && i == 0) || (fix_i1 && i == num_zones))
+        {
+            continue;
+        }
+
         double yl = face_positions[i];
         double yr = face_positions[i + 1];
         double xl = yl * (a0 + adot * time);
