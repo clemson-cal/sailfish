@@ -101,6 +101,7 @@ class EnvelopeShock(Setup):
     r_inner = param(0.1, "inner radius (comoving if expand=True)")
     r_outer = param(1.0, "outer radius (comoving if expand=True)")
     expand = param(True, "whether to expand the mesh homologously")
+    inflow = param(True, "whether to use an inflow BC at r_inner")
     polar_extent = param(0.0, "polar domain extent over pi (equator is 0.5, 1D is 0.0)")
 
     @property
@@ -152,7 +153,10 @@ class EnvelopeShock(Setup):
 
     @property
     def boundary_condition(self):
-        return "inflow", "outflow"
+        if self.inflow:
+            return "inflow", "outflow"
+        else:
+            return "fixed", "outflow"
 
     @property
     def default_end_time(self):
