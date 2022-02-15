@@ -89,8 +89,8 @@ class CircumbinaryDisk(SetupBase):
 
         if self.is_isothermal:
             primitive[0] = self.initial_sigma
-            primitive[1] = GM / sqrt(r_softened) * phi_hat_x
-            primitive[2] = GM / sqrt(r_softened) * phi_hat_y
+            primitive[1] = sqrt(GM / r_softened) * phi_hat_x
+            primitive[2] = sqrt(GM / r_softened) * phi_hat_y
 
         elif self.is_gamma_law:
             # See eq. (A2) from Goodman (2003)
@@ -99,8 +99,8 @@ class CircumbinaryDisk(SetupBase):
                 * r_softened ** (-3.0 / 5.0)
                 * (0.0001 + 0.9999 * exp(-((1.0 / r_softened) ** 30)))
             )
-            primitive[1] = GM / sqrt(r_softened) * phi_hat_x
-            primitive[2] = GM / sqrt(r_softened) * phi_hat_y
+            primitive[1] = sqrt(GM / r_softened) * phi_hat_x
+            primitive[2] = sqrt(GM / r_softened) * phi_hat_y
             primitive[3] = (
                 self.initial_pressure
                 * r_softened ** (-3.0 / 2.0)
