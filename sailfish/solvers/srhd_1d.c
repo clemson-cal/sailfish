@@ -397,60 +397,67 @@ PUBLIC void srhd_1d_advance_rk(
     double time,            // current time
     double rk_param,        // runge-kutta parameter
     double dt,              // timestep size
+    int fix_i0,             // don't evolve the first zone in the patch
+    int fix_i1,             // don't evolve the final zone in the patch
     int coords)             // :: $ in [0, 1]
 {
     int ng = 2; // number of guard zones
 
     FOR_EACH_1D(num_zones)
     {
-        double yl = face_positions[i];
-        double yr = face_positions[i + 1];
-        double xl = yl * (a0 + adot * time);
-        double xr = yr * (a0 + adot * time);
+        int fixed_zone = (fix_i0 && i == 0) || (fix_i1 && i == num_zones - 1);
 
-        double *urk = &conserved_rk[NCONS * (i + ng)];
-        double *urd = &conserved_rd[NCONS * (i + ng)];
-        double *uwr = &conserved_wr[NCONS * (i + ng)];
-        double *prd = &primitive_rd[NCONS * (i + ng)];
-        double *pli = &primitive_rd[NCONS * (i + ng - 1)];
-        double *pri = &primitive_rd[NCONS * (i + ng + 1)];
-        double *pki = &primitive_rd[NCONS * (i + ng - 2)];
-        double *pti = &primitive_rd[NCONS * (i + ng + 2)];
-
-        double plip[NCONS];
-        double plim[NCONS];
-        double prip[NCONS];
-        double prim[NCONS];
-        double gxli[NCONS];
-        double gxri[NCONS];
-        double gxcc[NCONS];
-
-        plm_gradient(pki, pli, prd, gxli);
-        plm_gradient(pli, prd, pri, gxcc);
-        plm_gradient(prd, pri, pti, gxri);
-
-        for (int q = 0; q < NCONS; ++q)
+        if (!fixed_zone)
         {
-            plim[q] = pli[q] + 0.5 * gxli[q];
-            plip[q] = prd[q] - 0.5 * gxcc[q];
-            prim[q] = prd[q] + 0.5 * gxcc[q];
-            prip[q] = pri[q] - 0.5 * gxri[q];
-        }
+            double yl = face_positions[i];
+            double yr = face_positions[i + 1];
+            double xl = yl * (a0 + adot * time);
+            double xr = yr * (a0 + adot * time);
 
-        double fli[NCONS];
-        double fri[NCONS];
-        double sources[NCONS];
-        double dal = face_area(coords, xl);
-        double dar = face_area(coords, xr);
+            double *urk = &conserved_rk[NCONS * (i + ng)];
+            double *urd = &conserved_rd[NCONS * (i + ng)];
+            double *uwr = &conserved_wr[NCONS * (i + ng)];
+            double *prd = &primitive_rd[NCONS * (i + ng)];
+            double *pli = &primitive_rd[NCONS * (i + ng - 1)];
+            double *pri = &primitive_rd[NCONS * (i + ng + 1)];
+            double *pki = &primitive_rd[NCONS * (i + ng - 2)];
+            double *pti = &primitive_rd[NCONS * (i + ng + 2)];
 
-        riemann_hlle(plim, plip, yl * adot, fli);
-        riemann_hlle(prim, prip, yr * adot, fri);
-        geometric_source_terms(coords, xl, xr, prd, sources);
+            double plip[NCONS];
+            double plim[NCONS];
+            double prip[NCONS];
+            double prim[NCONS];
+            double gxli[NCONS];
+            double gxri[NCONS];
+            double gxcc[NCONS];
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
-            uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            plm_gradient(pki, pli, prd, gxli);
+            plm_gradient(pli, prd, pri, gxcc);
+            plm_gradient(prd, pri, pti, gxri);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                plim[q] = pli[q] + 0.5 * gxli[q];
+                plip[q] = prd[q] - 0.5 * gxcc[q];
+                prim[q] = prd[q] + 0.5 * gxcc[q];
+                prip[q] = pri[q] - 0.5 * gxri[q];
+            }
+
+            double fli[NCONS];
+            double fri[NCONS];
+            double sources[NCONS];
+            double dal = face_area(coords, xl);
+            double dar = face_area(coords, xr);
+
+            riemann_hlle(plim, plip, yl * adot, fli);
+            riemann_hlle(prim, prip, yr * adot, fri);
+            geometric_source_terms(coords, xl, xr, prd, sources);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
+                uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            }
         }
     }
 }

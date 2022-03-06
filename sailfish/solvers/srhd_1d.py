@@ -31,12 +31,14 @@ BC_PERIODIC = 0
 BC_OUTFLOW = 1
 BC_INFLOW = 2
 BC_REFLECT = 3
+BC_FIXED = 4
 
 BC_DICT = {
     "periodic": BC_PERIODIC,
     "outflow": BC_OUTFLOW,
     "inflow": BC_INFLOW,
     "reflect": BC_REFLECT,
+    "fixed": BC_FIXED,
 }
 COORDINATES_DICT = {
     PlanarCartesianMesh: 0,
@@ -77,6 +79,8 @@ class Patch:
         conserved,
         mesh,
         index_range,
+        fix_i0,
+        fix_i1,
         lib,
         xp,
         execution_context,
@@ -89,6 +93,8 @@ class Patch:
         self.lib = lib
         self.xp = xp
         self.index_range = index_range
+        self.fix_i0 = fix_i0
+        self.fix_i1 = fix_i1
         self.num_zones = num_zones = index_range[1] - index_range[0]
         self.coordinates = coordinates = COORDINATES_DICT[type(mesh)]
         self.time = self.time0 = time
@@ -151,6 +157,8 @@ class Patch:
                 self.time,
                 rk_param,
                 dt,
+                int(self.fix_i0),
+                int(self.fix_i1),
                 self.coordinates,
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
@@ -230,12 +238,16 @@ class Solver(SolverBase):
         patches = list()
 
         for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
+            fix_i0 = self.boundary_condition[0] == BC_FIXED and n == 0
+            fix_i1 = self.boundary_condition[1] == BC_FIXED and n == num_patches - 1
             patch = Patch(
                 setup,
                 time,
                 solution[a:b] if solution is not None else None,
                 mesh,
                 (a, b),
+                fix_i0,
+                fix_i1,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
