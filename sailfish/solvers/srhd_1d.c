@@ -297,16 +297,17 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
 
         for (int q = 0; q < NCONS; ++q)
         {
-            double u_hll[q] = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
-            double f_hll[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+            u_hll[q] = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
+            f_hll[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
         }
 
         double a = f_hll[2] + f_hll[0]; // total energy flux
         double b = -(u_hll[2] + u_hll[0] + f_hll[1]);
         double c = u_hll[1];
         double v_star; 
+        double vl, vr;
 
-        if (abs(a) < 1e-10)
+        if (fabs(a) < 1e-10)
         {
             v_star = -c / b;
         }
@@ -319,11 +320,12 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
 
         if (v_face < v_star) // in left star state
         {   
-            D_star = ul[0] * (am - pl[1]) / (am - v_star);
+            vl = primitive_to_beta_component(pl);
+            D_star = ul[0] * (am - vl) / (am - v_star);
             E_star = (am * (ul[2] + ul[0]) - ul[1] + p_star * v_star) / (am - v_star);
             Sr_star = (E_star + p_star) * v_star;
             tau_star = E_star - D_star;
-            s_star = ul[3] * (am - pl[1]) / (am - v_star);
+            s_star = ul[3] * (am - vl) / (am - v_star);
             flux[0] = D_star * v_star - v_face * D_star;
             flux[1] = Sr_star * v_star + p_star - v_face * Sr_star;
             flux[2] = Sr_star - D_star * v_star - v_face * tau_star;
@@ -331,11 +333,12 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
         }
         else // in right star state
         {
-            D_star = ur[0] * (ap - pr[1]) / (ap - v_star);
+            vr = primitive_to_beta_component(pr);
+            D_star = ur[0] * (ap - vr) / (ap - v_star);
             E_star = (ap * (ur[2] + ur[0]) - ur[1] + p_star * v_star) / (ap - v_star);
             Sr_star = (E_star + p_star) * v_star;
             tau_star = E_star - D_star;
-            s_star = ur[3] * (ap - pr[1]) / (ap - v_star);
+            s_star = ur[3] * (ap - vr) / (ap - v_star);
             flux[0] = D_star * v_star - v_face * D_star;
             flux[1] = Sr_star * v_star + p_star - v_face * Sr_star;
             flux[2] = Sr_star - D_star * v_star - v_face * tau_star;
@@ -540,8 +543,8 @@ PUBLIC void srhd_1d_advance_rk(
             double dal = face_area(coords, xl);
             double dar = face_area(coords, xr);
 
-            riemann_hlle(plim, plip, yl * adot, fli);
-            riemann_hlle(prim, prip, yr * adot, fri);
+            riemann_hllc(plim, plip, yl * adot, fli);
+            riemann_hllc(prim, prip, yr * adot, fri);
             geometric_source_terms(coords, xl, xr, prd, sources);
 
             for (int q = 0; q < NCONS; ++q)
