@@ -6,6 +6,12 @@ import numpy as np
 from euler_solvers import *
 
 # Toro Table 10.1
+# Test 1
+# prim0l = [1.0, 0.75, 1.0]
+# prim0r = [0.125, 0.0, 0.1]
+# Test 2
+prim0l = [1.0, -2.0, 0.4]
+prim0r = [1.0, 2.0, 0.4]
 # Test 3
 # prim0l = [1.0, 0.0, 1000.0]
 # prim0r = [1.0, 0.0, 0.01]
@@ -13,10 +19,13 @@ from euler_solvers import *
 # prim0l = [5.99924, 19.5975, 460.894]
 # prim0r = [5.99942, -6.19633, 46.0950]
 # Test 5
-prim0l = [1.0, -19.5975, 1000.0]
-prim0r = [1.0, -19.5975, 0.01]
+# prim0l = [1.0, -19.5975, 1000.0]
+# prim0r = [1.0, -19.5975, 0.01]
 
-tmax = 0.012
+sl, sr = wavespeeds_simple(prim0l, prim0r)
+smax = max(sl, sr)
+
+tmax = 0.15
 
 
 def init_toro1(x):
@@ -33,7 +42,7 @@ def main():
     xmin = 0.0
     xmax = 1.0
     dx = (xmax - xmin) / nx
-    dt = 0.5 * dx / max(cs(prim0l), cs(prim0r))
+    dt = 0.5 * dx / smax
     uhlle = np.zeros([nx, 3])
     uhllc = np.zeros([nx, 3])
     uexact = np.zeros([nx, 3])
@@ -112,12 +121,13 @@ def main():
     plt.ylabel("v")
 
     ax = f.add_subplot(313)
-    plt.plot(x, phlle[:, 2])
-    plt.plot(x, phllc[:, 2])
-    plt.plot(x, pexact[:, 2])
+    plt.plot(x, phlle[:, 2], label="hlle")
+    plt.plot(x, phllc[:, 2], label="hllc")
+    plt.plot(x, pexact[:, 2], label="exact")
     plt.xlabel(r"$x$")
     plt.ylabel("P")
 
+    plt.legend()
     plt.show()
 
 

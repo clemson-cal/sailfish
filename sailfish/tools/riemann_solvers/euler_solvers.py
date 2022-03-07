@@ -33,6 +33,14 @@ def prim2flux(prim):
     return rho * v, m * v + p, E * v + p * v
 
 
+def wavespeeds_simple(priml, primr):
+    csl = cs(priml)
+    csr = cs(primr)
+    sl = min(priml[1] - csl, primr[1] - csr)
+    sr = max(priml[1] + csl, primr[1] + csr)
+    return sl, sr
+
+
 # Toro eqns. 10.21
 def hlle(priml, primr, s=0.0):
     rhol, ul, pl = priml
@@ -58,13 +66,6 @@ def hlle(priml, primr, s=0.0):
             qr = math.sqrt(1.0 + gp1 / (2.0 * g) * (ps / pr - 1.0))
         sl = ul - csl * ql
         sr = ur + csr * qr
-        return sl, sr
-
-    def wavespeeds1(priml, primr):
-        csl = cs(priml)
-        csr = cs(primr)
-        sl = min(ul - csl, ur - csr)
-        sr = max(ul + csl, ur + csr)
         return sl, sr
 
     fhlle = [0.0, 0.0, 0.0]
