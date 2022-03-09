@@ -312,12 +312,12 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
             uhll = u_hll[1];
             fhll = f_hll[1];
         }
-        else if (direction == 2)
+        else //if (direction == 2)
         {
             uhll = u_hll[2];
             fhll = f_hll[2];
         }
-        
+
         double a = f_hll[3] + f_hll[0]; // total energy flux
         double b = -(u_hll[3] + u_hll[0] + fhll);
         double c = uhll;
@@ -345,7 +345,7 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
                 S1_star = (E_star + p_star) * v_star;   
                 S2_star = ul[2] * (am - vl) / (am - v_star);
             }
-            else if (direction == 2)
+            else // if (direction == 2)
             {
                 E_star = (am * (ul[3] + ul[0]) - ul[2] + p_star * v_star) / (am - v_star);                
                 S1_star = ul[1] * (am - vl) / (am - v_star);
@@ -353,18 +353,20 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
             }
 
             tau_star = E_star - D_star;
-            s_star = ul[3] * (am - vl) / (am - v_star);
+
             flux[0] = D_star * v_star - v_face * D_star;
             flux[1] = S1_star * v_star + p_star * (direction == 1) - v_face * S1_star;
             flux[2] = S2_star * v_star + p_star * (direction == 2) - v_face * S2_star;            
+            
             if (direction == 1) 
             {
                 flux[3] = S1_star - D_star * v_star - v_face * tau_star;
             }
-            else if (direction == 2)
+            else //if (direction == 2)
             {
                 flux[3] = S2_star - D_star * v_star - v_face * tau_star;
             }
+        }
         else // in right star state
         {
             vr = primitive_to_beta_component(pr, direction);
@@ -376,7 +378,7 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
                 S1_star = (E_star + p_star) * v_star;   
                 S2_star = ur[2] * (am - vr) / (am - v_star);
             }
-            else if (direction == 2)
+            else //if (direction == 2)
             {
                 E_star = (am * (ur[3] + ur[0]) - ur[2] + p_star * v_star) / (am - v_star);                
                 S1_star = ur[1] * (am - vr) / (am - v_star);
@@ -388,11 +390,12 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
             flux[0] = D_star * v_star - v_face * D_star;
             flux[1] = S1_star * v_star + p_star * (direction == 1) - v_face * S1_star;
             flux[2] = S2_star * v_star + p_star * (direction == 2) - v_face * S2_star;            
+            
             if (direction == 1) 
             {
                 flux[3] = S1_star - D_star * v_star - v_face * tau_star;
             }
-            else if (direction == 2)
+            else //if (direction == 2)
             {
                 flux[3] = S2_star - D_star * v_star - v_face * tau_star;
             }
@@ -650,10 +653,10 @@ PUBLIC void srhd_2d_advance_rk(
             double da_q0 = face_area(r0, r1, q0, q0);
             double da_q1 = face_area(r0, r1, q1, q1);
 
-            riemann_hlle(plim, plip, x0 * adot, fli, 1);
-            riemann_hlle(prim, prip, x1 * adot, fri, 1);
-            riemann_hlle(pljm, pljp, 0.0, flj, 2);
-            riemann_hlle(prjm, prjp, 0.0, frj, 2);
+            riemann_hllc(plim, plip, x0 * adot, fli, 1);
+            riemann_hllc(prim, prip, x1 * adot, fri, 1);
+            riemann_hllc(pljm, pljp, 0.0, flj, 2);
+            riemann_hllc(prjm, prjp, 0.0, frj, 2);
             geometric_source_terms(r0, r1, q0, q1, pcc, sources);
 
             for (int q = 0; q < NCONS; ++q)
