@@ -56,16 +56,6 @@ PRIVATE double primitive_to_lorentz_factor(const double *prim)
     return sqrt(1.0 + primitive_to_gamma_beta_squared(prim));
 }
 
-// PRIVATE double primitive_to_gamma_beta_component(const double *prim, int direction)
-// {
-//     switch (direction)
-//     {
-//         case 1: return prim[1];
-//         case 2: return prim[2];
-//     }
-//     return 0.0;
-// }
-
 PRIVATE double primitive_to_beta_component(const double *prim, int direction)
 {
     const double w = primitive_to_lorentz_factor(prim);
@@ -268,6 +258,147 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, dou
     }
 }
 
+PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, double *flux, int direction)
+{
+    double ul[NCONS];
+    double ur[NCONS];
+    double fl[NCONS];
+    double fr[NCONS];
+    double u_hll[NCONS];
+    double f_hll[NCONS];
+    double al[2];
+    double ar[2];
+
+    primitive_to_conserved(pl, ul, 1.0);
+    primitive_to_conserved(pr, ur, 1.0);
+    primitive_to_flux(pl, ul, fl, direction);
+    primitive_to_flux(pr, ur, fr, direction);
+    primitive_to_outer_wavespeeds(pl, al, direction);
+    primitive_to_outer_wavespeeds(pr, ar, direction);
+
+    const double am = min2(al[0], ar[0]);
+    const double ap = max2(al[1], ar[1]);
+
+    if (v_face < am)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fl[q] - v_face * ul[q];
+        }
+    }
+    else if (v_face > ap)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fr[q] - v_face * ur[q];
+        }
+    }
+    else
+    {    
+        double D_star;
+        double S1_star;
+        double S2_star;
+        double E_star; // total energy E = tau + D
+        double tau_star;
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            u_hll[q] = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
+            f_hll[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+        }
+        double uhll, fhll;
+        if (direction == 1)
+        {
+            uhll = u_hll[1];
+            fhll = f_hll[1];
+        }
+        else if (direction == 2)
+        {
+            uhll = u_hll[2];
+            fhll = f_hll[2];
+        }
+        
+        double a = f_hll[3] + f_hll[0]; // total energy flux
+        double b = -(u_hll[3] + u_hll[0] + fhll);
+        double c = uhll;
+        double v_star; 
+        double vl, vr;
+
+        if (fabs(a) < 1e-10)
+        {
+            v_star = -c / b;
+        }
+        else
+        {
+            v_star = (-b - sqrt(b * b - 4.0 * a * c)) / (2.0 * a);
+        }
+
+        double p_star = -a * v_star + fhll;
+
+        if (v_face < v_star) // in left star state
+        {   
+            vl = primitive_to_beta_component(pl, direction);
+            D_star = ul[0] * (am - vl) / (am - v_star);
+            if (direction == 1)
+            {
+                E_star = (am * (ul[3] + ul[0]) - ul[1] + p_star * v_star) / (am - v_star);
+                S1_star = (E_star + p_star) * v_star;   
+                S2_star = ul[2] * (am - vl) / (am - v_star);
+            }
+            else if (direction == 2)
+            {
+                E_star = (am * (ul[3] + ul[0]) - ul[2] + p_star * v_star) / (am - v_star);                
+                S1_star = ul[1] * (am - vl) / (am - v_star);
+                S2_star = (E_star + p_star) * v_star;
+            }
+
+            tau_star = E_star - D_star;
+            s_star = ul[3] * (am - vl) / (am - v_star);
+            flux[0] = D_star * v_star - v_face * D_star;
+            flux[1] = S1_star * v_star + p_star * (direction == 1) - v_face * S1_star;
+            flux[2] = S2_star * v_star + p_star * (direction == 2) - v_face * S2_star;            
+            if (direction == 1) 
+            {
+                flux[3] = S1_star - D_star * v_star - v_face * tau_star;
+            }
+            else if (direction == 2)
+            {
+                flux[3] = S2_star - D_star * v_star - v_face * tau_star;
+            }
+        else // in right star state
+        {
+            vr = primitive_to_beta_component(pr, direction);
+            D_star = ur[0] * (am - vr) / (am - v_star);
+
+            if (direction == 1)
+            {
+                E_star = (am * (ur[3] + ur[0]) - ur[1] + p_star * v_star) / (am - v_star);
+                S1_star = (E_star + p_star) * v_star;   
+                S2_star = ur[2] * (am - vr) / (am - v_star);
+            }
+            else if (direction == 2)
+            {
+                E_star = (am * (ur[3] + ur[0]) - ur[2] + p_star * v_star) / (am - v_star);                
+                S1_star = ur[1] * (am - vr) / (am - v_star);
+                S2_star = (E_star + p_star) * v_star;
+            }
+
+            tau_star = E_star - D_star;
+
+            flux[0] = D_star * v_star - v_face * D_star;
+            flux[1] = S1_star * v_star + p_star * (direction == 1) - v_face * S1_star;
+            flux[2] = S2_star * v_star + p_star * (direction == 2) - v_face * S2_star;            
+            if (direction == 1) 
+            {
+                flux[3] = S1_star - D_star * v_star - v_face * tau_star;
+            }
+            else if (direction == 2)
+            {
+                flux[3] = S2_star - D_star * v_star - v_face * tau_star;
+            }
+        }   
+    }
+}
 
 // ============================ GEOMETRY ======================================
 // ============================================================================
