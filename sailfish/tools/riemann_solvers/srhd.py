@@ -28,7 +28,8 @@ def main():
     xmin = 0.0
     xmax = 1.0
     dx = (xmax - xmin) / nx
-    dt = 0.5 * dx / max(cs(prim0l), cs(prim0r))
+    sl, sr = wavespeeds_simple(prim0l, prim0r)
+    dt = 0.5 * dx / max(abs(sl), abs(sr))
     uhlle = np.zeros([nx, 3])
     uhllc = np.zeros([nx, 3])
     x = [xmin + (i + 0.5) * dx for i in range(nx)]
