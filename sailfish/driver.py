@@ -416,7 +416,7 @@ def simulate(driver):
             state = event_states[name]
             if event_states[name].is_due(user_time, event):
                 event_states[name] = state.next(user_time, event)
-                yield name, state.number, grab_state(**dict())
+                yield name, state.number, grab_state()
 
         with measure_time() as fold_time:
             for _ in range(fold):
@@ -431,7 +431,7 @@ def simulate(driver):
             f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )
 
-    yield "end", None, grab_state(**dict())
+    yield "end", None, grab_state()
 
 
 def run(setup_name, quiet=True, **kwargs):
