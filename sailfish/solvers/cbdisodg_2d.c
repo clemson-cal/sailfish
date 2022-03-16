@@ -375,9 +375,9 @@ PUBLIC void cbdiso_2d_advance_rk(
     double patch_xr,
     double patch_yl,
     double patch_yr,
-    double *conserved_rk, // :: $.shape == (ni + 2, nj + 2, NCONS * NPOLY)
-    double *conserved_rd, // :: $.shape == (ni + 2, nj + 2, NCONS * NPOLY)
-    double *conserved_wr, // :: $.shape == (ni + 2, nj + 2, NCONS * NPOLY)
+    double *conserved_rk, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
+    double *conserved_rd, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
+    double *conserved_wr, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
     double buffer_surface_density,
     double buffer_central_mass,
     double buffer_driving_rate,
@@ -483,7 +483,6 @@ PUBLIC void cbdiso_2d_advance_rk(
         int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
         int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
 
-        double *un  = &conserved_rk[ncc];
         double *ucc = &conserved_rd[ncc];
         double *uli = &conserved_rd[nli];
         double *uri = &conserved_rd[nri];
@@ -582,30 +581,30 @@ PUBLIC void cbdiso_2d_advance_rk(
 
             // Compute viscous fluxes here?
     
-            if (nu > 0.0)
-            {
-                double sli[4];
-                double sri[4];
-                double slj[4];
-                double srj[4];
-                double scc[4];
-    
-                shear_strain(gxli, gyli, dx, dy, sli);
-                shear_strain(gxri, gyri, dx, dy, sri);
-                shear_strain(gxlj, gylj, dx, dy, slj);
-                shear_strain(gxrj, gyrj, dx, dy, srj);
-                shear_strain(gxcc, gycc, dx, dy, scc);
-    
-                fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-                fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-                fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-                fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-                flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-                flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-                frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-                frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
-            }
-                        
+            //if (nu > 0.0)
+            //{
+            //    double sli[4];
+            //    double sri[4];
+            //    double slj[4];
+            //    double srj[4];
+            //    double scc[4];
+    //
+            //    shear_strain(gxli, gyli, dx, dy, sli);
+            //    shear_strain(gxri, gyri, dx, dy, sri);
+            //    shear_strain(gxlj, gylj, dx, dy, slj);
+            //    shear_strain(gxrj, gyrj, dx, dy, srj);
+            //    shear_strain(gxcc, gycc, dx, dy, scc);
+    //
+            //    fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+            //    fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+            //    fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+            //    fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+            //    flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+            //    flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+            //    frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+            //    frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+            //}
+
             for (int q = 0; q < NCONS; ++q)
             {
                 for (int l = 0; l < NPOLY; ++l)
@@ -659,13 +658,15 @@ PUBLIC void cbdiso_2d_advance_rk(
                     }
                 }
 
+                double u_dot[NCONS];
+
                 for (int q = 0; q < NCONS; ++q)
                 {
                     u_dot[q] = 0.0;
                 }
 
                 conserved_to_primitive(uij, pij, velocity_ceiling);
-                buffer_source_term(&buffer, xp, yp, ucc, u_dot);
+                buffer_source_term(&buffer, xp, yp, uij, u_dot);
                 point_masses_source_term(&mass_list, xp, yp, pij, u_dot);
                 
                 double flux_x[NCONS];
@@ -689,12 +690,16 @@ PUBLIC void cbdiso_2d_advance_rk(
             }
         }
 
+        double *u_rk = &conserved_rk[ncc];
+        double *u_rd = &conserved_rd[ncc];
+        double *u_wr = &conserved_wr[ncc];
+
         for (int q = 0; q < NCONS; ++q)
         {
             for (int l = 0; l < NK; ++l)
             {
-                ucc[NPOLY * q + l] += 0.5 * (surface_term[NPOLY * q + l] + volume_term[NPOLY * q + l]) * dt / (dx * dy);
-                ucc[NPOLY * q + l] = (1.0 - a) * ucc[NPOLY * q + l] + a * un[NPOLY * q + l];
+                u_wr[NPOLY * q + l] = u_rd[NPOLY * q + l] + 0.5 * (surface_term[NPOLY * q + l] + volume_term[NPOLY * q + l]) * dt / (dx * dy);
+                u_wr[NPOLY * q + l] = (1.0 - a) * u_wr[NPOLY * q + l] + a * u_rk[NPOLY * q + l];
             }
         }
     }
