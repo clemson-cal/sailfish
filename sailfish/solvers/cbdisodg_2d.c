@@ -85,7 +85,6 @@ PRIVATE void point_mass_source_term(
     struct PointMass *mass,
     double x1,
     double y1,
-    double dt,
     double *prim,
     double *cons_dot)
 {
@@ -151,14 +150,13 @@ PRIVATE void point_masses_source_term(
     struct PointMassList *mass_list,
     double x1,
     double y1,
-    double dt,
     double *prim,
     double *cons_dot)
 {
     for (int p = 0; p < 2; ++p)
     {
         double cons_dot_single[NCONS];
-        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, cons_dot_single);
+        point_mass_source_term(&mass_list->masses[p], x1, y1, prim, cons_dot_single);
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -193,9 +191,8 @@ PRIVATE void buffer_source_term(
     struct KeplerianBuffer *buffer,
     double xc,
     double yc,
-    double dt,
     double *cons,
-    double *delta_cons)
+    double *cons_dot)
 {
     if (buffer->is_enabled)
     {
@@ -220,8 +217,7 @@ PRIVATE void buffer_source_term(
 
             for (int q = 0; q < NCONS; ++q)
             {
-                // cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
-                delta_cons[q] = -(cons[q] - u0[q]) * buffer_rate;
+                cons_dot[q] -= (cons[q] - u0[q]) * buffer_rate;
             }
         }
     }
@@ -663,8 +659,15 @@ PUBLIC void cbdiso_2d_advance_rk(
                     }
                 }
 
-                conserved_to_primitive(uij, pij, velocity_ceiling);
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_dot[q] = 0.0;
+                }
 
+                conserved_to_primitive(uij, pij, velocity_ceiling);
+                buffer_source_term(&buffer, xp, yp, ucc, u_dot);
+                point_masses_source_term(&mass_list, xp, yp, pij, u_dot);
+                
                 double flux_x[NCONS];
                 double flux_y[NCONS];
 
@@ -680,27 +683,21 @@ PUBLIC void cbdiso_2d_advance_rk(
                         volume_term[NPOLY * q + l] += 
                             w[ic] * w[jc] * 
                             (flux_x[q] * dphidx[l] * dx + flux_y[q] * dphidy[l] * dy 
-                                + 0.5 * dx * dy * source_term * phiij[l]);
+                                + 0.5 * dx * dy * u_dot[q] * phiij[l]);
                     }
                 }
             }
         }
-
-        primitive_to_conserved(ucc, pcc);
-        buffer_source_term(&buffer, xc, yc, dt, ucc);
-        point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
 
         for (int q = 0; q < NCONS; ++q)
         {
             for (int l = 0; l < NK; ++l)
             {
                 //ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-                ucc[NPOLY * q + l] += 0.5 * (surface + volume) / (dx * dy);
+                ucc[NPOLY * q + l] += 0.5 * (surface + volume) * dt / (dx * dy);
                 ucc[NPOLY * q + l] = (1.0 - a) * ucc[NPOLY * q + l] + a * un[NPOLY * q + l];
             }
         }
-        double *pout = &primitive_wr[ncc];
-        conserved_to_primitive(ucc, pout, velocity_ceiling);
     }
 }
 
