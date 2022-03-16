@@ -520,32 +520,6 @@ PUBLIC void cbdiso_2d_advance_rk(
         double surface_term[NCONS * NPOLY];
         double volume_term[NCONS * NPOLY];
 
-        // Compute viscous fluxes here?
-
-        if (nu > 0.0)
-        {
-            double sli[4];
-            double sri[4];
-            double slj[4];
-            double srj[4];
-            double scc[4];
-
-            shear_strain(gxli, gyli, dx, dy, sli);
-            shear_strain(gxri, gyri, dx, dy, sri);
-            shear_strain(gxlj, gylj, dx, dy, slj);
-            shear_strain(gxrj, gyrj, dx, dy, srj);
-            shear_strain(gxcc, gycc, dx, dy, scc);
-
-            fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
-            fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
-            fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
-            fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
-            flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
-            flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
-            frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
-            frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
-        }
-
         // Surface term; loop over face nodes
 
         for (int ip = 0; ip < 3; ++ip)
@@ -604,8 +578,34 @@ PUBLIC void cbdiso_2d_advance_rk(
             riemann_hlle(uljm, uljp, flj, cs2lj, 1);
             riemann_hlle(urjm, urjp, frj, cs2rj, 1);
 
-            // Add viscous fluxes here? Use strain averaged across face? 
-            
+            // Add viscous fluxes here? Use strain averaged across face?
+
+            // Compute viscous fluxes here?
+    
+            if (nu > 0.0)
+            {
+                double sli[4];
+                double sri[4];
+                double slj[4];
+                double srj[4];
+                double scc[4];
+    
+                shear_strain(gxli, gyli, dx, dy, sli);
+                shear_strain(gxri, gyri, dx, dy, sri);
+                shear_strain(gxlj, gylj, dx, dy, slj);
+                shear_strain(gxrj, gyrj, dx, dy, srj);
+                shear_strain(gxcc, gycc, dx, dy, scc);
+    
+                fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
+                fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
+                fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
+                fri[2] -= 0.5 * nu * (pcc[0] * scc[1] + pri[0] * sri[1]); // x-y
+                flj[1] -= 0.5 * nu * (plj[0] * slj[2] + pcc[0] * scc[2]); // y-x
+                flj[2] -= 0.5 * nu * (plj[0] * slj[3] + pcc[0] * scc[3]); // y-y
+                frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
+                frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
+            }
+                        
             for (int q = 0; q < NCONS; ++q)
             {
                 for (int l = 0; l < NPOLY; ++l)
@@ -693,8 +693,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         {
             for (int l = 0; l < NK; ++l)
             {
-                //ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
-                ucc[NPOLY * q + l] += 0.5 * (surface + volume) * dt / (dx * dy);
+                ucc[NPOLY * q + l] += 0.5 * (surface_term[NPOLY * q + l] + volume_term[NPOLY * q + l]) * dt / (dx * dy);
                 ucc[NPOLY * q + l] = (1.0 - a) * ucc[NPOLY * q + l] + a * un[NPOLY * q + l];
             }
         }
