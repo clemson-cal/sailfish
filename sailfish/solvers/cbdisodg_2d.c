@@ -356,12 +356,12 @@ PRIVATE void riemann_hlle(
     }
 }
 
-PRIVATE double dot(double *u, double *p) 
+PRIVATE double dot(double *u, double *p)
 {
     double sum = 0.0;
 
     for (int i = 0; i < NPOLY; ++i) {
-        sum += u[i] * p[i]; 
+        sum += u[i] * p[i];
     }
     return sum;
 }
@@ -375,9 +375,9 @@ PUBLIC void cbdiso_2d_advance_rk(
     double patch_xr,
     double patch_yl,
     double patch_yr,
-    double *conserved_rk, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
-    double *conserved_rd, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
-    double *conserved_wr, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
+    double *weights0, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
+    double *weights1, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
+    double *weights2, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
     double buffer_surface_density,
     double buffer_central_mass,
     double buffer_driving_rate,
@@ -406,18 +406,18 @@ PUBLIC void cbdiso_2d_advance_rk(
     double mach_squared,
     int eos_type,
     double nu, // kinematic viscosity coefficient
-    double a, // RK parameter
+    double rk_param, // RK parameter
     double dt, // timestep
     double velocity_ceiling)
 {
     // Gaussian quadrature points in scaled domain xsi=[-1,1]
-    double g[3] = {-0.774596669241483, 0.000000000000000, 0.774596669241483}; 
+    double g[3] = {-0.774596669241483, 0.000000000000000, 0.774596669241483};
     // Gaussian weights at quadrature points
     double w[3] = { 0.555555555555556, 0.888888888888889, 0.555555555555556};
     // Scaled LeGendre polynomials at quadrature points
     double p[3][3] = {{ 1.000000000000000, 1.000000000000000, 1.000000000000000},
                       {-1.341640786499873, 0.000000000000000, 1.341640786499873},
-                      { 0.894427190999914, -1.11803398874990, 0.894427190999914}}; 
+                      { 0.894427190999914, -1.11803398874990, 0.894427190999914}};
     // Derivative of Scaled LeGendre polynomials at quadrature points
     double pp[3][3] = {{ 0.000000000000000, 0.000000000000000, 0.000000000000000},
                        { 1.732050807568877, 1.732050807568877, 1.732050807568877},
@@ -458,7 +458,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         double yr = patch_yl + (j + 1.0) * dy;
 
         // ------------------------------------------------------------------------
-        //                 
+        //
         //
         //      +-------+-------+-------+
         //      |       |       | x x x |   x(ic, jc) = quadrature points in each zone
@@ -466,7 +466,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         //      |       |       | x x x |
         //      +-------+-------+-------+
         //      |       |       |       |
-        //      |  li  -|+  c  -|+  ri  |  
+        //      |  li  -|+  c  -|+  ri  |
         //      |       |       |       |
         //      +-------+-------+-------+
         //      |       |       |       |
@@ -474,7 +474,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         //      |       |       |       |
         //      +-------+-------+-------+
         //
-        //                 
+        //
         // ------------------------------------------------------------------------
 
         int ncc = (i     + ng) * si + (j     + ng) * sj;
@@ -483,11 +483,11 @@ PUBLIC void cbdiso_2d_advance_rk(
         int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
         int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
 
-        double *ucc = &conserved_rd[ncc];
-        double *uli = &conserved_rd[nli];
-        double *uri = &conserved_rd[nri];
-        double *ulj = &conserved_rd[nlj];
-        double *urj = &conserved_rd[nrj];
+        double *ucc = &weights1[ncc];
+        double *uli = &weights1[nli];
+        double *uri = &weights1[nri];
+        double *ulj = &weights1[nlj];
+        double *urj = &weights1[nrj];
 
         double fli[NCONS];
         double fri[NCONS];
@@ -507,7 +507,7 @@ PUBLIC void cbdiso_2d_advance_rk(
 
         // face node values of basis function phi
         double phili[NPOLY];
-        double phiri[NPOLY];   
+        double phiri[NPOLY];
         double philj[NPOLY];
         double phirj[NPOLY];
 
@@ -538,15 +538,15 @@ PUBLIC void cbdiso_2d_advance_rk(
                         il += 1;
                     }
                 }
-            } 
+            }
 
             double xp = xc + 0.5 * g[ip] * dx;
             double yp = yc + 0.5 * g[ip] * dy;
 
             double cs2li = sound_speed_squared(cs2, mach_squared, eos_type, xl, yp, &mass_list);
-            double cs2ri = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);            
+            double cs2ri = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);
             double cs2lj = sound_speed_squared(cs2, mach_squared, eos_type, xp, yl, &mass_list);
-            double cs2rj = sound_speed_squared(cs2, mach_squared, eos_type, xp, yr, &mass_list);   
+            double cs2rj = sound_speed_squared(cs2, mach_squared, eos_type, xp, yr, &mass_list);
 
             for (int q = 0; q < NCONS; ++q){
 
@@ -561,13 +561,13 @@ PUBLIC void cbdiso_2d_advance_rk(
 
                 for (int l = 0; l < NPOLY; ++l)
                 {
-                    ulim[q] += uli[NPOLY * q + l] * phiri[l]; // right face of zone i-1 
-                    ulip[q] += ucc[NPOLY * q + l] * phili[l]; // left face of zone i                     
-                    urim[q] += ucc[NPOLY * q + l] * phiri[l]; // right face of zone i 
-                    urip[q] += uri[NPOLY * q + l] * phili[l]; // left face of zone i+1                     
-                    uljm[q] += ulj[NPOLY * q + l] * phirj[l]; // top face of zone j-1 
-                    uljp[q] += ucc[NPOLY * q + l] * philj[l]; // bottom face of zone j                     
-                    urjm[q] += ucc[NPOLY * q + l] * phirj[l]; // top face of zone j 
+                    ulim[q] += uli[NPOLY * q + l] * phiri[l]; // right face of zone i-1
+                    ulip[q] += ucc[NPOLY * q + l] * phili[l]; // left face of zone i
+                    urim[q] += ucc[NPOLY * q + l] * phiri[l]; // right face of zone i
+                    urip[q] += uri[NPOLY * q + l] * phili[l]; // left face of zone i+1
+                    uljm[q] += ulj[NPOLY * q + l] * phirj[l]; // top face of zone j-1
+                    uljp[q] += ucc[NPOLY * q + l] * philj[l]; // bottom face of zone j
+                    urjm[q] += ucc[NPOLY * q + l] * phirj[l]; // top face of zone j
                     urjp[q] += urj[NPOLY * q + l] * philj[l]; // bottom face of zone j+1                     j
                 }
             }
@@ -580,7 +580,7 @@ PUBLIC void cbdiso_2d_advance_rk(
             // Add viscous fluxes here? Use strain averaged across face?
 
             // Compute viscous fluxes here?
-    
+
             //if (nu > 0.0)
             //{
             //    double sli[4];
@@ -588,13 +588,11 @@ PUBLIC void cbdiso_2d_advance_rk(
             //    double slj[4];
             //    double srj[4];
             //    double scc[4];
-    //
             //    shear_strain(gxli, gyli, dx, dy, sli);
             //    shear_strain(gxri, gyri, dx, dy, sri);
             //    shear_strain(gxlj, gylj, dx, dy, slj);
             //    shear_strain(gxrj, gyrj, dx, dy, srj);
             //    shear_strain(gxcc, gycc, dx, dy, scc);
-    //
             //    fli[1] -= 0.5 * nu * (pli[0] * sli[0] + pcc[0] * scc[0]); // x-x
             //    fli[2] -= 0.5 * nu * (pli[0] * sli[1] + pcc[0] * scc[1]); // x-y
             //    fri[1] -= 0.5 * nu * (pcc[0] * scc[0] + pri[0] * sri[0]); // x-x
@@ -608,13 +606,13 @@ PUBLIC void cbdiso_2d_advance_rk(
             for (int q = 0; q < NCONS; ++q)
             {
                 for (int l = 0; l < NPOLY; ++l)
-                {    
+                {
                     surface_term[NPOLY * q + l] -= (
                         fli[q] * nhat[0] * phili[l] * w[ip] * dx +
                         fri[q] * nhat[1] * phiri[l] * w[ip] * dx +
                         flj[q] * nhat[0] * philj[l] * w[ip] * dy +
                         frj[q] * nhat[1] * phirj[l] * w[ip] * dy
-                        );
+                    );
                 }
             }
         }
@@ -654,7 +652,7 @@ PUBLIC void cbdiso_2d_advance_rk(
 
                     for (int l = 0; l < NPOLY; ++l)
                     {
-                        uij[q] += ucc[NPOLY * q + l] * phiij[l]; 
+                        uij[q] += ucc[NPOLY * q + l] * phiij[l];
                     }
                 }
 
@@ -668,7 +666,7 @@ PUBLIC void cbdiso_2d_advance_rk(
                 conserved_to_primitive(uij, pij, velocity_ceiling);
                 buffer_source_term(&buffer, xp, yp, uij, u_dot);
                 point_masses_source_term(&mass_list, xp, yp, pij, u_dot);
-                
+
                 double flux_x[NCONS];
                 double flux_y[NCONS];
 
@@ -681,25 +679,26 @@ PUBLIC void cbdiso_2d_advance_rk(
                 {
                     for (int l = 0; l < NPOLY; ++l)
                     {
-                        volume_term[NPOLY * q + l] += 
-                            w[ic] * w[jc] * 
-                            (flux_x[q] * dphidx[l] * dx + flux_y[q] * dphidy[l] * dy 
+                        volume_term[NPOLY * q + l] +=
+                            w[ic] * w[jc] *
+                            (flux_x[q] * dphidx[l] * dx + flux_y[q] * dphidy[l] * dy
                                 + 0.5 * dx * dy * u_dot[q] * phiij[l]);
                     }
                 }
             }
         }
 
-        double *u_rk = &conserved_rk[ncc];
-        double *u_rd = &conserved_rd[ncc];
-        double *u_wr = &conserved_wr[ncc];
+        double *w0 = &weights0[ncc];
+        double *w1 = &weights1[ncc];
+        double *w2 = &weights2[ncc];
 
         for (int q = 0; q < NCONS; ++q)
         {
             for (int l = 0; l < NK; ++l)
             {
-                u_wr[NPOLY * q + l] = u_rd[NPOLY * q + l] + 0.5 * (surface_term[NPOLY * q + l] + volume_term[NPOLY * q + l]) * dt / (dx * dy);
-                u_wr[NPOLY * q + l] = (1.0 - a) * u_wr[NPOLY * q + l] + a * u_rk[NPOLY * q + l];
+                int n = NPOLY * q + l;
+                w2[n] = w1[n] + 0.5 * (surface_term[n] + volume_term[n]) * dt / (dx * dy);
+                w2[n] = (1.0 - rk_param) * w2[n] + rk_param * w0[n];
             }
         }
     }
@@ -751,29 +750,32 @@ PUBLIC void cbdiso_2d_point_mass_source_term(
     double sink_radius2,
     int sink_model2,
     int which_mass, // :: $ in [1, 2]
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
-    double *cons_rate) // :: $.shape == (ni + 4, nj + 4, 3)
+    double *weights, // :: $.shape == (ni + 2, nj + 2, 18)
+    double *cons_rate) // :: $.shape == (ni + 2, nj + 2, 3)
 {
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
     struct PointMassList mass_list = {{m1, m2}};
 
-    int ng = 2; // number of guard zones
-    int si = NCONS * (nj + 2 * ng);
-    int sj = NCONS;
+    int ng = 1; // number of guard zones
+    int si = NCONS * NPOLY * (nj + 2 * ng);
+    int sj = NCONS * NPOLY;
 
     double dx = (patch_xr - patch_xl) / ni;
     double dy = (patch_yr - patch_yl) / nj;
 
     FOR_EACH_2D(ni, nj)
     {
-        int ncc = (i + ng) * si + (j + ng) * sj;
+        // TODO: integrate the source terms over the cell, and return the change in mass and
+        // momentum for the whole cell.
 
-        double xc = patch_xl + (i + 0.5) * dx;
-        double yc = patch_yl + (j + 0.5) * dy;
-        double *pc = &primitive[ncc];
-        double *uc = &cons_rate[ncc];
-        point_mass_source_term(&mass_list.masses[which_mass - 1], xc, yc, 1.0, pc, uc);
+        // int ncc = (i + ng) * si + (j + ng) * sj;
+
+        // double xc = patch_xl + (i + 0.5) * dx;
+        // double yc = patch_yl + (j + 0.5) * dy;
+        // double *pc = &primitive[ncc];
+        // double *uc = &cons_rate[ncc];
+        // point_mass_source_term(&mass_list.masses[which_mass - 1], xc, yc, 1.0, pc, uc);
     }
 }
 
@@ -806,16 +808,16 @@ PUBLIC void cbdiso_2d_wavespeed(
     double sink_rate2,
     double sink_radius2,
     int sink_model2,
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
-    double *wavespeed) // :: $.shape == (ni + 4, nj + 4)
+    double *weights, // :: $.shape == (ni + 2, nj + 2, 18)
+    double *wavespeed) // :: $.shape == (ni + 2, nj + 2)
 {
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
     struct PointMassList mass_list = {{m1, m2}};
 
-    int ng = 2; // number of guard zones
-    int si = NCONS * (nj + 2 * ng);
-    int sj = NCONS;
+    int ng = 1; // number of guard zones
+    int si = NCONS * NPOLY * (nj + 2 * ng);
+    int sj = NCONS * NPOLY;
     int ti = nj + 2 * ng;
     int tj = 1;
     double dx = (patch_xr - patch_xl)/ni;
@@ -823,15 +825,17 @@ PUBLIC void cbdiso_2d_wavespeed(
 
     FOR_EACH_2D(ni, nj)
     {
-        int np = (i + ng) * si + (j + ng) * sj;
-        int na = (i + ng) * ti + (j + ng) * tj;
+        // TODO: compute the wavespeed from cons_to_prim(zero_weight).
 
-        double x = patch_xl + (i + 0.5) * dx;
-        double y = patch_yl + (j + 0.5) * dy;
+        // int np = (i + ng) * si + (j + ng) * sj;
+        // int na = (i + ng) * ti + (j + ng) * tj;
 
-        double *pc = &primitive[np];
-        double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
-        double a = primitive_max_wavespeed(pc, cs2);
-        wavespeed[na] = a;
+        // double x = patch_xl + (i + 0.5) * dx;
+        // double y = patch_yl + (j + 0.5) * dy;
+
+        // double *pc = &primitive[np];
+        // double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+        // double a = primitive_max_wavespeed(pc, cs2);
+        // wavespeed[na] = a;
     }
 }

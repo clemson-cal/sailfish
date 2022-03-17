@@ -14,62 +14,10 @@ from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 
 logger = getLogger(__name__)
 
-
-class CellData:
-    """
-    Gauss weights, quadrature points, and tabulated Legendre polonomials.
-
-    This class works for n-th order Gaussian quadrature in 2D.
-    """
-
-    def __init__(self, order=3):
-        if order <= 0:
-            raise ValueError("cell order must be at least 1")
-
-        def leg(x, n, m=0):
-            c = [(2 * n + 1) ** 0.5 if i is n else 0.0 for i in range(n + 1)]
-            return Legendre(c).deriv(m)(x)
-
-        f = [-1.0, 1.0]  # xsi-coordinate of faces
-        g, w = leggauss(order)
-        self.gauss_points = g
-        self.weights = w
-        self.phi_faces = np.array([[leg(x, n, m=0) for n in range(order)] for x in f])
-        self.phi_value = np.array([[leg(x, n, m=0) for n in range(order)] for x in g])
-        self.phi_deriv = np.array([[leg(x, n, m=1) for n in range(order)] for x in g])
-        self.order = order
-
-    def to_weights(self, ux):
-        w = self.weights
-        p = self.phi_value
-        uw = np.zeros([NUM_CONS, self.order])
-
-        for q in range(NUM_CONS):
-            for n in range(self.order):
-                for j in range(self.num_points):
-                    uw[q, n] += ux[q, j] * p[j][n] * w[j] * 0.5
-
-        return uw
-
-    def sample(self, uw, j):
-        ux = np.zeros(NUM_CONS)
-
-        for q in range(NUM_CONS):
-            for n in range(self.order):
-                ux[q] += uw[q, n] * self.phi_value[j, n]
-        return ux
-
-    def sample_face(self, uw, j):
-        ux = np.zeros(NUM_CONS)
-
-        for q in range(NUM_CONS):
-            for n in range(self.order):
-                ux[q] += uw[q, n] * self.phi_faces[j, n]
-        return ux
-
-    @property
-    def num_points(self):
-        return self.order
+NCONS = 3
+NPOLY = 6
+ORDER = 3
+GUARD = 1
 
 
 class Options(NamedTuple):
@@ -94,14 +42,11 @@ def initial_condition(setup, mesh, time):
     """
     import numpy as np
 
-    n_cons = 3
-    n_poly = 3
-    order = 3
     ni, nj = mesh.shape
     dx, dy = mesh.dx, mesh.dy
-    prim_node = np.zeros(n_cons)
-    cons_node = np.zeros(n_cons)
-    weights = np.zeros([ni, nj, n_cons, n_poly])
+    prim_node = np.zeros(NCONS)
+    cons_node = np.zeros(NCONS)
+    weights = np.zeros([ni, nj, NCONS, NPOLY])
 
     g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
     w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
@@ -115,8 +60,8 @@ def initial_condition(setup, mesh, time):
                     y = yc + 0.5 * dy * g[jp]
                     setup.primitive(time, (x, y), prim_node)
                     primitive_to_conserved(prim_node, cons_node)
-                    for q in range(n_cons):
-                        for p in range(n_poly):
+                    for q in range(NCONS):
+                        for p in range(NPOLY):
                             weights[i, j, q, p] += cons_node[q] * w[ip] * w[jp]
 
     return weights
@@ -131,7 +76,7 @@ class Patch:
     def __init__(
         self,
         time,
-        primitive,
+        weights,
         mesh,
         index_range,
         physics,
@@ -158,22 +103,25 @@ class Patch:
         self.buffer_surface_density = buffer_surface_density
 
         with self.execution_context:
-            self.wavespeeds = xp.zeros(primitive.shape[:2])
-            self.primitive1 = xp.array(primitive)
-            self.primitive2 = xp.array(primitive)
-            self.conserved0 = xp.zeros(primitive.shape)
+            self.wavespeeds = xp.zeros(weights.shape[:2])
+            self.weights0 = xp.zeros(weights.shape)  # weights at the timestep start
+            self.weights1 = xp.array(weights)  # weights to be read from
+            self.weights2 = xp.array(weights)  # weights to be written to
 
     def point_mass_source_term(self, which_mass):
         """
-        Returns an array of conserved quantities over a patch.
+        Return an array of the rates of conserved quantities, resulting from the application of
+        gravitational and/or accretion source terms due to point masses.
         """
-        ng = 2  # number of guard cells
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
+        ng = GUARD  # number of guard cells
+        ni, nj = self.shape
         m1, m2 = self.physics.point_masses(self.time)
+
         with self.execution_context:
-            cons_rate = self.xp.zeros_like(self.conserved0)
+            cons_rate = self.xp.zeros([ni + 2 * ng, nj + 2 * ng, NCONS])
 
             self.lib.cbdiso_2d_point_mass_source_term[self.shape](
                 self.xl,
@@ -199,7 +147,7 @@ class Patch:
                 m2.sink_radius,
                 m2.sink_model.value,
                 which_mass,
-                self.primitive1,
+                self.weights1,
                 cons_rate,
             )
         return cons_rate[ng:-ng, ng:-ng]
@@ -236,25 +184,21 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                self.primitive1,
+                self.weights1,
                 self.wavespeeds,
             )
             return self.wavespeeds.max()
 
-    def recompute_conserved(self):
-        """Converts the most recent primitive array to conserved"""
+    def copy_weights1_to_weights0(self):
         with self.execution_context:
-            return self.lib.cbdiso_2d_primitive_to_conserved[self.shape](
-                self.primitive1,
-                self.conserved0,
-            )
+            self.weights0[...] = self.weights1[...]
 
     def advance_rk(self, rk_param, dt):
         """
-        Passes required parameters for time evolution of the setup.
+        Pass required parameters for time evolution of the setup.
 
-        Calls the C-module function responsible for performing time evolution
-        using a RK algorithm to update the parameters of the setup.
+        This function calls the C-module function responsible for performing time evolution using a
+        RK algorithm to update the parameters of the setup.
         """
         m1, m2 = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
@@ -306,16 +250,21 @@ class Patch:
 
     def new_iteration(self):
         self.time0 = self.time
-        self.recompute_conserved()
+        self.copy_weights1_to_weights0()
 
     @property
     def primitive(self):
-        return self.primitive1
+        sigma = self.weights1[:, :, :, 0]
+        p0 = self.xp.zeros_like(u0)
+        p0[..., 0] = u0[..., 0]
+        p0[..., 1] = u0[..., 1] / u0[..., 0]
+        p0[..., 2] = u0[..., 2] / u0[..., 0]
+        return p0
 
 
 class Solver(SolverBase):
     """
-    Adapter class to drive the isodg_2d C extension module.
+    Adapter class to drive the cbdisodg_2d C extension module.
     """
 
     def __init__(
@@ -331,7 +280,6 @@ class Solver(SolverBase):
     ):
         import numpy as np
 
-        cell = CellData(order=options.order)
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
 
@@ -360,8 +308,8 @@ class Solver(SolverBase):
             raise ValueError("solver only supports constant gravitational softening")
 
         xp = get_array_module(mode)
-        ng = 1  # number of guard zones
-        nq = 3  # number of conserved quantities
+        ng = GUARD  # number of guard zones
+        nq = NCONS  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
         lib = Library(code, mode=mode, debug=False)
@@ -380,44 +328,9 @@ class Solver(SolverBase):
         ni, nj = mesh.shape
 
         if solution is None:
-            xf = mesh.faces(0, num_zones)  # face coordinates
-            px = np.zeros([num_zones, 1, cell.num_points])
-            ux = np.zeros([num_zones, 1, cell.num_points])
-            uw = np.zeros([num_zones, 1, cell.order])
-            dx = mesh.dx
-
-    conserved_w = np.zeros([nx, ny, 3 * 6])
-
-    for i in range(ni):
-        for j in range(nj):
-            # global coordinates of zone centers
-            xc, yc = mesh.cell_coordinates(i, j)
-            # loop over quadrature points in each zone
-            for ic in range(cell.num_points):
-                for jc in range(cell.num_points):
-                    xp = xc + 0.5 * mesh.dx * cell.gauss_points[ic]
-                    yp = yc + 0.5 * mesh.dy * cell.gauss_points[jc]
-                    # primitive values at quadrature points
-                    setup.primitive(time, xp, yp, primitive[ic, jc])
-
-            for i in range(num_zones):
-                for j in range(cell.num_points):
-                    xsi = cell.gauss_points[j]
-                    xj = xf[i] + (xsi + 1.0) * 0.5 * dx
-                    setup.primitive(time, xj, px[i, :, j])
-
-            ux[...] = px[...]  # the conserved variable is also the primitive
-
-            for i in range(num_zones):
-                uw[i] = cell.to_weights(ux[i])
-            self.conserved_w = uw
+            weights = initial_condition(setup, mesh, time)
         else:
-            self.conserved_w = solution
-
-        # if solution is None:
-        #    primitive = initial_condition(setup, mesh, time)
-        # else:
-        #    primitive = solution
+            weights = solution
 
         if physics.buffer_is_enabled:
             # Here we sample the initial condition at the buffer onset radius
@@ -434,11 +347,11 @@ class Solver(SolverBase):
             buffer_surface_density = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
-            prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
-            prim[ng:-ng, ng:-ng] = primitive[a:b]
+            weights_patch = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
+            weights_patch[ng:-ng, ng:-ng] = weights[a:b]
             patch = Patch(
                 time,
-                prim,
+                weights_patch,
                 mesh,
                 (a, b),
                 physics,
@@ -453,7 +366,9 @@ class Solver(SolverBase):
 
     @property
     def solution(self):
-        return self.primitive
+        return concat_on_host(
+            [p.weights1 for p in self.patches], (self.num_guard, self.num_guard)
+        )
 
     @property
     def primitive(self):
@@ -509,15 +424,16 @@ class Solver(SolverBase):
 
     @property
     def recommended_cfl(self):
-        return 0.3
+        return 0.08
 
     @property
     def maximum_cfl(self):
-        return 0.4
+        return 0.08
 
     def maximum_wavespeed(self):
-        "Returns the global maximum wavespeed over the whole domain."
-
+        """
+        Return the global maximum wavespeed over the whole domain.
+        """
         return lazy_reduce(
             max,
             float,
@@ -537,7 +453,7 @@ class Solver(SolverBase):
         self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
-        self.set_bc("primitive1")
+        self.set_bc("weights1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
 
