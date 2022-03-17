@@ -252,6 +252,100 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, dou
     }
 }
 
+PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, double *flux)
+{
+    double ul[NCONS];
+    double ur[NCONS];
+    double fl[NCONS];
+    double fr[NCONS];
+    double u_hll[NCONS];
+    double f_hll[NCONS];    
+    double al[2];
+    double ar[2];
+
+    primitive_to_conserved(pl, ul, 1.0);
+    primitive_to_conserved(pr, ur, 1.0);
+    primitive_to_flux(pl, ul, fl);
+    primitive_to_flux(pr, ur, fr);
+    primitive_to_outer_wavespeeds(pl, al);
+    primitive_to_outer_wavespeeds(pr, ar);
+
+    const double am = min2(al[0], ar[0]);
+    const double ap = max2(al[1], ar[1]);
+
+    if (v_face < am)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fl[q] - v_face * ul[q];
+        }
+    }
+    else if (v_face > ap)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fr[q] - v_face * ur[q];
+        }
+    }
+    else
+    {    
+        double D_star;
+        double Sr_star;
+        double E_star; // total energy E = tau + D
+        double tau_star;
+        double s_star; // scalar concentration
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            u_hll[q] = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
+            f_hll[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+        }
+
+        double a = f_hll[2] + f_hll[0]; // total energy flux
+        double b = -(u_hll[2] + u_hll[0] + f_hll[1]);
+        double c = u_hll[1];
+        double v_star; 
+        double vl, vr;
+
+        if (fabs(a) < 1e-10)
+        {
+            v_star = -c / b;
+        }
+        else
+        {
+            v_star = (-b - sqrt(b * b - 4.0 * a * c)) / (2.0 * a);
+        }
+
+        double p_star = -a * v_star + f_hll[1];
+
+        if (v_face < v_star) // in left star state
+        {   
+            vl = primitive_to_beta_component(pl);
+            D_star = ul[0] * (am - vl) / (am - v_star);
+            E_star = (am * (ul[2] + ul[0]) - ul[1] + p_star * v_star) / (am - v_star);
+            Sr_star = (E_star + p_star) * v_star;
+            tau_star = E_star - D_star;
+            s_star = ul[3] * (am - vl) / (am - v_star);
+            flux[0] = D_star * v_star - v_face * D_star;
+            flux[1] = Sr_star * v_star + p_star - v_face * Sr_star;
+            flux[2] = Sr_star - D_star * v_star - v_face * tau_star;
+            flux[3] = s_star * v_star - v_face * s_star;
+        }
+        else // in right star state
+        {
+            vr = primitive_to_beta_component(pr);
+            D_star = ur[0] * (ap - vr) / (ap - v_star);
+            E_star = (ap * (ur[2] + ur[0]) - ur[1] + p_star * v_star) / (ap - v_star);
+            Sr_star = (E_star + p_star) * v_star;
+            tau_star = E_star - D_star;
+            s_star = ur[3] * (ap - vr) / (ap - v_star);
+            flux[0] = D_star * v_star - v_face * D_star;
+            flux[1] = Sr_star * v_star + p_star - v_face * Sr_star;
+            flux[2] = Sr_star - D_star * v_star - v_face * tau_star;
+            flux[3] = s_star * v_star - v_face * s_star;
+        }   
+    }
+}
 
 // ============================ GEOMETRY ======================================
 // ============================================================================
@@ -449,8 +543,8 @@ PUBLIC void srhd_1d_advance_rk(
             double dal = face_area(coords, xl);
             double dar = face_area(coords, xr);
 
-            riemann_hlle(plim, plip, yl * adot, fli);
-            riemann_hlle(prim, prip, yr * adot, fri);
+            riemann_hllc(plim, plip, yl * adot, fli);
+            riemann_hllc(prim, prip, yr * adot, fri);
             geometric_source_terms(coords, xl, xr, prd, sources);
 
             for (int q = 0; q < NCONS; ++q)
