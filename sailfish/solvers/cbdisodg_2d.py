@@ -15,6 +15,63 @@ from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 logger = getLogger(__name__)
 
 
+class CellData:
+    """
+    Gauss weights, quadrature points, and tabulated Legendre polonomials.
+
+    This class works for n-th order Gaussian quadrature in 2D.
+    """
+
+    def __init__(self, order=3):
+        if order <= 0:
+            raise ValueError("cell order must be at least 1")
+
+        def leg(x, n, m=0):
+            c = [(2 * n + 1) ** 0.5 if i is n else 0.0 for i in range(n + 1)]
+            return Legendre(c).deriv(m)(x)
+
+        f = [-1.0, 1.0]  # xsi-coordinate of faces
+        g, w = leggauss(order)
+        self.gauss_points = g
+        self.weights = w
+        self.phi_faces = np.array([[leg(x, n, m=0) for n in range(order)] for x in f])
+        self.phi_value = np.array([[leg(x, n, m=0) for n in range(order)] for x in g])
+        self.phi_deriv = np.array([[leg(x, n, m=1) for n in range(order)] for x in g])
+        self.order = order
+
+    def to_weights(self, ux):
+        w = self.weights
+        p = self.phi_value
+        uw = np.zeros([NUM_CONS, self.order])
+
+        for q in range(NUM_CONS):
+            for n in range(self.order):
+                for j in range(self.num_points):
+                    uw[q, n] += ux[q, j] * p[j][n] * w[j] * 0.5
+
+        return uw
+
+    def sample(self, uw, j):
+        ux = np.zeros(NUM_CONS)
+
+        for q in range(NUM_CONS):
+            for n in range(self.order):
+                ux[q] += uw[q, n] * self.phi_value[j, n]
+        return ux
+
+    def sample_face(self, uw, j):
+        ux = np.zeros(NUM_CONS)
+
+        for q in range(NUM_CONS):
+            for n in range(self.order):
+                ux[q] += uw[q, n] * self.phi_faces[j, n]
+        return ux
+
+    @property
+    def num_points(self):
+        return self.order
+
+
 class Options(NamedTuple):
     """
     Contains parameters which are solver specific options.
@@ -233,7 +290,7 @@ class Patch:
 
 class Solver(SolverBase):
     """
-    Adapter class to drive the iso_2d C extension module.
+    Adapter class to drive the isodg_2d C extension module.
     """
 
     def __init__(
@@ -249,6 +306,7 @@ class Solver(SolverBase):
     ):
         import numpy as np
 
+        cell = CellData(order=options.order)
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
 
@@ -297,9 +355,44 @@ class Solver(SolverBase):
         ni, nj = mesh.shape
 
         if solution is None:
-            primitive = initial_condition(setup, mesh, time)
+            xf = mesh.faces(0, num_zones)  # face coordinates
+            px = np.zeros([num_zones, 1, cell.num_points])
+            ux = np.zeros([num_zones, 1, cell.num_points])
+            uw = np.zeros([num_zones, 1, cell.order])
+            dx = mesh.dx
+
+    conserved_w = np.zeros([nx, ny, 3 * 6])
+
+    for i in range(ni):
+        for j in range(nj):
+            # global coordinates of zone centers
+            xc, yc = mesh.cell_coordinates(i, j)
+            # loop over quadrature points in each zone
+            for ic in range(cell.num_points):
+                for jc in range(cell.num_points):
+                    xp = xc + 0.5 * mesh.dx * cell.gauss_points[ic]
+                    yp = yc + 0.5 * mesh.dy * cell.gauss_points[jc]
+                    # primitive values at quadrature points
+                    setup.primitive(time, xp, yp, primitive[ic, jc])
+
+            for i in range(num_zones):
+                for j in range(cell.num_points):
+                    xsi = cell.gauss_points[j]
+                    xj = xf[i] + (xsi + 1.0) * 0.5 * dx
+                    setup.primitive(time, xj, px[i, :, j])
+
+            ux[...] = px[...]  # the conserved variable is also the primitive
+
+            for i in range(num_zones):
+                uw[i] = cell.to_weights(ux[i])
+            self.conserved_w = uw
         else:
-            primitive = solution
+            self.conserved_w = solution
+
+        # if solution is None:
+        #    primitive = initial_condition(setup, mesh, time)
+        # else:
+        #    primitive = solution
 
         if physics.buffer_is_enabled:
             # Here we sample the initial condition at the buffer onset radius
@@ -407,17 +500,16 @@ class Solver(SolverBase):
             (patch.execution_context for patch in self.patches),
         )
 
-#    def advance(self, dt):
-#        self.new_iteration()
-#        self.advance_rk(0.0, dt)
-#        self.advance_rk(0.5, dt)
+    #    def advance(self, dt):
+    #        self.new_iteration()
+    #        self.advance_rk(0.0, dt)
+    #        self.advance_rk(0.5, dt)
 
     def advance(self, dt):
         self.new_iteration()
         self.advance_rk(0.0, dt)
         self.advance_rk(0.75, dt)
         self.advance_rk(1.0 / 3.0, dt)
-
 
     def advance_rk(self, rk_param, dt):
         self.set_bc("primitive1")
