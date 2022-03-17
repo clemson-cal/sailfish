@@ -83,8 +83,10 @@ class Patch:
 
     def point_mass_source_term(self, which_mass):
         """
-        Returns an array of conserved quantities over a patch.
+        Return an array of the rates of conserved quantities, resulting from the application of
+        gravitational and/or accretion source terms due to point masses.
         """
+
         ng = 2  # number of guard cells
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
@@ -133,8 +135,8 @@ class Patch:
                 self.xr,
                 self.yl,
                 self.yr,
-                self.physics.sound_speed ** 2,
-                self.physics.mach_number ** 2,
+                self.physics.sound_speed**2,
+                self.physics.mach_number**2,
                 self.physics.eos_type.value,
                 m1.position_x,
                 m1.position_y,
@@ -169,10 +171,10 @@ class Patch:
 
     def advance_rk(self, rk_param, dt):
         """
-        Passes required parameters for time evolution of the setup.
+        Pass required parameters for time evolution of the setup.
 
-        Calls the C-module function responsible for performing time evolution
-        using a RK algorithm to update the parameters of the setup.
+        This function calls the C-module function responsible for performing time evolution using a
+        RK algorithm to update the parameters of the setup.
         """
         m1, m2 = self.physics.point_masses(self.time)
         buffer_central_mass = m1.mass + m2.mass
@@ -211,8 +213,8 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                self.physics.sound_speed ** 2,
-                self.physics.mach_number ** 2,
+                self.physics.sound_speed**2,
+                self.physics.mach_number**2,
                 self.physics.eos_type.value,
                 self.physics.viscosity_coefficient,
                 rk_param,
@@ -398,8 +400,9 @@ class Solver(SolverBase):
         return 0.4
 
     def maximum_wavespeed(self):
-        "Returns the global maximum wavespeed over the whole domain."
-
+        """
+        Return the global maximum wavespeed over the whole domain.
+        """
         return lazy_reduce(
             max,
             float,
