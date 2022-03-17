@@ -81,20 +81,45 @@ class Options(NamedTuple):
     mach_ceiling: float = 1e12
 
 
+def primitive_to_conserved(prim, cons):
+    sigma, vx, vy = prim
+    cons[0] = sigma
+    cons[1] = sigma * vx
+    cons[2] = sigma * vx
+
+
 def initial_condition(setup, mesh, time):
     """
-    Generate a 2D array of primitive data from a mesh and a setup.
+    Generate a 2D array of weights from a mesh and a setup.
     """
     import numpy as np
 
+    n_cons = 3
+    n_poly = 3
+    order = 3
     ni, nj = mesh.shape
-    primitive = np.zeros([ni, nj, 3])
+    dx, dy = mesh.dx, mesh.dy
+    prim_node = np.zeros(n_cons)
+    cons_node = np.zeros(n_cons)
+    weights = np.zeros([ni, nj, n_cons, n_poly])
+
+    g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
+    w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
 
     for i in range(ni):
         for j in range(nj):
-            setup.primitive(time, mesh.cell_coordinates(i, j), primitive[i, j])
+            for ip in range(3):
+                for jp in range(3):
+                    xc, yc = mesh.cell_coordinates(i, j)
+                    x = xc + 0.5 * dx * g[ip]
+                    y = yc + 0.5 * dy * g[jp]
+                    setup.primitive(time, (x, y), prim_node)
+                    primitive_to_conserved(prim_node, cons_node)
+                    for q in range(n_cons):
+                        for p in range(n_poly):
+                            weights[i, j, q, p] += cons_node[q] * w[ip] * w[jp]
 
-    return primitive
+    return weights
 
 
 class Patch:
@@ -217,7 +242,7 @@ class Patch:
             return self.wavespeeds.max()
 
     def recompute_conserved(self):
-        "Converts the most recent primitive array to conserved"
+        """Converts the most recent primitive array to conserved"""
         with self.execution_context:
             return self.lib.cbdiso_2d_primitive_to_conserved[self.shape](
                 self.primitive1,
