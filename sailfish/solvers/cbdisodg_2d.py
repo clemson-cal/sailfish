@@ -133,8 +133,8 @@ class Patch:
                 self.xr,
                 self.yl,
                 self.yr,
-                self.physics.sound_speed ** 2,
-                self.physics.mach_number ** 2,
+                self.physics.sound_speed**2,
+                self.physics.mach_number**2,
                 self.physics.eos_type.value,
                 m1.position_x,
                 m1.position_y,
@@ -211,8 +211,8 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                self.physics.sound_speed ** 2,
-                self.physics.mach_number ** 2,
+                self.physics.sound_speed**2,
+                self.physics.mach_number**2,
                 self.physics.eos_type.value,
                 self.physics.viscosity_coefficient,
                 rk_param,
@@ -253,7 +253,7 @@ class Solver(SolverBase):
         self._options = options = Options(**options)
 
         if type(mesh) is not PlanarCartesian2DMesh:
-            raise ValueError("solver only supports 2D cartesian mesh")
+            raise ValueError("solver only supports 2D Cartesian mesh")
 
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
@@ -277,7 +277,7 @@ class Solver(SolverBase):
             raise ValueError("solver only supports constant gravitational softening")
 
         xp = get_array_module(mode)
-        ng = 2  # number of guard zones
+        ng = 1  # number of guard zones
         nq = 3  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
@@ -407,10 +407,17 @@ class Solver(SolverBase):
             (patch.execution_context for patch in self.patches),
         )
 
+#    def advance(self, dt):
+#        self.new_iteration()
+#        self.advance_rk(0.0, dt)
+#        self.advance_rk(0.5, dt)
+
     def advance(self, dt):
         self.new_iteration()
         self.advance_rk(0.0, dt)
-        self.advance_rk(0.5, dt)
+        self.advance_rk(0.75, dt)
+        self.advance_rk(1.0 / 3.0, dt)
+
 
     def advance_rk(self, rk_param, dt):
         self.set_bc("primitive1")
