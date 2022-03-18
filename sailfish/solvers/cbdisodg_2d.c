@@ -85,8 +85,9 @@ PRIVATE void point_mass_source_term(
     struct PointMass *mass,
     double x1,
     double y1,
+    double dt,
     double *prim,
-    double *cons_dot)
+    double *delta_cons)
 {
     double x0 = mass->x;
     double y0 = mass->y;
@@ -108,9 +109,9 @@ PRIVATE void point_mass_source_term(
     {
         case 1: // acceleration-free
         {
-            cons_dot[0] =  mdot;
-            cons_dot[1] =  mdot * prim[1] +  fx;
-            cons_dot[2] =  mdot * prim[2] +  fy;
+            delta_cons[0] = dt * mdot;
+            delta_cons[1] = dt * mdot * prim[1] + dt * fx;
+            delta_cons[2] = dt * mdot * prim[2] + dt * fy;
             break;
         }
         case 2: // torque-free
@@ -124,23 +125,23 @@ PRIVATE void point_mass_source_term(
             double dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
             double vxstar = dvdotrhat * rhatx + vx0;
             double vystar = dvdotrhat * rhaty + vy0;
-            cons_dot[0] =  mdot;
-            cons_dot[1] =  mdot * vxstar +  fx;
-            cons_dot[2] =  mdot * vystar +  fy;
+            delta_cons[0] = dt * mdot;
+            delta_cons[1] = dt * mdot * vxstar + dt * fx;
+            delta_cons[2] = dt * mdot * vystar + dt * fy;
             break;
         }
         case 3: // force-free
         {
-            cons_dot[0] =  mdot;
-            cons_dot[1] =  fx;
-            cons_dot[2] =  fy;
+            delta_cons[0] = dt * mdot;
+            delta_cons[1] = dt * fx;
+            delta_cons[2] = dt * fy;
             break;
         }
         default: // sink is inactive
         {
-            cons_dot[0] = 0.0;
-            cons_dot[1] = 0.0;
-            cons_dot[2] = 0.0;
+            delta_cons[0] = 0.0;
+            delta_cons[1] = 0.0;
+            delta_cons[2] = 0.0;
             break;
         }
     }
@@ -150,21 +151,21 @@ PRIVATE void point_masses_source_term(
     struct PointMassList *mass_list,
     double x1,
     double y1,
+    double dt,
     double *prim,
-    double *cons_dot)
+    double *cons)
 {
     for (int p = 0; p < 2; ++p)
     {
-        double cons_dot_single[NCONS];
-        point_mass_source_term(&mass_list->masses[p], x1, y1, prim, cons_dot_single);
+        double delta_cons[NCONS];
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
-            cons_dot[q] += cons_dot_single[q];
+            cons[q] += delta_cons[q];
         }
     }
 }
-
 
 // ============================ EOS AND BUFFER ================================
 // ============================================================================
@@ -674,7 +675,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
                 conserved_to_primitive(uij, pij, velocity_ceiling);
                 buffer_source_term(&buffer, xp, yp, uij, u_dot);
-                point_masses_source_term(&mass_list, xp, yp, pij, u_dot);
+                point_masses_source_term(&mass_list, xp, yp, 1.0, pij, u_dot);
 
                 double flux_x[NCONS];
                 double flux_y[NCONS];
@@ -766,6 +767,15 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
     struct PointMassList mass_list = {{m1, m2}};
 
+    // Gaussian quadrature points in scaled domain xsi=[-1,1]
+    double g[3] = {-0.774596669241483, 0.000000000000000, 0.774596669241483};
+    // Gaussian weights at quadrature points
+    double w[3] = { 0.555555555555556, 0.888888888888889, 0.555555555555556};
+        // Scaled LeGendre polynomials at quadrature points
+    double p[3][3] = {{ 1.000000000000000, 1.000000000000000, 1.000000000000000},
+                      {-1.341640786499873, 0.000000000000000, 1.341640786499873},
+                      { 0.894427190999914, -1.11803398874990, 0.894427190999914}};
+
     int ng = 1; // number of guard zones
     int si = NCONS * NPOLY * (nj + 2 * ng);
     int sj = NCONS * NPOLY;
@@ -775,16 +785,71 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
 
     FOR_EACH_2D(ni, nj)
     {
-        // TODO: integrate the source terms over the cell, and return the change in mass and
-        // momentum for the whole cell.
-
-        // int ncc = (i + ng) * si + (j + ng) * sj;
-
-        // double xc = patch_xl + (i + 0.5) * dx;
-        // double yc = patch_yl + (j + 0.5) * dy;
+        int ncc = (i + ng) * si + (j + ng) * sj;
+        double *ucc  = &weights[ncc];
+        double *udot = &cons_rate[ncc];        
+        double xc = patch_xl + (i + 0.5) * dx;
+        double yc = patch_yl + (j + 0.5) * dy;
         // double *pc = &primitive[ncc];
         // double *uc = &cons_rate[ncc];
         // point_mass_source_term(&mass_list.masses[which_mass - 1], xc, yc, 1.0, pc, uc);
+
+        double u_dot[NCONS];
+        double u_dot_sum[NCONS];
+        double phiij[NPOLY];
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            u_dot[q]     = 0.0;
+            u_dot_sum[q] = 0.0;
+        }
+
+        for (int ic = 0; ic < 3; ++ic)
+        {
+            for (int jc = 0; jc < 3; ++jc)
+            {
+                double xp = xc + 0.5 * g[ic] * dx;
+                double yp = yc + 0.5 * g[jc] * dy;
+                
+                // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at cell points
+                int il = 0;
+                for (int m = 0; m < 3; ++m)
+                {
+                    for (int n = 0; n < 3; ++n)
+                    {
+                        if ((n + m) < 3)
+                        {
+                            phiij[il]  =  p[m][ic] *  p[n][jc];
+                            il += 1;
+                        }
+                    }
+                }
+
+                double uij[NCONS];
+                double pij[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    uij[q] = 0.0;
+
+                    for (int l = 0; l < NPOLY; ++l)
+                    {
+                        uij[q] += ucc[NPOLY * q + l] * phiij[l];
+                    }
+                }
+
+                conserved_to_primitive(uij, pij, velocity_ceiling);
+                point_mass_source_term(&mass_list.masses[which_mass - 1], xp, yp, 1.0, pij, u_dot);
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_dot_sum[q] += w[ic] * w[jc] * udot[q];
+                }
+            }
+        }
+        for (int q = 0; q < NCONS; ++q)
+        {
+            udot[q] = u_dot_sum[q];
+        }
     }
 }
 
