@@ -368,7 +368,7 @@ PRIVATE double dot(double *u, double *p)
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-PUBLIC void cbdiso_2d_advance_rk(
+PUBLIC void cbdisodg_2d_advance_rk(
     int ni,
     int nj,
     double patch_xl, // mesh
@@ -448,6 +448,15 @@ PUBLIC void cbdiso_2d_advance_rk(
     int si = NCONS * NPOLY * (nj + 2 * ng);
     int sj = NCONS * NPOLY;
 
+    for (int q = 0; q < NCONS; ++q)
+    {
+        for (int l = 0; l < NPOLY; ++l)
+        {
+            surface_term[NPOLY * q + l] = 0.0;
+            volume_term[ NPOLY * q + l] = 0.0;
+        }
+    }
+
     FOR_EACH_2D(ni, nj)
     {
         double xl = patch_xl + (i + 0.0) * dx;
@@ -523,7 +532,7 @@ PUBLIC void cbdiso_2d_advance_rk(
 
         for (int ip = 0; ip < 3; ++ip)
         {
-            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) at face points
+            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) at face node
             int il = 0;
             for (int m = 0; m < 3; ++m)
             {
@@ -704,27 +713,27 @@ PUBLIC void cbdiso_2d_advance_rk(
     }
 }
 
-PUBLIC void cbdiso_2d_primitive_to_conserved(
-    int ni,
-    int nj,
-    double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
-    double *conserved) // :: $.shape == (ni + 4, nj + 4, 3)
-{
-    int ng = 2; // number of guard zones
-    int si = NCONS * (nj + 2 * ng);
-    int sj = NCONS;
+//PUBLIC void cbdisodg_2d_primitive_to_conserved(
+//    int ni,
+//    int nj,
+//    double *primitive, // :: $.shape == (ni + 4, nj + 4, 3)
+//    double *conserved) // :: $.shape == (ni + 4, nj + 4, 3)
+//{
+//    int ng = 2; // number of guard zones
+//    int si = NCONS * (nj + 2 * ng);
+//    int sj = NCONS;
+//
+//    FOR_EACH_2D(ni, nj)
+//    {
+//        int n = (i + ng) * si + (j + ng) * sj;
+//
+//        double *pc = &primitive[n];
+//        double *uc = &conserved[n];
+//        primitive_to_conserved(pc, uc);
+//    }
+//}
 
-    FOR_EACH_2D(ni, nj)
-    {
-        int n = (i + ng) * si + (j + ng) * sj;
-
-        double *pc = &primitive[n];
-        double *uc = &conserved[n];
-        primitive_to_conserved(pc, uc);
-    }
-}
-
-PUBLIC void cbdiso_2d_point_mass_source_term(
+PUBLIC void cbdisodg_2d_point_mass_source_term(
     int ni,
     int nj,
     double patch_xl, // mesh
@@ -780,7 +789,7 @@ PUBLIC void cbdiso_2d_point_mass_source_term(
 }
 
 
-PUBLIC void cbdiso_2d_wavespeed(
+PUBLIC void cbdisodg_2d_wavespeed(
     int ni, // mesh
     int nj,
     double patch_xl,
@@ -825,17 +834,25 @@ PUBLIC void cbdiso_2d_wavespeed(
 
     FOR_EACH_2D(ni, nj)
     {
-        // TODO: compute the wavespeed from cons_to_prim(zero_weight).
+        int np = (i + ng) * si + (j + ng) * sj;
+        int na = (i + ng) * ti + (j + ng) * tj;
+        double x = patch_xl + (i + 0.5) * dx;
+        double y = patch_yl + (j + 0.5) * dy;
+        
+        double *ucc = &weights[np];
 
-        // int np = (i + ng) * si + (j + ng) * sj;
-        // int na = (i + ng) * ti + (j + ng) * tj;
+        double uij[NCONS];
+        double pij[NCONS];
 
-        // double x = patch_xl + (i + 0.5) * dx;
-        // double y = patch_yl + (j + 0.5) * dy;
+        // use zeroth weights for zone average of conserved variables
+        for (int q = 0; q < NCONS; ++q)
+        {
+            uij[q] = ucc[NPOLY * q + 0];
+        }
 
-        // double *pc = &primitive[np];
-        // double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
-        // double a = primitive_max_wavespeed(pc, cs2);
-        // wavespeed[na] = a;
+        conserved_to_primitive(uij, pij, velocity_ceiling);
+        double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+        double a = primitive_max_wavespeed(pij, cs2);
+        wavespeed[na] = a;
     }
 }
