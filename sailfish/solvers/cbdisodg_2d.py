@@ -50,6 +50,17 @@ def initial_condition(setup, mesh, time):
 
     g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
     w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
+    // Scaled LeGendre polynomials at quadrature points
+    p = [[ 1.000000000000000, 1.000000000000000, 1.000000000000000],
+         [-1.341640786499873, 0.000000000000000, 1.341640786499873],
+         [ 0.894427190999914, -1.11803398874990, 0.894427190999914]]
+    phi = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    il = 0
+    for ip in range(3):
+        for jp in range(3):
+            if ip + jp < 3:
+                phi[il] = p[ip] * p[jp]
+                il = il + 1
 
     for i in range(ni):
         for j in range(nj):
@@ -62,7 +73,9 @@ def initial_condition(setup, mesh, time):
                     primitive_to_conserved(prim_node, cons_node)
                     for q in range(NCONS):
                         for p in range(NPOLY):
-                            weights[i, j, q, p] += cons_node[q] * w[ip] * w[jp]
+                            weights[i, j, q, p] += (
+                                0.25 * cons_node[q] * phi[p] * w[ip] * w[jp]
+                            )
 
     return weights
 
@@ -158,7 +171,7 @@ class Patch:
         """
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context:
-            self.lib.cbdiso_2d_wavespeed[self.shape](
+            self.lib.cbdisodg_2d_wavespeed[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
@@ -205,7 +218,7 @@ class Patch:
         buffer_surface_density = self.buffer_surface_density
 
         with self.execution_context:
-            self.lib.cbdiso_2d_advance_rk[self.shape](
+            self.lib.cbdisodg_2d_advance_rk[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
