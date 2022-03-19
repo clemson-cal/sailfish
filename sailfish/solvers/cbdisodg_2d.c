@@ -655,6 +655,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
                 double uij[NCONS];
                 double pij[NCONS];
+                double dudx[NCONS];
+                double dudy[NCONS];
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -662,7 +664,9 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
                     for (int l = 0; l < NPOLY; ++l)
                     {
-                        uij[q] += ucc[NPOLY * q + l] * phiij[l];
+                        uij[q]  += ucc[NPOLY * q + l] * phiij[l];
+                        dudx[q] += ucc[NPOLY * q + l] * dphidx[l];
+                        dudy[q] += ucc[NPOLY * q + l] * dphidy[l];
                     }
                 }
 
@@ -683,7 +687,23 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 primitive_to_flux(pij, uij, flux_x, cs2ij, 0);
                 primitive_to_flux(pij, uij, flux_y, cs2ij, 1);
 
-                // Add viscous fluxes here? Use point value of strain.
+                // velocity derivatives
+                double dvxdx = dudx[1] / uij[0] - uij[1] * dudx[0] / uij[0] / uij[0]; 
+                double dvydx = dudx[2] / uij[0] - uij[2] * dudx[0] / uij[0] / uij[0]; 
+                double dvxdy = dudy[1] / uij[0] - uij[1] * dudy[0] / uij[0] / uij[0]; 
+                double dvydy = dudy[2] / uij[0] - uij[2] * dudy[0] / uij[0] / uij[0]; 
+                
+                double mu = uij[0] * nu;
+
+                // viscous stress tensor components
+                double tau_xx = 4.0 /3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+                double tau_yy = 4.0 /3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+                double tau_xy = dvxdy + dvydx;
+
+                flux_x[1] -= mu * tau_xx;
+                flux_x[2] -= mu * tau_xy;
+                flux_y[1] -= mu * tau_xy;
+                flux_y[2] -= mu * tau_yy;
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -786,7 +806,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
     FOR_EACH_2D(ni, nj)
     {
         int ncc = (i + ng) * si + (j + ng) * sj;
-        double *ucc  = &weights[ncc];
+        double *ucc = &weights[ncc];
         double *udot = &cons_rate[ncc];        
         double xc = patch_xl + (i + 0.5) * dx;
         double yc = patch_yl + (j + 0.5) * dy;
