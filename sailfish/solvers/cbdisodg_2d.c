@@ -524,6 +524,97 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double surface_term[NCONS * NPOLY];
         double volume_term[NCONS * NPOLY];
 
+        // Volume term including source terms
+        for (int ic = 0; ic < 3; ++ic)
+        {
+            for (int jc = 0; jc < 3; ++jc)
+            {
+                double xp = xc + 0.5 * g[ic] * dx;
+                double yp = yc + 0.5 * g[jc] * dy;
+
+                double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yp, &mass_list);
+
+                // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at cell points
+                int il = 0;
+                for (int m = 0; m < 3; ++m)
+                {
+                    for (int n = 0; n < 3; ++n)
+                    {
+                        if ((n + m) < 3)
+                        {
+                            phiij[il]  =  p[m][ic] *  p[n][jc];
+                            dphidx[il] = pp[m][ic] *  p[n][jc];
+                            dphidy[il] =  p[m][ic] * pp[n][jc];
+                            il += 1;
+                        }
+                    }
+                }
+
+                double uij[NCONS];
+                double pij[NCONS];
+                double dudx[NCONS];
+                double dudy[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    uij[q] = 0.0;
+
+                    for (int l = 0; l < NPOLY; ++l)
+                    {
+                        uij[q]  += ucc[NPOLY * q + l] * phiij[l];
+                        dudx[q] += ucc[NPOLY * q + l] * dphidx[l];
+                        dudy[q] += ucc[NPOLY * q + l] * dphidy[l];
+                    }
+                }
+
+                double u_dot[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_dot[q] = 0.0;
+                }
+
+                conserved_to_primitive(uij, pij, velocity_ceiling);
+                buffer_source_term(&buffer, xp, yp, uij, u_dot);
+                point_masses_source_term(&mass_list, xp, yp, 1.0, pij, u_dot);
+
+                double flux_x[NCONS];
+                double flux_y[NCONS];
+
+                primitive_to_flux(pij, uij, flux_x, cs2p, 0);
+                primitive_to_flux(pij, uij, flux_y, cs2p, 1);
+
+                // velocity derivatives
+                double dvxdx = dudx[1] / uij[0] - uij[1] * dudx[0] / uij[0] / uij[0]; 
+                double dvydx = dudx[2] / uij[0] - uij[2] * dudx[0] / uij[0] / uij[0]; 
+                double dvxdy = dudy[1] / uij[0] - uij[1] * dudy[0] / uij[0] / uij[0]; 
+                double dvydy = dudy[2] / uij[0] - uij[2] * dudy[0] / uij[0] / uij[0]; 
+                
+                double mu = uij[0] * nu;
+
+                // viscous stress tensor components
+                double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+                double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+                double tau_xy = dvxdy + dvydx;
+
+                flux_x[1] -= mu * tau_xx;
+                flux_x[2] -= mu * tau_xy;
+                flux_y[1] -= mu * tau_xy;
+                flux_y[2] -= mu * tau_yy;
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    for (int l = 0; l < NPOLY; ++l)
+                    {
+                        volume_term[NPOLY * q + l] +=
+                            w[ic] * w[jc] *
+                            (flux_x[q] * dphidx[l] * dx + flux_y[q] * dphidy[l] * dy
+                                + 0.5 * dx * dy * u_dot[q] * phiij[l]);
+                    }
+                }
+            }
+        }
+
         //// Surface term; loop over face nodes
 //
         //for (int ip = 0; ip < 3; ++ip)
@@ -624,7 +715,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
         {
             double yp = yc + 0.5 * g[ip] * dy;
 
-            double cs2 = sound_speed_squared(cs2, mach_squared, eos_type, xl, yp, &mass_list);
+            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xl, yp, &mass_list);
 
             for (int q = 0; q < NCONS; ++q){
 
@@ -652,7 +743,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2, 0);
+            riemann_hlle(um, up, flux, cs2p, 0);
 
             // add viscous flux
 
@@ -675,7 +766,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             double mu = 0.5 * (um[0] + up[0]) * nu;
 
             // viscous stress tensor components
-            double tau_xx = 4.0 /3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+            double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
             double tau_xy = dvxdy + dvydx;
 
             flux[1] -= mu * tau_xx;
@@ -695,7 +786,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
         {
             double yp = yc + 0.5 * g[ip] * dy;
 
-            double cs2 = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);
+            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);
 
             for (int q = 0; q < NCONS; ++q){
 
@@ -723,7 +814,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2, 0);
+            riemann_hlle(um, up, flux, cs2p, 0);
 
             // add viscous flux
 
@@ -746,7 +837,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             double mu = 0.5 * (um[0] + up[0]) * nu;
 
             // viscous stress tensor components
-            double tau_xx = 4.0 /3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+            double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
             double tau_xy = dvxdy + dvydx;
 
             flux[1] -= mu * tau_xx;
@@ -766,7 +857,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
         {
             double xp = xc + 0.5 * g[ip] * dx;
 
-            double cs2 = sound_speed_squared(cs2, mach_squared, eos_type, xp, yl, &mass_list);
+            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yl, &mass_list);
 
             for (int q = 0; q < NCONS; ++q){
 
@@ -794,7 +885,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2, 1);
+            riemann_hlle(um, up, flux, cs2p, 1);
 
             // add viscous flux
 
@@ -817,8 +908,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             double mu = 0.5 * (um[0] + up[0]) * nu;
 
             // viscous stress tensor components
-            //double tau_xx = 4.0 /3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-            double tau_yy = 4.0 /3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+            double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
             double tau_xy = dvxdy + dvydx;
 
             flux[1] -= mu * tau_xy;
@@ -838,7 +928,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
         {
             double xp = xc + 0.5 * g[ip] * dx;
 
-            double cs2 = sound_speed_squared(cs2, mach_squared, eos_type, xp, yr, &mass_list);
+            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yr, &mass_list);
 
             for (int q = 0; q < NCONS; ++q){
 
@@ -866,7 +956,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2, 1);
+            riemann_hlle(um, up, flux, cs2p, 1);
 
             // add viscous flux
 
@@ -889,7 +979,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             double mu = 0.5 * (um[0] + up[0]) * nu;
 
             // viscous stress tensor components 
-            double tau_yy = 4.0 /3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+            double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
             double tau_xy = dvxdy + dvydx;
 
             flux[1] -= mu * tau_xy;
@@ -902,97 +992,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
                     surface_term[NPOLY * q + l] -= flux[q] * nhat[1] * phir[l] * w[ip] * dy;
                 }
             }            
-        }
-
-        // Volume term including source terms
-        for (int ic = 0; ic < 3; ++ic)
-        {
-            for (int jc = 0; jc < 3; ++jc)
-            {
-                double xp = xc + 0.5 * g[ic] * dx;
-                double yp = yc + 0.5 * g[jc] * dy;
-
-                double cs2ij = sound_speed_squared(cs2, mach_squared, eos_type, xp, yp, &mass_list);
-
-                // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at cell points
-                int il = 0;
-                for (int m = 0; m < 3; ++m)
-                {
-                    for (int n = 0; n < 3; ++n)
-                    {
-                        if ((n + m) < 3)
-                        {
-                            phiij[il]  =  p[m][ic] *  p[n][jc];
-                            dphidx[il] = pp[m][ic] *  p[n][jc];
-                            dphidy[il] =  p[m][ic] * pp[n][jc];
-                            il += 1;
-                        }
-                    }
-                }
-
-                double uij[NCONS];
-                double pij[NCONS];
-                double dudx[NCONS];
-                double dudy[NCONS];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    uij[q] = 0.0;
-
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        uij[q]  += ucc[NPOLY * q + l] * phiij[l];
-                        dudx[q] += ucc[NPOLY * q + l] * dphidx[l];
-                        dudy[q] += ucc[NPOLY * q + l] * dphidy[l];
-                    }
-                }
-
-                double u_dot[NCONS];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_dot[q] = 0.0;
-                }
-
-                conserved_to_primitive(uij, pij, velocity_ceiling);
-                buffer_source_term(&buffer, xp, yp, uij, u_dot);
-                point_masses_source_term(&mass_list, xp, yp, 1.0, pij, u_dot);
-
-                double flux_x[NCONS];
-                double flux_y[NCONS];
-
-                primitive_to_flux(pij, uij, flux_x, cs2ij, 0);
-                primitive_to_flux(pij, uij, flux_y, cs2ij, 1);
-
-                // velocity derivatives
-                double dvxdx = dudx[1] / uij[0] - uij[1] * dudx[0] / uij[0] / uij[0]; 
-                double dvydx = dudx[2] / uij[0] - uij[2] * dudx[0] / uij[0] / uij[0]; 
-                double dvxdy = dudy[1] / uij[0] - uij[1] * dudy[0] / uij[0] / uij[0]; 
-                double dvydy = dudy[2] / uij[0] - uij[2] * dudy[0] / uij[0] / uij[0]; 
-                
-                double mu = uij[0] * nu;
-
-                // viscous stress tensor components
-                double tau_xx = 4.0 /3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-                double tau_yy = 4.0 /3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-                double tau_xy = dvxdy + dvydx;
-
-                flux_x[1] -= mu * tau_xx;
-                flux_x[2] -= mu * tau_xy;
-                flux_y[1] -= mu * tau_xy;
-                flux_y[2] -= mu * tau_yy;
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        volume_term[NPOLY * q + l] +=
-                            w[ic] * w[jc] *
-                            (flux_x[q] * dphidx[l] * dx + flux_y[q] * dphidy[l] * dy
-                                + 0.5 * dx * dy * u_dot[q] * phiij[l]);
-                    }
-                }
-            }
         }
 
         double *w0 = &weights0[ncc];
