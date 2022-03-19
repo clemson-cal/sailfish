@@ -454,15 +454,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
     int si = NCONS * NPOLY * (nj + 2 * ng);
     int sj = NCONS * NPOLY;
 
-    for (int q = 0; q < NCONS; ++q)
-    {
-        for (int l = 0; l < NPOLY; ++l)
-        {
-            surface_term[NPOLY * q + l] = 0.0;
-            volume_term[ NPOLY * q + l] = 0.0;
-        }
-    }
-
     FOR_EACH_2D(ni, nj)
     {
         double xl = patch_xl + (i + 0.0) * dx;
@@ -523,6 +514,15 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
         double surface_term[NCONS * NPOLY];
         double volume_term[NCONS * NPOLY];
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            for (int l = 0; l < NPOLY; ++l)
+            {
+                surface_term[NPOLY * q + l] = 0.0;
+                volume_term[ NPOLY * q + l] = 0.0;
+            }
+        }
 
         // Volume term including source terms
         for (int ic = 0; ic < 3; ++ic)
@@ -1118,10 +1118,11 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
                 point_mass_source_term(&mass_list.masses[which_mass - 1], xp, yp, 1.0, pij, u_dot);
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    u_dot_sum[q] += w[ic] * w[jc] * udot[q];
+                    u_dot_sum[q] += w[ic] * w[jc] * u_dot[q];
                 }
             }
         }
+        
         for (int q = 0; q < NCONS; ++q)
         {
             udot[q] = u_dot_sum[q];
