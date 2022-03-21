@@ -56,7 +56,7 @@ def initial_condition(setup, mesh, time):
         [-1.341640786499873, 0.000000000000000, 1.341640786499873],
         [0.894427190999914, -1.11803398874990, 0.894427190999914],
     ]
-    phi = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
+    # phi = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
     il = 0
     for ip in range(3):
         for jp in range(3):
@@ -161,6 +161,7 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
+                velocity_ceiling,
                 which_mass,
                 self.weights1,
                 cons_rate,
@@ -199,6 +200,7 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
+                velocity_ceiling,
                 self.weights1,
                 self.wavespeeds,
             )
@@ -327,7 +329,8 @@ class Solver(SolverBase):
         nq = NCONS  # number of conserved quantities
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        lib = Library(code, mode=mode, debug=False)
+        #        lib = Library(code, mode=mode, debug=False)
+        lib = Library(code, mode=mode, debug=True)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")

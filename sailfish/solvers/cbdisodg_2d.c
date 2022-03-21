@@ -224,24 +224,6 @@ PRIVATE void buffer_source_term(
     }
 }
 
-PRIVATE void shear_strain(
-    const double *gx,
-    const double *gy,
-    double dx,
-    double dy,
-    double *s)
-{
-    double sxx = 4.0 / 3.0 * gx[1] / dx - 2.0 / 3.0 * gy[2] / dy;
-    double syy =-2.0 / 3.0 * gx[1] / dx + 4.0 / 3.0 * gy[2] / dy;
-    double sxy = 1.0 / 1.0 * gx[2] / dx + 1.0 / 1.0 * gy[1] / dy;
-    double syx = sxy;
-    s[0] = sxx;
-    s[1] = sxy;
-    s[2] = syx;
-    s[3] = syy;
-}
-
-
 // ============================ HYDRO =========================================
 // ============================================================================
 PRIVATE void conserved_to_primitive(
@@ -258,21 +240,6 @@ PRIVATE void conserved_to_primitive(
     prim[0] = rho;
     prim[1] = vx;
     prim[2] = vy;
-}
-
-PRIVATE void primitive_to_conserved(
-    const double *prim,
-    double *cons)
-{
-    double rho = prim[0];
-    double vx = prim[1];
-    double vy = prim[2];
-    double px = vx * rho;
-    double py = vy * rho;
-
-    cons[0] = rho;
-    cons[1] = px;
-    cons[2] = py;
 }
 
 PRIVATE double primitive_to_velocity(
@@ -332,6 +299,7 @@ PRIVATE void riemann_hlle(
     const double *ur,
     double *flux,
     double cs2,
+    double velocity_ceiling,
     int direction)
 {
     double pl[NCONS];
@@ -341,8 +309,8 @@ PRIVATE void riemann_hlle(
     double al[2];
     double ar[2];
 
-    conserved_to_primitive(ul, pl);
-    conserved_to_primitive(ur, pr);
+    conserved_to_primitive(ul, pl, velocity_ceiling);
+    conserved_to_primitive(ur, pr, velocity_ceiling);
     primitive_to_flux(pl, ul, fl, cs2, direction);
     primitive_to_flux(pr, ur, fr, cs2, direction);
     primitive_to_outer_wavespeeds(pl, al, cs2, direction);
@@ -355,16 +323,6 @@ PRIVATE void riemann_hlle(
     {
         flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
     }
-}
-
-PRIVATE double dot(double *u, double *p)
-{
-    double sum = 0.0;
-
-    for (int i = 0; i < NPOLY; ++i) {
-        sum += u[i] * p[i];
-    }
-    return sum;
 }
 
 // ============================ PUBLIC API ====================================
@@ -498,19 +456,25 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double flux[NCONS];
         double um[NCONS];
         double up[NCONS];
-
-        // face node values of basis function phi
-        double phil[NPOLY];
-        double dphidxl[NPOLY];
-        double dphidyl[NPOLY];
-        double phir[NPOLY];
-        double dphidxr[NPOLY];
-        double dphidyr[NPOLY];
+        double dudxm[NCONS];
+        double dudxp[NCONS];
+        double dudym[NCONS];
+        double dudyp[NCONS];
 
         // interior node values of basis function phi and derivatives
         double phi[NPOLY];
         double dphidx[NPOLY];
         double dphidy[NPOLY];
+
+        // left face node values of basis function phi and derivatives
+        double phil[NPOLY];
+        double dphidxl[NPOLY];
+        double dphidyl[NPOLY];
+
+        // right face node values of basis function phi and derivatives
+        double phir[NPOLY];
+        double dphidxr[NPOLY];
+        double dphidyr[NPOLY];
 
         double surface_term[NCONS * NPOLY];
         double volume_term[NCONS * NPOLY];
@@ -542,7 +506,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                     {
                         if ((n + m) < 3)
                         {
-                            phiij[il]  =  p[m][ic] *  p[n][jc];
+                            phi[il]  =  p[m][ic] *  p[n][jc];
                             dphidx[il] = pp[m][ic] *  p[n][jc];
                             dphidy[il] =  p[m][ic] * pp[n][jc];
                             il += 1;
@@ -558,10 +522,12 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 for (int q = 0; q < NCONS; ++q)
                 {
                     uij[q] = 0.0;
+                    dudx[q] = 0.0;
+                    dudy[q] = 0.0;
 
                     for (int l = 0; l < NPOLY; ++l)
                     {
-                        uij[q]  += ucc[NPOLY * q + l] * phiij[l];
+                        uij[q]  += ucc[NPOLY * q + l] * phi[l];
                         dudx[q] += ucc[NPOLY * q + l] * dphidx[l];
                         dudy[q] += ucc[NPOLY * q + l] * dphidy[l];
                     }
@@ -584,23 +550,26 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 primitive_to_flux(pij, uij, flux_x, cs2p, 0);
                 primitive_to_flux(pij, uij, flux_y, cs2p, 1);
 
-                // velocity derivatives
-                double dvxdx = dudx[1] / uij[0] - uij[1] * dudx[0] / uij[0] / uij[0]; 
-                double dvydx = dudx[2] / uij[0] - uij[2] * dudx[0] / uij[0] / uij[0]; 
-                double dvxdy = dudy[1] / uij[0] - uij[1] * dudy[0] / uij[0] / uij[0]; 
-                double dvydy = dudy[2] / uij[0] - uij[2] * dudy[0] / uij[0] / uij[0]; 
-                
-                double mu = uij[0] * nu;
-
-                // viscous stress tensor components
-                double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-                double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-                double tau_xy = dvxdy + dvydx;
-
-                flux_x[1] -= mu * tau_xx;
-                flux_x[2] -= mu * tau_xy;
-                flux_y[1] -= mu * tau_xy;
-                flux_y[2] -= mu * tau_yy;
+                if (nu > 0.0)
+                {
+                    // velocity derivatives
+                    double dvxdx = dudx[1] / uij[0] - uij[1] * dudx[0] / uij[0] / uij[0]; 
+                    double dvydx = dudx[2] / uij[0] - uij[2] * dudx[0] / uij[0] / uij[0]; 
+                    double dvxdy = dudy[1] / uij[0] - uij[1] * dudy[0] / uij[0] / uij[0]; 
+                    double dvydy = dudy[2] / uij[0] - uij[2] * dudy[0] / uij[0] / uij[0]; 
+                    
+                    double mu = uij[0] * nu;
+    
+                    // viscous stress tensor components
+                    double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+                    double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+                    double tau_xy = dvxdy + dvydx;
+    
+                    flux_x[1] -= mu * tau_xx;
+                    flux_x[2] -= mu * tau_xy;
+                    flux_y[1] -= mu * tau_xy;
+                    flux_y[2] -= mu * tau_yy;
+                }
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -609,7 +578,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                         volume_term[NPOLY * q + l] +=
                             w[ic] * w[jc] *
                             (flux_x[q] * dphidx[l] * dx + flux_y[q] * dphidy[l] * dy
-                                + 0.5 * dx * dy * u_dot[q] * phiij[l]);
+                                + 0.5 * dx * dy * u_dot[q] * phi[l]);
                     }
                 }
             }
@@ -689,27 +658,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
         // Surface terms; loop over face nodes (one face at a time)
         
-        // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
-        int il = 0;
-        for (int m = 0; m < 3; ++m)
-        {
-            for (int n = 0; n < 3; ++n)
-            {
-                if ((n + m) < 3)
-                {
-                    // phi and derivatives at left side of zone
-                    phil[il]    =    pfl[m] *  p[n][ip];
-                    dphidxl[il] =   ppfl[m] *  p[n][ip];
-                    dphidyl[il] =    pfl[m] * pp[n][ip];
-                    // phi and derivatives at right side of zone
-                    phir[il]    =    pfr[m] *  p[n][ip];
-                    dphidxr[il] =   ppfr[m] *  p[n][ip];
-                    dphidyr[il] =    pfr[m] * pp[n][ip];      
-                    il += 1;
-                }
-            }
-        }
-
         // Left face
         for (int ip = 0; ip < 3; ++ip)
         {
@@ -717,60 +665,96 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
             double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xl, yp, &mass_list);
 
+            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
+            int il = 0;
+            for (int m = 0; m < 3; ++m)
+            {
+                for (int n = 0; n < 3; ++n)
+                {
+                    if ((n + m) < 3)
+                    {
+                        // phi and derivatives at left side of zone
+                        phil[il]    =    pfl[m] *  p[n][ip];
+                        dphidxl[il] =   ppfl[m] *  p[n][ip];
+                        dphidyl[il] =    pfl[m] * pp[n][ip];
+                        // phi and derivatives at right side of zone
+                        phir[il]    =    pfr[m] *  p[n][ip];
+                        dphidxr[il] =   ppfr[m] *  p[n][ip];
+                        dphidyr[il] =    pfr[m] * pp[n][ip];      
+                        il += 1;
+                    }
+                }
+            }
             for (int q = 0; q < NCONS; ++q){
 
                 // minus side of face
                 um[q] = 0.0; 
-                dudxm[q] = 0.0;
-                dudym[q] = 0.0;
 
                 // plus side of face
                 up[q] = 0.0; 
-                dudxp[q] = 0.0;
-                dudyp[q] = 0.0;
 
                 for (int l = 0; l < NPOLY; ++l)
                 {
                     // "minus side": right face of zone i-1
                     um[q]    += uli[NPOLY * q + l] * phir[l]; 
-                    dudxm[q] += uli[NPOLY * q + l] * dphidxr[l];
-                    dudym[q] += uli[NPOLY * q + l] * dphidyr[l];
 
                     // "plus side": left face of zone i
                     up[q]    += ucc[NPOLY * q + l] * phil[l]; 
-                    dudxp[q] += ucc[NPOLY * q + l] * dphidxl[l];
-                    dudyp[q] += ucc[NPOLY * q + l] * dphidyl[l];
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2p, 0);
+            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 0);
 
             // add viscous flux
+            if (nu > 0.0)
+            {
+                for (int q = 0; q < NCONS; ++q){
+    
+                    // minus side of face
+                    dudxm[q] = 0.0;
+                    dudym[q] = 0.0;
+    
+                    // plus side of face
+                    dudxp[q] = 0.0;
+                    dudyp[q] = 0.0;
+    
+                    for (int l = 0; l < NPOLY; ++l)
+                    {
+                        // "minus side": right face of zone i-1
+                        dudxm[q] += uli[NPOLY * q + l] * dphidxr[l];
+                        dudym[q] += uli[NPOLY * q + l] * dphidyr[l];
+    
+                        // "plus side": left face of zone i
+                        dudxp[q] += ucc[NPOLY * q + l] * dphidxl[l];
+                        dudyp[q] += ucc[NPOLY * q + l] * dphidyl[l];
+                    }
+                }
 
-            // velocity derivatives (average of minus and plus sides)
-            double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-            double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-            double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-            double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
-
-            dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-            dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-            dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-            dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-
-            dvxdx *= 0.5; 
-            dvydx *= 0.5; 
-            dvxdy *= 0.5; 
-            dvydy *= 0.5;
-
-            double mu = 0.5 * (um[0] + up[0]) * nu;
-
-            // viscous stress tensor components
-            double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-            double tau_xy = dvxdy + dvydx;
-
-            flux[1] -= mu * tau_xx;
-            flux[2] -= mu * tau_xy;
+                // velocity derivatives (average of minus and plus sides)
+                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
+                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
+                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
+                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
+    
+                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
+                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
+                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
+                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
+    
+                dvxdx *= 0.5; 
+                dvydx *= 0.5; 
+                dvxdy *= 0.5; 
+                dvydy *= 0.5;
+    
+                double mu = 0.5 * (um[0] + up[0]) * nu;
+    
+                // viscous stress tensor components
+                double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+                double tau_xy = dvxdy + dvydx;
+    
+                flux[1] -= mu * tau_xx;
+                flux[2] -= mu * tau_xy;
+            }
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -788,60 +772,97 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
             double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);
 
+            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
+            int il = 0;
+            for (int m = 0; m < 3; ++m)
+            {
+                for (int n = 0; n < 3; ++n)
+                {
+                    if ((n + m) < 3)
+                    {
+                        // phi and derivatives at left side of zone
+                        phil[il]    =    pfl[m] *  p[n][ip];
+                        dphidxl[il] =   ppfl[m] *  p[n][ip];
+                        dphidyl[il] =    pfl[m] * pp[n][ip];
+                        // phi and derivatives at right side of zone
+                        phir[il]    =    pfr[m] *  p[n][ip];
+                        dphidxr[il] =   ppfr[m] *  p[n][ip];
+                        dphidyr[il] =    pfr[m] * pp[n][ip];      
+                        il += 1;
+                    }
+                }
+            }
+
             for (int q = 0; q < NCONS; ++q){
 
                 // minus side of face
                 um[q] = 0.0; 
-                dudxm[q] = 0.0;
-                dudym[q] = 0.0;
 
                 // plus side of face
                 up[q] = 0.0; 
-                dudxp[q] = 0.0;
-                dudyp[q] = 0.0;
 
                 for (int l = 0; l < NPOLY; ++l)
                 {
                     // "minus side": right face of zone i
                     um[q]    += ucc[NPOLY * q + l] * phir[l]; 
-                    dudxp[q] += ucc[NPOLY * q + l] * dphidxr[l];
-                    dudyp[q] += ucc[NPOLY * q + l] * dphidyr[l];
 
                     // "plus side": left face of zone i+1
                     up[q]    += uri[NPOLY * q + l] * phil[l]; 
-                    dudxm[q] += uri[NPOLY * q + l] * dphidxl[l];
-                    dudym[q] += uri[NPOLY * q + l] * dphidyl[l];
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2p, 0);
+            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 0);
 
             // add viscous flux
+            if (nu > 0.0)
+            {
+                for (int q = 0; q < NCONS; ++q){
+    
+                    // minus side of face
+                    dudxm[q] = 0.0;
+                    dudym[q] = 0.0;
+    
+                    // plus side of face
+                    dudxp[q] = 0.0;
+                    dudyp[q] = 0.0;
+    
+                    for (int l = 0; l < NPOLY; ++l)
+                    {
+                        // "minus side": right face of zone i
+                        dudxm[q] += ucc[NPOLY * q + l] * dphidxr[l];
+                        dudym[q] += ucc[NPOLY * q + l] * dphidyr[l];
+    
+                        // "plus side": left face of zone i+1
+                        dudxp[q] += uri[NPOLY * q + l] * dphidxl[l];
+                        dudyp[q] += uri[NPOLY * q + l] * dphidyl[l];
+                    }
+                }
 
-            // velocity derivatives (average of minus and plus sides)
-            double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-            double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-            double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-            double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
-
-            dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-            dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-            dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-            dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-
-            dvxdx *= 0.5; 
-            dvydx *= 0.5; 
-            dvxdy *= 0.5; 
-            dvydy *= 0.5;
-
-            double mu = 0.5 * (um[0] + up[0]) * nu;
-
-            // viscous stress tensor components
-            double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-            double tau_xy = dvxdy + dvydx;
-
-            flux[1] -= mu * tau_xx;
-            flux[2] -= mu * tau_xy;
+                // velocity derivatives (average of minus and plus sides)
+                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
+                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
+                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
+                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
+    
+                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
+                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
+                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
+                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
+    
+                dvxdx *= 0.5; 
+                dvydx *= 0.5; 
+                dvxdy *= 0.5; 
+                dvydy *= 0.5;
+    
+                double mu = 0.5 * (um[0] + up[0]) * nu;
+    
+                // viscous stress tensor components
+                double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+                double tau_xy = dvxdy + dvydx;
+    
+                flux[1] -= mu * tau_xx;
+                flux[2] -= mu * tau_xy;
+            }
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -859,60 +880,97 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
             double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yl, &mass_list);
 
+            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
+            int il = 0;
+            for (int m = 0; m < 3; ++m)
+            {
+                for (int n = 0; n < 3; ++n)
+                {
+                    if ((n + m) < 3)
+                    {
+                        // phi and derivatives at left side of zone
+                        phil[il]    =    pfl[m] *  p[n][ip];
+                        dphidxl[il] =   ppfl[m] *  p[n][ip];
+                        dphidyl[il] =    pfl[m] * pp[n][ip];
+                        // phi and derivatives at right side of zone
+                        phir[il]    =    pfr[m] *  p[n][ip];
+                        dphidxr[il] =   ppfr[m] *  p[n][ip];
+                        dphidyr[il] =    pfr[m] * pp[n][ip];      
+                        il += 1;
+                    }
+                }
+            }
+
             for (int q = 0; q < NCONS; ++q){
 
                 // minus side of face
                 um[q] = 0.0; 
-                dudxm[q] = 0.0;
-                dudym[q] = 0.0;
 
                 // plus side of face
                 up[q] = 0.0; 
-                dudxp[q] = 0.0;
-                dudyp[q] = 0.0;
 
                 for (int l = 0; l < NPOLY; ++l)
                 {
                     // "minus side": top face of zone j-1
                     um[q]    += ulj[NPOLY * q + l] * phir[l]; 
-                    dudxm[q] += ulj[NPOLY * q + l] * dphidxr[l];
-                    dudym[q] += ulj[NPOLY * q + l] * dphidyr[l];
 
                     // "plus side": bottom face of zone ij
                     up[q]    += ucc[NPOLY * q + l] * phil[l]; 
-                    dudxp[q] += ucc[NPOLY * q + l] * dphidxl[l];
-                    dudyp[q] += ucc[NPOLY * q + l] * dphidyl[l];
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2p, 1);
+            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 1);
 
             // add viscous flux
+            if (nu > 0.0)
+            {
+                for (int q = 0; q < NCONS; ++q){
 
-            // velocity derivatives (average of minus and plus sides)
-            double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-            double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-            double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-            double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
+                    // minus side of face
+                    dudxm[q] = 0.0;
+                    dudym[q] = 0.0;
+    
+                    // plus side of face
+                    dudxp[q] = 0.0;
+                    dudyp[q] = 0.0;
+    
+                    for (int l = 0; l < NPOLY; ++l)
+                    {
+                        // "minus side": top face of zone j-1
+                        dudxm[q] += ulj[NPOLY * q + l] * dphidxr[l];
+                        dudym[q] += ulj[NPOLY * q + l] * dphidyr[l];
+    
+                        // "plus side": bottom face of zone ij
+                        dudxp[q] += ucc[NPOLY * q + l] * dphidxl[l];
+                        dudyp[q] += ucc[NPOLY * q + l] * dphidyl[l];
+                    }
+                }
 
-            dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-            dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-            dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-            dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-
-            dvxdx *= 0.5; 
-            dvydx *= 0.5; 
-            dvxdy *= 0.5; 
-            dvydy *= 0.5;
-
-            double mu = 0.5 * (um[0] + up[0]) * nu;
-
-            // viscous stress tensor components
-            double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-            double tau_xy = dvxdy + dvydx;
-
-            flux[1] -= mu * tau_xy;
-            flux[2] -= mu * tau_yy;
+                // velocity derivatives (average of minus and plus sides)
+                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
+                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
+                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
+                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
+    
+                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
+                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
+                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
+                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
+    
+                dvxdx *= 0.5; 
+                dvydx *= 0.5; 
+                dvxdy *= 0.5; 
+                dvydy *= 0.5;
+    
+                double mu = 0.5 * (um[0] + up[0]) * nu;
+    
+                // viscous stress tensor components
+                double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+                double tau_xy = dvxdy + dvydx;
+    
+                flux[1] -= mu * tau_xy;
+                flux[2] -= mu * tau_yy;
+            }
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -930,60 +988,97 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
             double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yr, &mass_list);
 
+            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
+            int il = 0;
+            for (int m = 0; m < 3; ++m)
+            {
+                for (int n = 0; n < 3; ++n)
+                {
+                    if ((n + m) < 3)
+                    {
+                        // phi and derivatives at left side of zone
+                        phil[il]    =    pfl[m] *  p[n][ip];
+                        dphidxl[il] =   ppfl[m] *  p[n][ip];
+                        dphidyl[il] =    pfl[m] * pp[n][ip];
+                        // phi and derivatives at right side of zone
+                        phir[il]    =    pfr[m] *  p[n][ip];
+                        dphidxr[il] =   ppfr[m] *  p[n][ip];
+                        dphidyr[il] =    pfr[m] * pp[n][ip];      
+                        il += 1;
+                    }
+                }
+            }
+
             for (int q = 0; q < NCONS; ++q){
 
                 // minus side of face
                 um[q] = 0.0; 
-                dudxm[q] = 0.0;
-                dudym[q] = 0.0;
 
                 // plus side of face
                 up[q] = 0.0; 
-                dudxp[q] = 0.0;
-                dudyp[q] = 0.0;
 
                 for (int l = 0; l < NPOLY; ++l)
                 {
                     // "minus side": top face of zone j
                     up[q]    += ucc[NPOLY * q + l] * phir[l]; 
-                    dudxp[q] += ucc[NPOLY * q + l] * dphidxr[l];
-                    dudyp[q] += ucc[NPOLY * q + l] * dphidyr[l];
 
                     // "plus side": bottom face of zone j+1
                     um[q]    += urj[NPOLY * q + l] * phil[l]; 
-                    dudxm[q] += urj[NPOLY * q + l] * dphidxl[l];
-                    dudym[q] += urj[NPOLY * q + l] * dphidyl[l];
                 }
             }
 
-            riemann_hlle(um, up, flux, cs2p, 1);
+            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 1);
 
             // add viscous flux
-
-            // velocity derivatives (average of minus and plus sides)
-            double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-            double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-            double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-            double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
-
-            dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-            dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-            dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-            dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-
-            dvxdx *= 0.5; 
-            dvydx *= 0.5; 
-            dvxdy *= 0.5; 
-            dvydy *= 0.5;
-
-            double mu = 0.5 * (um[0] + up[0]) * nu;
-
-            // viscous stress tensor components 
-            double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-            double tau_xy = dvxdy + dvydx;
-
-            flux[1] -= mu * tau_xy;
-            flux[2] -= mu * tau_yy;
+            if (nu > 0.0)
+            {
+                for (int q = 0; q < NCONS; ++q){
+    
+                    // minus side of face
+                    dudxm[q] = 0.0;
+                    dudym[q] = 0.0;
+    
+                    // plus side of face
+                    dudxp[q] = 0.0;
+                    dudyp[q] = 0.0;
+    
+                    for (int l = 0; l < NPOLY; ++l)
+                    {
+                        // "minus side": top face of zone j
+                        dudxp[q] += ucc[NPOLY * q + l] * dphidxr[l];
+                        dudyp[q] += ucc[NPOLY * q + l] * dphidyr[l];
+    
+                        // "plus side": bottom face of zone j+1
+                        dudxm[q] += urj[NPOLY * q + l] * dphidxl[l];
+                        dudym[q] += urj[NPOLY * q + l] * dphidyl[l];
+                    }
+                }
+    
+                // velocity derivatives (average of minus and plus sides)
+                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
+                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
+                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
+                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
+    
+                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
+                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
+                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
+                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
+    
+                dvxdx *= 0.5; 
+                dvydx *= 0.5; 
+                dvxdy *= 0.5; 
+                dvydy *= 0.5;
+    
+                double mu = 0.5 * (um[0] + up[0]) * nu;
+    
+                // viscous stress tensor components 
+                double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+                double tau_xy = dvxdy + dvydx;
+    
+                flux[1] -= mu * tau_xy;
+                flux[2] -= mu * tau_yy;
+            }
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -1000,7 +1095,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
         for (int q = 0; q < NCONS; ++q)
         {
-            for (int l = 0; l < NK; ++l)
+            for (int l = 0; l < NPOLY; ++l)
             {
                 int n = NPOLY * q + l;
                 w2[n] = w1[n] + 0.5 * (surface_term[n] + volume_term[n]) * dt / (dx * dy);
@@ -1035,6 +1130,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
     double sink_rate2,
     double sink_radius2,
     int sink_model2,
+    double velocity_ceiling,
     int which_mass, // :: $ in [1, 2]
     double *weights, // :: $.shape == (ni + 2, nj + 2, 18)
     double *cons_rate) // :: $.shape == (ni + 2, nj + 2, 3)
@@ -1072,7 +1168,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
 
         double u_dot[NCONS];
         double u_dot_sum[NCONS];
-        double phiij[NPOLY];
+        double phi[NPOLY];
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -1087,7 +1183,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
                 double xp = xc + 0.5 * g[ic] * dx;
                 double yp = yc + 0.5 * g[jc] * dy;
                 
-                // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at cell points
+                // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) at cell points
                 int il = 0;
                 for (int m = 0; m < 3; ++m)
                 {
@@ -1095,7 +1191,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
                     {
                         if ((n + m) < 3)
                         {
-                            phiij[il]  =  p[m][ic] *  p[n][jc];
+                            phi[il]  =  p[m][ic] *  p[n][jc];
                             il += 1;
                         }
                     }
@@ -1110,7 +1206,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
 
                     for (int l = 0; l < NPOLY; ++l)
                     {
-                        uij[q] += ucc[NPOLY * q + l] * phiij[l];
+                        uij[q] += ucc[NPOLY * q + l] * phi[l];
                     }
                 }
 
@@ -1122,7 +1218,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
                 }
             }
         }
-        
+
         for (int q = 0; q < NCONS; ++q)
         {
             udot[q] = u_dot_sum[q];
@@ -1159,6 +1255,7 @@ PUBLIC void cbdisodg_2d_wavespeed(
     double sink_rate2,
     double sink_radius2,
     int sink_model2,
+    double velocity_ceiling,
     double *weights, // :: $.shape == (ni + 2, nj + 2, 18)
     double *wavespeed) // :: $.shape == (ni + 2, nj + 2)
 {
