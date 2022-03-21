@@ -56,13 +56,8 @@ def initial_condition(setup, mesh, time):
         [-1.341640786499873, 0.000000000000000, 1.341640786499873],
         [0.894427190999914, -1.11803398874990, 0.894427190999914],
     ]
-    # phi = [0.0, 0.0, 0.0, 0.0, 0.0, 0.0]
-    il = 0
-    for ip in range(3):
-        for jp in range(3):
-            if ip + jp < 3:
-                phi[il] = p[ip] * p[jp]
-                il = il + 1
+
+    phi = np.zeros(NPOLY)
 
     for i in range(ni):
         for j in range(nj):
@@ -73,10 +68,16 @@ def initial_condition(setup, mesh, time):
                     y = yc + 0.5 * dy * g[jp]
                     setup.primitive(time, (x, y), prim_node)
                     primitive_to_conserved(prim_node, cons_node)
+                    il = 0
+                    for n in range(3):
+                        for m in range(3):
+                            if n + m < 3:
+                                phi[il] = p[n][ip] * p[m][jp]
+                                il += 1
                     for q in range(NCONS):
-                        for p in range(NPOLY):
-                            weights[i, j, q, p] += (
-                                0.25 * cons_node[q] * phi[p] * w[ip] * w[jp]
+                        for l in range(NPOLY):
+                            weights[i, j, q, l] += (
+                                0.25 * cons_node[q] * phi[l] * w[ip] * w[jp]
                             )
 
     return weights
