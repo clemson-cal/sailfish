@@ -334,9 +334,9 @@ PUBLIC void cbdisodg_2d_advance_rk(
     double patch_xr,
     double patch_yl,
     double patch_yr,
-    double *weights0, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
-    double *weights1, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
-    double *weights2, // :: $.shape == (ni + 2, nj + 2, 18) # 18 = NCONS * NPOLY
+    double *weights0, // :: $.shape == (ni + 2, nj + 2, 3, 6) # 3, 6 = NCONS, NPOLY
+    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 6) # 3, 6 = NCONS, NPOLY
+    double *weights2, // :: $.shape == (ni + 2, nj + 2, 3, 6) # 3, 6 = NCONS, NPOLY
     double buffer_surface_density,
     double buffer_central_mass,
     double buffer_driving_rate,
@@ -769,11 +769,10 @@ PUBLIC void cbdisodg_2d_advance_rk(
         for (int ip = 0; ip < 3; ++ip)
         {
             double yp = yc + 0.5 * g[ip] * dy;
-
             double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);
+            int il = 0;
 
             // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
-            int il = 0;
             for (int m = 0; m < 3; ++m)
             {
                 for (int n = 0; n < 3; ++n)
@@ -793,8 +792,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 }
             }
 
-            for (int q = 0; q < NCONS; ++q){
-
+            for (int q = 0; q < NCONS; ++q)
+            {
                 // minus side of face
                 um[q] = 0.0; 
 
@@ -810,7 +809,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
                     up[q]    += uri[NPOLY * q + l] * phil[l]; 
                 }
             }
-
             riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 0);
 
             // add viscous flux
@@ -1132,7 +1130,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
     int sink_model2,
     double velocity_ceiling,
     int which_mass, // :: $ in [1, 2]
-    double *weights, // :: $.shape == (ni + 2, nj + 2, 18)
+    double *weights, // :: $.shape == (ni + 2, nj + 2, 3, 6)
     double *cons_rate) // :: $.shape == (ni + 2, nj + 2, 3)
 {
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
@@ -1226,7 +1224,6 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
     }
 }
 
-
 PUBLIC void cbdisodg_2d_wavespeed(
     int ni, // mesh
     int nj,
@@ -1256,7 +1253,7 @@ PUBLIC void cbdisodg_2d_wavespeed(
     double sink_radius2,
     int sink_model2,
     double velocity_ceiling,
-    double *weights, // :: $.shape == (ni + 2, nj + 2, 18)
+    double *weights,   // :: $.shape == (ni + 2, nj + 2, 3, 6)
     double *wavespeed) // :: $.shape == (ni + 2, nj + 2)
 {
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};

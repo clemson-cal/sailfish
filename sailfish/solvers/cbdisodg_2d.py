@@ -50,14 +50,22 @@ def initial_condition(setup, mesh, time):
 
     g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
     w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
-    # Scaled LeGendre polynomials at quadrature points
-    p = [
-        [1.000000000000000, 1.000000000000000, 1.000000000000000],
-        [-1.341640786499873, 0.000000000000000, 1.341640786499873],
-        [0.894427190999914, -1.11803398874990, 0.894427190999914],
-    ]
+    # scaled LeGendre polynomials at quadrature points
+    p = (
+        (+1.000000000000000, +1.000000000000000, +1.000000000000000),
+        (-1.341640786499873, +0.000000000000000, +1.341640786499873),
+        (+0.894427190999914, -1.118033988749900, +0.894427190999914),
+    )
+    phi = np.zeros([3, 3, NPOLY])
 
-    phi = np.zeros(NPOLY)
+    for ip in range(3):
+        for jp in range(3):
+            il = 0
+            for n in range(3):
+                for m in range(3):
+                    if n + m < 3:
+                        phi[ip][jp][il] = p[n][ip] * p[m][jp]
+                        il += 1
 
     for i in range(ni):
         for j in range(nj):
@@ -68,18 +76,11 @@ def initial_condition(setup, mesh, time):
                     y = yc + 0.5 * dy * g[jp]
                     setup.primitive(time, (x, y), prim_node)
                     primitive_to_conserved(prim_node, cons_node)
-                    il = 0
-                    for n in range(3):
-                        for m in range(3):
-                            if n + m < 3:
-                                phi[il] = p[n][ip] * p[m][jp]
-                                il += 1
                     for q in range(NCONS):
                         for l in range(NPOLY):
                             weights[i, j, q, l] += (
-                                0.25 * cons_node[q] * phi[l] * w[ip] * w[jp]
+                                0.25 * cons_node[q] * phi[ip][jp][l] * w[ip] * w[jp]
                             )
-
     return weights
 
 
@@ -162,7 +163,7 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                velocity_ceiling,
+                self.options.velocity_ceiling,
                 which_mass,
                 self.weights1,
                 cons_rate,
@@ -201,7 +202,7 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                velocity_ceiling,
+                self.options.velocity_ceiling,
                 self.weights1,
                 self.wavespeeds,
             )
@@ -228,9 +229,9 @@ class Patch:
                 self.xr,
                 self.yl,
                 self.yr,
-                self.conserved0,
-                self.primitive1,
-                self.primitive2,
+                self.weights0,
+                self.weights1,
+                self.weights2,
                 buffer_surface_density,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
@@ -264,7 +265,7 @@ class Patch:
                 self.options.velocity_ceiling,
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
-        self.primitive1, self.primitive2 = self.primitive2, self.primitive1
+        self.weights1, self.weights2 = self.weights2, self.weights1
 
     def new_iteration(self):
         self.time0 = self.time
@@ -272,7 +273,7 @@ class Patch:
 
     @property
     def primitive(self):
-        sigma = self.weights1[:, :, :, 0]
+        u0 = self.weights1[:, :, :, 0]
         p0 = self.xp.zeros_like(u0)
         p0[..., 0] = u0[..., 0]
         p0[..., 1] = u0[..., 1] / u0[..., 0]
@@ -296,7 +297,7 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
-        import numpy as np
+        import numpy
 
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
@@ -328,6 +329,7 @@ class Solver(SolverBase):
         xp = get_array_module(mode)
         ng = GUARD  # number of guard zones
         nq = NCONS  # number of conserved quantities
+        np = NPOLY  # number of polynomials
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
         #        lib = Library(code, mode=mode, debug=False)
@@ -366,7 +368,7 @@ class Solver(SolverBase):
             buffer_surface_density = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
-            weights_patch = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
+            weights_patch = numpy.zeros([b - a + 2 * ng, nj + 2 * ng, nq, np])
             weights_patch[ng:-ng, ng:-ng] = weights[a:b]
             patch = Patch(
                 time,
@@ -453,12 +455,14 @@ class Solver(SolverBase):
         """
         Return the global maximum wavespeed over the whole domain.
         """
-        return lazy_reduce(
-            max,
-            float,
-            (patch.maximum_wavespeed for patch in self.patches),
-            (patch.execution_context for patch in self.patches),
-        )
+        # WARNING! Timestep calculation is disabled
+        return 5.0
+        # return lazy_reduce(
+        #     max,
+        #     float,
+        #     (patch.maximum_wavespeed for patch in self.patches),
+        #     (patch.execution_context for patch in self.patches),
+        # )
 
     #    def advance(self, dt):
     #        self.new_iteration()

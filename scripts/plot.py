@@ -185,7 +185,7 @@ def main_cbdiso_2d():
 
     for filename in args.checkpoints:
         fig, ax = plt.subplots()
-        chkpt = load_checkpoint(filename, require_solver="cbdiso_2d")
+        chkpt = load_checkpoint(filename)  # , require_solver="cbdiso_2d")
         mesh = chkpt["mesh"]
         prim = chkpt["primitive"]
         f = fields[args.field](prim).T
@@ -207,6 +207,10 @@ def main_cbdiso_2d():
         fig.suptitle(filename)
 
     plt.show()
+
+
+def main_cbdisodg_2d():
+    main_cbdiso_2d()
 
 
 def main_cbdgam_2d():
@@ -291,6 +295,11 @@ if __name__ == "__main__":
             if chkpt["solver"] == "cbdiso_2d":
                 print("plotting for cbdiso_2d solver")
                 exit(main_cbdiso_2d())
+            if chkpt["solver"] == "cbdisodg_2d":
+                print("plotting for cbdisodg_2d solver")
+                exit(main_cbdisodg_2d())
             if chkpt["solver"] == "cbdgam_2d":
                 print("plotting for cbdgam_2d solver")
                 exit(main_cbdgam_2d())
+            else:
+                print(f"Unknown solver {chkpt['solver']}")

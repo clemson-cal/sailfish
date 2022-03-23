@@ -90,13 +90,17 @@ class CylindricalExplosion(Setup):
     @property
     def solver(self):
         if self.is_isothermal:
-            return "cbdiso_2d"
+            return "cbdisodg_2d"
         elif self.is_gamma_law:
             return "cbdgam_2d"
 
     @property
     def boundary_condition(self):
         return "outflow"
+
+    @property
+    def default_resolution(self):
+        return 200
 
     @property
     def default_end_time(self):
