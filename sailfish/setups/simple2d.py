@@ -5,6 +5,7 @@ Validation setups for various 2D solvers
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import EquationOfState
 from sailfish.setup import Setup, param
+from math import exp
 
 __all__ = ["UniformPolar", "CylindricalExplosion"]
 
@@ -50,6 +51,8 @@ class CylindricalExplosion(Setup):
     """
 
     eos = param("isothermal", "EOS type: either isothermal or gamma-law")
+    smooth = param(False, "Use a smooth initial condition rather than tophat")
+    use_dg = param(False, "Use the DG solver (isothermal only)")
 
     @property
     def is_isothermal(self):
@@ -62,20 +65,19 @@ class CylindricalExplosion(Setup):
     def primitive(self, t, coords, primitive):
         x, y = coords
         in_cylinder = (x * x + y * y) ** 0.5 < 0.25
+        r = (x * x + y * y) ** 0.5
+
+        if self.smooth:
+            f = exp(-((r / 0.25) ** 2.0))
+        else:
+            f = float(r < 0.25)
 
         if self.is_isothermal:
-            if in_cylinder:
-                primitive[0] = 1.0
-            else:
-                primitive[0] = 0.1
+            primitive[0] = 0.1 + 0.9 * f
 
         elif self.is_gamma_law:
-            if in_cylinder:
-                primitive[0] = 1.0
-                primitive[3] = 1.0
-            else:
-                primitive[0] = 0.1
-                primitive[3] = 0.125
+            primitive[0] = 0.100 + 0.900 * f
+            primitive[3] = 0.125 + 0.875 * f
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(1.0, resolution)
@@ -90,7 +92,7 @@ class CylindricalExplosion(Setup):
     @property
     def solver(self):
         if self.is_isothermal:
-            return "cbdisodg_2d"
+            return "cbdiso_2d" if not self.use_dg else "cbdisodg_2d"
         elif self.is_gamma_law:
             return "cbdgam_2d"
 
@@ -109,3 +111,5 @@ class CylindricalExplosion(Setup):
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
             raise ValueError(f"eos must be isothermal or gamma-law, got {self.eos}")
+        if self.use_dg and not self.is_isothermal:
+            raise ValueError("DG mode is only available for eos=isothermal")

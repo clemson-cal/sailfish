@@ -403,7 +403,7 @@ def simulate(driver):
         siml_time = solver.time
         user_time = siml_time / reference_time
 
-        if end_time is not None and user_time > end_time:
+        if end_time is not None and user_time >= end_time:
             break
 
         """

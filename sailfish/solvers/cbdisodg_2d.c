@@ -1103,6 +1103,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
     }
 }
 
+
 PUBLIC void cbdisodg_2d_point_mass_source_term(
     int ni,
     int nj,
@@ -1223,6 +1224,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
         }
     }
 }
+
 
 PUBLIC void cbdisodg_2d_wavespeed(
     int ni, // mesh

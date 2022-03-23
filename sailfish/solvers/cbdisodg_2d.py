@@ -339,6 +339,7 @@ class Solver(SolverBase):
         logger.info(f"subdivide grid over {num_patches} patches")
         logger.info(f"mesh is {mesh}")
         logger.info(f"boundary condition is outflow")
+        logger.info(f"viscosity is {physics.viscosity_coefficient}")
 
         self.mesh = mesh
         self.setup = setup
