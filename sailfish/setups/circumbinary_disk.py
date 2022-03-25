@@ -171,3 +171,111 @@ class CircumbinaryDisk(Setup):
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time))
+
+
+class KitpCodeComparison(Setup):
+    mach_number = 10.0
+    eccentricity = 0.0
+    mass_ratio = 1.0
+    sink_radius = 0.05
+    softening_length = 0.05
+    viscous_nu = 0.001
+    sink_model = "torque_free"
+    domain_radius = param(8.0, "half side length of the square computational domain")
+    sink_rate = param(10.0, "component sink rate", mutable=True)
+    buffer_is_enabled = param(True, "whether the buffer zone is enabled")
+
+    def primitive(self, t, coords, primitive):
+        GM = 1.0
+        x, y = coords
+        r = sqrt(x * x + y * y)
+        r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
+        phi_hat_x = -y / max(r, 1e-12)
+        phi_hat_y = +x / max(r, 1e-12)
+
+        r_cav = 2.0
+        delta0 = 1e-5
+        sigma0 = 1.0
+        sigma = sigma0 * (delta0 + (1 - delta0) * exp(-((r_cav / r) ** 12)))
+
+        GM = 1.0
+        a = 1.0
+        n = 4.0
+        omegaB = GM / a**3
+        omega0 = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
+        omega = (omega0**-n + omegaB**-n) ** (-1 / n)
+
+        v_phi = omega * r
+
+        primitive[0] = sigma
+        primitive[1] = v_phi * phi_hat_x
+        primitive[2] = v_phi * phi_hat_y
+
+    def mesh(self, resolution):
+        return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
+
+    @property
+    def default_resolution(self):
+        return 1000
+
+    @property
+    def physics(self):
+        return dict(
+            eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
+            buffer_is_enabled=self.buffer_is_enabled,
+            buffer_driving_rate=100.0,
+            mach_number=self.mach_number,
+            point_mass_function=self.point_masses,
+            viscosity_coefficient=self.viscous_nu,
+        )
+
+    @property
+    def solver(self):
+        return "cbdiso_2d"
+
+    @property
+    def boundary_condition(self):
+        return "outflow"
+
+    @property
+    def default_end_time(self):
+        return 1.0
+
+    @property
+    def reference_time_scale(self):
+        return 2.0 * pi
+
+    def validate(self):
+        pass
+
+    @property
+    def orbital_elements(self):
+        return OrbitalElements(
+            semimajor_axis=1.0,
+            total_mass=1.0,
+            mass_ratio=self.mass_ratio,
+            eccentricity=self.eccentricity,
+        )
+
+    def point_masses(self, time):
+        m1, m2 = self.orbital_elements.orbital_state(time)
+
+        return (
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m1._asdict(),
+            ),
+            PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                **m2._asdict(),
+            ),
+        )
+
+    def checkpoint_diagnostics(self, time):
+        return dict(point_masses=self.point_masses(time))

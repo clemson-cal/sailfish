@@ -57,7 +57,6 @@ struct PointMassList {
 
 struct KeplerianBuffer {
     double surface_density;
-    double surface_pressure;
     double central_mass;
     double driving_rate;
     double outer_radius;
@@ -425,6 +424,7 @@ PUBLIC void cbdiso_2d_advance_rk(
         buffer_onset_width,
         buffer_is_enabled
     };
+
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
     struct PointMassList mass_list = {{m1, m2}};

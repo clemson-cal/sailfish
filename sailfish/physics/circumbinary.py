@@ -143,7 +143,7 @@ class Physics(NamedTuple):
     """ Square of the Mach number, if EOS type is locally isothermal """
 
     gamma_law_index: float = 5.0 / 3.0
-    """ Adiabatic index, if the EOS type is globally isothermal """
+    """ Adiabatic index, if the EOS type is not isothermal """
 
     viscosity_model: ViscosityModel = ViscosityModel.NONE
     """ Which viscosity model to use (none, nu, alpha) """
