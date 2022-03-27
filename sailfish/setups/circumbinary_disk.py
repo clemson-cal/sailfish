@@ -190,10 +190,8 @@ class KitpCodeComparison(Setup):
         x, y = coords
         r = sqrt(x * x + y * y)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
-        phi_hat_x = -y / max(r, 1e-12)
-        phi_hat_y = +x / max(r, 1e-12)
 
-        r_cav = 2.0
+        r_cav = 2.5
         delta0 = 1e-5
         sigma0 = 1.0
         sigma = sigma0 * (delta0 + (1 - delta0) * exp(-((r_cav / r) ** 12)))
@@ -201,15 +199,13 @@ class KitpCodeComparison(Setup):
         GM = 1.0
         a = 1.0
         n = 4.0
-        omegaB = GM / a**3
+        omegaB = (GM / a**3) ** 0.5
         omega0 = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
         omega = (omega0**-n + omegaB**-n) ** (-1 / n)
 
-        v_phi = omega * r
-
         primitive[0] = sigma
-        primitive[1] = v_phi * phi_hat_x
-        primitive[2] = v_phi * phi_hat_y
+        primitive[1] = omega * -y
+        primitive[2] = omega * +x
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)

@@ -3,7 +3,7 @@ Isothermal solver for the binary accretion problem in 2D planar coordinates.
 """
 
 from logging import getLogger
-from typing import NamedTuple
+from typing import NamedTuple, Callable
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
@@ -22,6 +22,7 @@ class Options(NamedTuple):
 
     velocity_ceiling: float = 1e12
     mach_ceiling: float = 1e12
+    patch_reduction_function: Callable = None
 
 
 def initial_condition(setup, mesh, time):
@@ -76,12 +77,27 @@ class Patch:
         self.buffer_surface_density = buffer_surface_density
 
         with self.execution_context:
+            x0 = self.xl + 0.5 * mesh.dx
+            x1 = self.xr - 0.5 * mesh.dx
+            y0 = self.yl + 0.5 * mesh.dy
+            y1 = self.yr - 0.5 * mesh.dy
+            self.coordinate_array_x = xp.linspace(x0, x1, ni)[:, None]
+            self.coordinate_array_y = xp.linspace(y0, y1, nj)[None, :]
             self.wavespeeds = xp.zeros(primitive.shape[:2])
             self.primitive1 = xp.array(primitive)
             self.primitive2 = xp.array(primitive)
             self.conserved0 = xp.zeros(primitive.shape)
 
-    def point_mass_source_term(self, which_mass):
+    @property
+    def cell_center_coordinate_arrays(self):
+        """
+        Return two 2d arrays, one with the cell-center X coordinates, and the
+        other with the cell-center Y coordinates. The arrays are either numpy
+        or cupy arrays, allocated for the device this patch is assigned to.
+        """
+        return self.coordinate_array_x, self.coordinate_array_y
+
+    def point_mass_source_term(self, which_mass, gravity=False, accretion=False):
         """
         Return an array of the rates of conserved quantities, resulting from the application of
         gravitational and/or accretion source terms due to point masses.
@@ -91,7 +107,8 @@ class Patch:
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
-        m1, m2 = self.physics.point_masses(self.time)
+        m = self.physics.point_masses(self.time)[which_mass - 1]
+
         with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
 
@@ -100,25 +117,15 @@ class Patch:
                 self.xr,
                 self.yl,
                 self.yr,
-                m1.position_x,
-                m1.position_y,
-                m1.velocity_x,
-                m1.velocity_y,
-                m1.mass,
-                m1.softening_length,
-                m1.sink_rate,
-                m1.sink_radius,
-                m1.sink_model.value,
-                m2.position_x,
-                m2.position_y,
-                m2.velocity_x,
-                m2.velocity_y,
-                m2.mass,
-                m2.softening_length,
-                m2.sink_rate,
-                m2.sink_radius,
-                m2.sink_model.value,
-                which_mass,
+                m.position_x,
+                m.position_y,
+                m.velocity_x,
+                m.velocity_y,
+                m.mass * float(gravity),
+                m.softening_length,
+                m.sink_rate * float(accretion),
+                m.sink_radius,
+                m.sink_model.value,
                 self.primitive1,
                 cons_rate,
             )
@@ -355,6 +362,7 @@ class Solver(SolverBase):
         then the result of this function is a 7-element list: :pyobj:`[time,
         mdot1, fx1, fy1, mdot2, fx2, fy2]`.
         """
+        import numpy as np
 
         def to_host(a):
             try:
@@ -363,7 +371,22 @@ class Solver(SolverBase):
                 return a
 
         def patch_reduction(patch, which):
-            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+            x, y = patch.cell_center_coordinate_arrays
+            r = (x**2 + y**2) ** 0.5
+            udot = patch.point_mass_source_term(which, gravity=True)
+            mdot = udot[..., 0]
+            fx = udot[..., 1]
+            fy = udot[..., 2]
+            torque = x * fy - y * fx
+            return np.array(
+                [
+                    mdot.sum() * da,
+                    fx.sum() * da,
+                    fy.sum() * da,
+                    torque.sum() * da,
+                    torque[r > 1.0].sum() * da,
+                ]
+            )
 
         da = self.mesh.dx * self.mesh.dy
         point_mass_reductions = [self.time]
