@@ -3,11 +3,16 @@ Isothermal solver for the binary accretion problem in 2D planar coordinates.
 """
 
 from logging import getLogger
-from typing import NamedTuple, Callable
+from typing import NamedTuple, List
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
+from sailfish.physics.circumbinary import (
+    Physics,
+    EquationOfState,
+    ViscosityModel,
+    Diagnostic,
+)
 from sailfish.solver import SolverBase
 from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 
@@ -22,7 +27,6 @@ class Options(NamedTuple):
 
     velocity_ceiling: float = 1e12
     mach_ceiling: float = 1e12
-    patch_reduction_function: Callable = None
 
 
 def initial_condition(setup, mesh, time):
@@ -99,8 +103,9 @@ class Patch:
 
     def point_mass_source_term(self, which_mass, gravity=False, accretion=False):
         """
-        Return an array of the rates of conserved quantities, resulting from the application of
-        gravitational and/or accretion source terms due to point masses.
+        Return an array of the rates of conserved quantities, resulting from
+        the application of gravitational and/or accretion source terms due to
+        point masses.
         """
 
         ng = 2  # number of guard cells
@@ -133,7 +138,7 @@ class Patch:
 
     def maximum_wavespeed(self):
         """
-        Returns the maximum wavespeed over a given patch.
+        Return the maximum wavespeed over a given patch.
         """
         m1, m2 = self.physics.point_masses(self.time)
         with self.execution_context:
@@ -169,7 +174,9 @@ class Patch:
             return self.wavespeeds.max()
 
     def recompute_conserved(self):
-        "Converts the most recent primitive array to conserved"
+        """
+        Convert the most recent primitive array to conserved.
+        """
         with self.execution_context:
             return self.lib.cbdiso_2d_primitive_to_conserved[self.shape](
                 self.primitive1,
@@ -257,6 +264,10 @@ class Solver(SolverBase):
         options=dict(),
     ):
         import numpy as np
+
+        physics["diagnostics"] = [
+            Diagnostic(**v) for v in physics.get("diagnostics", [])
+        ]
 
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)

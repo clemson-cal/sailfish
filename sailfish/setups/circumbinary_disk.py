@@ -216,6 +216,17 @@ class KitpCodeComparison(Setup):
 
     @property
     def physics(self):
+        diagnostics = [
+            # "time",
+            dict(quantity="ldot", which_mass=1, gravity=True, radial_cut=(0.0, 1.0)),
+            dict(quantity="ldot", which_mass=1, accretion=True, radial_cut=(0.0, 1.0)),
+            dict(quantity="ldot", which_mass=1, gravity=True, radial_cut=(1.0, 2.0)),
+            dict(quantity="ldot", which_mass=1, accretion=True, radial_cut=(1.0, 2.0)),
+            dict(quantity="ldot", which_mass=2, gravity=True, radial_cut=(0.0, 1.0)),
+            dict(quantity="ldot", which_mass=2, accretion=True, radial_cut=(0.0, 1.0)),
+            dict(quantity="ldot", which_mass=2, gravity=True, radial_cut=(1.0, 2.0)),
+            dict(quantity="ldot", which_mass=2, accretion=True, radial_cut=(1.0, 2.0)),
+        ]
         return dict(
             eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
             buffer_is_enabled=self.buffer_is_enabled,
@@ -223,6 +234,7 @@ class KitpCodeComparison(Setup):
             mach_number=self.mach_number,
             point_mass_function=self.point_masses,
             viscosity_coefficient=self.viscous_nu,
+            diagnostics=diagnostics,
         )
 
     @property
