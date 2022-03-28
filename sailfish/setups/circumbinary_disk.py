@@ -217,15 +217,16 @@ class KitpCodeComparison(Setup):
     @property
     def physics(self):
         diagnostics = [
-            # "time",
-            dict(quantity="ldot", which_mass=1, gravity=True, radial_cut=(0.0, 1.0)),
-            dict(quantity="ldot", which_mass=1, accretion=True, radial_cut=(0.0, 1.0)),
-            dict(quantity="ldot", which_mass=1, gravity=True, radial_cut=(1.0, 2.0)),
-            dict(quantity="ldot", which_mass=1, accretion=True, radial_cut=(1.0, 2.0)),
-            dict(quantity="ldot", which_mass=2, gravity=True, radial_cut=(0.0, 1.0)),
-            dict(quantity="ldot", which_mass=2, accretion=True, radial_cut=(0.0, 1.0)),
-            dict(quantity="ldot", which_mass=2, gravity=True, radial_cut=(1.0, 2.0)),
-            dict(quantity="ldot", which_mass=2, accretion=True, radial_cut=(1.0, 2.0)),
+            dict(quantity="time"),
+            dict(quantity="mdot", which_mass=1, accretion=True),
+            dict(quantity="mdot", which_mass=2, accretion=True),
+            dict(quantity="torque", which_mass="both", gravity=True),
+            dict(
+                quantity="torque",
+                which_mass="both",
+                gravity=True,
+                radial_cut=(1.0, self.domain_radius),
+            ),
         ]
         return dict(
             eos_type=EquationOfState.LOCALLY_ISOTHERMAL,

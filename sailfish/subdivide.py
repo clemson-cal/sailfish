@@ -3,6 +3,13 @@ Utility functions for domain decomposition.
 """
 
 
+def to_host(a):
+    try:
+        return a.get()
+    except AttributeError:
+        return a
+
+
 def lazy_reduce(reduction, block, launches, contexts):
     """
     Applies a reduction over a sequence of parallelizable device operations.
@@ -71,12 +78,6 @@ def concat_on_host(arrays: list, num_guard=None):
             except UnboundLocalError:
                 y = x
         return x
-
-    def to_host(a):
-        try:
-            return a.get()
-        except AttributeError:
-            return a
 
     if len(arrays[0].shape) == 2:
         ng = num_guard or 0

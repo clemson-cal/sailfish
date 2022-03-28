@@ -14,7 +14,7 @@ from sailfish.physics.circumbinary import (
     Diagnostic,
 )
 from sailfish.solver import SolverBase
-from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
+from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
 
 
 logger = getLogger(__name__)
@@ -107,10 +107,14 @@ class Patch:
         the application of gravitational and/or accretion source terms due to
         point masses.
         """
+        if which_mass == "both":
+            udot1 = self.point_mass_source_term(1, gravity=gravity, accretion=accretion)
+            udot2 = self.point_mass_source_term(2, gravity=gravity, accretion=accretion)
+            return udot1 + udot2
 
         ng = 2  # number of guard cells
         if which_mass not in (1, 2):
-            raise ValueError("the mass must be either 1 or 2")
+            raise ValueError("which_mass must be either 1 or 2")
 
         m = self.physics.point_masses(self.time)[which_mass - 1]
 
@@ -366,52 +370,87 @@ class Solver(SolverBase):
     def reductions(self):
         """
         Generate runtime reductions on the solution data for time series.
-
-        As of now, the reductions generated are the rates of mass accretion,
-        and of x and y momentum (combined gravitational and accretion)
-        resulting from each of the point masses. If there are 2 point masses,
-        then the result of this function is a 7-element list: :pyobj:`[time,
-        mdot1, fx1, fy1, mdot2, fx2, fy2]`.
         """
-        import numpy as np
 
-        def to_host(a):
-            try:
-                return a.get()
-            except AttributeError:
-                return a
+        diagnostics = self._physics.diagnostics
+        udots1_acc = [p.point_mass_source_term(1, accretion=True) for p in self.patches]
+        udots2_acc = [p.point_mass_source_term(2, accretion=True) for p in self.patches]
+        udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
+        udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
+        da = self.mesh.dx * self.mesh.dy
 
-        def patch_reduction(patch, which):
+        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False):
+            """
+            Return one of the udot fields: for a particular patch, conserved
+            variable quantity, radial cut (optional), and point mass (either
+            1, 2, or 'both'), term (either 'acc' or 'grv').
+            """
             x, y = patch.cell_center_coordinate_arrays
             r = (x**2 + y**2) ** 0.5
-            udot = patch.point_mass_source_term(which, gravity=True)
-            mdot = udot[..., 0]
-            fx = udot[..., 1]
-            fy = udot[..., 2]
-            torque = x * fy - y * fx
-            return np.array(
-                [
-                    mdot.sum() * da,
-                    fx.sum() * da,
-                    fy.sum() * da,
-                    torque.sum() * da,
-                    torque[r > 1.0].sum() * da,
-                ]
-            )
 
-        da = self.mesh.dx * self.mesh.dy
-        point_mass_reductions = [self.time]
+            if quantity == "mdot":
+                return get_field(patch, 0, cut, mass, gravity, accretion)
 
-        for n in range(self._physics.num_particles):
-            point_mass_reductions.extend(
-                lazy_reduce(
-                    sum,
-                    to_host,
-                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
-                    (patch.execution_context for patch in self.patches),
+            if quantity == "torque":
+                fx = get_field(patch, 1, cut, mass, gravity, accretion)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                return x * fy - y * fx
+
+            q = quantity
+            i = self.patches.index(patch)
+
+            if accretion:
+                udots1 = udots1_acc
+                udots2 = udots2_acc
+            elif gravity:
+                udots1 = udots1_grv
+                udots2 = udots2_grv
+
+            if mass == "both":
+                f = udots1[i][..., q] + udots2[i][..., q]
+            elif mass == 1:
+                f = udots1[i][..., q]
+            elif mass == 2:
+                f = udots2[i][..., q]
+
+            if cut is not None:
+                r0, r1 = cut
+                return f * (r0 < r) * (r < r1)
+            else:
+                return f
+
+        def get_fields(d):
+            return [
+                get_field(
+                    p,
+                    d.quantity,
+                    d.radial_cut,
+                    d.which_mass,
+                    gravity=d.gravity,
+                    accretion=d.accretion,
                 )
-            )
-        return point_mass_reductions
+                for p in self.patches
+            ]
+
+        def get_sum_fields(d):
+            return [f.sum() for f in get_fields(d)]
+
+        pass1 = []
+        pass2 = []
+
+        for d in diagnostics:
+            if d.quantity == "time":
+                pass1.append(self.time / self.setup.reference_time_scale)
+            else:
+                pass1.append(get_sum_fields(d))
+
+        for item in pass1:
+            if type(item) is not float:
+                pass2.append(sum(to_host(x) for x in item) * da)
+            else:
+                pass2.append(item)
+
+        return pass2
 
     @property
     def time(self):
