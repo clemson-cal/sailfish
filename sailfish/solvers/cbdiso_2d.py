@@ -378,6 +378,7 @@ class Solver(SolverBase):
         udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
         udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
         da = self.mesh.dx * self.mesh.dy
+        ng = self.num_guard
 
         def get_field(patch, quantity, cut, mass, gravity=False, accretion=False):
             """
@@ -388,6 +389,13 @@ class Solver(SolverBase):
             x, y = patch.cell_center_coordinate_arrays
             r = (x**2 + y**2) ** 0.5
 
+            def apply_radial_cut(f):
+                if cut is not None:
+                    r0, r1 = cut
+                    return f * (r0 < r) * (r < r1)
+                else:
+                    return f
+
             if quantity == "mdot":
                 return get_field(patch, 0, cut, mass, gravity, accretion)
 
@@ -395,6 +403,23 @@ class Solver(SolverBase):
                 fx = get_field(patch, 1, cut, mass, gravity, accretion)
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)
                 return x * fy - y * fx
+
+            if quantity == "sigma_m1":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                cos_phi = x / r
+                sin_phi = y / r
+                return sigma * (cos_phi + 1.0j * sin_phi)
+
+            if quantity == "eccentricity_vector":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                GM = 1.0
+                v_dot_v = vx * vx + vy * vy
+                v_dot_r = vx * x + vy * y
+                ex = (v_dot_v * x - v_dot_r * vx) / GM - x / r
+                ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
+                return sigma * (ex + 1.0j * ey)
 
             q = quantity
             i = self.patches.index(patch)
@@ -413,11 +438,7 @@ class Solver(SolverBase):
             elif mass == 2:
                 f = udots2[i][..., q]
 
-            if cut is not None:
-                r0, r1 = cut
-                return f * (r0 < r) * (r < r1)
-            else:
-                return f
+            return apply_radial_cut(f)
 
         def get_fields(d):
             return [

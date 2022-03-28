@@ -203,9 +203,11 @@ class KitpCodeComparison(Setup):
         omega0 = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
         omega = (omega0**-n + omegaB**-n) ** (-1 / n)
 
+        vr_pert = 1e-3 * y * exp(-((r / 3.5) ** 6))
+
         primitive[0] = sigma
-        primitive[1] = omega * -y
-        primitive[2] = omega * +x
+        primitive[1] = omega * -y + vr_pert * x / r
+        primitive[2] = omega * +x + vr_pert * y / r
 
     def mesh(self, resolution):
         return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
@@ -215,8 +217,8 @@ class KitpCodeComparison(Setup):
         return 1000
 
     @property
-    def physics(self):
-        diagnostics = [
+    def diagnostics(self):
+        return [
             dict(quantity="time"),
             dict(quantity="mdot", which_mass=1, accretion=True),
             dict(quantity="mdot", which_mass=2, accretion=True),
@@ -227,7 +229,12 @@ class KitpCodeComparison(Setup):
                 gravity=True,
                 radial_cut=(1.0, self.domain_radius),
             ),
+            dict(quantity="sigma_m1"),
+            dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
         ]
+
+    @property
+    def physics(self):
         return dict(
             eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
             buffer_is_enabled=self.buffer_is_enabled,
@@ -235,7 +242,7 @@ class KitpCodeComparison(Setup):
             mach_number=self.mach_number,
             point_mass_function=self.point_masses,
             viscosity_coefficient=self.viscous_nu,
-            diagnostics=diagnostics,
+            diagnostics=self.diagnostics,
         )
 
     @property
@@ -287,4 +294,4 @@ class KitpCodeComparison(Setup):
         )
 
     def checkpoint_diagnostics(self, time):
-        return dict(point_masses=self.point_masses(time))
+        return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
