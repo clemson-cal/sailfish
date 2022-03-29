@@ -509,23 +509,29 @@ def load_user_config():
         config = ConfigParser()
         config.read(".sailfish")
 
-        for setup_extension in config["extensions"]["setups"].split():
-            import_module(setup_extension)
+        try:
+            for setup_extension in config["extensions"]["setups"].split():
+                import_module(setup_extension)
+        except KeyError:
+            pass
 
-        for solver_extension in config["extensions"]["solvers"].split():
-            register_solver_extension(solver_extension)
+        try:
+            for solver_extension in config["extensions"]["solvers"].split():
+                register_solver_extension(solver_extension)
+        except KeyError:
+            pass
 
-        for key, val in config["build"].items():
-            user_build_config[key] = val
+        try:
+            for key, val in config["build"].items():
+                user_build_config[key] = val
+        except KeyError:
+            pass
 
     except ModuleNotFoundError as e:
         raise ExtensionError(e)
 
     except ParsingError as e:
         raise ConfigurationError(e)
-
-    except KeyError:
-        pass
 
 
 def main():
