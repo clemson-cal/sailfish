@@ -386,76 +386,74 @@ class Solver(SolverBase):
             variable quantity, radial cut (optional), and point mass (either
             1, 2, or 'both'), term (either 'acc' or 'grv').
             """
-            with patch.execution_context:
-                x, y = patch.cell_center_coordinate_arrays
-                r = (x**2 + y**2) ** 0.5
+            x, y = patch.cell_center_coordinate_arrays
+            r = (x**2 + y**2) ** 0.5
 
-                def apply_radial_cut(f):
-                    if cut is not None:
-                        r0, r1 = cut
-                        return f * (r0 < r) * (r < r1)
-                    else:
-                        return f
+            def apply_radial_cut(f):
+                if cut is not None:
+                    r0, r1 = cut
+                    return f * (r0 < r) * (r < r1)
+                else:
+                    return f
 
-                if quantity == "mdot":
-                    return get_field(patch, 0, cut, mass, gravity, accretion)
+            if quantity == "mdot":
+                return get_field(patch, 0, cut, mass, gravity, accretion)
 
-                if quantity == "torque":
-                    fx = get_field(patch, 1, cut, mass, gravity, accretion)
-                    fy = get_field(patch, 2, cut, mass, gravity, accretion)
-                    return x * fy - y * fx
+            if quantity == "torque":
+                fx = get_field(patch, 1, cut, mass, gravity, accretion)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                return x * fy - y * fx
 
-                if quantity == "sigma_m1":
-                    sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
-                    cos_phi = x / r
-                    sin_phi = y / r
-                    return sigma * (cos_phi + 1.0j * sin_phi)
+            if quantity == "sigma_m1":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                cos_phi = x / r
+                sin_phi = y / r
+                return sigma * (cos_phi + 1.0j * sin_phi)
 
-                if quantity == "eccentricity_vector":
-                    sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
-                    vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
-                    vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
-                    GM = 1.0
-                    v_dot_v = vx * vx + vy * vy
-                    v_dot_r = vx * x + vy * y
-                    ex = (v_dot_v * x - v_dot_r * vx) / GM - x / r
-                    ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
-                    return sigma * (ex + 1.0j * ey)
+            if quantity == "eccentricity_vector":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                GM = 1.0
+                v_dot_v = vx * vx + vy * vy
+                v_dot_r = vx * x + vy * y
+                ex = (v_dot_v * x - v_dot_r * vx) / GM - x / r
+                ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
+                return sigma * (ex + 1.0j * ey)
 
-                q = quantity
-                i = self.patches.index(patch)
+            q = quantity
+            i = self.patches.index(patch)
 
-                if accretion:
-                    udots1 = udots1_acc
-                    udots2 = udots2_acc
-                elif gravity:
-                    udots1 = udots1_grv
-                    udots2 = udots2_grv
+            if accretion:
+                udots1 = udots1_acc
+                udots2 = udots2_acc
+            elif gravity:
+                udots1 = udots1_grv
+                udots2 = udots2_grv
 
-                if mass == "both":
-                    f = udots1[i][..., q] + udots2[i][..., q]
-                elif mass == 1:
-                    f = udots1[i][..., q]
-                elif mass == 2:
-                    f = udots2[i][..., q]
+            if mass == "both":
+                f = udots1[i][..., q] + udots2[i][..., q]
+            elif mass == 1:
+                f = udots1[i][..., q]
+            elif mass == 2:
+                f = udots2[i][..., q]
 
-                return apply_radial_cut(f)
-
-        def get_fields(d):
-            return [
-                get_field(
-                    p,
-                    d.quantity,
-                    d.radial_cut,
-                    d.which_mass,
-                    gravity=d.gravity,
-                    accretion=d.accretion,
-                )
-                for p in self.patches
-            ]
+            return apply_radial_cut(f)
 
         def get_sum_fields(d):
-            return [f.sum() for f in get_fields(d)]
+            result = []
+            for p in self.patches:
+                with p.execution_context:
+                    f = get_field(
+                        p,
+                        d.quantity,
+                        d.radial_cut,
+                        d.which_mass,
+                        gravity=d.gravity,
+                        accretion=d.accretion,
+                    )
+                    result.append(f.sum())
+            return result
 
         pass1 = []
         pass2 = []
