@@ -465,10 +465,10 @@ class Solver(SolverBase):
         #     (patch.execution_context for patch in self.patches),
         # )
 
-    #    def advance(self, dt):
-    #        self.new_iteration()
-    #        self.advance_rk(0.0, dt)
-    #        self.advance_rk(0.5, dt)
+    # def advance(self, dt):
+    #    self.new_iteration()
+    #    self.advance_rk(0.0, dt)
+    #    self.advance_rk(0.5, dt)
 
     def advance(self, dt):
         self.new_iteration()
