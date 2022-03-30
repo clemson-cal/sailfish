@@ -61,10 +61,10 @@ def initial_condition(setup, mesh, time):
     for ip in range(3):
         for jp in range(3):
             il = 0
-            for n in range(3):
-                for m in range(3):
+            for m in range(3):
+                for n in range(3):
                     if n + m < 3:
-                        phi[ip][jp][il] = p[n][ip] * p[m][jp]
+                        phi[ip][jp][il] = p[m][ip] * p[n][jp]
                         il += 1
 
     for i in range(ni):

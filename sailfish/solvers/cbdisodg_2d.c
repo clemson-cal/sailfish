@@ -1494,7 +1494,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             {
                 for (int l = 0; l < NPOLY; ++l)
                 {
-                    //surface_term[NPOLY * q + l] -= flux[q] * nhat[0] * phil[l] * w[ip] * dy;
+                    surface_term[NPOLY * q + l] -= flux[q] * nhat[0] * phil[l] * w[ip] * dy;
                 }
             }            
         }
@@ -1547,7 +1547,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             {
                 for (int l = 0; l < NPOLY; ++l)
                 {
-                    //surface_term[NPOLY * q + l] -= flux[q] * nhat[1] * phir[l] * w[ip] * dy;
+                    surface_term[NPOLY * q + l] -= flux[q] * nhat[1] * phir[l] * w[ip] * dy;
                 }
             }            
         }
@@ -1558,7 +1558,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
         for (int q = 0; q < NCONS; ++q)
         {
-            for (int l = 0; l < NPOLY; ++l)
+            for (int l = 0; l < 1; ++l)
             {
                 int n = NPOLY * q + l;
                 w2[n] = w1[n] + 0.5 * (surface_term[n] + volume_term[n]) * dt / (dx * dy);
