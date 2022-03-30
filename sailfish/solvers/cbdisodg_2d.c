@@ -5,13 +5,11 @@ DESCRIPTION: Isothermal DG solver for a binary accretion problem in 2D planar
   cartesian coordinates.
 */
 
-// ============================ PHYSICS =======================================
-// ============================================================================
-#define NCONS 3
 
-// ============================ SCHEME =======================================
-// ============================================================================
+#define ORDER 3
+#define NCONS 3
 #define NPOLY 6
+
 
 // ============================ MATH ==========================================
 // ============================================================================
@@ -325,6 +323,51 @@ PRIVATE void riemann_hlle(
     }
 }
 
+PRIVATE double basis_phi_face(
+    int A_face,
+    int j_poly,
+    int i_quad)
+{
+    // Scaled LeGendre polynomials at internal quadrature points
+    double phi_vol[3][3] = {{ 1.000000000000000, 1.000000000000000, 1.000000000000000},
+                            {-1.341640786499873, 0.000000000000000, 1.341640786499873},
+                            { 0.894427190999914, -1.11803398874990, 0.894427190999914}};
+
+    // Scaled LeGendgre polynomials at the interval endpoints
+    double phi_lface[3] = {1.000000000000000, -1.732050807568877, 2.23606797749979};
+    double phi_rface[3] = {1.000000000000000, +1.732050807568877, 2.23606797749979};
+
+    switch (A_face)
+    {
+        case 0: case 2: return phi_lface[j_poly] * phi_vol[j_poly][i_quad];
+        case 1: case 3: return phi_rface[j_poly] * phi_vol[j_poly][i_quad];
+    }
+}
+
+PRIVATE void reconstruct_cons_at_face(
+    int A_face,
+    int i_quad,
+    double *weights,
+    double *cons)
+{
+    // Gaussian weights at quadrature points
+    double gauss_weights_1d[3] = { 0.555555555555556, 0.888888888888889, 0.555555555555556};
+
+    for (int q_cons = 0; q_cons < NCONS; ++q_cons)
+    {
+        // 1st order for testing
+        int j_poly = 0;
+        cons[q_cons] = weights[q_cons * NPOLY + j_poly] * gauss_weights_1d[i_quad];
+
+        // cons[q_cons] = 0.0;
+        // for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
+        // {
+        //     cons[q_cons] += weights[q_cons * NPOLY + j_poly] * gauss_weights_1d[i_quad];
+        // }
+    }
+}
+
+
 // ============================ PUBLIC API ====================================
 // ============================================================================
 PUBLIC void cbdisodg_2d_advance_rk_safe(
@@ -370,43 +413,23 @@ PUBLIC void cbdisodg_2d_advance_rk_safe(
     double velocity_ceiling)
 {
     // Gaussian quadrature points in scaled domain xsi=[-1,1]
-    double g[3] = {-0.774596669241483, 0.000000000000000, 0.774596669241483};
+    double xsi_quad[3] = {-0.774596669241483, 0.000000000000000, 0.774596669241483};
+
     // Gaussian weights at quadrature points
-    double w[3] = { 0.555555555555556, 0.888888888888889, 0.555555555555556};
-    // Scaled LeGendre polynomials at quadrature points
-    double p[3][3] = {{ 1.000000000000000, 1.000000000000000, 1.000000000000000},
-                      {-1.341640786499873, 0.000000000000000, 1.341640786499873},
-                      { 0.894427190999914, -1.11803398874990, 0.894427190999914}};
-    // Derivative of Scaled LeGendre polynomials at quadrature points
-    double pp[3][3] = {{ 0.000000000000000, 0.000000000000000, 0.000000000000000},
-                       { 1.732050807568877, 1.732050807568877, 1.732050807568877},
-                       {-5.196152422706629, 0.000000000000000, 5.196152422706629}};
+    double gauss_weights_1d[3] = {0.555555555555556, 0.888888888888889, 0.555555555555556};
+
+    // Scaled LeGendre polynomials at internal quadrature points
+    double phi_vol[3][3] = {{ 1.000000000000000, +1.00000000000000, +1.000000000000000},
+                            {-1.341640786499873, +0.00000000000000, +1.341640786499873},
+                            {+0.894427190999914, -1.11803398874990, +0.894427190999914}};
+
     // Unit normal vector at left and right faces
     double nhat[2] = {-1.0, 1.0};
-    // Scaled LeGendre polynomials at left face
-    double pfl[3] = {1.000000000000000, -1.732050807568877, 2.23606797749979};
-    // Derivative of Scaled LeGendre polynomials at left face
-    double ppfl[3] = {0.000000000000000, 1.732050807568877, -6.708203932499369};
-    // Scaled LeGendre polynomials at right face
-    double pfr[3] = {1.000000000000000,  1.732050807568877, 2.23606797749979};
-    // Derivative of Scaled LeGendre polynomials at right face
-    double ppfr[3] = {0.000000000000000, 1.732050807568877, 6.708203932499369};
-
-
-    struct KeplerianBuffer buffer = {
-        buffer_surface_density,
-        buffer_central_mass,
-        buffer_driving_rate,
-        buffer_outer_radius,
-        buffer_onset_width,
-        buffer_is_enabled
-    };
-    struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
-    struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
-    struct PointMassList mass_list = {{m1, m2}};
 
     double dx = (patch_xr - patch_xl) / ni;
     double dy = (patch_yr - patch_yl) / nj;
+    double face_area_vector[4] = {-dy, dy, -dx, dx}; // n-hat times the face area
+    double cell_volume = dx * dy;
 
     int ng = 1; // number of guard zones
     int si = NCONS * NPOLY * (nj + 2 * ng);
@@ -421,26 +444,6 @@ PUBLIC void cbdisodg_2d_advance_rk_safe(
         double yc = patch_yl + (j + 0.5) * dy;
         double yr = patch_yl + (j + 1.0) * dy;
 
-        // ------------------------------------------------------------------------
-        //
-        //
-        //      +-------+-------+-------+
-        //      |       |       | x x x |   x(ic, jc) = quadrature points in each zone
-        //      |       |  rj   | x x x |
-        //      |       |       | x x x |
-        //      +-------+-------+-------+
-        //      |       |       |       |
-        //      |  li  -|+  c  -|+  ri  |
-        //      |       |       |       |
-        //      +-------+-------+-------+
-        //      |       |       |       |
-        //      |       |  lj   |       |
-        //      |       |       |       |
-        //      +-------+-------+-------+
-        //
-        //
-        // ------------------------------------------------------------------------
-
         int ncc = (i     + ng) * si + (j     + ng) * sj;
         int nli = (i - 1 + ng) * si + (j     + ng) * sj;
         int nri = (i + 1 + ng) * si + (j     + ng) * sj;
@@ -453,655 +456,57 @@ PUBLIC void cbdisodg_2d_advance_rk_safe(
         double *ulj = &weights1[nlj];
         double *urj = &weights1[nrj];
 
-        double flux[NCONS];
-        double um[NCONS];
+        int face_axis[4] = {0, 0, 1, 1};
+        double equation_20[NCONS][NPOLY] = {0.0};
+        double godunov_flux[4][NCONS]; // xl, xr, yl, yr
+        double cs2 = 1.0;
         double up[NCONS];
-        double dudxm[NCONS];
-        double dudxp[NCONS];
-        double dudym[NCONS];
-        double dudyp[NCONS];
+        double um[NCONS];
 
-        // interior node values of basis function phi and derivatives
-        double phi[NPOLY];
-        double dphidx[NPOLY];
-        double dphidy[NPOLY];
-
-        // left face node values of basis function phi and derivatives
-        double phil[NPOLY];
-        double dphidxl[NPOLY];
-        double dphidyl[NPOLY];
-
-        // right face node values of basis function phi and derivatives
-        double phir[NPOLY];
-        double dphidxr[NPOLY];
-        double dphidyr[NPOLY];
-
-        double surface_term[NCONS * NPOLY];
-        double volume_term[NCONS * NPOLY];
-
-        for (int q = 0; q < NCONS; ++q)
+        for (int i_quad; i_quad < ORDER; ++i_quad)
         {
-            for (int l = 0; l < NPOLY; ++l)
+            for (int A_face = 0; A_face < 4; ++A_face)
             {
-                surface_term[NPOLY * q + l] = 0.0;
-                volume_term[ NPOLY * q + l] = 0.0;
+                int opposing[4] = {1, 0, 3, 2};
+                int B_face = opposing[A_face];
+                reconstruct_cons_at_face(A_face, i_quad, ucc, up);
+                reconstruct_cons_at_face(B_face, i_quad, uli, um);
+                riemann_hlle(um, up, godunov_flux[A_face], cs2, velocity_ceiling, face_axis[A_face]);                
             }
         }
 
-        // Volume term including source terms
-        for (int ic = 0; ic < 3; ++ic)
+        for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
         {
-            for (int jc = 0; jc < 3; ++jc)
+            for (int A_face = 0; A_face < 4; ++A_face)
             {
-                double xp = xc + 0.5 * g[ic] * dx;
-                double yp = yc + 0.5 * g[jc] * dy;
-
-                double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yp, &mass_list);
-
-                // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at cell points
-                int il = 0;
-                for (int m = 0; m < 3; ++m)
+                for (int i_quad; i_quad < ORDER; ++i_quad)
                 {
-                    for (int n = 0; n < 3; ++n)
+                    for (int q_cons = 0; q_cons < NCONS; ++q_cons)
                     {
-                        if ((n + m) < 3)
-                        {
-                            phi[il]  =  p[m][ic] *  p[n][jc];
-                            dphidx[il] = pp[m][ic] *  p[n][jc];
-                            dphidy[il] =  p[m][ic] * pp[n][jc];
-                            il += 1;
-                        }
-                    }
-                }
-
-                double uij[NCONS];
-                double pij[NCONS];
-                double dudx[NCONS];
-                double dudy[NCONS];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    uij[q] = 0.0;
-                    dudx[q] = 0.0;
-                    dudy[q] = 0.0;
-
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        uij[q]  += ucc[NPOLY * q + l] * phi[l];
-                        dudx[q] += ucc[NPOLY * q + l] * dphidx[l];
-                        dudy[q] += ucc[NPOLY * q + l] * dphidy[l];
-                    }
-                }
-
-                double cons_dot[NCONS];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    cons_dot[q] = 0.0;
-                }
-
-                conserved_to_primitive(uij, pij, velocity_ceiling);
-                buffer_source_term(&buffer, xp, yp, uij, cons_dot);
-                point_masses_source_term(&mass_list, xp, yp, 1.0, pij, cons_dot);
-
-                double flux_x[NCONS];
-                double flux_y[NCONS];
-
-                primitive_to_flux(pij, uij, flux_x, cs2p, 0);
-                primitive_to_flux(pij, uij, flux_y, cs2p, 1);
-
-                if (nu > 0.0)
-                {
-                    // velocity derivatives
-                    double dvxdx = dudx[1] / uij[0] - uij[1] * dudx[0] / uij[0] / uij[0]; 
-                    double dvydx = dudx[2] / uij[0] - uij[2] * dudx[0] / uij[0] / uij[0]; 
-                    double dvxdy = dudy[1] / uij[0] - uij[1] * dudy[0] / uij[0] / uij[0]; 
-                    double dvydy = dudy[2] / uij[0] - uij[2] * dudy[0] / uij[0] / uij[0]; 
-                    
-                    double mu = uij[0] * nu;
-    
-                    // viscous stress tensor components
-                    double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-                    double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-                    double tau_xy = dvxdy + dvydx;
-    
-                    flux_x[1] -= mu * tau_xx;
-                    flux_x[2] -= mu * tau_xy;
-                    flux_y[1] -= mu * tau_xy;
-                    flux_y[2] -= mu * tau_yy;
-                }
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        volume_term[NPOLY * q + l] +=
-                            w[ic] * w[jc] *
-                            (flux_x[q] * dphidx[l] * dx + flux_y[q] * dphidy[l] * dy
-                                + 0.5 * dx * dy * cons_dot[q] * phi[l]);
+                        equation_20[q_cons][j_poly] += (0.5 * face_area[A_face]
+                            * godunov_flux[A_face][q_cons]
+                            * basis_phi_face(A_face, j_poly, i_quad)
+                            * gauss_weights_1d[i_quad]
+                        );
                     }
                 }
             }
         }
 
-        //// Surface term; loop over face nodes
-//
-        //for (int ip = 0; ip < 3; ++ip)
-        //{
-        //    // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) at face nodes
-        //    int il = 0;
-        //    for (int m = 0; m < 3; ++m)
-        //    {
-        //        for (int n = 0; n < 3; ++n)
-        //        {
-        //            if ((n + m) < 3)
-        //            {
-        //                phili[il] = pfl[m] * p[n][ip];
-        //                phiri[il] = pfr[m] * p[n][ip];
-        //                philj[il] = pfl[n] * p[m][ip];
-        //                phirj[il] = pfr[n] * p[m][ip];
-        //                il += 1;
-        //            }
-        //        }
-        //    }
-//
-        //    double xp = xc + 0.5 * g[ip] * dx;
-        //    double yp = yc + 0.5 * g[ip] * dy;
-//
-        //    double cs2li = sound_speed_squared(cs2, mach_squared, eos_type, xl, yp, &mass_list);
-        //    double cs2ri = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);
-        //    double cs2lj = sound_speed_squared(cs2, mach_squared, eos_type, xp, yl, &mass_list);
-        //    double cs2rj = sound_speed_squared(cs2, mach_squared, eos_type, xp, yr, &mass_list);
-//
-        //    for (int q = 0; q < NCONS; ++q){
-//
-        //        ulim[q] = 0.0;
-        //        ulip[q] = 0.0;
-        //        urim[q] = 0.0;
-        //        urip[q] = 0.0;
-        //        uljm[q] = 0.0;
-        //        uljp[q] = 0.0;
-        //        urjm[q] = 0.0;
-        //        urjp[q] = 0.0;
-//
-        //        for (int l = 0; l < NPOLY; ++l)
-        //        {
-        //            ulim[q] += uli[NPOLY * q + l] * phiri[l]; // right face of zone i-1
-        //            ulip[q] += ucc[NPOLY * q + l] * phili[l]; // left face of zone i
-        //            urim[q] += ucc[NPOLY * q + l] * phiri[l]; // right face of zone i
-        //            urip[q] += uri[NPOLY * q + l] * phili[l]; // left face of zone i+1
-        //            uljm[q] += ulj[NPOLY * q + l] * phirj[l]; // top face of zone j-1
-        //            uljp[q] += ucc[NPOLY * q + l] * philj[l]; // bottom face of zone j
-        //            urjm[q] += ucc[NPOLY * q + l] * phirj[l]; // top face of zone j
-        //            urjp[q] += urj[NPOLY * q + l] * philj[l]; // bottom face of zone j+1                     j
-        //        }
-        //    }
-//
-        //    riemann_hlle(ulim, ulip, fli, cs2li, 0);
-        //    riemann_hlle(urim, urip, fri, cs2ri, 0);
-        //    riemann_hlle(uljm, uljp, flj, cs2lj, 1);
-        //    riemann_hlle(urjm, urjp, frj, cs2rj, 1);
-//
-        //    for (int q = 0; q < NCONS; ++q)
-        //    {
-        //        for (int l = 0; l < NPOLY; ++l)
-        //        {
-        //            surface_term[NPOLY * q + l] -= (
-        //                fli[q] * nhat[0] * phili[l] * w[ip] * dx +
-        //                fri[q] * nhat[1] * phiri[l] * w[ip] * dx +
-        //                flj[q] * nhat[0] * philj[l] * w[ip] * dy +
-        //                frj[q] * nhat[1] * phirj[l] * w[ip] * dy
-        //            );
-        //        }
-        //    }
-        //}
-
-        // Surface terms; loop over face nodes (one face at a time)
-        
-        // Left face
-        for (int ip = 0; ip < 3; ++ip)
-        {
-            double yp = yc + 0.5 * g[ip] * dy;
-
-            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xl, yp, &mass_list);
-
-            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
-            int il = 0;
-            for (int m = 0; m < 3; ++m)
-            {
-                for (int n = 0; n < 3; ++n)
-                {
-                    if ((n + m) < 3)
-                    {
-                        // phi and derivatives at left side of zone
-                        phil[il]    =    pfl[m] *  p[n][ip];
-                        dphidxl[il] =   ppfl[m] *  p[n][ip];
-                        dphidyl[il] =    pfl[m] * pp[n][ip];
-                        // phi and derivatives at right side of zone
-                        phir[il]    =    pfr[m] *  p[n][ip];
-                        dphidxr[il] =   ppfr[m] *  p[n][ip];
-                        dphidyr[il] =    pfr[m] * pp[n][ip];      
-                        il += 1;
-                    }
-                }
-            }
-            for (int q = 0; q < NCONS; ++q){
-
-                // minus side of face
-                um[q] = 0.0; 
-
-                // plus side of face
-                up[q] = 0.0; 
-
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    // "minus side": right face of zone i-1
-                    um[q]    += uli[NPOLY * q + l] * phir[l]; 
-
-                    // "plus side": left face of zone i
-                    up[q]    += ucc[NPOLY * q + l] * phil[l]; 
-                }
-            }
-
-            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 0);
-
-            // add viscous flux
-            if (nu > 0.0)
-            {
-                for (int q = 0; q < NCONS; ++q){
-    
-                    // minus side of face
-                    dudxm[q] = 0.0;
-                    dudym[q] = 0.0;
-    
-                    // plus side of face
-                    dudxp[q] = 0.0;
-                    dudyp[q] = 0.0;
-    
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        // "minus side": right face of zone i-1
-                        dudxm[q] += uli[NPOLY * q + l] * dphidxr[l];
-                        dudym[q] += uli[NPOLY * q + l] * dphidyr[l];
-    
-                        // "plus side": left face of zone i
-                        dudxp[q] += ucc[NPOLY * q + l] * dphidxl[l];
-                        dudyp[q] += ucc[NPOLY * q + l] * dphidyl[l];
-                    }
-                }
-
-                // velocity derivatives (average of minus and plus sides)
-                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
-    
-                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-    
-                dvxdx *= 0.5; 
-                dvydx *= 0.5; 
-                dvxdy *= 0.5; 
-                dvydy *= 0.5;
-    
-                double mu = 0.5 * (um[0] + up[0]) * nu;
-    
-                // viscous stress tensor components
-                double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-                double tau_xy = dvxdy + dvydx;
-    
-                flux[1] -= mu * tau_xx;
-                flux[2] -= mu * tau_xy;
-            }
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    surface_term[NPOLY * q + l] -= flux[q] * nhat[0] * phil[l] * w[ip] * dx;
-                }
-            }            
-        }
-
-        // Right face
-        for (int ip = 0; ip < 3; ++ip)
-        {
-            double yp = yc + 0.5 * g[ip] * dy;
-            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xr, yp, &mass_list);
-            int il = 0;
-
-            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
-            for (int m = 0; m < 3; ++m)
-            {
-                for (int n = 0; n < 3; ++n)
-                {
-                    if ((n + m) < 3)
-                    {
-                        // phi and derivatives at left side of zone
-                        phil[il]    =    pfl[m] *  p[n][ip];
-                        dphidxl[il] =   ppfl[m] *  p[n][ip];
-                        dphidyl[il] =    pfl[m] * pp[n][ip];
-                        // phi and derivatives at right side of zone
-                        phir[il]    =    pfr[m] *  p[n][ip];
-                        dphidxr[il] =   ppfr[m] *  p[n][ip];
-                        dphidyr[il] =    pfr[m] * pp[n][ip];      
-                        il += 1;
-                    }
-                }
-            }
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                // minus side of face
-                um[q] = 0.0; 
-
-                // plus side of face
-                up[q] = 0.0; 
-
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    // "minus side": right face of zone i
-                    um[q]    += ucc[NPOLY * q + l] * phir[l]; 
-
-                    // "plus side": left face of zone i+1
-                    up[q]    += uri[NPOLY * q + l] * phil[l]; 
-                }
-            }
-            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 0);
-
-            // add viscous flux
-            if (nu > 0.0)
-            {
-                for (int q = 0; q < NCONS; ++q){
-    
-                    // minus side of face
-                    dudxm[q] = 0.0;
-                    dudym[q] = 0.0;
-    
-                    // plus side of face
-                    dudxp[q] = 0.0;
-                    dudyp[q] = 0.0;
-    
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        // "minus side": right face of zone i
-                        dudxm[q] += ucc[NPOLY * q + l] * dphidxr[l];
-                        dudym[q] += ucc[NPOLY * q + l] * dphidyr[l];
-    
-                        // "plus side": left face of zone i+1
-                        dudxp[q] += uri[NPOLY * q + l] * dphidxl[l];
-                        dudyp[q] += uri[NPOLY * q + l] * dphidyl[l];
-                    }
-                }
-
-                // velocity derivatives (average of minus and plus sides)
-                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
-    
-                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-    
-                dvxdx *= 0.5; 
-                dvydx *= 0.5; 
-                dvxdy *= 0.5; 
-                dvydy *= 0.5;
-    
-                double mu = 0.5 * (um[0] + up[0]) * nu;
-    
-                // viscous stress tensor components
-                double tau_xx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-                double tau_xy = dvxdy + dvydx;
-    
-                flux[1] -= mu * tau_xx;
-                flux[2] -= mu * tau_xy;
-            }
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    surface_term[NPOLY * q + l] -= flux[q] * nhat[1] * phir[l] * w[ip] * dx;
-                }
-            }            
-        }
-
-        // Bottom face
-        for (int ip = 0; ip < 3; ++ip)
-        {
-            double xp = xc + 0.5 * g[ip] * dx;
-
-            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yl, &mass_list);
-
-            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
-            int il = 0;
-            for (int m = 0; m < 3; ++m)
-            {
-                for (int n = 0; n < 3; ++n)
-                {
-                    if ((n + m) < 3)
-                    {
-                        // phi and derivatives at left side of zone
-                        phil[il]    =    pfl[m] *  p[n][ip];
-                        dphidxl[il] =   ppfl[m] *  p[n][ip];
-                        dphidyl[il] =    pfl[m] * pp[n][ip];
-                        // phi and derivatives at right side of zone
-                        phir[il]    =    pfr[m] *  p[n][ip];
-                        dphidxr[il] =   ppfr[m] *  p[n][ip];
-                        dphidyr[il] =    pfr[m] * pp[n][ip];      
-                        il += 1;
-                    }
-                }
-            }
-
-            for (int q = 0; q < NCONS; ++q){
-
-                // minus side of face
-                um[q] = 0.0; 
-
-                // plus side of face
-                up[q] = 0.0; 
-
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    // "minus side": top face of zone j-1
-                    um[q]    += ulj[NPOLY * q + l] * phir[l]; 
-
-                    // "plus side": bottom face of zone ij
-                    up[q]    += ucc[NPOLY * q + l] * phil[l]; 
-                }
-            }
-
-            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 1);
-
-            // add viscous flux
-            if (nu > 0.0)
-            {
-                for (int q = 0; q < NCONS; ++q){
-
-                    // minus side of face
-                    dudxm[q] = 0.0;
-                    dudym[q] = 0.0;
-    
-                    // plus side of face
-                    dudxp[q] = 0.0;
-                    dudyp[q] = 0.0;
-    
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        // "minus side": top face of zone j-1
-                        dudxm[q] += ulj[NPOLY * q + l] * dphidxr[l];
-                        dudym[q] += ulj[NPOLY * q + l] * dphidyr[l];
-    
-                        // "plus side": bottom face of zone ij
-                        dudxp[q] += ucc[NPOLY * q + l] * dphidxl[l];
-                        dudyp[q] += ucc[NPOLY * q + l] * dphidyl[l];
-                    }
-                }
-
-                // velocity derivatives (average of minus and plus sides)
-                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
-    
-                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-    
-                dvxdx *= 0.5; 
-                dvydx *= 0.5; 
-                dvxdy *= 0.5; 
-                dvydy *= 0.5;
-    
-                double mu = 0.5 * (um[0] + up[0]) * nu;
-    
-                // viscous stress tensor components
-                double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-                double tau_xy = dvxdy + dvydx;
-    
-                flux[1] -= mu * tau_xy;
-                flux[2] -= mu * tau_yy;
-            }
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    surface_term[NPOLY * q + l] -= flux[q] * nhat[0] * phil[l] * w[ip] * dy;
-                }
-            }            
-        }
-
-        // Top face
-        for (int ip = 0; ip < 3; ++ip)
-        {
-            double xp = xc + 0.5 * g[ip] * dx;
-
-            double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xp, yr, &mass_list);
-
-            // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) and derivatives at face nodes
-            int il = 0;
-            for (int m = 0; m < 3; ++m)
-            {
-                for (int n = 0; n < 3; ++n)
-                {
-                    if ((n + m) < 3)
-                    {
-                        // phi and derivatives at left side of zone
-                        phil[il]    =    pfl[m] *  p[n][ip];
-                        dphidxl[il] =   ppfl[m] *  p[n][ip];
-                        dphidyl[il] =    pfl[m] * pp[n][ip];
-                        // phi and derivatives at right side of zone
-                        phir[il]    =    pfr[m] *  p[n][ip];
-                        dphidxr[il] =   ppfr[m] *  p[n][ip];
-                        dphidyr[il] =    pfr[m] * pp[n][ip];      
-                        il += 1;
-                    }
-                }
-            }
-
-            for (int q = 0; q < NCONS; ++q){
-
-                // minus side of face
-                um[q] = 0.0; 
-
-                // plus side of face
-                up[q] = 0.0; 
-
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    // "minus side": top face of zone j
-                    up[q]    += ucc[NPOLY * q + l] * phir[l]; 
-
-                    // "plus side": bottom face of zone j+1
-                    um[q]    += urj[NPOLY * q + l] * phil[l]; 
-                }
-            }
-
-            riemann_hlle(um, up, flux, cs2p, velocity_ceiling, 1);
-
-            // add viscous flux
-            if (nu > 0.0)
-            {
-                for (int q = 0; q < NCONS; ++q){
-    
-                    // minus side of face
-                    dudxm[q] = 0.0;
-                    dudym[q] = 0.0;
-    
-                    // plus side of face
-                    dudxp[q] = 0.0;
-                    dudyp[q] = 0.0;
-    
-                    for (int l = 0; l < NPOLY; ++l)
-                    {
-                        // "minus side": top face of zone j
-                        dudxp[q] += ucc[NPOLY * q + l] * dphidxr[l];
-                        dudyp[q] += ucc[NPOLY * q + l] * dphidyr[l];
-    
-                        // "plus side": bottom face of zone j+1
-                        dudxm[q] += urj[NPOLY * q + l] * dphidxl[l];
-                        dudym[q] += urj[NPOLY * q + l] * dphidyl[l];
-                    }
-                }
-    
-                // velocity derivatives (average of minus and plus sides)
-                double dvxdx = dudxm[1] / um[0] - um[1] * dudxm[0] / um[0] / um[0]; 
-                double dvydx = dudxm[2] / um[0] - um[2] * dudxm[0] / um[0] / um[0]; 
-                double dvxdy = dudym[1] / um[0] - um[1] * dudym[0] / um[0] / um[0]; 
-                double dvydy = dudym[2] / um[0] - um[2] * dudym[0] / um[0] / um[0]; 
-    
-                dvxdx += dudxp[1] / up[0] - up[1] * dudxp[0] / up[0] / up[0]; 
-                dvydx += dudxp[2] / up[0] - up[2] * dudxp[0] / up[0] / up[0]; 
-                dvxdy += dudyp[1] / up[0] - up[1] * dudyp[0] / up[0] / up[0]; 
-                dvydy += dudyp[2] / up[0] - up[2] * dudyp[0] / up[0] / up[0];
-    
-                dvxdx *= 0.5; 
-                dvydx *= 0.5; 
-                dvxdy *= 0.5; 
-                dvydy *= 0.5;
-    
-                double mu = 0.5 * (um[0] + up[0]) * nu;
-    
-                // viscous stress tensor components 
-                double tau_yy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-                double tau_xy = dvxdy + dvydx;
-    
-                flux[1] -= mu * tau_xy;
-                flux[2] -= mu * tau_yy;
-            }
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                for (int l = 0; l < NPOLY; ++l)
-                {
-                    surface_term[NPOLY * q + l] -= flux[q] * nhat[1] * phir[l] * w[ip] * dy;
-                }
-            }            
-        }
-
-        double *w0 = &weights0[ncc];
         double *w1 = &weights1[ncc];
         double *w2 = &weights2[ncc];
 
-        for (int q = 0; q < NCONS; ++q)
+        for (int q_cons = 0; q_cons < NCONS; ++q_cons)
         {
-            for (int l = 0; l < NPOLY; ++l)
+            for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
             {
-                int n = NPOLY * q + l;
-                w2[n] = w1[n] + 0.5 * (surface_term[n] + volume_term[n]) * dt / (dx * dy);
-                w2[n] = (1.0 - rk_param) * w2[n] + rk_param * w0[n];
+                int n = q_cons * NPOLY + j_poly;
+                w2[n] = w1[n] - 0.5 * equation_20[n] * dt / cell_volume;
             }
         }
     }
 }
+
 
 PUBLIC void cbdisodg_2d_advance_rk(
     int ni,

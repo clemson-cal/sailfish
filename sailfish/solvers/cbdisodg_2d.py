@@ -466,15 +466,19 @@ class Solver(SolverBase):
         # )
 
     # def advance(self, dt):
-    #    self.new_iteration()
-    #    self.advance_rk(0.0, dt)
-    #    self.advance_rk(0.5, dt)
 
     def advance(self, dt):
         self.new_iteration()
         self.advance_rk(0.0, dt)
-        self.advance_rk(0.75, dt)
-        self.advance_rk(1.0 / 3.0, dt)
+
+        # RK2
+        # self.advance_rk(0.0, dt)
+        # self.advance_rk(0.5, dt)
+
+        # RK3
+        # self.advance_rk(0.0, dt)
+        # self.advance_rk(0.75, dt)
+        # self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
         self.set_bc("weights1")
