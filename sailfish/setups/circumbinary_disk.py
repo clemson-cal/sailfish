@@ -180,7 +180,7 @@ class KitpCodeComparison(Setup):
     sink_radius = 0.05
     softening_length = 0.05
     viscous_nu = 0.001
-    sink_model = "torque_free"
+    sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
     domain_radius = param(8.0, "half side length of the square computational domain")
     sink_rate = param(10.0, "component sink rate", mutable=True)
     buffer_is_enabled = param(True, "whether the buffer zone is enabled")
