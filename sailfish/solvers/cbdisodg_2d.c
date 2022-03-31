@@ -330,9 +330,9 @@ PRIVATE double basis_phi_face(
     int j_poly)
 {
     // Scaled LeGendre polynomials at internal quadrature points
-    double phi_vol[3][3] = {{ 1.000000000000000, 1.000000000000000, 1.000000000000000},
-                            {-1.341640786499873, 0.000000000000000, 1.341640786499873},
-                            { 0.894427190999914, -1.11803398874990, 0.894427190999914}};
+    double phi_vol[3][3] = {{ 1.000000000000000, +1.00000000000000, 1.000000000000000},
+                            {-1.341640786499873, +0.00000000000000, 1.341640786499873},
+                            {+0.894427190999914, -1.11803398874990, 0.894427190999914}};
 
     // Scaled LeGendgre polynomials at the interval endpoints
     double phi_lface[3] = {1.000000000000000, -1.732050807568877, 2.23606797749979};
@@ -340,7 +340,7 @@ PRIVATE double basis_phi_face(
 
     switch (A_face)
     {
-        case 0: case 2:
+        case 0: // left face
 
         switch (j_poly)
         {
@@ -352,7 +352,7 @@ PRIVATE double basis_phi_face(
             case 5: return phi_lface[2] * phi_vol[0][i_quad];
         }
 
-        case 1: case 3:
+        case 1: // right face
 
         switch (j_poly)
         {
@@ -363,8 +363,31 @@ PRIVATE double basis_phi_face(
             case 4: return phi_rface[1] * phi_vol[1][i_quad];
             case 5: return phi_rface[2] * phi_vol[0][i_quad];
         }
+
+        case 2: // bottom face
+
+        switch (j_poly)
+        {
+            case 0: return phi_vol[0][i_quad] * phi_lface[0];
+            case 1: return phi_vol[0][i_quad] * phi_lface[1];
+            case 2: return phi_vol[0][i_quad] * phi_lface[2];
+            case 3: return phi_vol[1][i_quad] * phi_lface[0];
+            case 4: return phi_vol[1][i_quad] * phi_lface[1];
+            case 5: return phi_vol[2][i_quad] * phi_lface[0];
+        }
+
+        case 3: // top face
+
+        switch (j_poly)
+        {
+            case 0: return phi_vol[0][i_quad] * phi_rface[0];
+            case 1: return phi_vol[0][i_quad] * phi_rface[1];
+            case 2: return phi_vol[0][i_quad] * phi_rface[2];
+            case 3: return phi_vol[1][i_quad] * phi_rface[0];
+            case 4: return phi_vol[1][i_quad] * phi_rface[1];
+            case 5: return phi_vol[2][i_quad] * phi_rface[0];
+        }
     }
-    printf("WHAT ARE YOU DOING.\n");
     return 0.0;
 }
 
@@ -374,7 +397,7 @@ PRIVATE double basis_phi_volume(
     int j_poly)
 {
     // Scaled LeGendre polynomials at internal quadrature points
-    double phi_vol[3][3] = {{ 1.000000000000000, +1.00000000000000, 1.000000000000000},
+    double phi_vol[3][3] = {{+1.000000000000000, +1.00000000000000, 1.000000000000000},
                             {-1.341640786499873, +0.00000000000000, 1.341640786499873},
                             {+0.894427190999914, -1.11803398874990, 0.894427190999914}};
 
@@ -387,7 +410,6 @@ PRIVATE double basis_phi_volume(
         case 4: return phi_vol[1][i_quad] * phi_vol[1][j_quad];
         case 5: return phi_vol[2][i_quad] * phi_vol[0][j_quad];
     }
-    printf("WHAT ARE YOU DOING.\n");
     return 0.0;
 }
 
@@ -403,7 +425,7 @@ PRIVATE double basis_phi_derivative(
                               {-5.196152422706629, +0.000000000000000, +5.196152422706629}};
 
     // Scaled LeGendre polynomials at internal quadrature points
-    double phi_vol[3][3] = {{ 1.000000000000000, +1.00000000000000, +1.000000000000000},
+    double phi_vol[3][3] = {{+1.000000000000000, +1.00000000000000, +1.000000000000000},
                             {-1.341640786499873, +0.00000000000000, +1.341640786499873},
                             {+0.894427190999914, -1.11803398874990, +0.894427190999914}};
 
@@ -433,7 +455,6 @@ PRIVATE double basis_phi_derivative(
             case 5: return phi_vol[2][i_quad] * phi_deriv[0][j_quad];
         }
     }
-    printf("WHAT ARE YOU DOING.\n");
     return 0.0;
 }
 
@@ -445,16 +466,14 @@ PRIVATE void reconstruct_cons_at_face(
 {
     for (int q_cons = 0; q_cons < NCONS; ++q_cons)
     {
-        // int j_poly = 0;
-        // cons[q_cons] = (1.0
-        //     * weights[q_cons * NPOLY + j_poly]
-        //     * basis_phi_face(A_face, i_quad, j_poly)
-        // );
-
         cons[q_cons] = 0.0;
 
         for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
         {
+            // if (j_poly != 0)
+            // {
+            //     continue;
+            // }
             cons[q_cons] += (1.0
                 * weights[q_cons * NPOLY + j_poly]
                 * basis_phi_face(A_face, i_quad, j_poly)
@@ -475,10 +494,10 @@ PRIVATE void reconstruct_cons_in_volume(
 
         for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
         {
-            if (j_poly != 0)
-            {
-                continue;
-            }
+            // if (j_poly != 0)
+            // {
+            //     continue;
+            // }
             cons[q_cons] += (1.0
                 * weights[q_cons * NPOLY + j_poly]
                 * basis_phi_volume(i_quad, j_quad, j_poly)
@@ -559,7 +578,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double *ulj = &weights1[nlj];
         double *urj = &weights1[nrj];
 
-        // int face_axis[4] = {0, 0, 1, 1};
         double equation_19[NCONS][NPOLY] = {{0.0}};
         double equation_20[NCONS][NPOLY] = {{0.0}};
         double godunov_flux[4][NCONS]; // xl, xr, yl, yr
@@ -567,36 +585,36 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double up[NCONS];
         double um[NCONS];
 
-        // for (int i_quad = 0; i_quad < ORDER; ++i_quad)
-        // {
-        //     for (int j_quad = 0; j_quad < ORDER; ++j_quad)
-        //     {
-        //         double cons[NCONS];
-        //         double prim[NCONS];
-        //         double flux[NCONS];
-        //         reconstruct_cons_in_volume(i_quad, j_quad, ucc, cons);
-        //         conserved_to_primitive(cons, prim, velocity_ceiling);
+        for (int i_quad = 0; i_quad < ORDER; ++i_quad)
+        {
+            for (int j_quad = 0; j_quad < ORDER; ++j_quad)
+            {
+                double cons[NCONS];
+                double prim[NCONS];
+                double flux[NCONS];
+                reconstruct_cons_in_volume(i_quad, j_quad, ucc, cons);
+                conserved_to_primitive(cons, prim, velocity_ceiling);
 
-        //         for (int alpha = 0; alpha < 2; ++alpha)
-        //         {
-        //             primitive_to_flux(prim, cons, flux, cs2, alpha);
+                for (int alpha = 0; alpha < 2; ++alpha)
+                {
+                    primitive_to_flux(prim, cons, flux, cs2, alpha);
 
-        //             for (int q_cons = 0; q_cons < NCONS; ++q_cons)
-        //             {
-        //                 for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
-        //                 {
-        //                     equation_19[q_cons][j_poly] += (0.5
-        //                         * cell_linear_dimension[alpha]
-        //                         * flux[q_cons]
-        //                         * basis_phi_derivative(i_quad, j_quad, j_poly, alpha)
-        //                         * gauss_weights_1d[i_quad]
-        //                         * gauss_weights_1d[j_quad]
-        //                     );
-        //                 }
-        //             }
-        //         }
-        //     }
-        // }
+                    for (int q_cons = 0; q_cons < NCONS; ++q_cons)
+                    {
+                        for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
+                        {
+                            equation_19[q_cons][j_poly] += (0.5
+                                * cell_linear_dimension[alpha]
+                                * flux[q_cons]
+                                * basis_phi_derivative(i_quad, j_quad, j_poly, alpha)
+                                * gauss_weights_1d[i_quad]
+                                * gauss_weights_1d[j_quad]
+                            );
+                        }
+                    }
+                }
+            }
+        }
 
         for (int i_quad = 0; i_quad < ORDER; ++i_quad)
         {
@@ -644,7 +662,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
             {
                 int n = q_cons * NPOLY + j_poly;
-                w2[n] = w1[n] + (0.0 * equation_19[q_cons][j_poly] - equation_20[q_cons][j_poly]) * dt / cell_volume;
+                w2[n] = w1[n] + (equation_19[q_cons][j_poly] - equation_20[q_cons][j_poly]) * dt / cell_volume;
             }
         }
     }
