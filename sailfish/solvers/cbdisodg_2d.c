@@ -577,7 +577,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                         equation_20[q_cons][j_poly] += (0.5
                             * face_area_vector[A_face]
                             * godunov_flux[A_face][q_cons]
-                            * basis_phi_face(A_face, j_poly, i_quad)
+                            * basis_phi_face(A_face, i_quad, j_poly)
                             * gauss_weights_1d[i_quad]
                         );
                     }
@@ -593,7 +593,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
             {
                 int n = q_cons * NPOLY + j_poly;
-                w2[n] = w1[n] - 0.5 * equation_20[q_cons][j_poly] * dt / cell_volume;
+                w2[n] = w1[n] - equation_20[q_cons][j_poly] * dt / cell_volume;
             }
         }
     }
