@@ -385,6 +385,7 @@ class Solver(SolverBase):
                 execution_context(mode, device_id=n % num_devices(mode)),
             )
             self.patches.append(patch)
+            self.set_bc("weights1")
 
     @property
     def solution(self):
