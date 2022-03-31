@@ -33,7 +33,7 @@ def primitive_to_conserved(prim, cons):
     sigma, vx, vy = prim
     cons[0] = sigma
     cons[1] = sigma * vx
-    cons[2] = sigma * vx
+    cons[2] = sigma * vy
 
 
 def initial_condition(setup, mesh, time):
