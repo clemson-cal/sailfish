@@ -475,6 +475,10 @@ PRIVATE void reconstruct_cons_in_volume(
 
         for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
         {
+            if (j_poly != 0)
+            {
+                continue;
+            }
             cons[q_cons] += (1.0
                 * weights[q_cons * NPOLY + j_poly]
                 * basis_phi_volume(i_quad, j_quad, j_poly)
@@ -563,36 +567,36 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double up[NCONS];
         double um[NCONS];
 
-        for (int i_quad = 0; i_quad < ORDER; ++i_quad)
-        {
-            for (int j_quad = 0; j_quad < ORDER; ++j_quad)
-            {
-                double cons[NCONS];
-                double prim[NCONS];
-                double flux[NCONS];
-                reconstruct_cons_in_volume(i_quad, j_quad, ucc, cons);
-                conserved_to_primitive(cons, prim, velocity_ceiling);
+        // for (int i_quad = 0; i_quad < ORDER; ++i_quad)
+        // {
+        //     for (int j_quad = 0; j_quad < ORDER; ++j_quad)
+        //     {
+        //         double cons[NCONS];
+        //         double prim[NCONS];
+        //         double flux[NCONS];
+        //         reconstruct_cons_in_volume(i_quad, j_quad, ucc, cons);
+        //         conserved_to_primitive(cons, prim, velocity_ceiling);
 
-                for (int alpha = 0; alpha < 2; ++alpha)
-                {
-                    primitive_to_flux(prim, cons, flux, cs2, alpha);
+        //         for (int alpha = 0; alpha < 2; ++alpha)
+        //         {
+        //             primitive_to_flux(prim, cons, flux, cs2, alpha);
 
-                    for (int q_cons = 0; q_cons < NCONS; ++q_cons)
-                    {
-                        for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
-                        {
-                            equation_19[q_cons][j_poly] += (0.5
-                                * cell_linear_dimension[alpha]
-                                * flux[q_cons]
-                                * basis_phi_derivative(i_quad, j_quad, j_poly, alpha)
-                                * gauss_weights_1d[i_quad]
-                                * gauss_weights_1d[j_quad]
-                            );
-                        }
-                    }
-                }
-            }
-        }
+        //             for (int q_cons = 0; q_cons < NCONS; ++q_cons)
+        //             {
+        //                 for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
+        //                 {
+        //                     equation_19[q_cons][j_poly] += (0.5
+        //                         * cell_linear_dimension[alpha]
+        //                         * flux[q_cons]
+        //                         * basis_phi_derivative(i_quad, j_quad, j_poly, alpha)
+        //                         * gauss_weights_1d[i_quad]
+        //                         * gauss_weights_1d[j_quad]
+        //                     );
+        //                 }
+        //             }
+        //         }
+        //     }
+        // }
 
         for (int i_quad = 0; i_quad < ORDER; ++i_quad)
         {
@@ -600,16 +604,16 @@ PUBLIC void cbdisodg_2d_advance_rk(
             reconstruct_cons_at_face(1, i_quad, uli, um);
             riemann_hlle(um, up, godunov_flux[0], cs2, velocity_ceiling, 0);
 
-            reconstruct_cons_at_face(1, i_quad, uri, up);
-            reconstruct_cons_at_face(0, i_quad, ucc, um);
+            reconstruct_cons_at_face(0, i_quad, uri, up);
+            reconstruct_cons_at_face(1, i_quad, ucc, um);
             riemann_hlle(um, up, godunov_flux[1], cs2, velocity_ceiling, 0);
 
             reconstruct_cons_at_face(2, i_quad, ucc, up);
             reconstruct_cons_at_face(3, i_quad, ulj, um);
             riemann_hlle(um, up, godunov_flux[2], cs2, velocity_ceiling, 1);
 
-            reconstruct_cons_at_face(3, i_quad, urj, up);
-            reconstruct_cons_at_face(2, i_quad, ucc, um);
+            reconstruct_cons_at_face(2, i_quad, urj, up);
+            reconstruct_cons_at_face(3, i_quad, ucc, um);
             riemann_hlle(um, up, godunov_flux[3], cs2, velocity_ceiling, 1);
         }
 
@@ -640,7 +644,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
             for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
             {
                 int n = q_cons * NPOLY + j_poly;
-                w2[n] = w1[n] + (equation_19[q_cons][j_poly] - equation_20[q_cons][j_poly]) * dt / cell_volume;
+                w2[n] = w1[n] + (0.0 * equation_19[q_cons][j_poly] - equation_20[q_cons][j_poly]) * dt / cell_volume;
             }
         }
     }
