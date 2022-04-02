@@ -60,12 +60,12 @@ def initial_condition(setup, mesh, time):
 
     for ip in range(3):
         for jp in range(3):
-            il = 0
+            phi_ij = list()
             for m in range(3):
                 for n in range(3):
-                    if n + m < 3:
-                        phi[ip][jp][il] = p[m][ip] * p[n][jp]
-                        il += 1
+                    if m + n < 3:
+                        phi_ij.append(p[m][ip] * p[n][jp])
+            phi[ip, jp] = phi_ij
 
     for i in range(ni):
         for j in range(nj):
@@ -77,9 +77,13 @@ def initial_condition(setup, mesh, time):
                     setup.primitive(time, (x, y), prim_node)
                     primitive_to_conserved(prim_node, cons_node)
                     for q in range(NCONS):
-                        for l in range(NPOLY):
-                            weights[i, j, q, l] += (
-                                0.25 * cons_node[q] * phi[ip][jp][l] * w[ip] * w[jp]
+                        for j_poly in range(NPOLY):
+                            weights[i, j, q, j_poly] += (
+                                0.25
+                                * cons_node[q]
+                                * phi[ip][jp][j_poly]
+                                * w[ip]
+                                * w[jp]
                             )
     return weights
 
@@ -389,12 +393,16 @@ class Solver(SolverBase):
 
     @property
     def solution(self):
-        return concat_on_host(
-            [p.weights1 for p in self.patches], (self.num_guard, self.num_guard)
-        )
+        # TODO: generalize concat_on_host so it works for larger dimension arrays
+        ng = self.num_guard
+        return self.patches[0].weights1[ng:-ng, ng:-ng]
+        # return concat_on_host(
+        #     [p.weights1 for p in self.patches], (self.num_guard, self.num_guard)
+        # )
 
     @property
     def primitive(self):
+        self.set_bc("weights1")
         return concat_on_host(
             [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
         )

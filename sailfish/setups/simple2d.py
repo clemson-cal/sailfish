@@ -64,8 +64,8 @@ class CylindricalExplosion(Setup):
 
     def primitive(self, t, coords, primitive):
         x, y = coords
-        in_cylinder = (x * x + y * y) ** 0.5 < 0.25
         r = (x * x + y * y) ** 0.5
+        # r = x
 
         if self.smooth:
             f = exp(-((r / 0.25) ** 2.0))

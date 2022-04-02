@@ -330,13 +330,14 @@ PRIVATE double basis_phi_face(
     int j_poly)
 {
     // Scaled LeGendre polynomials at internal quadrature points
-    double phi_vol[3][3] = {{ 1.000000000000000, +1.00000000000000, 1.000000000000000},
-                            {-1.341640786499873, +0.00000000000000, 1.341640786499873},
-                            {+0.894427190999914, -1.11803398874990, 0.894427190999914}};
+    double phi_vol[3][3] = {{+1.000000000000000, +1.00000000000000, +1.000000000000000},
+                            {-1.341640786499873, +0.00000000000000, +1.341640786499873},
+                            {+0.894427190999914, -1.11803398874990, +0.894427190999914}};
 
     // Scaled LeGendgre polynomials at the interval endpoints
-    double phi_lface[3] = {1.000000000000000, -1.732050807568877, 2.23606797749979};
-    double phi_rface[3] = {1.000000000000000, +1.732050807568877, 2.23606797749979};
+    // NOTE: switch the definitions of lface and rface here to fix an asymmmetry in the zero density mode
+    double phi_lface[3] = {+1.000000000000000, -1.732050807568877, +2.23606797749979};
+    double phi_rface[3] = {+1.000000000000000, +1.732050807568877, +2.23606797749979};
 
     switch (A_face)
     {
@@ -397,9 +398,9 @@ PRIVATE double basis_phi_volume(
     int j_poly)
 {
     // Scaled LeGendre polynomials at internal quadrature points
-    double phi_vol[3][3] = {{+1.000000000000000, +1.00000000000000, 1.000000000000000},
-                            {-1.341640786499873, +0.00000000000000, 1.341640786499873},
-                            {+0.894427190999914, -1.11803398874990, 0.894427190999914}};
+    double phi_vol[3][3] = {{+1.000000000000000, +1.00000000000000, +1.000000000000000},
+                            {-1.341640786499873, +0.00000000000000, +1.341640786499873},
+                            {+0.894427190999914, -1.11803398874990, +0.894427190999914}};
 
     switch (j_poly)
     {
@@ -431,7 +432,7 @@ PRIVATE double basis_phi_derivative(
 
     switch (axis)
     {
-        case 0:    
+        case 0:
 
         switch (j_poly)
         {
@@ -470,10 +471,8 @@ PRIVATE void reconstruct_cons_at_face(
 
         for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
         {
-            // if (j_poly != 0)
-            // {
-            //     continue;
-            // }
+            // if (j_poly != 0) continue;
+
             cons[q_cons] += (1.0
                 * weights[q_cons * NPOLY + j_poly]
                 * basis_phi_face(A_face, i_quad, j_poly)
@@ -494,10 +493,8 @@ PRIVATE void reconstruct_cons_in_volume(
 
         for (int j_poly = 0; j_poly < NPOLY; ++j_poly)
         {
-            // if (j_poly != 0)
-            // {
-            //     continue;
-            // }
+            // if (j_poly != 0) continue;
+
             cons[q_cons] += (1.0
                 * weights[q_cons * NPOLY + j_poly]
                 * basis_phi_volume(i_quad, j_quad, j_poly)
@@ -641,14 +638,17 @@ PUBLIC void cbdisodg_2d_advance_rk(
             {
                 for (int i_quad = 0; i_quad < ORDER; ++i_quad)
                 {
+                    double phi_2d = basis_phi_face(A_face, i_quad, j_poly);
+
                     for (int q_cons = 0; q_cons < NCONS; ++q_cons)
                     {
-                        equation_20[q_cons][j_poly] += (0.5
+                        double x = (0.5
                             * face_area_vector[A_face]
                             * godunov_flux[A_face][q_cons]
-                            * basis_phi_face(A_face, i_quad, j_poly)
+                            * phi_2d
                             * gauss_weights_1d[i_quad]
                         );
+                        equation_20[q_cons][j_poly] += x;
                     }
                 }
             }
@@ -663,6 +663,9 @@ PUBLIC void cbdisodg_2d_advance_rk(
             {
                 int n = q_cons * NPOLY + j_poly;
                 w2[n] = w1[n] + (equation_19[q_cons][j_poly] - equation_20[q_cons][j_poly]) * dt / cell_volume;
+
+                // NOTE: uncomment this line to see just the surface term (make sure to run for only 1 timestep)
+                // w2[n] = -equation_20[q_cons][j_poly];
             }
         }
     }
@@ -883,7 +886,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                 }
 
 //                 conserved_to_primitive(uij, pij, velocity_ceiling);
-                
+
 //                 //buffer_source_term(&buffer, xp, yp, uij, cons_dot);
 //                 //point_masses_source_term(&mass_list, xp, yp, 1.0, pij, cons_dot);
 
@@ -907,7 +910,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //         }
 
 //         // Surface terms; loop over face nodes (one face at a time)
-        
+
 //         // Left face
 //         for (int jp = 0; jp < 3; ++jp)
 //         {
@@ -915,7 +918,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
 //             double cs2p = sound_speed_squared(cs2, mach_squared, eos_type, xl, yp, &mass_list);
 
-//             // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) 
+//             // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y)
 //             int il = 0;
 //             for (int m = 0; m < 3; ++m)
 //             {
@@ -926,7 +929,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                         // phi at left side of zone
 //                         phil[il]    =    pfl[m] *  p[n][jp];
 //                         // phi and at right side of zone
-//                         phir[il]    =    pfr[m] *  p[n][jp];      
+//                         phir[il]    =    pfr[m] *  p[n][jp];
 //                         il += 1;
 //                     }
 //                 }
@@ -934,18 +937,18 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //             for (int q = 0; q < NCONS; ++q){
 
 //                 // minus side of face
-//                 um[q] = 0.0; 
+//                 um[q] = 0.0;
 
 //                 // plus side of face
-//                 up[q] = 0.0; 
+//                 up[q] = 0.0;
 
 //                 for (int l = 0; l < NPOLY; ++l)
 //                 {
 //                     // "minus side": right face of zone i-1
-//                     um[q]    += uli[NPOLY * q + l] * phir[l]; 
+//                     um[q]    += uli[NPOLY * q + l] * phir[l];
 
 //                     // "plus side": left face of zone i
-//                     up[q]    += ucc[NPOLY * q + l] * phil[l]; 
+//                     up[q]    += ucc[NPOLY * q + l] * phil[l];
 //                 }
 //             }
 
@@ -957,7 +960,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                 {
 //                     surface_term[NPOLY * q + l] -= flux[q] * nhat[0] * phil[l] * w[jp] * dx;
 //                 }
-//             }            
+//             }
 //         }
 
 //         // Right face
@@ -977,7 +980,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                         // phi and derivatives at left side of zone
 //                         phil[il]    =    pfl[m] *  p[n][jp];
 //                         // phi and derivatives at right side of zone
-//                         phir[il]    =    pfr[m] *  p[n][jp];      
+//                         phir[il]    =    pfr[m] *  p[n][jp];
 //                         il += 1;
 //                     }
 //                 }
@@ -986,18 +989,18 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //             for (int q = 0; q < NCONS; ++q)
 //             {
 //                 // minus side of face
-//                 um[q] = 0.0; 
+//                 um[q] = 0.0;
 
 //                 // plus side of face
-//                 up[q] = 0.0; 
+//                 up[q] = 0.0;
 
 //                 for (int l = 0; l < NPOLY; ++l)
 //                 {
 //                     // "minus side": right face of zone i
-//                     um[q]    += ucc[NPOLY * q + l] * phir[l]; 
+//                     um[q]    += ucc[NPOLY * q + l] * phir[l];
 
 //                     // "plus side": left face of zone i+1
-//                     up[q]    += uri[NPOLY * q + l] * phil[l]; 
+//                     up[q]    += uri[NPOLY * q + l] * phil[l];
 //                 }
 //             }
 
@@ -1009,7 +1012,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                 {
 //                     surface_term[NPOLY * q + l] -= flux[q] * nhat[1] * phir[l] * w[jp] * dx;
 //                 }
-//             }            
+//             }
 //         }
 
 //         // Bottom face
@@ -1030,7 +1033,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                         // phi and derivatives at left side of zone
 //                         phil[il]    =    pfl[m] *  p[n][ip];
 //                         // phi and derivatives at right side of zone
-//                         phir[il]    =    pfr[m] *  p[n][ip];     
+//                         phir[il]    =    pfr[m] *  p[n][ip];
 //                         il += 1;
 //                     }
 //                 }
@@ -1039,18 +1042,18 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //             for (int q = 0; q < NCONS; ++q){
 
 //                 // minus side of face
-//                 um[q] = 0.0; 
+//                 um[q] = 0.0;
 
 //                 // plus side of face
-//                 up[q] = 0.0; 
+//                 up[q] = 0.0;
 
 //                 for (int l = 0; l < NPOLY; ++l)
 //                 {
 //                     // "minus side": top face of zone j-1
-//                     um[q]    += ulj[NPOLY * q + l] * phir[l]; 
+//                     um[q]    += ulj[NPOLY * q + l] * phir[l];
 
 //                     // "plus side": bottom face of zone ij
-//                     up[q]    += ucc[NPOLY * q + l] * phil[l]; 
+//                     up[q]    += ucc[NPOLY * q + l] * phil[l];
 //                 }
 //             }
 
@@ -1062,7 +1065,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                 {
 //                     surface_term[NPOLY * q + l] -= flux[q] * nhat[0] * phil[l] * w[ip] * dy;
 //                 }
-//             }            
+//             }
 //         }
 
 //         // Top face
@@ -1083,7 +1086,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                         // phi and derivatives at left side of zone
 //                         phil[il]    =    pfl[m] *  p[n][ip];
 //                         // phi and derivatives at right side of zone
-//                         phir[il]    =    pfr[m] *  p[n][ip];      
+//                         phir[il]    =    pfr[m] *  p[n][ip];
 //                         il += 1;
 //                     }
 //                 }
@@ -1092,18 +1095,18 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //             for (int q = 0; q < NCONS; ++q){
 
 //                 // minus side of face
-//                 um[q] = 0.0; 
+//                 um[q] = 0.0;
 
 //                 // plus side of face
-//                 up[q] = 0.0; 
+//                 up[q] = 0.0;
 
 //                 for (int l = 0; l < NPOLY; ++l)
 //                 {
 //                     // "minus side": top face of zone j
-//                     um[q]    += ucc[NPOLY * q + l] * phir[l]; 
+//                     um[q]    += ucc[NPOLY * q + l] * phir[l];
 
 //                     // "plus side": bottom face of zone j+1
-//                     up[q]    += urj[NPOLY * q + l] * phil[l]; 
+//                     up[q]    += urj[NPOLY * q + l] * phil[l];
 //                 }
 //             }
 
@@ -1115,7 +1118,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
 //                 {
 //                     surface_term[NPOLY * q + l] -= flux[q] * nhat[1] * phir[l] * w[ip] * dy;
 //                 }
-//             }            
+//             }
 //         }
 
 //         double *w0 = &weights0[ncc];
@@ -1191,7 +1194,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
     {
         int ncc = (i + ng) * si + (j + ng) * sj;
         double *ucc = &weights[ncc];
-        double *udot = &cons_rate[ncc];        
+        double *udot = &cons_rate[ncc];
         double xc = patch_xl + (i + 0.5) * dx;
         double yc = patch_yl + (j + 0.5) * dy;
         // double *pc = &primitive[ncc];
@@ -1214,7 +1217,7 @@ PUBLIC void cbdisodg_2d_point_mass_source_term(
             {
                 double xp = xc + 0.5 * g[ic] * dx;
                 double yp = yc + 0.5 * g[jc] * dy;
-                
+
                 // 2D basis functions phi_l(x,y) = P_m(x) * P_n(y) at cell points
                 int il = 0;
                 for (int m = 0; m < 3; ++m)
@@ -1309,7 +1312,7 @@ PUBLIC void cbdisodg_2d_wavespeed(
         int na = (i + ng) * ti + (j + ng) * tj;
         double x = patch_xl + (i + 0.5) * dx;
         double y = patch_yl + (j + 0.5) * dy;
-        
+
         double *ucc = &weights[np];
 
         double uij[NCONS];

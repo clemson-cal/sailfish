@@ -161,6 +161,7 @@ def main_cbdiso_2d():
         choices=fields.keys(),
         help="which field to plot",
     )
+    parser.add_argument("--poly", type=int, nargs=2, default=None)
     parser.add_argument(
         "--log",
         "-l",
@@ -180,15 +181,27 @@ def main_cbdiso_2d():
         type=float,
         help="maximum value for colormap",
     )
+    parser.add_argument(
+        "--cmap",
+        default="magma",
+        help="colormap name",
+    )
 
     args = parser.parse_args()
 
     for filename in args.checkpoints:
         fig, ax = plt.subplots()
-        chkpt = load_checkpoint(filename)  # , require_solver="cbdiso_2d")
+        chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
-        prim = chkpt["primitive"]
-        f = fields[args.field](prim).T
+
+        if args.poly is None:
+            prim = chkpt["primitive"]
+            f = fields[args.field](prim).T
+        else:
+            j_poly = {(0, 0): 0, (0, 1): 1, (0, 2): 2, (1, 0): 3, (1, 1): 4, (2, 0): 5}[
+                tuple(args.poly)
+            ]
+            f = chkpt["solution"][:, :, 0, j_poly].T
 
         if args.log:
             f = np.log10(f)
@@ -199,7 +212,7 @@ def main_cbdiso_2d():
             origin="lower",
             vmin=args.vmin,
             vmax=args.vmax,
-            cmap="magma",
+            cmap=args.cmap,
             extent=extent,
         )
         ax.set_aspect("equal")
