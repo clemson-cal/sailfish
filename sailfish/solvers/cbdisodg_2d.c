@@ -374,7 +374,29 @@ PRIVATE double basis_phi_2d(int i_quad, int j_quad, int m, int n, int deriv_x, i
     return basis_phi_1d(i_quad, m, deriv_x) * basis_phi_1d(j_quad, n, deriv_y);
 }
 
-PRIVATE void reconstruct(int i_quad, int j_quad, double *weights, double *cons)
+// PRIVATE void reconstruct(int i_quad, int j_quad, double *weights, double *cons)
+// {
+//     for (int q = 0; q < NCONS; ++q)
+//     {
+//         cons[q] = 0.0;
+
+//         for (int m = 0; m < ORDER; ++m)
+//         {
+//             for (int n = 0; n < ORDER; ++n)
+//             {
+//                 if (m + n < ORDER)
+//                 {
+//                     cons[q] += (
+//                           weights[q * ORDER * ORDER + m * ORDER + n]
+//                         * basis_phi_2d(i_quad, j_quad, m, n, 0, 0)
+//                     );
+//                 }
+//             }
+//         }
+//     }
+// }
+
+PRIVATE void reconstruct_2d(int i_quad, int j_quad, double phi[ORDER][ORDER][ORDER][ORDER], double *weights, double *cons)
 {
     for (int q = 0; q < NCONS; ++q)
     {
@@ -386,30 +408,8 @@ PRIVATE void reconstruct(int i_quad, int j_quad, double *weights, double *cons)
             {
                 if (m + n < ORDER)
                 {
-                    cons[q] += (1.0
-                        * weights[q * ORDER * ORDER + m * ORDER + n]
-                        * basis_phi_2d(i_quad, j_quad, m, n, 0, 0)
-                    );
-                }
-            }
-        }
-    }
-}
-
-PRIVATE void reconstruct_2d_cached(int i_quad, int j_quad, double phi[ORDER][ORDER][ORDER][ORDER], double *weights, double *cons)
-{
-    for (int q = 0; q < NCONS; ++q)
-    {
-        cons[q] = 0.0;
-
-        for (int m = 0; m < ORDER; ++m)
-        {
-            for (int n = 0; n < ORDER; ++n)
-            {
-                if (m + n < ORDER)
-                {
-                    cons[q] += (1.0
-                        * weights[q * ORDER * ORDER + m * ORDER + n]
+                    cons[q] += (
+                          weights[q * ORDER * ORDER + m * ORDER + n]
                         * phi[i_quad][j_quad][m][n]
                     );
                 }
@@ -418,7 +418,7 @@ PRIVATE void reconstruct_2d_cached(int i_quad, int j_quad, double phi[ORDER][ORD
     }
 }
 
-PRIVATE void reconstruct_1d_cached(int quad, double phi[ORDER][ORDER][ORDER], double *weights, double *cons)
+PRIVATE void reconstruct_1d(int quad, double phi[ORDER][ORDER][ORDER], double *weights, double *cons)
 {
     for (int q = 0; q < NCONS; ++q)
     {
@@ -430,8 +430,8 @@ PRIVATE void reconstruct_1d_cached(int quad, double phi[ORDER][ORDER][ORDER], do
             {
                 if (m + n < ORDER)
                 {
-                    cons[q] += (1.0
-                        * weights[q * ORDER * ORDER + m * ORDER + n]
+                    cons[q] += (
+                          weights[q * ORDER * ORDER + m * ORDER + n]
                         * phi[quad][m][n]
                     );
                 }
@@ -495,52 +495,52 @@ PUBLIC void cbdisodg_2d_advance_rk(
     int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
     int sj = NCONS * ORDER * ORDER;
 
-    // Caching phi and phi gradients
-    double phi_volume[ORDER][ORDER][ORDER][ORDER]; // i_quad x j_quad x m x n
-    double phi_gradient_x[ORDER][ORDER][ORDER][ORDER];
-    double phi_gradient_y[ORDER][ORDER][ORDER][ORDER];
-    double phi_face_xl[ORDER][ORDER][ORDER]; // quad x m x n
-    double phi_face_xr[ORDER][ORDER][ORDER];
-    double phi_face_yl[ORDER][ORDER][ORDER];
-    double phi_face_yr[ORDER][ORDER][ORDER];
-    double fhat[NCONS];
-    double up[NCONS];
-    double um[NCONS];
-    double equation_19[NCONS][ORDER][ORDER];
-    double equation_20[NCONS][ORDER][ORDER];
-
-    for (int i_quad = 0; i_quad < ORDER; ++i_quad)
+    FOR_EACH_2D(ni, nj)
     {
-        for (int j_quad = 0; j_quad < ORDER; ++j_quad)
+        // Caching phi and phi gradients
+        double phi_volume[ORDER][ORDER][ORDER][ORDER]; // i_quad x j_quad x m x n
+        double phi_gradient_x[ORDER][ORDER][ORDER][ORDER];
+        double phi_gradient_y[ORDER][ORDER][ORDER][ORDER];
+        double phi_face_xl[ORDER][ORDER][ORDER]; // quad x m x n
+        double phi_face_xr[ORDER][ORDER][ORDER];
+        double phi_face_yl[ORDER][ORDER][ORDER];
+        double phi_face_yr[ORDER][ORDER][ORDER];
+        double fhat[NCONS];
+        double up[NCONS];
+        double um[NCONS];
+        double equation_19[NCONS][ORDER][ORDER];
+        double equation_20[NCONS][ORDER][ORDER];
+
+        for (int i_quad = 0; i_quad < ORDER; ++i_quad)
+        {
+            for (int j_quad = 0; j_quad < ORDER; ++j_quad)
+            {
+                for (int m = 0; m < ORDER; ++m)
+                {
+                    for (int n = 0; n < ORDER; ++n)
+                    {
+                        phi_volume[i_quad][j_quad][m][n] = basis_phi_2d(i_quad, j_quad, m, n, 0, 0);
+                        phi_gradient_x[i_quad][j_quad][m][n] = basis_phi_2d(i_quad, j_quad, m, n, 1, 0);
+                        phi_gradient_y[i_quad][j_quad][m][n] = basis_phi_2d(i_quad, j_quad, m, n, 0, 1);
+                    }
+                }
+            }
+        }
+
+        for (int quad = 0; quad < ORDER; ++quad)
         {
             for (int m = 0; m < ORDER; ++m)
             {
                 for (int n = 0; n < ORDER; ++n)
                 {
-                    phi_volume[i_quad][j_quad][m][n] = basis_phi_2d(i_quad, j_quad, m, n, 0, 0);
-                    phi_gradient_x[i_quad][j_quad][m][n] = basis_phi_2d(i_quad, j_quad, m, n, 1, 0);
-                    phi_gradient_y[i_quad][j_quad][m][n] = basis_phi_2d(i_quad, j_quad, m, n, 0, 1);
+                    phi_face_xl[quad][m][n] = basis_phi_2d(L_ENDPOINT, quad, m, n, 0, 0);
+                    phi_face_xr[quad][m][n] = basis_phi_2d(R_ENDPOINT, quad, m, n, 0, 0);
+                    phi_face_yl[quad][m][n] = basis_phi_2d(quad, L_ENDPOINT, m, n, 0, 0);
+                    phi_face_yr[quad][m][n] = basis_phi_2d(quad, R_ENDPOINT, m, n, 0, 0);                    
                 }
             }
         }
-    }
 
-    for (int quad = 0; quad < ORDER; ++quad)
-    {
-        for (int m = 0; m < ORDER; ++m)
-        {
-            for (int n = 0; n < ORDER; ++n)
-            {
-                phi_face_xl[quad][m][n] = basis_phi_2d(L_ENDPOINT, quad, m, n, 0, 0);
-                phi_face_xr[quad][m][n] = basis_phi_2d(R_ENDPOINT, quad, m, n, 0, 0);
-                phi_face_yl[quad][m][n] = basis_phi_2d(quad, L_ENDPOINT, m, n, 0, 0);
-                phi_face_yr[quad][m][n] = basis_phi_2d(quad, R_ENDPOINT, m, n, 0, 0);                    
-            }
-        }
-    }
-
-    FOR_EACH_2D(ni, nj)
-    {
         int ncc = (i     + ng) * si + (j     + ng) * sj;
         int nli = (i - 1 + ng) * si + (j     + ng) * sj;
         int nri = (i + 1 + ng) * si + (j     + ng) * sj;
@@ -574,7 +574,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 double prim[NCONS];
                 double fx[NCONS];
                 double fy[NCONS];
-                reconstruct_2d_cached(i_quad, j_quad, phi_volume, ucc, cons);
+                reconstruct_2d(i_quad, j_quad, phi_volume, ucc, cons);
                 conserved_to_primitive(cons, prim, velocity_ceiling);
                 primitive_to_flux(prim, cons, fx, cs2, 0);
                 primitive_to_flux(prim, cons, fy, cs2, 1);
@@ -601,8 +601,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
         for (int quad = 0; quad < ORDER; ++quad)
         {
-            reconstruct_1d_cached(quad, phi_face_xl, ucc, up);
-            reconstruct_1d_cached(quad, phi_face_xr, uli, um);
+            reconstruct_1d(quad, phi_face_xl, ucc, up);
+            reconstruct_1d(quad, phi_face_xr, uli, um);
             riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);
 
             for (int q = 0; q < NCONS; ++q)
@@ -612,8 +612,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
                             equation_20[q][m][n] -=
                                 dy * fhat[q] * phi_face_xl[quad][m][n] * gauss_weights_1d[quad];
 
-            reconstruct_1d_cached(quad, phi_face_xl, uri, up);
-            reconstruct_1d_cached(quad, phi_face_xr, ucc, um);
+            reconstruct_1d(quad, phi_face_xl, uri, up);
+            reconstruct_1d(quad, phi_face_xr, ucc, um);
             riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);
 
             for (int q = 0; q < NCONS; ++q)
@@ -623,8 +623,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
                             equation_20[q][m][n] +=
                                 dy * fhat[q] * phi_face_xr[quad][m][n] * gauss_weights_1d[quad];
 
-            reconstruct_1d_cached(quad, phi_face_yl, ucc, up);
-            reconstruct_1d_cached(quad, phi_face_yr, ulj, um);
+            reconstruct_1d(quad, phi_face_yl, ucc, up);
+            reconstruct_1d(quad, phi_face_yr, ulj, um);
             riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
 
             for (int q = 0; q < NCONS; ++q)
@@ -634,8 +634,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
                             equation_20[q][m][n] -=
                                 dx * fhat[q] * phi_face_yl[quad][m][n] * gauss_weights_1d[quad];
 
-            reconstruct_1d_cached(quad, phi_face_yl, urj, up);
-            reconstruct_1d_cached(quad, phi_face_yr, ucc, um);
+            reconstruct_1d(quad, phi_face_yl, urj, up);
+            reconstruct_1d(quad, phi_face_yr, ucc, um);
             riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
 
             for (int q = 0; q < NCONS; ++q)
