@@ -198,11 +198,11 @@ def main_cbdiso_2d():
             prim = chkpt["primitive"]
             f = fields[args.field](prim).T
         else:
-            j_poly = {(0, 0): 0, (0, 1): 1, (0, 2): 2, (1, 0): 3, (1, 1): 4, (2, 0): 5}[
-                tuple(args.poly)
-            ]
-            f = chkpt["solution"][:, :, 0, j_poly].T
-
+            # j_poly = {(0, 0): 0, (0, 1): 1, (0, 2): 2, (1, 0): 3, (1, 1): 4, (2, 0): 5}[
+            #     tuple(args.poly)
+            # ]
+            m, n = args.poly
+            f = chkpt["solution"][:, :, 0, m, n].T
         if args.log:
             f = np.log10(f)
 

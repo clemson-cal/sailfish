@@ -46,7 +46,7 @@ def initial_condition(setup, mesh, time):
     dx, dy = mesh.dx, mesh.dy
     prim_node = np.zeros(NCONS)
     cons_node = np.zeros(NCONS)
-    weights = np.zeros([ni, nj, NCONS, NPOLY])
+    weights = np.zeros([ni, nj, NCONS, ORDER, ORDER])
 
     g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
     w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
@@ -56,35 +56,27 @@ def initial_condition(setup, mesh, time):
         (-1.341640786499873, +0.000000000000000, +1.341640786499873),
         (+0.894427190999914, -1.118033988749900, +0.894427190999914),
     )
-    phi = np.zeros([3, 3, NPOLY])
-
-    for ip in range(3):
-        for jp in range(3):
-            phi_ij = list()
-            for m in range(3):
-                for n in range(3):
-                    if m + n < 3:
-                        phi_ij.append(p[m][ip] * p[n][jp])
-            phi[ip, jp] = phi_ij
 
     for i in range(ni):
         for j in range(nj):
-            for ip in range(3):
-                for jp in range(3):
+            for i_quad in range(3):
+                for j_quad in range(3):
                     xc, yc = mesh.cell_coordinates(i, j)
-                    x = xc + 0.5 * dx * g[ip]
-                    y = yc + 0.5 * dy * g[jp]
+                    x = xc + 0.5 * dx * g[i_quad]
+                    y = yc + 0.5 * dy * g[j_quad]
                     setup.primitive(time, (x, y), prim_node)
                     primitive_to_conserved(prim_node, cons_node)
                     for q in range(NCONS):
-                        for j_poly in range(NPOLY):
-                            weights[i, j, q, j_poly] += (
-                                0.25
-                                * cons_node[q]
-                                * phi[ip][jp][j_poly]
-                                * w[ip]
-                                * w[jp]
-                            )
+                        for m in range(ORDER):
+                            for n in range(ORDER):
+                                weights[i, j, q, m, n] += (
+                                    0.25
+                                    * cons_node[q]
+                                    * p[m][i_quad]
+                                    * p[n][j_quad]
+                                    * w[i_quad]
+                                    * w[j_quad]
+                                )
     return weights
 
 
@@ -277,7 +269,7 @@ class Patch:
 
     @property
     def primitive(self):
-        u0 = self.weights1[:, :, :, 0]
+        u0 = self.weights1[:, :, :, 0, 0]
         p0 = self.xp.zeros_like(u0)
         p0[..., 0] = u0[..., 0]
         p0[..., 1] = u0[..., 1] / u0[..., 0]
@@ -336,7 +328,6 @@ class Solver(SolverBase):
         np = NPOLY  # number of polynomials
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        #        lib = Library(code, mode=mode, debug=False)
         lib = Library(code, mode=mode, debug=True)
 
         logger.info(f"initiate with time={time:0.4f}")
@@ -373,7 +364,7 @@ class Solver(SolverBase):
             buffer_surface_density = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
-            weights_patch = numpy.zeros([b - a + 2 * ng, nj + 2 * ng, nq, np])
+            weights_patch = numpy.zeros([b - a + 2 * ng, nj + 2 * ng, nq, ORDER, ORDER])
             weights_patch[ng:-ng, ng:-ng] = weights[a:b]
             patch = Patch(
                 time,
