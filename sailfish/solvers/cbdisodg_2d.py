@@ -27,6 +27,7 @@ class Options(NamedTuple):
 
     velocity_ceiling: float = 1e12
     mach_ceiling: float = 1e12
+    rk_order: int = 2
 
 
 def primitive_to_conserved(prim, cons):
@@ -384,18 +385,20 @@ class Solver(SolverBase):
 
     @property
     def solution(self):
-        # TODO: generalize concat_on_host so it works for larger dimension arrays
-        ng = self.num_guard
-        return self.patches[0].weights1[ng:-ng, ng:-ng]
-        # return concat_on_host(
-        #     [p.weights1 for p in self.patches], (self.num_guard, self.num_guard)
-        # )
+        self.set_bc("weights1")
+        return concat_on_host(
+            [p.weights1 for p in self.patches],
+            (self.num_guard, self.num_guard),
+            rank=2,
+        )
 
     @property
     def primitive(self):
         self.set_bc("weights1")
         return concat_on_host(
-            [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
+            [p.primitive for p in self.patches],
+            (self.num_guard, self.num_guard),
+            rank=2,
         )
 
     def reductions(self):
@@ -456,29 +459,24 @@ class Solver(SolverBase):
         """
         Return the global maximum wavespeed over the whole domain.
         """
-        # WARNING! Timestep calculation is disabled
-        return 5.0
-        # return lazy_reduce(
-        #     max,
-        #     float,
-        #     (patch.maximum_wavespeed for patch in self.patches),
-        #     (patch.execution_context for patch in self.patches),
-        # )
-
-    # def advance(self, dt):
+        return lazy_reduce(
+            max,
+            float,
+            (patch.maximum_wavespeed for patch in self.patches),
+            (patch.execution_context for patch in self.patches),
+        )
 
     def advance(self, dt):
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-
-        # RK2
-        # self.advance_rk(0.0, dt)
-        # self.advance_rk(0.5, dt)
-
-        # RK3
-        # self.advance_rk(0.0, dt)
-        # self.advance_rk(0.75, dt)
-        # self.advance_rk(1.0 / 3.0, dt)
+        if self._options.rk_order == 1:
+            self.advance_rk(0.0, dt)
+        elif self._options.rk_order == 2:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.5, dt)
+        elif self._options.rk_order == 3:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.75, dt)
+            self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
         self.set_bc("weights1")

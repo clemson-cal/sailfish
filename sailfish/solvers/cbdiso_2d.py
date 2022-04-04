@@ -27,6 +27,7 @@ class Options(NamedTuple):
 
     velocity_ceiling: float = 1e12
     mach_ceiling: float = 1e12
+    rk_order: int = 2
 
 
 def initial_condition(setup, mesh, time):
@@ -505,8 +506,15 @@ class Solver(SolverBase):
 
     def advance(self, dt):
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-        self.advance_rk(0.5, dt)
+        if self._options.rk_order == 1:
+            self.advance_rk(0.0, dt)
+        elif self._options.rk_order == 2:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.5, dt)
+        elif self._options.rk_order == 3:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.75, dt)
+            self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
         self.set_bc("primitive1")

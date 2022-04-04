@@ -646,6 +646,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                                 dx * fhat[q] * phi_face_yr[quad][m][n] * gauss_weights_1d[quad];
         }
 
+        double *w0 = &weights0[ncc];
         double *w1 = &weights1[ncc];
         double *w2 = &weights2[ncc];
 
@@ -659,12 +660,14 @@ PUBLIC void cbdisodg_2d_advance_rk(
                     {
                         int k = q * ORDER * ORDER + m * ORDER + n;
                         w2[k] = w1[k] + (equation_19[q][m][n] - equation_20[q][m][n]) * 0.5 * dt / cell_volume;
+                        w2[k] = (1.0 - rk_param) * w2[k] + rk_param * w0[k];
                     }
                 }
             }
         }
     }
 }
+
 
 // PUBLIC void cbdisodg_2d_point_mass_source_term(
 //     int ni,
@@ -788,71 +791,71 @@ PUBLIC void cbdisodg_2d_advance_rk(
 // }
 
 
-// PUBLIC void cbdisodg_2d_wavespeed(
-//     int ni, // mesh
-//     int nj,
-//     double patch_xl,
-//     double patch_xr,
-//     double patch_yl,
-//     double patch_yr,
-//     double soundspeed2, // equation of state
-//     double mach_squared,
-//     int eos_type,
-//     double x1, // point mass 1
-//     double y1,
-//     double vx1,
-//     double vy1,
-//     double mass1,
-//     double softening_length1,
-//     double sink_rate1,
-//     double sink_radius1,
-//     int sink_model1,
-//     double x2, // point mass 2
-//     double y2,
-//     double vx2,
-//     double vy2,
-//     double mass2,
-//     double softening_length2,
-//     double sink_rate2,
-//     double sink_radius2,
-//     int sink_model2,
-//     double velocity_ceiling,
-//     double *weights,   // :: $.shape == (ni + 2, nj + 2, 3, 6)
-//     double *wavespeed) // :: $.shape == (ni + 2, nj + 2)
-// {
-//     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
-//     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
-//     struct PointMassList mass_list = {{m1, m2}};
+PUBLIC void cbdisodg_2d_wavespeed(
+    int ni, // mesh
+    int nj,
+    double patch_xl,
+    double patch_xr,
+    double patch_yl,
+    double patch_yr,
+    double soundspeed2, // equation of state
+    double mach_squared,
+    int eos_type,
+    double x1, // point mass 1
+    double y1,
+    double vx1,
+    double vy1,
+    double mass1,
+    double softening_length1,
+    double sink_rate1,
+    double sink_radius1,
+    int sink_model1,
+    double x2, // point mass 2
+    double y2,
+    double vx2,
+    double vy2,
+    double mass2,
+    double softening_length2,
+    double sink_rate2,
+    double sink_radius2,
+    int sink_model2,
+    double velocity_ceiling,
+    double *weights,   // :: $.shape == (ni + 2, nj + 2, 3, 3, 3)
+    double *wavespeed) // :: $.shape == (ni + 2, nj + 2)
+{
+    struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
+    struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
+    struct PointMassList mass_list = {{m1, m2}};
 
-//     int ng = 1; // number of guard zones
-//     int si = NCONS * NPOLY * (nj + 2 * ng);
-//     int sj = NCONS * NPOLY;
-//     int ti = nj + 2 * ng;
-//     int tj = 1;
-//     double dx = (patch_xr - patch_xl)/ni;
-//     double dy = (patch_yr - patch_yl)/nj;
+    int ng = 1; // number of guard zones
+    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
+    int sj = NCONS * ORDER * ORDER;
+    int ti = nj + 2 * ng;
+    int tj = 1;
+    double dx = (patch_xr - patch_xl)/ni;
+    double dy = (patch_yr - patch_yl)/nj;
 
-//     FOR_EACH_2D(ni, nj)
-//     {
-//         int np = (i + ng) * si + (j + ng) * sj;
-//         int na = (i + ng) * ti + (j + ng) * tj;
-//         double x = patch_xl + (i + 0.5) * dx;
-//         double y = patch_yl + (j + 0.5) * dy;
+    FOR_EACH_2D(ni, nj)
+    {
+        int nu = (i + ng) * si + (j + ng) * sj;
+        int na = (i + ng) * ti + (j + ng) * tj;
+        double x = patch_xl + (i + 0.5) * dx;
+        double y = patch_yl + (j + 0.5) * dy;
 
-//         double *ucc = &weights[np];
+        double *ucc = &weights[nu];
 
-//         double uij[NCONS];
-//         double pij[NCONS];
+        double uij[NCONS];
+        double pij[NCONS];
 
-//         // use zeroth weights for zone average of conserved variables
-//         for (int q = 0; q < NCONS; ++q)
-//         {
-//             uij[q] = ucc[NPOLY * q + 0];
-//         }
+        // use zeroth weights for zone average of conserved variables
+        for (int q = 0; q < NCONS; ++q)
+        {
+            uij[q] = ucc[q * ORDER * ORDER];
+        }
 
-//         conserved_to_primitive(uij, pij, velocity_ceiling);
-//         double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
-//         double a = primitive_max_wavespeed(pij, cs2);
-//         wavespeed[na] = a;
-//     }
-// }
+        conserved_to_primitive(uij, pij, velocity_ceiling);
+        double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+        double a = primitive_max_wavespeed(pij, cs2);
+        wavespeed[na] = a;
+    }
+}
