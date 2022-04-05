@@ -353,6 +353,7 @@ def simulate(driver):
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
     reference_time = setup.reference_time_scale
     new_timestep_cadence = driver.new_timestep_cadence or 1
+    dt = None
 
     solver = make_solver(
         setup.solver,
@@ -420,7 +421,7 @@ def simulate(driver):
 
         with measure_time() as fold_time:
             for _ in range(fold):
-                if iteration % new_timestep_cadence == 0:
+                if dt is None or (iteration % new_timestep_cadence == 0):
                     dx = mesh.min_spacing(siml_time)
                     dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
