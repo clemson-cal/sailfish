@@ -43,25 +43,24 @@ def initial_condition(setup, mesh, time):
     """
     import numpy as np
 
-    ni, nj = mesh.shape
-    dx, dy = mesh.dx, mesh.dy
-    prim_node = np.zeros(NCONS)
-    cons_node = np.zeros(NCONS)
-    weights = np.zeros([ni, nj, NCONS, ORDER, ORDER])
-
     g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
     w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
-    # scaled LeGendre polynomials at quadrature points
     p = (
         (+1.000000000000000, +1.000000000000000, +1.000000000000000),
         (-1.341640786499873, +0.000000000000000, +1.341640786499873),
         (+0.894427190999914, -1.118033988749900, +0.894427190999914),
     )
 
+    ni, nj = mesh.shape
+    dx, dy = mesh.dx, mesh.dy
+    prim_node = np.zeros(NCONS)
+    cons_node = np.zeros(NCONS)
+    weights = np.zeros([ni, nj, NCONS, ORDER, ORDER])
+
     for i in range(ni):
         for j in range(nj):
-            for i_quad in range(3):
-                for j_quad in range(3):
+            for i_quad in range(ORDER):
+                for j_quad in range(ORDER):
                     xc, yc = mesh.cell_coordinates(i, j)
                     x = xc + 0.5 * dx * g[i_quad]
                     y = yc + 0.5 * dy * g[j_quad]

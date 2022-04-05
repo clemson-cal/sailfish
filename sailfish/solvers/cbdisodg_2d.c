@@ -147,25 +147,25 @@ PRIVATE void point_mass_source_term(
     }
 }
 
-// PRIVATE void point_masses_source_term(
-//     struct PointMassList *mass_list,
-//     double x1,
-//     double y1,
-//     double dt,
-//     double *prim,
-//     double *cons)
-// {
-//     for (int p = 0; p < 2; ++p)
-//     {
-//         double delta_cons[NCONS];
-//         point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
+PRIVATE void point_masses_source_term(
+    struct PointMassList *mass_list,
+    double x1,
+    double y1,
+    double dt,
+    double *prim,
+    double *cons)
+{
+    for (int p = 0; p < 2; ++p)
+    {
+        double delta_cons[NCONS];
+        point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
 
-//         for (int q = 0; q < NCONS; ++q)
-//         {
-//             cons[q] += delta_cons[q];
-//         }
-//     }
-// }
+        for (int q = 0; q < NCONS; ++q)
+        {
+            cons[q] += delta_cons[q];
+        }
+    }
+}
 
 
 // ============================ EOS AND BUFFER ================================
@@ -486,7 +486,9 @@ PUBLIC void cbdisodg_2d_advance_rk(
     double velocity_ceiling)
 {
     // Gaussian weights at quadrature points
-    static double gauss_weights_1d[3] = {0.555555555555556, 0.888888888888889, 0.555555555555556};    
+    static double gauss_weights_1d[ORDER] = {0.555555555555556, 0.888888888888889, 0.555555555555556};    
+    // Gaussian quadrature points in scaled domain xsi=[-1,1]
+    double gauss_xsi_1d[ORDER] = {-0.774596669241483, 0.000000000000000, 0.774596669241483};
     double dx = (patch_xr - patch_xl) / ni;
     double dy = (patch_yr - patch_yl) / nj;
     double cell_volume = dx * dy;
@@ -495,9 +497,14 @@ PUBLIC void cbdisodg_2d_advance_rk(
     int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
     int sj = NCONS * ORDER * ORDER;
 
+    struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
+    struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
+    struct PointMassList mass_list = {{m1, m2}};
+
     FOR_EACH_2D(ni, nj)
     {
-        // Caching phi and phi gradients
+        // Cache phi and phi gradients
+        // --------------------------------------------------------------------
         double phi_volume[ORDER][ORDER][ORDER][ORDER]; // i_quad x j_quad x m x n
         double phi_gradient_x[ORDER][ORDER][ORDER][ORDER];
         double phi_gradient_y[ORDER][ORDER][ORDER][ORDER];
@@ -505,11 +512,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double phi_face_xr[ORDER][ORDER][ORDER];
         double phi_face_yl[ORDER][ORDER][ORDER];
         double phi_face_yr[ORDER][ORDER][ORDER];
-        double fhat[NCONS];
-        double up[NCONS];
-        double um[NCONS];
-        double equation_19[NCONS][ORDER][ORDER];
-        double equation_20[NCONS][ORDER][ORDER];
 
         for (int i_quad = 0; i_quad < ORDER; ++i_quad)
         {
@@ -541,6 +543,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
             }
         }
 
+        // Get the indexes and pointers to neighbor zones
+        // --------------------------------------------------------------------
         int ncc = (i     + ng) * si + (j     + ng) * sj;
         int nli = (i - 1 + ng) * si + (j     + ng) * sj;
         int nri = (i + 1 + ng) * si + (j     + ng) * sj;
@@ -553,6 +557,15 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double *ulj = &weights1[nlj];
         double *urj = &weights1[nrj];
 
+        // Define and initialize working arrays
+        // --------------------------------------------------------------------
+        double fhat[NCONS];
+        double up[NCONS];
+        double um[NCONS];
+        double equation_19[NCONS][ORDER][ORDER];
+        double equation_20[NCONS][ORDER][ORDER];
+        double source_weights[NCONS][ORDER][ORDER];
+
         for (int q = 0; q < NCONS; ++q)
         {
             for (int m = 0; m < ORDER; ++m)
@@ -561,10 +574,13 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 {
                     equation_19[q][m][n] = 0.0;
                     equation_20[q][m][n] = 0.0;
+                    source_weights[q][m][n] = 0.0;
                 }
             }
         }
 
+        // Compute the volume term
+        // --------------------------------------------------------------------
         for (int i_quad = 0; i_quad < ORDER; ++i_quad)
         {
             for (int j_quad = 0; j_quad < ORDER; ++j_quad)
@@ -596,9 +612,38 @@ PUBLIC void cbdisodg_2d_advance_rk(
                         }
                     }
                 }
+
+                // Source terms
+                double xc = patch_xl + (i + 0.5) * dx;
+                double yc = patch_yl + (j + 0.5) * dy;
+                double x = xc + 0.5 * gauss_xsi_1d[i_quad] * dx;
+                double y = yc + 0.5 * gauss_xsi_1d[j_quad] * dy;
+                double du_source[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    du_source[q] = 0.0;
+                }
+                point_masses_source_term(&mass_list, x, y, dt, prim, du_source);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    for (int m = 0; m < ORDER; ++m)
+                    {
+                        for (int n = 0; n < ORDER; ++n)
+                        {
+                            if (m + n < ORDER)
+                            {
+                                source_weights[q][m][n] += 0.25 * du_source[q] * phi_volume[i_quad][j_quad][m][n] * gw;
+                            }
+                        }
+                    }
+                }
             }
         }
 
+        // Compute the surface term
+        // --------------------------------------------------------------------
         for (int quad = 0; quad < ORDER; ++quad)
         {
             reconstruct_1d(quad, phi_face_xl, ucc, up);
@@ -659,7 +704,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                     if (m + n < ORDER)
                     {
                         int k = q * ORDER * ORDER + m * ORDER + n;
-                        w2[k] = w1[k] + (equation_19[q][m][n] - equation_20[q][m][n]) * 0.5 * dt / cell_volume;
+                        w2[k] = w1[k] + (equation_19[q][m][n] - equation_20[q][m][n]) * 0.5 * dt / cell_volume + source_weights[q][m][n];
                         w2[k] = (1.0 - rk_param) * w2[k] + rk_param * w0[k];
                     }
                 }
@@ -832,8 +877,8 @@ PUBLIC void cbdisodg_2d_wavespeed(
     int sj = NCONS * ORDER * ORDER;
     int ti = nj + 2 * ng;
     int tj = 1;
-    double dx = (patch_xr - patch_xl)/ni;
-    double dy = (patch_yr - patch_yl)/nj;
+    double dx = (patch_xr - patch_xl) / ni;
+    double dy = (patch_yr - patch_yl) / nj;
 
     FOR_EACH_2D(ni, nj)
     {
@@ -856,6 +901,11 @@ PUBLIC void cbdisodg_2d_wavespeed(
         conserved_to_primitive(uij, pij, velocity_ceiling);
         double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
         double a = primitive_max_wavespeed(pij, cs2);
+
+        if (a > 100.0)
+        {
+            printf("large a! a = %3.2e at position (%+3.2f %+3.2f) prim=(%+3.2e %+3.2e %+3.2e)\n", a, x, y, pij[0], pij[1], pij[2]);
+        }
         wavespeed[na] = a;
     }
 }
