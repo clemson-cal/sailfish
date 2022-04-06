@@ -440,9 +440,99 @@ PRIVATE void reconstruct_1d(int quad, double phi[ORDER][ORDER][ORDER], double *w
     }
 }
 
+PRIVATE minmodTVB(real w1, real w0l, real w0, real w0r, real dl)
+{
+    #define min2(a, b) (a) < (b) ? (a) : (b)
+    #define min3(a, b, c) min2(a, min2(b, c))
+    #define sign(x) copysign(1.0, x)
+    #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
+
+    double BETA_TVB = 1.0;
+    double a = w1 * sqrt(3.0);
+    double b = (w0 - w0l) * BETA_TVB;
+    double c = (w0r - w0) * BETA_TVB;
+
+    const real M = 10.0; //Cockburn & Shu, JCP 141, 199 (1998) eq. 3.7 suggest M~50.0
+    //const real Mtilde = 0.5; //Schaal+
+    if (fabs(a) <= M * dl * dl)
+    //if (fabs(a) <= Mtilde * dl)
+    {        
+        return w1;
+    }
+    else
+    {
+        real x1 = fabs(sign(a) + sign(b)) * (sign(a) + sign(c));
+        real x2 = minabs(a, b, c);
+        real x = (0.25 / sqrt(3.0)) * x1 * x2;
+
+        return x;
+    }
+}
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
+PUBLIC void cbdisodg_2d_slope_limit(
+    int ni,
+    int nj,
+    double patch_xl, // mesh
+    double patch_xr,
+    double patch_yl,
+    double patch_yr,
+    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+    double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+{
+    double dx = (patch_xr - patch_xl) / ni;
+    double dy = (patch_yr - patch_yl) / nj;
+    int ng = 1; // number of guard zones
+    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
+    int sj = NCONS * ORDER * ORDER;
+
+    FOR_EACH_2D(ni, nj)
+    {
+        // Get the indexes and pointers to neighbor zones
+        // --------------------------------------------------------------------
+        int ncc = (i     + ng) * si + (j     + ng) * sj;
+        int nli = (i - 1 + ng) * si + (j     + ng) * sj;
+        int nri = (i + 1 + ng) * si + (j     + ng) * sj;
+        int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
+        int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
+
+        double *ucc = &weights1[ncc];
+        double *uli = &weights1[nli];
+        double *uri = &weights1[nri];
+        double *ulj = &weights1[nlj];
+        double *urj = &weights1[nrj];
+
+        double *w2 = &weights2[ncc];
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
+            int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
+            int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
+
+            double wtilde_x = minmodTVB(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
+            double wtilde_y = minmodTVB(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
+            
+            if (wtilde_x != ucc[p01] || wtilde_y != ucc[p10]) 
+            {
+                for (int m = 0; m < ORDER; ++n)
+                {
+                    for (int n = 0; n < ORDER; ++n)
+                    {
+                        if (m + n > 0)
+                        {
+                            w2[ORDER * ORDER * m + ORDER * n] = 0.0;
+                        }
+                    }
+                }
+                w2[p10] = wtilde_x;
+                w2[p01] = wtilde_y;
+            }
+        }
+    }
+}
+
 PUBLIC void cbdisodg_2d_advance_rk(
     int ni,
     int nj,
@@ -633,6 +723,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                         for (int n = 0; n < ORDER; ++n)
                         {
                             if (m + n < ORDER)
+                            //if (m == 0 && n == 0)
                             {
                                 source_weights[q][m][n] += 0.25 * du_source[q] * phi_volume[i_quad][j_quad][m][n] * gw;
                             }
@@ -902,10 +993,10 @@ PUBLIC void cbdisodg_2d_wavespeed(
         double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
         double a = primitive_max_wavespeed(pij, cs2);
 
-        if (a > 100.0)
-        {
-            printf("large a! a = %3.2e at position (%+3.2f %+3.2f) prim=(%+3.2e %+3.2e %+3.2e)\n", a, x, y, pij[0], pij[1], pij[2]);
-        }
+        //if (a > 100.0)
+        //{
+        //    printf("large a! a = %3.2e at position (%+3.2f %+3.2f) prim=(%+3.2e %+3.2e %+3.2e)\n", a, x, y, pij[0], pij[1], pij[2]);
+        //}
         wavespeed[na] = a;
     }
 }

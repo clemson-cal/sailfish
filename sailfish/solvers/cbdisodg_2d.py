@@ -208,6 +208,21 @@ class Patch:
         with self.execution_context:
             self.weights0[...] = self.weights1[...]
 
+    def slope_limit(self):
+        """
+        Limit slopes using minmodTVB
+        """
+        with self.execution_context:
+            self.lib.cbdisodg_2d_advance_rk[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.weights1,
+                self.weights2,
+            )
+        self.weights1, self.weights2 = self.weights2, self.weights1
+
     def advance_rk(self, rk_param, dt):
         """
         Pass required parameters for time evolution of the setup.
@@ -481,6 +496,9 @@ class Solver(SolverBase):
         self.set_bc("weights1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
+        self.set_bc("weights1")
+        for patch in self.patches:
+            patch.slope_limit()
 
     def set_bc(self, array):
         ng = self.num_guard
