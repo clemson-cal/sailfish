@@ -213,7 +213,7 @@ class Patch:
         Limit slopes using minmodTVB
         """
         with self.execution_context:
-            self.lib.cbdisodg_2d_advance_rk[self.shape](
+            self.lib.cbdisodg_2d_slope_limit[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
