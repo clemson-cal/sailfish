@@ -508,68 +508,6 @@ PRIVATE minmodTVB(double w1, double w0l, double w0, double w0r, double dl)
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-//PUBLIC void cbdisodg_2d_slope_limit(
-//    int ni,
-//    int nj,
-//    double patch_xl, // mesh
-//    double patch_xr,
-//    double patch_yl,
-//    double patch_yr,
-//    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-//    double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-//{
-//    double dx = (patch_xr - patch_xl) / ni;
-//    double dy = (patch_yr - patch_yl) / nj;
-//    int ng = 1; // number of guard zones
-//    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
-//    int sj = NCONS * ORDER * ORDER;
-//
-//    FOR_EACH_2D(ni, nj)
-//    {
-//        // Get the indexes and pointers to neighbor zones
-//        // --------------------------------------------------------------------
-//        int ncc = (i     + ng) * si + (j     + ng) * sj;
-//        int nli = (i - 1 + ng) * si + (j     + ng) * sj;
-//        int nri = (i + 1 + ng) * si + (j     + ng) * sj;
-//        int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
-//        int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
-//
-//        double *ucc = &weights1[ncc];
-//        double *uli = &weights1[nli];
-//        double *uri = &weights1[nri];
-//        double *ulj = &weights1[nlj];
-//        double *urj = &weights1[nrj];
-//
-//        double *w2 = &weights2[ncc];
-//
-//        for (int q = 0; q < NCONS; ++q)
-//        {
-//            int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
-//            int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
-//            int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
-//
-//            double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
-//            double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
-//            
-//            if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01]) 
-//            {
-//                for (int m = 0; m < ORDER; ++m)
-//                {
-//                    for (int n = 0; n < ORDER; ++n)
-//                    {
-//                        if (m + n > 0)
-//                        {
-//                            w2[ORDER * ORDER * m + ORDER * n] = 0.0;
-//                        }
-//                    }
-//                }
-//                w2[p10] = wtilde_x;
-//                w2[p01] = wtilde_y;
-//            }
-//        }
-//    }
-//}
-
 PUBLIC void cbdisodg_2d_slope_limit(
     int ni,
     int nj,
@@ -580,19 +518,11 @@ PUBLIC void cbdisodg_2d_slope_limit(
     double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
     double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
 {
-    #define max2(a, b) (a) > (b) ? (a) : (b)
-    #define max3(a, b, c) max2(a, max2(b, c))
-    #define maxabs5(a, b, c, d, e) max2(max2(fabs(a), fabs(b)), max3(fabs(c), fabs(d), fabs(e)))
-    #define SQRT_THREE sqrt(3.0)
-    #define SQRT_FIVE  sqrt(5.0)
-    #define CK 0.03 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
-
     double dx = (patch_xr - patch_xl) / ni;
     double dy = (patch_yr - patch_yl) / nj;
     int ng = 1; // number of guard zones
     int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
     int sj = NCONS * ORDER * ORDER;
-    double dvol = 4.0; // volume in xsi coordinates [-1,1] x [-1,1]
 
     FOR_EACH_2D(ni, nj)
     {
@@ -610,60 +540,130 @@ PUBLIC void cbdisodg_2d_slope_limit(
         double *ulj = &weights1[nlj];
         double *urj = &weights1[nrj];
 
-        int qt = 0; // index of conserved variable to test for trouble
+        double *w2 = &weights2[ncc];
 
-        int t00 = ORDER * ORDER * qt + 0 * ORDER + 0;
-        int t01 = ORDER * ORDER * qt + 0 * ORDER + 1;
-        int t10 = ORDER * ORDER * qt + 1 * ORDER + 0;
-        int t02 = ORDER * ORDER * qt + 0 * ORDER + 2;
-        int t20 = ORDER * ORDER * qt + 2 * ORDER + 0;
-
-        double maxpj = maxabs5(ucc[t00], uli[t00], uri[t00], ulj[t00], urj[t00]);
-
-        double a = 4.0 * uli[t00] + 8.0 * SQRT_THREE * uli[t10] + 24.0 * SQRT_FIVE * uli[t20];
-        double b = 4.0 * uri[t00] - 8.0 * SQRT_THREE * uri[t10] + 24.0 * SQRT_FIVE * uri[t20];
-        double c = 4.0 * ulj[t00] + 8.0 * SQRT_THREE * ulj[t01] + 24.0 * SQRT_FIVE * ulj[t02];
-        double d = 4.0 * urj[t00] - 8.0 * SQRT_THREE * urj[t01] + 24.0 * SQRT_FIVE * urj[t02];
-
-        double pbb_li = fabs(ucc[t00] - a / dvol);
-        double pbb_ri = fabs(ucc[t00] - b / dvol);
-        double pbb_lj = fabs(ucc[t00] - c / dvol);
-        double pbb_rj = fabs(ucc[t00] - d / dvol);
-
-        double tci = (pbb_li + pbb_ri + pbb_lj + pbb_rj) / maxpj;
-        
-        if (tci > CK)
+        for (int q = 0; q < NCONS; ++q)
         {
-            double *w2 = &weights2[ncc];
-    
-            for (int q = 0; q < NCONS; ++q)
+            int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
+            int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
+            int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
+
+            double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
+            double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
+            
+            if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01]) 
             {
-                int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
-                int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
-                int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
-    
-                double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
-                double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
-                
-                if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01]) 
+                for (int m = 0; m < ORDER; ++m)
                 {
-                    for (int m = 0; m < ORDER; ++m)
+                    for (int n = 0; n < ORDER; ++n)
                     {
-                        for (int n = 0; n < ORDER; ++n)
+                        if (m + n > 0)
                         {
-                            if (m + n > 0)
-                            {
-                                w2[ORDER * ORDER * q + m * ORDER + n] = 0.0;
-                            }
+                            w2[ORDER * ORDER * q + m * ORDER + n] = 0.0;
                         }
                     }
-                    w2[p10] = wtilde_x;
-                    w2[p01] = wtilde_y;
                 }
+                w2[p10] = wtilde_x;
+                w2[p01] = wtilde_y;
             }
         }
     }
 }
+
+//PUBLIC void cbdisodg_2d_slope_limit(
+//    int ni,
+//    int nj,
+//    double patch_xl, // mesh
+//    double patch_xr,
+//    double patch_yl,
+//    double patch_yr,
+//    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+//    double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+//{
+//    #define max2(a, b) (a) > (b) ? (a) : (b)
+//    #define max3(a, b, c) max2(a, max2(b, c))
+//    #define maxabs5(a, b, c, d, e) max2(max2(fabs(a), fabs(b)), max3(fabs(c), fabs(d), fabs(e)))
+//    #define SQRT_THREE sqrt(3.0)
+//    #define SQRT_FIVE  sqrt(5.0)
+//    #define CK 0.03 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
+//
+//    double dx = (patch_xr - patch_xl) / ni;
+//    double dy = (patch_yr - patch_yl) / nj;
+//    int ng = 1; // number of guard zones
+//    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
+//    int sj = NCONS * ORDER * ORDER;
+//    double dvol = 4.0; // volume in xsi coordinates [-1,1] x [-1,1]
+//
+//    FOR_EACH_2D(ni, nj)
+//    {
+//        // Get the indexes and pointers to neighbor zones
+//        // --------------------------------------------------------------------
+//        int ncc = (i     + ng) * si + (j     + ng) * sj;
+//        int nli = (i - 1 + ng) * si + (j     + ng) * sj;
+//        int nri = (i + 1 + ng) * si + (j     + ng) * sj;
+//        int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
+//        int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
+//
+//        double *ucc = &weights1[ncc];
+//        double *uli = &weights1[nli];
+//        double *uri = &weights1[nri];
+//        double *ulj = &weights1[nlj];
+//        double *urj = &weights1[nrj];
+//
+//        int qt = 0; // index of conserved variable to test for trouble
+//
+//        int t00 = ORDER * ORDER * qt + 0 * ORDER + 0;
+//        int t01 = ORDER * ORDER * qt + 0 * ORDER + 1;
+//        int t10 = ORDER * ORDER * qt + 1 * ORDER + 0;
+//        int t02 = ORDER * ORDER * qt + 0 * ORDER + 2;
+//        int t20 = ORDER * ORDER * qt + 2 * ORDER + 0;
+//
+//        double maxpj = maxabs5(ucc[t00], uli[t00], uri[t00], ulj[t00], urj[t00]);
+//
+//        double a = 4.0 * uli[t00] + 8.0 * SQRT_THREE * uli[t10] + 24.0 * SQRT_FIVE * uli[t20];
+//        double b = 4.0 * uri[t00] - 8.0 * SQRT_THREE * uri[t10] + 24.0 * SQRT_FIVE * uri[t20];
+//        double c = 4.0 * ulj[t00] + 8.0 * SQRT_THREE * ulj[t01] + 24.0 * SQRT_FIVE * ulj[t02];
+//        double d = 4.0 * urj[t00] - 8.0 * SQRT_THREE * urj[t01] + 24.0 * SQRT_FIVE * urj[t02];
+//
+//        double pbb_li = fabs(ucc[t00] - a / dvol);
+//        double pbb_ri = fabs(ucc[t00] - b / dvol);
+//        double pbb_lj = fabs(ucc[t00] - c / dvol);
+//        double pbb_rj = fabs(ucc[t00] - d / dvol);
+//
+//        double tci = (pbb_li + pbb_ri + pbb_lj + pbb_rj) / maxpj;
+//        
+//        if (tci > CK)
+//        {
+//            double *w2 = &weights2[ncc];
+//    
+//            for (int q = 0; q < NCONS; ++q)
+//            {
+//                int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
+//                int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
+//                int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
+//    
+//                double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
+//                double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
+//                
+//                if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01]) 
+//                {
+//                    for (int m = 0; m < ORDER; ++m)
+//                    {
+//                        for (int n = 0; n < ORDER; ++n)
+//                        {
+//                            if (m + n > 0)
+//                            {
+//                                w2[ORDER * ORDER * q + m * ORDER + n] = 0.0;
+//                            }
+//                        }
+//                    }
+//                    w2[p10] = wtilde_x;
+//                    w2[p01] = wtilde_y;
+//                }
+//            }
+//        }
+//    }
+//}
 
 PUBLIC void cbdisodg_2d_advance_rk(
     int ni,
