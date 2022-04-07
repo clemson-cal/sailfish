@@ -440,6 +440,48 @@ PRIVATE void reconstruct_1d(int quad, double phi[ORDER][ORDER][ORDER], double *w
     }
 }
 
+PRIVATE minmod_simple(real w1, real w0l, real w0, real w0r, real dl)
+{
+    #define sign(x) copysign(1.0, x)
+
+    double beta = 1.0;
+    double a = w1;
+    double b = (w0 - w0l) * beta / sqrt(3.0);
+    double c = (w0r - w0) * beta / sqrt(3.0);
+
+    if (a < 0.0 && b < 0.0 && c < 0.0)
+    {
+        if (a > b && a > c)
+        {
+            return a; // no trigger
+        }
+        if (b > c && b > a)
+        {
+            return b; // trigger
+        }
+        if (c > a && c > b)
+        {
+            return c;
+        }
+    }
+    if (a > 0.0 && b > 0.0 && c > 0.0)
+    {
+        if (a < b && a < c)
+        {
+            return a; // no trigger
+        }
+        if (b < c && b < a)
+        {
+            return b; // trigger
+        }
+        if (c < a && c < b)
+        {
+            return c;
+        }
+    }
+    return 0.0; // trigger
+}
+
 PRIVATE minmodTVB(real w1, real w0l, real w0, real w0r, real dl)
 {
     #define min2(a, b) (a) < (b) ? (a) : (b)
@@ -456,7 +498,7 @@ PRIVATE minmodTVB(real w1, real w0l, real w0, real w0r, real dl)
     //const real Mtilde = 0.5; //Schaal+
     if (fabs(a) <= M * dl * dl)
     //if (fabs(a) <= Mtilde * dl)
-    {        
+    {
         return w1;
     }
     else
@@ -511,8 +553,8 @@ PUBLIC void cbdisodg_2d_slope_limit(
             int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
             int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
 
-            double wtilde_x = minmodTVB(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
-            double wtilde_y = minmodTVB(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
+            double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
+            double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
             
             if (wtilde_x != ucc[p01] || wtilde_y != ucc[p10]) 
             {
