@@ -440,7 +440,7 @@ PRIVATE void reconstruct_1d(int quad, double phi[ORDER][ORDER][ORDER], double *w
     }
 }
 
-PRIVATE minmod_simple(real w1, real w0l, real w0, real w0r, real dl)
+PRIVATE minmod_simple(double w1, double w0l, double w0, double w0r, double dl)
 {
     #define sign(x) copysign(1.0, x)
 
@@ -482,20 +482,15 @@ PRIVATE minmod_simple(real w1, real w0l, real w0, real w0r, real dl)
     return 0.0; // trigger
 }
 
-PRIVATE minmodTVB(real w1, real w0l, real w0, real w0r, real dl)
+PRIVATE minmodTVB(double w1, double w0l, double w0, double w0r, double dl)
 {
-    #define min2(a, b) (a) < (b) ? (a) : (b)
-    #define min3(a, b, c) min2(a, min2(b, c))
-    #define sign(x) copysign(1.0, x)
-    #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
-
     double BETA_TVB = 1.0;
     double a = w1 * sqrt(3.0);
     double b = (w0 - w0l) * BETA_TVB;
     double c = (w0r - w0) * BETA_TVB;
 
-    const real M = 10.0; //Cockburn & Shu, JCP 141, 199 (1998) eq. 3.7 suggest M~50.0
-    //const real Mtilde = 0.5; //Schaal+
+    const double M = 10.0; //Cockburn & Shu, JCP 141, 199 (1998) eq. 3.7 suggest M~50.0
+    //const double Mtilde = 0.5; //Schaal+
     if (fabs(a) <= M * dl * dl)
     //if (fabs(a) <= Mtilde * dl)
     {
@@ -503,9 +498,9 @@ PRIVATE minmodTVB(real w1, real w0l, real w0, real w0r, real dl)
     }
     else
     {
-        real x1 = fabs(sign(a) + sign(b)) * (sign(a) + sign(c));
-        real x2 = minabs(a, b, c);
-        real x = (0.25 / sqrt(3.0)) * x1 * x2;
+        double x1 = fabs(sign(a) + sign(b)) * (sign(a) + sign(c));
+        double x2 = minabs(a, b, c);
+        double x = (0.25 / sqrt(3.0)) * x1 * x2;
 
         return x;
     }
@@ -513,69 +508,69 @@ PRIVATE minmodTVB(real w1, real w0l, real w0, real w0r, real dl)
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
+//PUBLIC void cbdisodg_2d_slope_limit(
+//    int ni,
+//    int nj,
+//    double patch_xl, // mesh
+//    double patch_xr,
+//    double patch_yl,
+//    double patch_yr,
+//    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+//    double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+//{
+//    double dx = (patch_xr - patch_xl) / ni;
+//    double dy = (patch_yr - patch_yl) / nj;
+//    int ng = 1; // number of guard zones
+//    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
+//    int sj = NCONS * ORDER * ORDER;
+//
+//    FOR_EACH_2D(ni, nj)
+//    {
+//        // Get the indexes and pointers to neighbor zones
+//        // --------------------------------------------------------------------
+//        int ncc = (i     + ng) * si + (j     + ng) * sj;
+//        int nli = (i - 1 + ng) * si + (j     + ng) * sj;
+//        int nri = (i + 1 + ng) * si + (j     + ng) * sj;
+//        int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
+//        int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
+//
+//        double *ucc = &weights1[ncc];
+//        double *uli = &weights1[nli];
+//        double *uri = &weights1[nri];
+//        double *ulj = &weights1[nlj];
+//        double *urj = &weights1[nrj];
+//
+//        double *w2 = &weights2[ncc];
+//
+//        for (int q = 0; q < NCONS; ++q)
+//        {
+//            int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
+//            int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
+//            int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
+//
+//            double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
+//            double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
+//            
+//            if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01]) 
+//            {
+//                for (int m = 0; m < ORDER; ++m)
+//                {
+//                    for (int n = 0; n < ORDER; ++n)
+//                    {
+//                        if (m + n > 0)
+//                        {
+//                            w2[ORDER * ORDER * m + ORDER * n] = 0.0;
+//                        }
+//                    }
+//                }
+//                w2[p10] = wtilde_x;
+//                w2[p01] = wtilde_y;
+//            }
+//        }
+//    }
+//}
+
 PUBLIC void cbdisodg_2d_slope_limit(
-    int ni,
-    int nj,
-    double patch_xl, // mesh
-    double patch_xr,
-    double patch_yl,
-    double patch_yr,
-    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-    double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-{
-    double dx = (patch_xr - patch_xl) / ni;
-    double dy = (patch_yr - patch_yl) / nj;
-    int ng = 1; // number of guard zones
-    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
-    int sj = NCONS * ORDER * ORDER;
-
-    FOR_EACH_2D(ni, nj)
-    {
-        // Get the indexes and pointers to neighbor zones
-        // --------------------------------------------------------------------
-        int ncc = (i     + ng) * si + (j     + ng) * sj;
-        int nli = (i - 1 + ng) * si + (j     + ng) * sj;
-        int nri = (i + 1 + ng) * si + (j     + ng) * sj;
-        int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
-        int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
-
-        double *ucc = &weights1[ncc];
-        double *uli = &weights1[nli];
-        double *uri = &weights1[nri];
-        double *ulj = &weights1[nlj];
-        double *urj = &weights1[nrj];
-
-        double *w2 = &weights2[ncc];
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
-            int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
-            int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
-
-            double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00], dx);
-            double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00], dy);
-            
-            if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01]) 
-            {
-                for (int m = 0; m < ORDER; ++n)
-                {
-                    for (int n = 0; n < ORDER; ++n)
-                    {
-                        if (m + n > 0)
-                        {
-                            w2[ORDER * ORDER * m + ORDER * n] = 0.0;
-                        }
-                    }
-                }
-                w2[p10] = wtilde_x;
-                w2[p01] = wtilde_y;
-            }
-        }
-    }
-}
-
-PUBLIC void cbdisodg_2d_slope_limit_tci(
     int ni,
     int nj,
     double patch_xl, // mesh
@@ -588,8 +583,8 @@ PUBLIC void cbdisodg_2d_slope_limit_tci(
     #define max2(a, b) (a) > (b) ? (a) : (b)
     #define max3(a, b, c) max2(a, max2(b, c))
     #define maxabs5(a, b, c, d, e) max2(max2(fabs(a), fabs(b)), max3(fabs(c), fabs(d), fabs(e)))
-    #define SQRT_THREE square_root(3.0)
-    #define SQRT_FIVE  square_root(5.0)
+    #define SQRT_THREE sqrt(3.0)
+    #define SQRT_FIVE  sqrt(5.0)
     #define CK 0.03 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
 
     double dx = (patch_xr - patch_xl) / ni;
@@ -652,7 +647,7 @@ PUBLIC void cbdisodg_2d_slope_limit_tci(
                 
                 if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01]) 
                 {
-                    for (int m = 0; m < ORDER; ++n)
+                    for (int m = 0; m < ORDER; ++m)
                     {
                         for (int n = 0; n < ORDER; ++n)
                         {
