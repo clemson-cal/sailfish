@@ -28,6 +28,7 @@ class Options(NamedTuple):
     velocity_ceiling: float = 1e12
     mach_ceiling: float = 1e12
     rk_order: int = 2
+    limit_slopes: bool = False
 
 
 def primitive_to_conserved(prim, cons):
@@ -493,12 +494,13 @@ class Solver(SolverBase):
             self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
+        if self._options.limit_slopes:
+            self.set_bc("weights1")
+            for patch in self.patches:
+                patch.slope_limit()
         self.set_bc("weights1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
-        self.set_bc("weights1")
-        for patch in self.patches:
-            patch.slope_limit()
 
     def set_bc(self, array):
         ng = self.num_guard
