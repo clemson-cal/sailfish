@@ -285,12 +285,13 @@ class Patch:
 
     @property
     def primitive(self):
-        u0 = self.weights1[:, :, :, 0, 0]
-        p0 = self.xp.zeros_like(u0)
-        p0[..., 0] = u0[..., 0]
-        p0[..., 1] = u0[..., 1] / u0[..., 0]
-        p0[..., 2] = u0[..., 2] / u0[..., 0]
-        return p0
+        with self.execution_context:
+            u0 = self.weights1[:, :, :, 0, 0]
+            p0 = self.xp.zeros_like(u0)
+            p0[..., 0] = u0[..., 0]
+            p0[..., 1] = u0[..., 1] / u0[..., 0]
+            p0[..., 2] = u0[..., 2] / u0[..., 0]
+            return p0
 
 
 class Solver(SolverBase):
