@@ -184,6 +184,7 @@ class KitpCodeComparison(Setup):
     domain_radius = param(8.0, "half side length of the square computational domain")
     sink_rate = param(10.0, "component sink rate", mutable=True)
     buffer_is_enabled = param(True, "whether the buffer zone is enabled")
+    use_dg = param(False, "use the DG solver")
 
     def primitive(self, t, coords, primitive):
         GM = 1.0
@@ -214,7 +215,7 @@ class KitpCodeComparison(Setup):
 
     @property
     def default_resolution(self):
-        return 1000
+        return 200
 
     @property
     def diagnostics(self):
@@ -236,10 +237,8 @@ class KitpCodeComparison(Setup):
     @property
     def physics(self):
         return dict(
-            # eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
-            # mach_number=self.mach_number,
-            eos_type=EquationOfState.GLOBALLY_ISOTHERMAL,
-            sound_speed=0.1,
+            eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
+            mach_number=self.mach_number,
             buffer_is_enabled=self.buffer_is_enabled,
             buffer_driving_rate=100.0,
             point_mass_function=self.point_masses,
@@ -249,8 +248,7 @@ class KitpCodeComparison(Setup):
 
     @property
     def solver(self):
-        # return "cbdiso_2d"
-        return "cbdisodg_2d"
+        return "cbdiso_2d" if not self.use_dg else "cbdisodg_2d"
 
     @property
     def boundary_condition(self):
@@ -277,13 +275,6 @@ class KitpCodeComparison(Setup):
         )
 
     def point_masses(self, time):
-        # return PointMass(
-        #     softening_length=self.softening_length,
-        #     sink_model=SinkModel[self.sink_model.upper()],
-        #     sink_rate=self.sink_rate,
-        #     sink_radius=self.sink_radius,
-        #     mass=1.0,
-        # )
         m1, m2 = self.orbital_elements.orbital_state(time)
 
         return (
