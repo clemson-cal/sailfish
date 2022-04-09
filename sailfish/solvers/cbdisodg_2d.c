@@ -189,41 +189,41 @@ PRIVATE double sound_speed_squared(
     }
 }
 
-PRIVATE void buffer_source_term(
-    struct KeplerianBuffer *buffer,
-    double xc,
-    double yc,
-    double *cons,
-    double *cons_dot)
-{
-    if (buffer->is_enabled)
-    {
-        double rc = sqrt(xc * xc + yc * yc);
-        double surface_density = buffer->surface_density;
-        double central_mass = buffer->central_mass;
-        double driving_rate = buffer->driving_rate;
-        double outer_radius = buffer->outer_radius;
-        double onset_width = buffer->onset_width;
-        double onset_radius = outer_radius - onset_width;
+// PRIVATE void buffer_source_term(
+//     struct KeplerianBuffer *buffer,
+//     double xc,
+//     double yc,
+//     double *cons,
+//     double *cons_dot)
+// {
+//     if (buffer->is_enabled)
+//     {
+//         double rc = sqrt(xc * xc + yc * yc);
+//         double surface_density = buffer->surface_density;
+//         double central_mass = buffer->central_mass;
+//         double driving_rate = buffer->driving_rate;
+//         double outer_radius = buffer->outer_radius;
+//         double onset_width = buffer->onset_width;
+//         double onset_radius = outer_radius - onset_width;
 
-        if (rc > onset_radius)
-        {
-            double pf = surface_density * sqrt(central_mass / rc);
-            double px = pf * (-yc / rc);
-            double py = pf * ( xc / rc);
-            double u0[NCONS] = {surface_density, px, py};
+//         if (rc > onset_radius)
+//         {
+//             double pf = surface_density * sqrt(central_mass / rc);
+//             double px = pf * (-yc / rc);
+//             double py = pf * ( xc / rc);
+//             double u0[NCONS] = {surface_density, px, py};
 
-            double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-            // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
-            double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
+//             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
+//             // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+//             double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
-            for (int q = 0; q < NCONS; ++q)
-            {
-                cons_dot[q] -= (cons[q] - u0[q]) * buffer_rate;
-            }
-        }
-    }
-}
+//             for (int q = 0; q < NCONS; ++q)
+//             {
+//                 cons_dot[q] -= (cons[q] - u0[q]) * buffer_rate;
+//             }
+//         }
+//     }
+// }
 
 // ============================ HYDRO =========================================
 // ============================================================================
@@ -464,7 +464,7 @@ PRIVATE void reconstruct_1d(int quad, double phi[ORDER][ORDER][ORDER], double *w
     }
 }
 
-PRIVATE minmod_simple(double w1, double w0l, double w0, double w0r)
+PRIVATE int minmod_simple(double w1, double w0l, double w0, double w0r)
 {
     double beta = 0.5; // in the range 0.5 - 1.0
     double a = w1;
@@ -507,68 +507,68 @@ PRIVATE minmod_simple(double w1, double w0l, double w0, double w0r)
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-PUBLIC void cbdisodg_2d_slope_limit_no_tci(
-    int ni,
-    int nj,
-    double patch_xl, // mesh
-    double patch_xr,
-    double patch_yl,
-    double patch_yr,
-    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-    double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-{
-    double dx = (patch_xr - patch_xl) / ni;
-    double dy = (patch_yr - patch_yl) / nj;
-    int ng = 1; // number of guard zones
-    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
-    int sj = NCONS * ORDER * ORDER;
+// PUBLIC void cbdisodg_2d_slope_limit_no_tci(
+//     int ni,
+//     int nj,
+//     double patch_xl, // mesh
+//     double patch_xr,
+//     double patch_yl,
+//     double patch_yr,
+//     double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+//     double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+// {
+//     double dx = (patch_xr - patch_xl) / ni;
+//     double dy = (patch_yr - patch_yl) / nj;
+//     int ng = 1; // number of guard zones
+//     int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
+//     int sj = NCONS * ORDER * ORDER;
 
-    FOR_EACH_2D(ni, nj)
-    {
-        // Get the indexes and pointers to neighbor zones
-        // --------------------------------------------------------------------
-        int ncc = (i     + ng) * si + (j     + ng) * sj;
-        int nli = (i - 1 + ng) * si + (j     + ng) * sj;
-        int nri = (i + 1 + ng) * si + (j     + ng) * sj;
-        int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
-        int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
+//     FOR_EACH_2D(ni, nj)
+//     {
+//         // Get the indexes and pointers to neighbor zones
+//         // --------------------------------------------------------------------
+//         int ncc = (i     + ng) * si + (j     + ng) * sj;
+//         int nli = (i - 1 + ng) * si + (j     + ng) * sj;
+//         int nri = (i + 1 + ng) * si + (j     + ng) * sj;
+//         int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
+//         int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
 
-        double *ucc = &weights1[ncc];
-        double *uli = &weights1[nli];
-        double *uri = &weights1[nri];
-        double *ulj = &weights1[nlj];
-        double *urj = &weights1[nrj];
-        double *w2 = &weights2[ncc];
+//         double *ucc = &weights1[ncc];
+//         double *uli = &weights1[nli];
+//         double *uri = &weights1[nri];
+//         double *ulj = &weights1[nlj];
+//         double *urj = &weights1[nrj];
+//         double *w2 = &weights2[ncc];
 
-        memcpy(w2, ucc, NCONS * ORDER * ORDER * sizeof(double));
+//         memcpy(w2, ucc, NCONS * ORDER * ORDER * sizeof(double));
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
-            int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
-            int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
+//         for (int q = 0; q < NCONS; ++q)
+//         {
+//             int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
+//             int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
+//             int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
 
-            double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00]);
-            double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00]);
+//             double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00]);
+//             double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00]);
 
-            if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01])
-            {
-                for (int m = 0; m < ORDER; ++m)
-                {
-                    for (int n = 0; n < ORDER; ++n)
-                    {
-                        if (m + n > 0)
-                        {
-                            w2[ORDER * ORDER * q + ORDER * m + n] = 0.0;
-                        }
-                    }
-                }
-                w2[p10] = wtilde_x;
-                w2[p01] = wtilde_y;
-            }
-        }
-    }
-}
+//             if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01])
+//             {
+//                 for (int m = 0; m < ORDER; ++m)
+//                 {
+//                     for (int n = 0; n < ORDER; ++n)
+//                     {
+//                         if (m + n > 0)
+//                         {
+//                             w2[ORDER * ORDER * q + ORDER * m + n] = 0.0;
+//                         }
+//                     }
+//                 }
+//                 w2[p10] = wtilde_x;
+//                 w2[p01] = wtilde_y;
+//             }
+//         }
+//     }
+// }
 
 PUBLIC void cbdisodg_2d_slope_limit(
    int ni,
@@ -580,15 +580,12 @@ PUBLIC void cbdisodg_2d_slope_limit(
    double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
    double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
 {
-   #define max2(a, b) (a) > (b) ? (a) : (b)
    #define max3(a, b, c) max2(a, max2(b, c))
    #define maxabs5(a, b, c, d, e) max2(max2(fabs(a), fabs(b)), max3(fabs(c), fabs(d), fabs(e)))
    #define SQRT_THREE sqrt(3.0)
    #define SQRT_FIVE  sqrt(5.0)
    #define CK 0.1 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
 
-   double dx = (patch_xr - patch_xl) / ni;
-   double dy = (patch_yr - patch_yl) / nj;
    int ng = 1; // number of guard zones
    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
    int sj = NCONS * ORDER * ORDER;
@@ -700,7 +697,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
     double sink_rate2,
     double sink_radius2,
     int sink_model2,
-    double cs2, // equation of state
+    double soundspeed2, // equation of state
     double mach_squared,
     int eos_type,
     double nu, // kinematic viscosity coefficient
@@ -802,17 +799,27 @@ PUBLIC void cbdisodg_2d_advance_rk(
             }
         }
 
+        // Zone center coordinates
+        // --------------------------------------------------------------------
+        double xc = patch_xl + (i + 0.5) * dx;
+        double yc = patch_yl + (j + 0.5) * dy;
+
         // Compute the volume term
         // --------------------------------------------------------------------
         for (int i_quad = 0; i_quad < ORDER; ++i_quad)
         {
             for (int j_quad = 0; j_quad < ORDER; ++j_quad)
             {
+                // Node coordinates
+                double x = xc + 0.5 * gauss_xsi_1d[i_quad] * dx;
+                double y = yc + 0.5 * gauss_xsi_1d[j_quad] * dy;
+
                 double gw = gauss_weights_1d[i_quad] * gauss_weights_1d[j_quad];
                 double cons[NCONS];
                 double prim[NCONS];
                 double fx[NCONS];
                 double fy[NCONS];
+                double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
                 reconstruct_2d(i_quad, j_quad, phi_volume, ucc, cons);
                 conserved_to_primitive(cons, prim, velocity_ceiling);
                 primitive_to_flux(prim, cons, fx, cs2, 0);
@@ -837,10 +844,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 }
 
                 // Source terms
-                double xc = patch_xl + (i + 0.5) * dx;
-                double yc = patch_yl + (j + 0.5) * dy;
-                double x = xc + 0.5 * gauss_xsi_1d[i_quad] * dx;
-                double y = yc + 0.5 * gauss_xsi_1d[j_quad] * dy;
                 double du_source[NCONS];
 
                 for (int q = 0; q < NCONS; ++q)
@@ -869,10 +872,16 @@ PUBLIC void cbdisodg_2d_advance_rk(
         // --------------------------------------------------------------------
         for (int quad = 0; quad < ORDER; ++quad)
         {
-            reconstruct_1d(quad, phi_face_xl, ucc, up);
-            reconstruct_1d(quad, phi_face_xr, uli, um);
-            riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);
-
+            // xl face
+            // ----------------------------------------------------------------
+            {
+                double x = xc - 0.5 * dx;
+                double y = yc + 0.5 * gauss_xsi_1d[quad] * dy;
+                double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+                reconstruct_1d(quad, phi_face_xl, ucc, up);
+                reconstruct_1d(quad, phi_face_xr, uli, um);
+                riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);                
+            }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
                     for (int n = 0; n < ORDER; ++n)
@@ -880,10 +889,16 @@ PUBLIC void cbdisodg_2d_advance_rk(
                             equation_20[q][m][n] -=
                                 dy * fhat[q] * phi_face_xl[quad][m][n] * gauss_weights_1d[quad];
 
-            reconstruct_1d(quad, phi_face_xl, uri, up);
-            reconstruct_1d(quad, phi_face_xr, ucc, um);
-            riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);
-
+            // xr face
+            // ----------------------------------------------------------------
+            {
+                double x = xc + 0.5 * dx;
+                double y = yc + 0.5 * gauss_xsi_1d[quad] * dy;
+                double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+                reconstruct_1d(quad, phi_face_xl, uri, up);
+                reconstruct_1d(quad, phi_face_xr, ucc, um);
+                riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);
+            }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
                     for (int n = 0; n < ORDER; ++n)
@@ -891,10 +906,16 @@ PUBLIC void cbdisodg_2d_advance_rk(
                             equation_20[q][m][n] +=
                                 dy * fhat[q] * phi_face_xr[quad][m][n] * gauss_weights_1d[quad];
 
-            reconstruct_1d(quad, phi_face_yl, ucc, up);
-            reconstruct_1d(quad, phi_face_yr, ulj, um);
-            riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
-
+            // yl face
+            // ----------------------------------------------------------------
+            {
+                double x = xc + 0.5 * gauss_xsi_1d[quad] * dx;
+                double y = yc - 0.5 * dy;
+                double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+                reconstruct_1d(quad, phi_face_yl, ucc, up);
+                reconstruct_1d(quad, phi_face_yr, ulj, um);
+                riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
+            }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
                     for (int n = 0; n < ORDER; ++n)
@@ -902,10 +923,16 @@ PUBLIC void cbdisodg_2d_advance_rk(
                             equation_20[q][m][n] -=
                                 dx * fhat[q] * phi_face_yl[quad][m][n] * gauss_weights_1d[quad];
 
-            reconstruct_1d(quad, phi_face_yl, urj, up);
-            reconstruct_1d(quad, phi_face_yr, ucc, um);
-            riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
-
+            // yr face
+            // ----------------------------------------------------------------
+            {
+                double x = xc + 0.5 * gauss_xsi_1d[quad] * dx;
+                double y = yc + 0.5 * dy;
+                double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
+                reconstruct_1d(quad, phi_face_yl, urj, up);
+                reconstruct_1d(quad, phi_face_yr, ucc, um);
+                riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
+            }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
                     for (int n = 0; n < ORDER; ++n)
@@ -1125,10 +1152,6 @@ PUBLIC void cbdisodg_2d_wavespeed(
         double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
         double a = primitive_max_wavespeed(pij, cs2);
 
-        //if (a > 100.0)
-        //{
-        //    printf("large a! a = %3.2e at position (%+3.2f %+3.2f) prim=(%+3.2e %+3.2e %+3.2e)\n", a, x, y, pij[0], pij[1], pij[2]);
-        //}
         wavespeed[na] = a;
     }
 }
