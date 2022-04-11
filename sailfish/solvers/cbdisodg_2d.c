@@ -326,6 +326,43 @@ PRIVATE void riemann_hlle(
     }
 }
 
+PRIVATE void add_viscous_flux(
+    double *u,
+    double *ux,
+    double *uy,
+    double *fx,
+    double *fy,
+    double nu,
+    double multiplier,
+    double dx,
+    double dy)
+{
+    // velocity gradients (use product rule on momentum and sigma gradient)
+    double dvxdx = 2.0 * (ux[1] / u[0] - u[1] * ux[0] / u[0] / u[0]) / dx; 
+    double dvydx = 2.0 * (ux[2] / u[0] - u[2] * ux[0] / u[0] / u[0]) / dx; 
+    double dvxdy = 2.0 * (uy[1] / u[0] - u[1] * uy[0] / u[0] / u[0]) / dy; 
+    double dvydy = 2.0 * (uy[2] / u[0] - u[2] * uy[0] / u[0] / u[0]) / dy; 
+    double mu = u[0] * nu;
+
+    // strain tensor
+    double sxx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+    double syy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+    double sxy = dvxdy + dvydx;
+    double syx = sxy;
+
+    // accumulate the stress tensor components on the fluxes
+    if (fx != NULL)
+    {
+        fx[1] -= mu * sxx;
+        fx[2] -= mu * sxy;        
+    }
+    if (fy != NULL)
+    {
+        fy[1] -= mu * syx;
+        fy[2] -= mu * syy;
+    }
+}
+
 PRIVATE double basis_phi_1d(int i_quad, int m, int deriv)
 {
     // Scaled LeGendgre polynomials at the interval endpoints
@@ -777,7 +814,6 @@ PUBLIC void cbdisodg_2d_advance_rk(
                     phi_gradient_y_face_xr[quad][m][n] = basis_phi_2d(R_ENDPOINT, quad, m, n, 0, 1);
                     phi_gradient_y_face_yl[quad][m][n] = basis_phi_2d(quad, L_ENDPOINT, m, n, 0, 1);
                     phi_gradient_y_face_yr[quad][m][n] = basis_phi_2d(quad, R_ENDPOINT, m, n, 0, 1);
-
                 }
             }
         }
@@ -804,6 +840,8 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double equation_19[NCONS][ORDER][ORDER];
         double equation_20[NCONS][ORDER][ORDER];
         double source_weights[NCONS][ORDER][ORDER];
+        double ux[NCONS]; // gradients of the conserved fields for viscous fluxes
+        double uy[NCONS];
 
         for (int q = 0; q < NCONS; ++q)
         {
@@ -846,30 +884,9 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
                 if (nu > 0.0)
                 {
-                    double dudx[NCONS];
-                    double dudy[NCONS];
-
-                    reconstruct_2d(i_quad, j_quad, phi_gradient_x, ucc, dudx);
-                    reconstruct_2d(i_quad, j_quad, phi_gradient_y, ucc, dudy);
-                    // write function 
-                    viscous_flux();
-                    double dvxdx = 2.0 * (dudx[1] / cons[0] - cons[1] * dudx[0] / cons[0] / cons[0]) / dx; 
-                    double dvydx = 2.0 * (dudx[2] / cons[0] - cons[2] * dudx[0] / cons[0] / cons[0]) / dx; 
-                    double dvxdy = 2.0 * (dudy[1] / cons[0] - cons[1] * dudy[0] / cons[0] / cons[0]) / dy; 
-                    double dvydy = 2.0 * (dudy[2] / cons[0] - cons[2] * dudy[0] / cons[0] / cons[0]) / dy; 
-                    
-                    double mu = cons[0] * nu;
-    
-                    // velocity strain tensor components
-                    double sxx = 4.0 /3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-                    double syy = 4.0 /3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
-                    double sxy = dvxdy + dvydx;
-                    double syx = sxy;
-    
-                    fx[1] -= mu * sxx;
-                    fx[2] -= mu * sxy;
-                    fy[1] -= mu * syx;
-                    fy[2] -= mu * syy;
+                    reconstruct_2d(i_quad, j_quad, phi_gradient_x, ucc, ux);
+                    reconstruct_2d(i_quad, j_quad, phi_gradient_y, ucc, uy);
+                    add_viscous_flux(cons, ux, uy, fx, fy, nu, 1.0, dx, dy);
                 }
 
                 for (int m = 0; m < ORDER; ++m)
@@ -931,9 +948,14 @@ PUBLIC void cbdisodg_2d_advance_rk(
 
                 if (nu > 0.0)
                 {
-                    reconstruct_1d(quad, dphidx_face_xl, ucc, up);
+                    reconstruct_1d(quad, phi_gradient_x_face_xl, ucc, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_xl, ucc, uy);
+                    add_viscous_flux(up, ux, uy, fhat, NULL, nu, 0.5, dx, dy);
 
-                }                
+                    reconstruct_1d(quad, phi_gradient_x_face_xr, uli, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_xr, uli, uy);
+                    add_viscous_flux(um, ux, uy, fhat, NULL, nu, 0.5, dx, dy);
+                }
             }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
@@ -951,6 +973,17 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 reconstruct_1d(quad, phi_face_xl, uri, up);
                 reconstruct_1d(quad, phi_face_xr, ucc, um);
                 riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);
+
+                if (nu > 0.0)
+                {
+                    reconstruct_1d(quad, phi_gradient_x_face_xl, uri, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_xl, uri, uy);
+                    add_viscous_flux(up, ux, uy, fhat, NULL, nu, 0.5, dx, dy);
+
+                    reconstruct_1d(quad, phi_gradient_x_face_xr, ucc, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_xr, ucc, uy);
+                    add_viscous_flux(um, ux, uy, fhat, NULL, nu, 0.5, dx, dy);
+                }
             }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
@@ -968,6 +1001,17 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 reconstruct_1d(quad, phi_face_yl, ucc, up);
                 reconstruct_1d(quad, phi_face_yr, ulj, um);
                 riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
+
+                if (nu > 0.0)
+                {
+                    reconstruct_1d(quad, phi_gradient_x_face_yl, ucc, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_yl, ucc, uy);
+                    add_viscous_flux(up, ux, uy, NULL, fhat, nu, 0.5, dx, dy);
+
+                    reconstruct_1d(quad, phi_gradient_x_face_yr, ulj, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_yr, ulj, uy);
+                    add_viscous_flux(um, ux, uy, NULL, fhat, nu, 0.5, dx, dy);
+                }
             }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
@@ -985,6 +1029,17 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 reconstruct_1d(quad, phi_face_yl, urj, up);
                 reconstruct_1d(quad, phi_face_yr, ucc, um);
                 riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 1);
+
+                if (nu > 0.0)
+                {
+                    reconstruct_1d(quad, phi_gradient_x_face_yl, urj, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_yl, urj, uy);
+                    add_viscous_flux(up, ux, uy, NULL, fhat, nu, 0.5, dx, dy);
+
+                    reconstruct_1d(quad, phi_gradient_x_face_yr, ucc, ux);
+                    reconstruct_1d(quad, phi_gradient_y_face_yr, ucc, uy);
+                    add_viscous_flux(um, ux, uy, NULL, fhat, nu, 0.5, dx, dy);
+                }
             }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
