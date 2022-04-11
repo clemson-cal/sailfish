@@ -180,6 +180,7 @@ class KitpCodeComparison(Setup):
     sink_radius = 0.05
     softening_length = 0.05
     viscous_nu = 0.001
+    single_point_mass = param(False, "put one point mass at the origin (no binary)")
     sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
     domain_radius = param(8.0, "half side length of the square computational domain")
     sink_rate = param(10.0, "component sink rate", mutable=True)
@@ -276,24 +277,33 @@ class KitpCodeComparison(Setup):
         )
 
     def point_masses(self, time):
-        m1, m2 = self.orbital_elements.orbital_state(time)
+        if self.single_point_mass:
+            return PointMass(
+                softening_length=self.softening_length,
+                sink_model=SinkModel[self.sink_model.upper()],
+                sink_rate=self.sink_rate,
+                sink_radius=self.sink_radius,
+                mass=1.0,
+            )
+        else:
+            m1, m2 = self.orbital_elements.orbital_state(time)
 
-        return (
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m1._asdict(),
-            ),
-            PointMass(
-                softening_length=self.softening_length,
-                sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
-                sink_radius=self.sink_radius,
-                **m2._asdict(),
-            ),
-        )
+            return (
+                PointMass(
+                    softening_length=self.softening_length,
+                    sink_model=SinkModel[self.sink_model.upper()],
+                    sink_rate=self.sink_rate,
+                    sink_radius=self.sink_radius,
+                    **m1._asdict(),
+                ),
+                PointMass(
+                    softening_length=self.softening_length,
+                    sink_model=SinkModel[self.sink_model.upper()],
+                    sink_rate=self.sink_rate,
+                    sink_radius=self.sink_radius,
+                    **m2._asdict(),
+                ),
+            )
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
