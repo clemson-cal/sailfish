@@ -43,7 +43,6 @@ struct PointMassList {
 
 struct KeplerianBuffer {
     double surface_density;
-    double surface_pressure;
     double central_mass;
     double driving_rate;
     double outer_radius;
@@ -153,17 +152,11 @@ PRIVATE void point_masses_source_term(
     double y1,
     double dt,
     double *prim,
-    double *cons)
+    double *delta_cons)
 {
     for (int p = 0; p < 2; ++p)
     {
-        double delta_cons[NCONS];
         point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            cons[q] += delta_cons[q];
-        }
     }
 }
 
@@ -193,8 +186,9 @@ PRIVATE void buffer_source_term(
     struct KeplerianBuffer *buffer,
     double xc,
     double yc,
+    double dt,
     double *cons,
-    double *cons_dot)
+    double *delta_cons)
 {
     if (buffer->is_enabled)
     {
@@ -204,19 +198,20 @@ PRIVATE void buffer_source_term(
         double driving_rate = buffer->driving_rate;
         double outer_radius = buffer->outer_radius;
         double onset_width = buffer->onset_width;
-        double onset_radius = outer_radius - onset_widt
+        double onset_radius = outer_radius - onset_width;
+
         if (rc > onset_radius)
         {
-            double pf = surface_density * sqrt(central_mass / rc);
-            double px = pf * (-yc / rc);
-            double py = pf * ( xc / rc);
-            double u0[NCONS] = {surface_density, px, py
+            double v_kep = sqrt(central_mass / rc);
+            double px = surface_density * (-yc / rc) * v_kep;
+            double py = surface_density * (+xc / rc) * v_kep;
+            double u0[NCONS] = {surface_density, px, py};
             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-            // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
             double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
+
             for (int q = 0; q < NCONS; ++q)
             {
-                cons_dot[q] -= (cons[q] - u0[q]) * buffer_rate;
+                delta_cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
             }
         }
     }
@@ -335,15 +330,15 @@ PRIVATE void add_viscous_flux(
     double dy)
 {
     // velocity gradients (use product rule on momentum and sigma gradient)
-    double dvxdx = 2.0 * (ux[1] / u[0] - u[1] * ux[0] / u[0] / u[0]) / dx; 
-    double dvydx = 2.0 * (ux[2] / u[0] - u[2] * ux[0] / u[0] / u[0]) / dx; 
-    double dvxdy = 2.0 * (uy[1] / u[0] - u[1] * uy[0] / u[0] / u[0]) / dy; 
-    double dvydy = 2.0 * (uy[2] / u[0] - u[2] * uy[0] / u[0] / u[0]) / dy; 
+    double dvxdx = 2.0 * (ux[1] / u[0] - u[1] * ux[0] / u[0] / u[0]) / dx;
+    double dvydx = 2.0 * (ux[2] / u[0] - u[2] * ux[0] / u[0] / u[0]) / dx;
+    double dvxdy = 2.0 * (uy[1] / u[0] - u[1] * uy[0] / u[0] / u[0]) / dy;
+    double dvydy = 2.0 * (uy[2] / u[0] - u[2] * uy[0] / u[0] / u[0]) / dy;
     double mu = u[0] * nu;
 
     // strain tensor
-    double sxx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
-    double syy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+    double sxx = 4.0 / 3.0 * dvxdx - 2.0 / 3.0 * dvydy;
+    double syy = 4.0 / 3.0 * dvydy - 2.0 / 3.0 * dvxdx;
     double sxy = dvxdy + dvydx;
     double syx = sxy;
 
@@ -351,7 +346,7 @@ PRIVATE void add_viscous_flux(
     if (fx != NULL)
     {
         fx[1] -= mu * sxx;
-        fx[2] -= mu * sxy;        
+        fx[2] -= mu * sxy;
     }
     if (fy != NULL)
     {
@@ -407,52 +402,6 @@ PRIVATE double basis_phi_2d(int i_quad, int j_quad, int m, int n, int deriv_x, i
 {
     return basis_phi_1d(i_quad, m, deriv_x) * basis_phi_1d(j_quad, n, deriv_y);
 }
-
-// PRIVATE void reconstruct(int i_quad, int j_quad, double *weights, double *cons)
-// {
-//     for (int q = 0; q < NCONS; ++q)
-//     {
-//         cons[q] = 0.0;
-
-//         for (int m = 0; m < ORDER; ++m)
-//         {
-//             for (int n = 0; n < ORDER; ++n)
-//             {
-//                 if (m + n < ORDER)
-//                 {
-//                     cons[q] += (
-//                           weights[q * ORDER * ORDER + m * ORDER + n]
-//                         * basis_phi_2d(i_quad, j_quad, m, n, 0, 0)
-//                     );
-//                 }
-//             }
-//         }
-//     }
-// }
-
-// PRIVATE minmodTVB(double w1, double w0l, double w0, double w0r, double dl)
-// {
-//     double BETA_TVB = 1.0;
-//     double a = w1 * sqrt(3.0);
-//     double b = (w0 - w0l) * BETA_TVB;
-//     double c = (w0r - w0) * BETA_TVB;
-
-//     const double M = 10.0; //Cockburn & Shu, JCP 141, 199 (1998) eq. 3.7 suggest M~50.0
-//     //const double Mtilde = 0.5; //Schaal+
-//     if (fabs(a) <= M * dl * dl)
-//     //if (fabs(a) <= Mtilde * dl)
-//     {
-//         return w1;
-//     }
-//     else
-//     {
-//         double x1 = fabs(sign(a) + sign(b)) * (sign(a) + sign(c));
-//         double x2 = minabs(a, b, c);
-//         double x = (0.25 / sqrt(3.0)) * x1 * x2;
-
-//         return x;
-//     }
-// }
 
 PRIVATE void reconstruct_2d(int i_quad, int j_quad, double phi[ORDER][ORDER][ORDER][ORDER], double *weights, double *cons)
 {
@@ -541,69 +490,6 @@ PRIVATE int minmod_simple(double w1, double w0l, double w0, double w0r)
 
 // ============================ PUBLIC API ====================================
 // ============================================================================
-// PUBLIC void cbdisodg_2d_slope_limit_no_tci(
-//     int ni,
-//     int nj,
-//     double patch_xl, // mesh
-//     double patch_xr,
-//     double patch_yl,
-//     double patch_yr,
-//     double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-//     double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
-// {
-//     double dx = (patch_xr - patch_xl) / ni;
-//     double dy = (patch_yr - patch_yl) / nj;
-//     int ng = 1; // number of guard zones
-//     int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
-//     int sj = NCONS * ORDER * ORDER;
-
-//     FOR_EACH_2D(ni, nj)
-//     {
-//         // Get the indexes and pointers to neighbor zones
-//         // --------------------------------------------------------------------
-//         int ncc = (i     + ng) * si + (j     + ng) * sj;
-//         int nli = (i - 1 + ng) * si + (j     + ng) * sj;
-//         int nri = (i + 1 + ng) * si + (j     + ng) * sj;
-//         int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
-//         int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
-
-//         double *ucc = &weights1[ncc];
-//         double *uli = &weights1[nli];
-//         double *uri = &weights1[nri];
-//         double *ulj = &weights1[nlj];
-//         double *urj = &weights1[nrj];
-//         double *w2 = &weights2[ncc];
-
-//         memcpy(w2, ucc, NCONS * ORDER * ORDER * sizeof(double));
-
-//         for (int q = 0; q < NCONS; ++q)
-//         {
-//             int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
-//             int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
-//             int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
-
-//             double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00]);
-//             double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00]);
-
-//             if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01])
-//             {
-//                 for (int m = 0; m < ORDER; ++m)
-//                 {
-//                     for (int n = 0; n < ORDER; ++n)
-//                     {
-//                         if (m + n > 0)
-//                         {
-//                             w2[ORDER * ORDER * q + ORDER * m + n] = 0.0;
-//                         }
-//                     }
-//                 }
-//                 w2[p10] = wtilde_x;
-//                 w2[p01] = wtilde_y;
-//             }
-//         }
-//     }
-// }
-
 PUBLIC void cbdisodg_2d_slope_limit(
    int ni,
    int nj,
@@ -739,9 +625,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
     double dt, // timestep
     double velocity_ceiling)
 {
-    // Gaussian weights at quadrature points
     static double gauss_weights_1d[ORDER] = {0.555555555555556, 0.888888888888889, 0.555555555555556};
-    // Gaussian quadrature points in scaled domain xsi=[-1,1]
     double gauss_xsi_1d[ORDER] = {-0.774596669241483, 0.000000000000000, 0.774596669241483};
     double dx = (patch_xr - patch_xl) / ni;
     double dy = (patch_yr - patch_yl) / nj;
@@ -751,6 +635,14 @@ PUBLIC void cbdisodg_2d_advance_rk(
     int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
     int sj = NCONS * ORDER * ORDER;
 
+    struct KeplerianBuffer buffer = {
+        buffer_surface_density,
+        buffer_central_mass,
+        buffer_driving_rate,
+        buffer_outer_radius,
+        buffer_onset_width,
+        buffer_is_enabled
+    };
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
     struct PointMassList mass_list = {{m1, m2}};
@@ -911,7 +803,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 {
                     du_source[q] = 0.0;
                 }
-                buffer_source_term(&buffer, x, y, ucc, dt, du_source);
+                buffer_source_term(&buffer, x, y, dt, cons, du_source);
                 point_masses_source_term(&mass_list, x, y, dt, prim, du_source);
 
                 for (int q = 0; q < NCONS; ++q)
@@ -1261,3 +1153,115 @@ PUBLIC void cbdisodg_2d_wavespeed(
         wavespeed[na] = a;
     }
 }
+
+
+
+
+// PRIVATE void reconstruct(int i_quad, int j_quad, double *weights, double *cons)
+// {
+//     for (int q = 0; q < NCONS; ++q)
+//     {
+//         cons[q] = 0.0;
+
+//         for (int m = 0; m < ORDER; ++m)
+//         {
+//             for (int n = 0; n < ORDER; ++n)
+//             {
+//                 if (m + n < ORDER)
+//                 {
+//                     cons[q] += (
+//                           weights[q * ORDER * ORDER + m * ORDER + n]
+//                         * basis_phi_2d(i_quad, j_quad, m, n, 0, 0)
+//                     );
+//                 }
+//             }
+//         }
+//     }
+// }
+
+// PRIVATE minmodTVB(double w1, double w0l, double w0, double w0r, double dl)
+// {
+//     double BETA_TVB = 1.0;
+//     double a = w1 * sqrt(3.0);
+//     double b = (w0 - w0l) * BETA_TVB;
+//     double c = (w0r - w0) * BETA_TVB;
+
+//     const double M = 10.0; //Cockburn & Shu, JCP 141, 199 (1998) eq. 3.7 suggest M~50.0
+//     //const double Mtilde = 0.5; //Schaal+
+//     if (fabs(a) <= M * dl * dl)
+//     //if (fabs(a) <= Mtilde * dl)
+//     {
+//         return w1;
+//     }
+//     else
+//     {
+//         double x1 = fabs(sign(a) + sign(b)) * (sign(a) + sign(c));
+//         double x2 = minabs(a, b, c);
+//         double x = (0.25 / sqrt(3.0)) * x1 * x2;
+
+//         return x;
+//     }
+// }
+
+// PUBLIC void cbdisodg_2d_slope_limit_no_tci(
+//     int ni,
+//     int nj,
+//     double patch_xl, // mesh
+//     double patch_xr,
+//     double patch_yl,
+//     double patch_yr,
+//     double *weights1, // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+//     double *weights2) // :: $.shape == (ni + 2, nj + 2, 3, 3, 3) # 3, 3, 3 = NCONS, ORDER, ORDER
+// {
+//     double dx = (patch_xr - patch_xl) / ni;
+//     double dy = (patch_yr - patch_yl) / nj;
+//     int ng = 1; // number of guard zones
+//     int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
+//     int sj = NCONS * ORDER * ORDER;
+
+//     FOR_EACH_2D(ni, nj)
+//     {
+//         // Get the indexes and pointers to neighbor zones
+//         // --------------------------------------------------------------------
+//         int ncc = (i     + ng) * si + (j     + ng) * sj;
+//         int nli = (i - 1 + ng) * si + (j     + ng) * sj;
+//         int nri = (i + 1 + ng) * si + (j     + ng) * sj;
+//         int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
+//         int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
+
+//         double *ucc = &weights1[ncc];
+//         double *uli = &weights1[nli];
+//         double *uri = &weights1[nri];
+//         double *ulj = &weights1[nlj];
+//         double *urj = &weights1[nrj];
+//         double *w2 = &weights2[ncc];
+
+//         memcpy(w2, ucc, NCONS * ORDER * ORDER * sizeof(double));
+
+//         for (int q = 0; q < NCONS; ++q)
+//         {
+//             int p00 = ORDER * ORDER * q + 0 * ORDER + 0;
+//             int p01 = ORDER * ORDER * q + 0 * ORDER + 1;
+//             int p10 = ORDER * ORDER * q + 1 * ORDER + 0;
+
+//             double wtilde_x = minmod_simple(ucc[p10], uli[p00], ucc[p00], uri[p00]);
+//             double wtilde_y = minmod_simple(ucc[p01], ulj[p00], ucc[p00], urj[p00]);
+
+//             if (wtilde_x != ucc[p10] || wtilde_y != ucc[p01])
+//             {
+//                 for (int m = 0; m < ORDER; ++m)
+//                 {
+//                     for (int n = 0; n < ORDER; ++n)
+//                     {
+//                         if (m + n > 0)
+//                         {
+//                             w2[ORDER * ORDER * q + ORDER * m + n] = 0.0;
+//                         }
+//                     }
+//                 }
+//                 w2[p10] = wtilde_x;
+//                 w2[p01] = wtilde_y;
+//             }
+//         }
+//     }
+// }

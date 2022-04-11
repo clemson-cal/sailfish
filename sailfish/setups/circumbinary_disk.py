@@ -241,6 +241,7 @@ class KitpCodeComparison(Setup):
             mach_number=self.mach_number,
             buffer_is_enabled=self.buffer_is_enabled,
             buffer_driving_rate=100.0,
+            buffer_onset_width=1.0,
             point_mass_function=self.point_masses,
             viscosity_coefficient=self.viscous_nu,
             diagnostics=self.diagnostics,

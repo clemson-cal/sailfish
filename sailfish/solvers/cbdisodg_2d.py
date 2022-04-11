@@ -469,7 +469,7 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 0.08
+        return 0.4
 
     def maximum_wavespeed(self):
         """
