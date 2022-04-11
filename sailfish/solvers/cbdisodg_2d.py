@@ -213,12 +213,18 @@ class Patch:
         """
         Limit slopes using minmodTVB
         """
+        m1, m2 = self.physics.point_masses(self.time)
+
         with self.execution_context:
             self.lib.cbdisodg_2d_slope_limit[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
                 self.yr,
+                m1.position_x,
+                m1.position_y,
+                m2.position_x,
+                m2.position_y,
                 self.weights1,
                 self.weights2,
             )
