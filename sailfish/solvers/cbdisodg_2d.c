@@ -513,15 +513,14 @@ PUBLIC void cbdisodg_2d_slope_limit(
    #define maxabs5(a, b, c, d, e) max2(max2(fabs(a), fabs(b)), max3(fabs(c), fabs(d), fabs(e)))
    #define SQRT_THREE sqrt(3.0)
    #define SQRT_FIVE  sqrt(5.0)
-   #define CK 0.1 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
+   #define CK 0.3 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
 
    int ng = 1; // number of guard zones
    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
    int sj = NCONS * ORDER * ORDER;
    double dvol = 4.0; // volume in xsi coordinates [-1,1] x [-1,1]
-   double r_sink_squared = 0.05 * 0.05;
-   double dx = (patch_xr - patch_xl) / ni;
-   double dy = (patch_yr - patch_yl) / nj;
+   // double dx = (patch_xr - patch_xl) / ni;
+   // double dy = (patch_yr - patch_yl) / nj;
 
    FOR_EACH_2D(ni, nj)
    {
@@ -533,19 +532,24 @@ PUBLIC void cbdisodg_2d_slope_limit(
        int nlj = (i     + ng) * si + (j - 1 + ng) * sj;
        int nrj = (i     + ng) * si + (j + 1 + ng) * sj;
 
-       double x = patch_xl + (i + 0.5) * dx;
-       double y = patch_yl + (j + 0.5) * dy;
-       double r2_1 = pow(x - point_mass1_x, 2.0) + pow(y - point_mass1_y, 2.0);
-       double r2_2 = pow(x - point_mass2_x, 2.0) + pow(y - point_mass2_y, 2.0);
+       double *ucc = &weights1[ncc];
+       double *uli = &weights1[nli];
+       double *uri = &weights1[nri];
+       double *ulj = &weights1[nlj];
+       double *urj = &weights1[nrj];
 
-       if (r2_1 < r_sink_squared || r2_2 < r_sink_squared)
+       double *w2 = &weights2[ncc];
+       memcpy(w2, ucc, NCONS * ORDER * ORDER * sizeof(double));
+
+       // double x = patch_xl + (i + 0.5) * dx;
+       // double y = patch_yl + (j + 0.5) * dy;
+       // double r2_1 = pow(x - point_mass1_x, 2.0) + pow(y - point_mass1_y, 2.0);
+       // double r2_2 = pow(x - point_mass2_x, 2.0) + pow(y - point_mass2_y, 2.0);
+       // double r_sink_squared = 0.1 * 0.1;
+
+       // space-limited slope limiting is disabled
+       // if (r2_1 < r_sink_squared || r2_2 < r_sink_squared)
        {
-           double *ucc = &weights1[ncc];
-           double *uli = &weights1[nli];
-           double *uri = &weights1[nri];
-           double *ulj = &weights1[nlj];
-           double *urj = &weights1[nrj];
-
            int qt = 0; // index of conserved variable to test for trouble
 
            int t00 = ORDER * ORDER * qt + 0 * ORDER + 0;
@@ -565,9 +569,6 @@ PUBLIC void cbdisodg_2d_slope_limit(
            double pbb_ri = fabs(ucc[t00] - b / dvol);
            double pbb_lj = fabs(ucc[t00] - c / dvol);
            double pbb_rj = fabs(ucc[t00] - d / dvol);
-
-           double *w2 = &weights2[ncc];
-           memcpy(w2, ucc, NCONS * ORDER * ORDER * sizeof(double));
 
            double tci = (pbb_li + pbb_ri + pbb_lj + pbb_rj) / maxpj;
 
