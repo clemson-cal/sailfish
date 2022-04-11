@@ -189,41 +189,38 @@ PRIVATE double sound_speed_squared(
     }
 }
 
-// PRIVATE void buffer_source_term(
-//     struct KeplerianBuffer *buffer,
-//     double xc,
-//     double yc,
-//     double *cons,
-//     double *cons_dot)
-// {
-//     if (buffer->is_enabled)
-//     {
-//         double rc = sqrt(xc * xc + yc * yc);
-//         double surface_density = buffer->surface_density;
-//         double central_mass = buffer->central_mass;
-//         double driving_rate = buffer->driving_rate;
-//         double outer_radius = buffer->outer_radius;
-//         double onset_width = buffer->onset_width;
-//         double onset_radius = outer_radius - onset_width;
-
-//         if (rc > onset_radius)
-//         {
-//             double pf = surface_density * sqrt(central_mass / rc);
-//             double px = pf * (-yc / rc);
-//             double py = pf * ( xc / rc);
-//             double u0[NCONS] = {surface_density, px, py};
-
-//             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-//             // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
-//             double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
-
-//             for (int q = 0; q < NCONS; ++q)
-//             {
-//                 cons_dot[q] -= (cons[q] - u0[q]) * buffer_rate;
-//             }
-//         }
-//     }
-// }
+PRIVATE void buffer_source_term(
+    struct KeplerianBuffer *buffer,
+    double xc,
+    double yc,
+    double *cons,
+    double *cons_dot)
+{
+    if (buffer->is_enabled)
+    {
+        double rc = sqrt(xc * xc + yc * yc);
+        double surface_density = buffer->surface_density;
+        double central_mass = buffer->central_mass;
+        double driving_rate = buffer->driving_rate;
+        double outer_radius = buffer->outer_radius;
+        double onset_width = buffer->onset_width;
+        double onset_radius = outer_radius - onset_widt
+        if (rc > onset_radius)
+        {
+            double pf = surface_density * sqrt(central_mass / rc);
+            double px = pf * (-yc / rc);
+            double py = pf * ( xc / rc);
+            double u0[NCONS] = {surface_density, px, py
+            double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
+            // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
+            double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
+            for (int q = 0; q < NCONS; ++q)
+            {
+                cons_dot[q] -= (cons[q] - u0[q]) * buffer_rate;
+            }
+        }
+    }
+}
 
 // ============================ HYDRO =========================================
 // ============================================================================
@@ -914,6 +911,7 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 {
                     du_source[q] = 0.0;
                 }
+                buffer_source_term(&buffer, x, y, ucc, dt, du_source);
                 point_masses_source_term(&mass_list, x, y, dt, prim, du_source);
 
                 for (int q = 0; q < NCONS; ++q)
