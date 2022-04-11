@@ -67,7 +67,7 @@ def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args
     if platform.system() == "Darwin":
         logger.info("configure JIT build for MacOS")
         sys_compile_args = ["-Xpreprocessor", "-fopenmp"]
-        sys_link_args = ["-lomp"]
+        sys_link_args = ["-L/usr/local/lib", "-lomp"]
 
     elif platform.system() == "Linux":
         logger.info("configure JIT build for Linux")

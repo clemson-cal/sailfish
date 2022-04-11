@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 
 import sys
+import logging
 
 sys.path.insert(1, ".")
 
@@ -44,7 +45,9 @@ def main():
     import argparse
     import numpy as np
     from sailfish.kernel.library import Library
+    from sailfish.kernel.system import configure_build
 
+    configure_build(enable_openmp=True)
     logging.basicConfig(level=logging.INFO)
 
     parser = argparse.ArgumentParser()
