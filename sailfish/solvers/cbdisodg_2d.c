@@ -732,6 +732,14 @@ PUBLIC void cbdisodg_2d_advance_rk(
         double phi_face_xr[ORDER][ORDER][ORDER];
         double phi_face_yl[ORDER][ORDER][ORDER];
         double phi_face_yr[ORDER][ORDER][ORDER];
+        double phi_gradient_x_face_xl[ORDER][ORDER][ORDER]; // quad x m x n
+        double phi_gradient_x_face_xr[ORDER][ORDER][ORDER];
+        double phi_gradient_x_face_yl[ORDER][ORDER][ORDER];
+        double phi_gradient_x_face_yr[ORDER][ORDER][ORDER];
+        double phi_gradient_y_face_xl[ORDER][ORDER][ORDER]; // quad x m x n
+        double phi_gradient_y_face_xr[ORDER][ORDER][ORDER];
+        double phi_gradient_y_face_yl[ORDER][ORDER][ORDER];
+        double phi_gradient_y_face_yr[ORDER][ORDER][ORDER];
 
         for (int i_quad = 0; i_quad < ORDER; ++i_quad)
         {
@@ -759,6 +767,17 @@ PUBLIC void cbdisodg_2d_advance_rk(
                     phi_face_xr[quad][m][n] = basis_phi_2d(R_ENDPOINT, quad, m, n, 0, 0);
                     phi_face_yl[quad][m][n] = basis_phi_2d(quad, L_ENDPOINT, m, n, 0, 0);
                     phi_face_yr[quad][m][n] = basis_phi_2d(quad, R_ENDPOINT, m, n, 0, 0);
+
+                    phi_gradient_x_face_xl[quad][m][n] = basis_phi_2d(L_ENDPOINT, quad, m, n, 1, 0);
+                    phi_gradient_x_face_xr[quad][m][n] = basis_phi_2d(R_ENDPOINT, quad, m, n, 1, 0);
+                    phi_gradient_x_face_yl[quad][m][n] = basis_phi_2d(quad, L_ENDPOINT, m, n, 1, 0);
+                    phi_gradient_x_face_yr[quad][m][n] = basis_phi_2d(quad, R_ENDPOINT, m, n, 1, 0);
+
+                    phi_gradient_y_face_xl[quad][m][n] = basis_phi_2d(L_ENDPOINT, quad, m, n, 0, 1);
+                    phi_gradient_y_face_xr[quad][m][n] = basis_phi_2d(R_ENDPOINT, quad, m, n, 0, 1);
+                    phi_gradient_y_face_yl[quad][m][n] = basis_phi_2d(quad, L_ENDPOINT, m, n, 0, 1);
+                    phi_gradient_y_face_yr[quad][m][n] = basis_phi_2d(quad, R_ENDPOINT, m, n, 0, 1);
+
                 }
             }
         }
@@ -825,6 +844,34 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 primitive_to_flux(prim, cons, fx, cs2, 0);
                 primitive_to_flux(prim, cons, fy, cs2, 1);
 
+                if (nu > 0.0)
+                {
+                    double dudx[NCONS];
+                    double dudy[NCONS];
+
+                    reconstruct_2d(i_quad, j_quad, phi_gradient_x, ucc, dudx);
+                    reconstruct_2d(i_quad, j_quad, phi_gradient_y, ucc, dudy);
+                    // write function 
+                    viscous_flux();
+                    double dvxdx = 2.0 * (dudx[1] / cons[0] - cons[1] * dudx[0] / cons[0] / cons[0]) / dx; 
+                    double dvydx = 2.0 * (dudx[2] / cons[0] - cons[2] * dudx[0] / cons[0] / cons[0]) / dx; 
+                    double dvxdy = 2.0 * (dudy[1] / cons[0] - cons[1] * dudy[0] / cons[0] / cons[0]) / dy; 
+                    double dvydy = 2.0 * (dudy[2] / cons[0] - cons[2] * dudy[0] / cons[0] / cons[0]) / dy; 
+                    
+                    double mu = cons[0] * nu;
+    
+                    // velocity strain tensor components
+                    double sxx = 4.0 /3.0 * dvxdx - 2.0 / 3.0 * dvydy; 
+                    double syy = 4.0 /3.0 * dvydy - 2.0 / 3.0 * dvxdx; 
+                    double sxy = dvxdy + dvydx;
+                    double syx = sxy;
+    
+                    fx[1] -= mu * sxx;
+                    fx[2] -= mu * sxy;
+                    fy[1] -= mu * syx;
+                    fy[2] -= mu * syy;
+                }
+
                 for (int m = 0; m < ORDER; ++m)
                 {
                     for (int n = 0; n < ORDER; ++n)
@@ -880,7 +927,13 @@ PUBLIC void cbdisodg_2d_advance_rk(
                 double cs2 = sound_speed_squared(soundspeed2, mach_squared, eos_type, x, y, &mass_list);
                 reconstruct_1d(quad, phi_face_xl, ucc, up);
                 reconstruct_1d(quad, phi_face_xr, uli, um);
-                riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);                
+                riemann_hlle(um, up, fhat, cs2, velocity_ceiling, 0);
+
+                if (nu > 0.0)
+                {
+                    reconstruct_1d(quad, dphidx_face_xl, ucc, up);
+
+                }                
             }
             for (int q = 0; q < NCONS; ++q)
                 for (int m = 0; m < ORDER; ++m)
