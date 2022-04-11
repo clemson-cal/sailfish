@@ -104,13 +104,18 @@ PRIVATE void point_mass_source_term(
     double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
     double mdot = sigma * sink_rate * -1.0;
 
+    // gravitational force
+    delta_cons[0] += 0.0;
+    delta_cons[1] += fx * dt;
+    delta_cons[2] += fy * dt;
+
     switch (mass->sink_model)
     {
         case 1: // acceleration-free
         {
-            delta_cons[0] = dt * mdot;
-            delta_cons[1] = dt * mdot * prim[1] + dt * fx;
-            delta_cons[2] = dt * mdot * prim[2] + dt * fy;
+            delta_cons[0] += dt * mdot;
+            delta_cons[1] += dt * mdot * prim[1];
+            delta_cons[2] += dt * mdot * prim[2];
             break;
         }
         case 2: // torque-free
@@ -124,23 +129,23 @@ PRIVATE void point_mass_source_term(
             double dvdotrhat = (vx - vx0) * rhatx + (vy - vy0) * rhaty;
             double vxstar = dvdotrhat * rhatx + vx0;
             double vystar = dvdotrhat * rhaty + vy0;
-            delta_cons[0] = dt * mdot;
-            delta_cons[1] = dt * mdot * vxstar + dt * fx;
-            delta_cons[2] = dt * mdot * vystar + dt * fy;
+            delta_cons[0] += dt * mdot;
+            delta_cons[1] += dt * mdot * vxstar;
+            delta_cons[2] += dt * mdot * vystar;
             break;
         }
         case 3: // force-free
         {
-            delta_cons[0] = dt * mdot;
-            delta_cons[1] = dt * fx;
-            delta_cons[2] = dt * fy;
+            delta_cons[0] += dt * mdot;
+            delta_cons[1] += 0.0;
+            delta_cons[2] += 0.0;
             break;
         }
         default: // sink is inactive
         {
-            delta_cons[0] = 0.0;
-            delta_cons[1] = 0.0;
-            delta_cons[2] = 0.0;
+            delta_cons[0] += 0.0;
+            delta_cons[1] += 0.0;
+            delta_cons[2] += 0.0;
             break;
         }
     }

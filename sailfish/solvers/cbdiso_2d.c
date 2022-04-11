@@ -118,6 +118,7 @@ PRIVATE void point_mass_source_term(
     double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
     double mdot = sigma * sink_rate * -1.0;
 
+    // gravitational force
     delta_cons[0] = 0.0;
     delta_cons[1] = fx * dt;
     delta_cons[2] = fy * dt;
