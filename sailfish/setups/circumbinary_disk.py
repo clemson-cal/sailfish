@@ -42,7 +42,7 @@ class CircumbinaryDisk(Setup):
     mach_number = param(10.0, "orbital Mach number (isothermal)", mutable=True)
     eccentricity = param(0.0, "orbital eccentricity of the binary", mutable=True)
     mass_ratio = param(1.0, "component mass ratio m2 / m1 <= 1", mutable=True)
-    sink_rate = param(10.0, "component sink rate", mutable=True)
+    sink_rate = param((10.0,), "component sink rate", mutable=True)
     sink_radius = param(0.05, "component sink radius", mutable=True)
     softening_length = param(0.05, "gravitational softening length", mutable=True)
     buffer_is_enabled = param(True, "whether the buffer zone is enabled")
@@ -52,6 +52,7 @@ class CircumbinaryDisk(Setup):
     initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
     cooling_coefficient = param(0.0, "strength of the cooling term (gamma-law)")
     alpha = param(0.1, "alpha-viscosity parameter (gamma-law)")
+    nu = param(0.001, "kinematic viscosity parameter (isothermal)")
     constant_softening = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
 
@@ -104,7 +105,12 @@ class CircumbinaryDisk(Setup):
             return dict(
                 eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
                 mach_number=self.mach_number,
+                buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=100.0,
+                buffer_onset_width=1.0,
                 point_mass_function=self.point_masses,
+                viscosity_coefficient=self.nu,
+                # diagnostics=self.diagnostics,
             )
 
         elif self.is_gamma_law:
@@ -149,6 +155,17 @@ class CircumbinaryDisk(Setup):
             eccentricity=self.eccentricity,
         )
 
+    @property
+    def sink_rate1(self):
+        return self.sink_rate[0]
+
+    @property
+    def sink_rate2(self):
+        try:
+            return self.sink_rate[1]
+        except IndexError:
+            return self.sink_rate1
+
     def point_masses(self, time):
         m1, m2 = self.orbital_elements.orbital_state(time)
 
@@ -156,14 +173,14 @@ class CircumbinaryDisk(Setup):
             PointMass(
                 softening_length=self.softening_length,
                 sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
+                sink_rate=self.sink_rate1,
                 sink_radius=self.sink_radius,
                 **m1._asdict(),
             ),
             PointMass(
                 softening_length=self.softening_length,
                 sink_model=SinkModel[self.sink_model.upper()],
-                sink_rate=self.sink_rate,
+                sink_rate=self.sink_rate2,
                 sink_radius=self.sink_radius,
                 **m2._asdict(),
             ),
@@ -179,7 +196,7 @@ class KitpCodeComparison(Setup):
     mass_ratio = 1.0
     sink_radius = 0.05
     softening_length = 0.05
-    viscous_nu = 0.001
+    nu = 0.001
     single_point_mass = param(False, "put one point mass at the origin (no binary)")
     sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
     domain_radius = param(8.0, "half side length of the square computational domain")
@@ -244,7 +261,7 @@ class KitpCodeComparison(Setup):
             buffer_driving_rate=100.0,
             buffer_onset_width=1.0,
             point_mass_function=self.point_masses,
-            viscosity_coefficient=self.viscous_nu,
+            viscosity_coefficient=self.nu,
             diagnostics=self.diagnostics,
         )
 

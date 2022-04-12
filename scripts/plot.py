@@ -186,11 +186,25 @@ def main_cbdiso_2d():
         default="magma",
         help="colormap name",
     )
-
+    parser.add_argument(
+        "--radius",
+        default=None,
+        type=float,
+        help="plot the domain out to this radius",
+    )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="save PNG files instead of showing a window",
+    )
+    parser.add_argument(
+        "--draw-lindblat31-radius",
+        action="store_true",
+    )
     args = parser.parse_args()
 
     for filename in args.checkpoints:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
 
@@ -198,9 +212,6 @@ def main_cbdiso_2d():
             prim = chkpt["primitive"]
             f = fields[args.field](prim).T
         else:
-            # j_poly = {(0, 0): 0, (0, 1): 1, (0, 2): 2, (1, 0): 3, (1, 1): 4, (2, 0): 5}[
-            #     tuple(args.poly)
-            # ]
             m, n = args.poly
             f = chkpt["solution"][:, :, 0, m, n].T
         if args.log:
@@ -215,11 +226,34 @@ def main_cbdiso_2d():
             cmap=args.cmap,
             extent=extent,
         )
+
+        if args.draw_lindblat31_radius:
+            x1 = chkpt["point_masses"][0].position_x
+            y1 = chkpt["point_masses"][0].position_y
+            t = np.linspace(0, 2 * np.pi, 1000)
+            x = x1 + 0.3 * np.cos(t)
+            y = y1 + 0.3 * np.sin(t)
+            a = 1.0
+            q = chkpt["model_parameters"]["mass_ratio"]
+            # Eq. 1 in Franchini & Martin (2019; https://arxiv.org/pdf/1908.02776.pdf)
+            r_res = 3 ** (-2 / 3) * (1 + q) ** (-1 / 3) * a
+            ax.plot(x, y, ls="--", lw=0.75, c="w", alpha=1.0)
+
         ax.set_aspect("equal")
+        if args.radius is not None:
+            ax.set_xlim(-args.radius, args.radius)
+            ax.set_ylim(-args.radius, args.radius)
         fig.colorbar(cm)
         fig.suptitle(filename)
-
-    plt.show()
+        fig.subplots_adjust(
+            left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
+        )
+        if args.save:
+            pngname = filename.replace(".pk", ".png")
+            print(pngname)
+            fig.savefig(pngname, dpi=400)
+    if not args.save:
+        plt.show()
 
 
 def main_cbdisodg_2d():
@@ -270,7 +304,7 @@ def main_cbdgam_2d():
     args = parser.parse_args()
 
     for filename in args.checkpoints:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=[10, 10])
         chkpt = load_checkpoint(filename, require_solver="cbdgam_2d")
         mesh = chkpt["mesh"]
         prim = chkpt["primitive"]
