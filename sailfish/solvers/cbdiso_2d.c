@@ -116,13 +116,13 @@ PRIVATE void point_mass_source_term(
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
     double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
-    double mdot;
+    double mdot = 0.0;
 
     if (sink_rate > 0.0)
     {
         mdot = -sink_rate * sigma;
     }
-    else
+    else if (sink_rate < 0.0)
     {
         mdot = -sink_rate; // add constant M-dot for uniform sink.
     }
