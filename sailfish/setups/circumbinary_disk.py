@@ -45,8 +45,8 @@ class CircumbinaryDisk(Setup):
     sink_rate = param((10.0,), "component sink rate", mutable=True)
     sink_radius = param(0.05, "component sink radius", mutable=True)
     softening_length = param(0.05, "gravitational softening length", mutable=True)
-    buffer_is_enabled = param(True, "whether the buffer zone is enabled")
-    sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
+    buffer_is_enabled = param(True, "whether the buffer zone is enabled", mutable=True)
+    sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]", mutable=True)
 
     initial_sigma = param(1.0, "initial disk surface density at r=a (gamma-law)")
     initial_pressure = param(1e-2, "initial disk surface pressure at r=a (gamma-law)")
