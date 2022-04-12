@@ -454,7 +454,7 @@ PRIVATE void reconstruct_1d(int quad, double phi[ORDER][ORDER][ORDER], double *w
 
 PRIVATE int minmod_simple(double w1, double w0l, double w0, double w0r)
 {
-    double beta = 0.5; // in the range 0.5 - 1.0
+    double beta = 1.0; // in the range 0.5 - 1.0
     double a = w1;
     double b = (w0 - w0l) * beta / sqrt(3.0);
     double c = (w0r - w0) * beta / sqrt(3.0);
