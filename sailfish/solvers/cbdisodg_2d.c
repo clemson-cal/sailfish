@@ -513,7 +513,7 @@ PUBLIC void cbdisodg_2d_slope_limit(
    #define maxabs5(a, b, c, d, e) max2(max2(fabs(a), fabs(b)), max3(fabs(c), fabs(d), fabs(e)))
    #define SQRT_THREE sqrt(3.0)
    #define SQRT_FIVE  sqrt(5.0)
-   #define CK 0.3 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
+   #define CK 0.1 // Troubled Cell Indicator G. Fu & C.-W. Shu (JCP, 347, 305 (2017))
 
    int ng = 1; // number of guard zones
    int si = NCONS * ORDER * ORDER * (nj + 2 * ng);
