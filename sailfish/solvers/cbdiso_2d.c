@@ -116,12 +116,21 @@ PRIVATE void point_mass_source_term(
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
     double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
-    double mdot = sigma * sink_rate * -1.0;
+    double mdot;
+
+    if (sink_rate > 0.0)
+    {
+        mdot = -sink_rate * sigma;
+    }
+    else
+    {
+        mdot = -sink_rate; // add constant M-dot for uniform sink.
+    }
 
     // gravitational force
-    delta_cons[0] = 0.0;
-    delta_cons[1] = fx * dt;
-    delta_cons[2] = fy * dt;
+    delta_cons[0] += 0.0;
+    delta_cons[1] += fx * dt;
+    delta_cons[2] += fy * dt;
 
     switch (mass->sink_model)
     {
@@ -171,17 +180,11 @@ PRIVATE void point_masses_source_term(
     double y1,
     double dt,
     double *prim,
-    double *cons)
+    double *delta_cons)
 {
     for (int p = 0; p < 2; ++p)
     {
-        double delta_cons[NCONS];
         point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            cons[q] += delta_cons[q];
-        }
     }
 }
 
@@ -212,8 +215,10 @@ PRIVATE void buffer_source_term(
     double xc,
     double yc,
     double dt,
-    double *cons)
+    double *cons,
+    double *delta_cons)
 {
+
     if (buffer->is_enabled)
     {
         double rc = sqrt(xc * xc + yc * yc);
@@ -226,18 +231,16 @@ PRIVATE void buffer_source_term(
 
         if (rc > onset_radius)
         {
-            double pf = surface_density * sqrt(central_mass / rc);
-            double px = pf * (-yc / rc);
-            double py = pf * ( xc / rc);
+            double v_kep = sqrt(central_mass / rc);
+            double px = surface_density * (-yc / rc) * v_kep;
+            double py = surface_density * (+xc / rc) * v_kep;
             double u0[NCONS] = {surface_density, px, py};
-
             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-            // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
             double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
             for (int q = 0; q < NCONS; ++q)
             {
-                cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
+                delta_cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
             }
         }
     }
@@ -582,17 +585,21 @@ PUBLIC void cbdiso_2d_advance_rk(
             frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
             frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
         }
+        double delta_cons[3] = {0.0, 0.0, 0.0};
         primitive_to_conserved(pcc, ucc);
-        buffer_source_term(&buffer, xc, yc, dt, ucc);
-        point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
+        buffer_source_term(&buffer, xc, yc, dt, ucc, delta_cons);
+        point_masses_source_term(&mass_list, xc, yc, dt, pcc, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
-            ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+            delta_cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        }
+        for (int q = 0; q < NCONS; ++q)
+        {
+            ucc[q] += delta_cons[q];
             ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
         }
-        double *pout = &primitive_wr[ncc];
-        conserved_to_primitive(ucc, pout, velocity_ceiling);
+        conserved_to_primitive(ucc, &primitive_wr[ncc], velocity_ceiling);
     }
 }
 
