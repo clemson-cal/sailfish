@@ -8,7 +8,7 @@ DESCRIPTION: Isothermal solver for a binary accretion problem in 2D planar
 // ============================ PHYSICS =======================================
 // ============================================================================
 #define NCONS 3
-#define PLM_THETA 1.5
+#define PLM_THETA 1.8
 
 
 // ============================ MATH ==========================================
