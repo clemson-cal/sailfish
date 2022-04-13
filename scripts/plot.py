@@ -170,6 +170,13 @@ def main_cbdiso_2d():
         help="use log scaling",
     )
     parser.add_argument(
+        "--scale-by-power",
+        "-s",
+        default=None,
+        type=float,
+        help="scale the field by the given power",
+    )
+    parser.add_argument(
         "--vmin",
         default=None,
         type=float,
@@ -201,6 +208,7 @@ def main_cbdiso_2d():
         "--draw-lindblat31-radius",
         action="store_true",
     )
+    parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
     for filename in args.checkpoints:
@@ -208,7 +216,8 @@ def main_cbdiso_2d():
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
 
-        print(chkpt["model_parameters"])
+        if args.print_model_parameters:
+            print(chkpt["model_parameters"])
 
         if args.poly is None:
             prim = chkpt["primitive"]
@@ -216,6 +225,8 @@ def main_cbdiso_2d():
         else:
             m, n = args.poly
             f = chkpt["solution"][:, :, 0, m, n].T
+        if args.scale_by_power is not None:
+            f = f**args.scale_by_power
         if args.log:
             f = np.log10(f)
 
