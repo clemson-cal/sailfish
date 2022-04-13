@@ -208,6 +208,8 @@ def main_cbdiso_2d():
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
 
+        print(chkpt["model_parameters"])
+
         if args.poly is None:
             prim = chkpt["primitive"]
             f = fields[args.field](prim).T
