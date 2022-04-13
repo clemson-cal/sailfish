@@ -74,7 +74,7 @@ class CircumbinaryDisk(Setup):
         phi_hat_y = +x / max(r, 1e-12)
 
         if self.is_isothermal:
-            primitive[0] = 1.0
+            primitive[0] = self.initial_sigma
             primitive[1] = GM / sqrt(r_softened) * phi_hat_x
             primitive[2] = GM / sqrt(r_softened) * phi_hat_y
 
