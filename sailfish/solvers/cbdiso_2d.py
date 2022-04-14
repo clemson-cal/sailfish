@@ -26,7 +26,7 @@ class Options(NamedTuple):
     """
 
     velocity_ceiling: float = 1e12
-    mach_ceiling: float = 1e12
+    density_floor: float = 1e-12
     rk_order: int = 2
 
 
@@ -239,6 +239,7 @@ class Patch:
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
+                self.options.density_floor,
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1

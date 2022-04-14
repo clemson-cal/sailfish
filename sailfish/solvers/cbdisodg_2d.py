@@ -26,7 +26,6 @@ class Options(NamedTuple):
     """
 
     velocity_ceiling: float = 1e12
-    mach_ceiling: float = 1e12
     rk_order: int = 2
     limit_slopes: bool = True
 

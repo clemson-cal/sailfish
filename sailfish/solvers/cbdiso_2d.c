@@ -268,9 +268,10 @@ PRIVATE void shear_strain(
 PRIVATE void conserved_to_primitive(
     const double *cons,
     double *prim,
-    double velocity_ceiling)
+    double velocity_ceiling,
+    double density_floor)
 {
-    double rho = cons[0];
+    double rho = max2(cons[0], density_floor);
     double px = cons[1];
     double py = cons[2];
     double vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
@@ -421,7 +422,8 @@ PUBLIC void cbdiso_2d_advance_rk(
     double nu, // kinematic viscosity coefficient
     double a, // RK parameter
     double dt, // timestep
-    double velocity_ceiling)
+    double velocity_ceiling,
+    double density_floor)
 {
     struct KeplerianBuffer buffer = {
         buffer_surface_density,
@@ -597,7 +599,7 @@ PUBLIC void cbdiso_2d_advance_rk(
             ucc[q] += delta_cons[q];
             ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
         }
-        conserved_to_primitive(ucc, &primitive_wr[ncc], velocity_ceiling);
+        conserved_to_primitive(ucc, &primitive_wr[ncc], velocity_ceiling, density_floor);
     }
 }
 
