@@ -205,7 +205,7 @@ def main_cbdiso_2d():
         help="save PNG files instead of showing a window",
     )
     parser.add_argument(
-        "--draw-lindblat31-radius",
+        "--draw-lindblad31-radius",
         action="store_true",
     )
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
@@ -240,7 +240,7 @@ def main_cbdiso_2d():
             extent=extent,
         )
 
-        if args.draw_lindblat31_radius:
+        if args.draw_lindblad31_radius:
             x1 = chkpt["point_masses"][0].position_x
             y1 = chkpt["point_masses"][0].position_y
             t = np.linspace(0, 2 * np.pi, 1000)
