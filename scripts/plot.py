@@ -185,9 +185,13 @@ def main_cbdiso_2d():
 
     for filename in args.checkpoints:
         fig, ax = plt.subplots()
-        chkpt = load_checkpoint(filename)  # , require_solver="cbdiso_2d")
+        chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
-        prim = chkpt["primitive"]
+        if chkpt["solver"] == "cbdisodg_2d":
+            prim = chkpt["primitive"]
+        else:
+            # the cbdiso_2d solver uses primitive data as the solution array
+            prim = chkpt["solution"]
         f = fields[args.field](prim).T
 
         if args.log:
@@ -260,7 +264,7 @@ def main_cbdgam_2d():
         fig, ax = plt.subplots()
         chkpt = load_checkpoint(filename, require_solver="cbdgam_2d")
         mesh = chkpt["mesh"]
-        prim = chkpt["primitive"]
+        prim = chkpt["solution"]
         f = fields[args.field](prim).T
 
         if args.log:

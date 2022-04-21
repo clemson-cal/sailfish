@@ -252,6 +252,8 @@ class DriverState(NamedTuple):
     event_states: list
     solver: SolverBase
     setup: Setup
+    cfl_number: float
+    timestep_dt: float
 
 
 def simulate(driver):
@@ -304,6 +306,7 @@ def simulate(driver):
         event_states = {name: RecurringEvent() for name in driver.events}
         solution = None
         timeseries = list()
+        dt = None
 
     elif driver.chkpt_file:
         """
@@ -335,6 +338,22 @@ def simulate(driver):
         time = chkpt["time"]
         event_states = chkpt["event_states"]
         solution = chkpt["solution"]
+
+        try:
+            dt = chkpt["timestep_dt"]
+        except KeyError:
+            # Forgive missing dt in the checkpoint, this key was added recently
+            # (JZ 4-21-22). Prior to this change, timestep_dt was not stored in
+            # the checkpoint file, and a restarted simulation could end up
+            # different from a continuous one, when: (1) new_timestep_cadence >
+            # 1, and (2) a new dt was not computed just before the checkpoint
+            # was written. The differences would be due to a slightly different
+            # timestep used, after it's recomuted following the restart, and
+            # they would be minor. Still, the code has a policy that restarted
+            # runs should be bitwise identical to continuous ones. Older
+            # checkpoints will still work, but they will not have this garantee.
+            dt = None
+
         try:
             timeseries = chkpt["timeseries"]
         except KeyError:
@@ -398,6 +417,8 @@ def simulate(driver):
             event_states=event_states,
             solver=solver,
             setup=setup,
+            cfl_number=cfl_number,
+            timestep_dt=dt,
         )
 
     while True:

@@ -300,13 +300,16 @@ class Solver(SolverBase):
 
     @property
     def solution(self):
-        return self.primitive
-
-    @property
-    def primitive(self):
         return concat_on_host(
             [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
         )
+
+    @property
+    def primitive(self):
+        """
+        This solver uses primitive data as the solution array.
+        """
+        return None
 
     def reductions(self):
         """
