@@ -11,7 +11,7 @@ DESCRIPTION:
 // ============================ PHYSICS =======================================
 // ============================================================================
 #define NCONS 4
-#define PLM_THETA 2.0
+#define PLM_THETA 1.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
 #define PI 3.141592653589793
 
@@ -403,6 +403,7 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
     }
 }
 
+
 // ============================ GEOMETRY ======================================
 // ============================================================================
 PRIVATE double face_area(double r0, double r1, double q0, double q1)
@@ -574,8 +575,10 @@ PUBLIC void srhd_2d_advance_rk(
     double time,            // current time
     double rk_param,        // runge-kutta parameter
     double dt,              // timestep size
-    int fix_i0,             // don't evolve the first radial zone in the patch
-    int fix_i1)             // don't evolve the final radial zone in the patch
+    double jet_mdot,
+    double jet_gamma_beta,
+    double jet_theta,
+    double jet_duration)
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
@@ -584,18 +587,24 @@ PUBLIC void srhd_2d_advance_rk(
 
     FOR_EACH_2D(ni, nj)
     {
-        int fixed_zone = (fix_i0 && i == 0) || (fix_i1 && i == ni - 1);
+        double x0 = face_positions[i];
+        double x1 = face_positions[i + 1];
+        double r0 = x0 * (a0 + adot * time);
+        double r1 = x1 * (a0 + adot * time);
+        double q0 = dq * (j + 0);
+        double q1 = dq * (j + 1);
+        double qc = 0.5 * (q0 + q1);
 
-        if (!fixed_zone)
+        if (i == 0 && jet_mdot > 0.0 && qc < jet_theta && time < 1.0 + jet_duration) // assumes the jet starts at t=1.0
         {
-
-            double x0 = face_positions[i];
-            double x1 = face_positions[i + 1];
-            double r0 = x0 * (a0 + adot * time);
-            double r1 = x1 * (a0 + adot * time);
-            double q0 = dq * (j + 0);
-            double q1 = dq * (j + 1);
-
+            double *uwr = &conserved_wr[(i + 0 + ng) * si + (j + 0) * sj];
+            double jet_rho = jet_mdot / (4.0 * M_PI * r0 * r0 * jet_gamma_beta);
+            double prim[NCONS] = {jet_rho, jet_gamma_beta, 0.0, 0.1 * jet_rho};
+            double dv = cell_volume(r0, r1, q0, q1);
+            primitive_to_conserved(prim, uwr, dv);
+        }
+        else
+        {
             double *urk = &conserved_rk[(i + 0 + ng) * si + (j + 0) * sj];
             double *urd = &conserved_rd[(i + 0 + ng) * si + (j + 0) * sj];
             double *uwr = &conserved_wr[(i + 0 + ng) * si + (j + 0) * sj];

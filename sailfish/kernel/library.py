@@ -164,7 +164,7 @@ class Library:
     def __init__(self, code=None, mode="cpu", name="module", debug=True):
         code = f"{KERNEL_LIB_HEADER} {code}"
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
-        logger.info(f"prepare module {name} for {mode} execution")
+        logger.info(f"prepare {name} for {mode} execution")
 
         with measure_time() as prep_time:
             self.debug = debug

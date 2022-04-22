@@ -6,7 +6,7 @@ from math import sqrt, exp, pi
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import EquationOfState, PointMass, SinkModel
 from sailfish.physics.kepler import OrbitalElements
-from sailfish.setup import Setup, param
+from sailfish.setup import Setup, SetupError, param
 
 
 class CircumbinaryDisk(Setup):
@@ -138,7 +138,7 @@ class CircumbinaryDisk(Setup):
 
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
-            raise ValueError(f"eos must be isothermal or gamma-law, got {self.eos}")
+            raise SetupError(f"eos must be isothermal or gamma-law, got {self.eos}")
 
     @property
     def orbital_elements(self):
