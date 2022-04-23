@@ -366,7 +366,7 @@ class Solver(SolverBase):
                 return [p[0], -p[1], p[2], p[3]]
 
             if patch_index == 0:
-                if bcl == BC_OUTFLOW:
+                if bcl == BC_OUTFLOW or bcl == BC_JET:
                     pc[:+ng] = pc[+ng : +2 * ng]
                 elif bcl == BC_INFLOW:
                     for i in range(-ng, 0):
