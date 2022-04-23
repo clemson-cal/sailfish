@@ -145,10 +145,12 @@ class Patch:
             self.lib.srhd_2d_conserved_to_primitive[self.shape](
                 self.faces,
                 self.conserved1,
+                self.conserved2,
                 self.primitive1,
                 self.polar_extent,
                 self.scale_factor,
             )
+            self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 
     def advance_rk(self, rk_param, dt):
         with self.execution_context:

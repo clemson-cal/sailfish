@@ -93,15 +93,15 @@ PRIVATE void primitive_to_conserved(const double *prim, double *cons, double dv)
     // cons[4] = dv * m * prim[3];
 }
 
-PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, double x, double q)
+PRIVATE void conserved_to_primitive(double *cons1, double *cons2, double *prim, double dv, double x, double q)
 {
     const double newton_iter_max = 500;
-    const double error_tolerance = 1e-12 * (cons[0] + cons[3]) / dv;
+    const double error_tolerance = 1e-12 * (cons1[0] + cons1[3]) / dv;
     const double gm              = ADIABATIC_GAMMA;
-    const double m               = cons[0] / dv;
-    const double tau             = cons[3] / dv;
-    const double s1              = cons[1] / dv;
-    const double s2              = cons[2] / dv;
+    const double m               = cons1[0] / dv;
+    const double tau             = cons1[3] / dv;
+    const double s1              = cons1[1] / dv;
+    const double s2              = cons1[2] / dv;
     const double ss              = s1 * s1 + s2 * s2;
     int iteration                = 0;
     double p                     = prim[3];
@@ -133,7 +133,7 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
     prim[1] = w0 * s1 / (tau + m + p);
     prim[2] = w0 * s2 / (tau + m + p);
     prim[3] = p;
-    // prim[4] = cons[4] / cons[0];
+    // prim[4] = cons1[4] / cons1[0];
 
     double mach_ceiling = 1e6;
     double u_squared = prim[1] * prim[1] + prim[2] * prim[2];
@@ -142,7 +142,12 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
 
     if (e < emin) {
         prim[3] = prim[0] * emin * (ADIABATIC_GAMMA - 1.0);
-        primitive_to_conserved(prim, cons, dv);
+        primitive_to_conserved(prim, cons2, dv);
+    }
+    else {
+        for (int q = 0; q < NCONS; ++q) {
+            cons2[q] = cons1[q];
+        }
     }
 
     #if (EXEC_MODE != EXEC_GPU)
@@ -150,13 +155,13 @@ PRIVATE void conserved_to_primitive(double *cons, double *prim, double dv, doubl
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive reached max "
             "iteration at comoving position (%.3f %.3f) "
-            "cons = [%.3e %.3e %.3e %.3e] error = %.3e\n", x, q, cons[0], cons[1], cons[2], cons[3], f);
+            "cons1 = [%.3e %.3e %.3e %.3e] error = %.3e\n", x, q, cons1[0], cons1[1], cons1[2], cons1[3], f);
         exit(1);
     }
-    if (cons[3] <= 0.0) {
+    if (cons1[3] <= 0.0) {
         printf(
             "[FATAL] srhd_2d_conserved_to_primitive found non-positive "
-            "or NaN total energy tau=%.5e at comoving position (%.3f %.3f)\n", cons[3], x, q);
+            "or NaN total energy tau=%.5e at comoving position (%.3f %.3f)\n", cons1[3], x, q);
         exit(1);
     }
     if (prim[3] <= 0.0 || prim[3] != prim[3]) {
@@ -496,7 +501,8 @@ PUBLIC void srhd_2d_conserved_to_primitive(
     int ni,
     int nj,
     double *face_positions,  // :: $.shape == (ni + 1,)
-    double *conserved,       // :: $.shape == (ni + 4, nj, 4)
+    double *conserved1,      // :: $.shape == (ni + 4, nj, 4)
+    double *conserved2,      // :: $.shape == (ni + 4, nj, 4)
     double *primitive,       // :: $.shape == (ni + 4, nj, 4)
     double polar_extent,
     double scale_factor)     // :: $ >= 0.0
@@ -510,7 +516,8 @@ PUBLIC void srhd_2d_conserved_to_primitive(
     {
         int n = (i + ng) * si + j * sj;
         double *p = &primitive[n];
-        double *u = &conserved[n];
+        double *u1 = &conserved1[n];
+        double *u2 = &conserved2[n];
         double x0 = face_positions[i];
         double x1 = face_positions[i + 1];
         double r0 = x0 * scale_factor;
@@ -518,7 +525,7 @@ PUBLIC void srhd_2d_conserved_to_primitive(
         double q0 = dq * (j + 0);
         double q1 = dq * (j + 1);
         double dv = cell_volume(r0, r1, q0, q1);
-        conserved_to_primitive(u, p, dv, x0, q0);
+        conserved_to_primitive(u1, u2, p, dv, x0, q0);
     }
 }
 
