@@ -578,7 +578,8 @@ PUBLIC void srhd_2d_advance_rk(
     double jet_mdot,
     double jet_gamma_beta,
     double jet_theta,
-    double jet_duration)
+    double jet_duration,
+    int num_first_order_zones)
 {
     int ng = 2; // number of guard zones in the radial direction
     int si = NCONS * nj;
@@ -626,24 +627,27 @@ PUBLIC void srhd_2d_advance_rk(
             double pljm[NCONS];
             double prjp[NCONS];
             double prjm[NCONS];
-            double grli[NCONS];
-            double grri[NCONS];
-            double grcc[NCONS];
-            double gqlj[NCONS];
-            double gqrj[NCONS];
-            double gqcc[NCONS];
+            double grli[NCONS] = {0.0};
+            double grri[NCONS] = {0.0};
+            double grcc[NCONS] = {0.0};
+            double gqlj[NCONS] = {0.0};
+            double gqrj[NCONS] = {0.0};
+            double gqcc[NCONS] = {0.0};
             double fli[NCONS];
             double fri[NCONS];
             double flj[NCONS];
             double frj[NCONS];
             double sources[NCONS];
 
-            plm_gradient(pki, pli, pcc, grli);
-            plm_gradient(pli, pcc, pri, grcc);
-            plm_gradient(pcc, pri, pti, grri);
-            plm_gradient(pkj, plj, pcc, gqlj);
-            plm_gradient(plj, pcc, prj, gqcc);
-            plm_gradient(pcc, prj, ptj, gqrj);
+            if (i >= num_first_order_zones)
+            {
+                plm_gradient(pki, pli, pcc, grli);
+                plm_gradient(pli, pcc, pri, grcc);
+                plm_gradient(pcc, pri, pti, grri);
+                plm_gradient(pkj, plj, pcc, gqlj);
+                plm_gradient(plj, pcc, prj, gqcc);
+                plm_gradient(pcc, prj, ptj, gqrj);
+            }
 
             for (int q = 0; q < NCONS; ++q)
             {

@@ -87,6 +87,7 @@ class Patch:
         conserved,
         mesh,
         index_range,
+        num_first_order_zones,
         lib,
         xp,
         execution_context,
@@ -99,6 +100,7 @@ class Patch:
         self.xp = xp
         self.physics = physics
         self.index_range = index_range
+        self.num_first_order_zones = num_first_order_zones
         self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
         self.polar_extent = mesh.polar_extent
         self.time = self.time0 = time
@@ -166,6 +168,7 @@ class Patch:
                 self.physics.jet_gamma_beta,
                 self.physics.jet_theta,
                 self.physics.jet_duration,
+                self.num_first_order_zones,
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
@@ -244,6 +247,12 @@ class Solver(SolverBase):
         patches = list()
 
         for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
+            if n == 0 and bcl == "jet":
+                # introduction of some extra diffusion near the jet inlet is
+                # effective at preventing crashes
+                num_first_order_zones = 4
+            else:
+                num_first_order_zones = 0
             patch = Patch(
                 setup,
                 physics,
@@ -251,6 +260,7 @@ class Solver(SolverBase):
                 solution[a:b] if solution is not None else None,
                 mesh,
                 (a, b),
+                num_first_order_zones,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
