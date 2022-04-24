@@ -11,9 +11,16 @@ DESCRIPTION:
 // ============================ PHYSICS =======================================
 // ============================================================================
 #define NCONS 4
-#define PLM_THETA 2.0
 #define ADIABATIC_GAMMA (4.0 / 3.0)
 #define PI 3.141592653589793
+
+#ifndef RIEMANN_SOLVER
+#define RIEMANN_SOLVER 1 // 0=HLLE 1=HLLC
+#endif
+
+#ifndef PLM_THETA
+#define PLM_THETA 1.5
+#endif
 
 
 // ============================ MATH ==========================================
@@ -219,6 +226,7 @@ PRIVATE void primitive_with_radial_boost(const double *prim, double *prim_booste
     prim_boosted[3] = prim[3];
 }
 
+#if (RIEMANN_SOLVER == 0)
 PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, double *flux, int direction)
 {
     double ul[NCONS];
@@ -262,7 +270,9 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, dou
         }
     }
 }
+#endif
 
+#if (RIEMANN_SOLVER == 1)
 PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, double *flux, int direction)
 {
     double ul[NCONS];
@@ -407,7 +417,7 @@ PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, dou
         }   
     }
 }
-
+#endif
 
 // ============================ GEOMETRY ======================================
 // ============================================================================

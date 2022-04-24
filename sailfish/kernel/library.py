@@ -161,7 +161,9 @@ class Library:
     Builds and maintains (in memory) a CPU or GPU dynamically compiled module.
     """
 
-    def __init__(self, code=None, mode="cpu", name="module", debug=True):
+    def __init__(
+        self, code=None, mode="cpu", name="module", debug=True, define_macros=dict()
+    ):
         code = f"{KERNEL_LIB_HEADER} {code}"
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
         logger.info(f"prepare {name} for {mode} execution")
@@ -172,23 +174,25 @@ class Library:
             self.api = parse_api(code)
 
             if self.cpu_mode:
-                self.load_cpu_module(code, name, mode=mode)
+                self.load_cpu_module(code, name, mode=mode, define_macros=define_macros)
             else:
-                self.load_gpu_module(code)
+                self.load_gpu_module(code, define_macros)
 
             logger.info(f"module preparation took {prep_time():0.3}s")
 
         for symbol in self.api:
             logger.info(f"+-- {symbol}")
 
-    def load_cpu_module(self, code, name, mode="cpu"):
+    def load_cpu_module(self, code, name, mode="cpu", define_macros=dict()):
         import cffi
         import numpy
 
         if mode == "omp" and not build_config["enable_openmp"]:
             raise ValueError("need enable_openmp=True to compile with mode=omp")
 
-        define_macros = [("EXEC_MODE", dict(cpu=0, omp=1)[mode])]
+        exec_mode = dict(cpu=0, omp=1)[mode]
+        define_macros = list(define_macros.items()) + [("EXEC_MODE", exec_mode)]
+
         ffi = cffi.FFI()
         ffi.set_source(
             name,
@@ -220,10 +224,13 @@ class Library:
 
         self.xp = numpy
 
-    def load_gpu_module(self, code):
+    def load_gpu_module(self, code, define_macros):
         import cupy
 
-        module = cupy.RawModule(code=code, options=("-D EXEC_MODE=2",))
+        options = tuple(f"-D {k}={v}" for k, v in define_macros.items()) + (
+            "-D EXEC_MODE=2",
+        )
+        module = cupy.RawModule(code=code, options=options)
         module.compile()
         self.module = module
         self.xp = cupy

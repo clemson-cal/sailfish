@@ -62,6 +62,7 @@ def initial_condition(setup, mesh, i0, i1, j0, j1, time, xp):
 class Options(NamedTuple):
     compute_wavespeed: bool = False
     rk_order: int = 2
+    plm_theta: float = 1.5
 
 
 class Physics(NamedTuple):
@@ -223,11 +224,16 @@ class Solver(SolverBase):
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
 
-        xp = get_array_module(mode)
-        lib = Library(code, mode=mode, debug=False)
-
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
+
+        xp = get_array_module(mode)
+        lib = Library(
+            code,
+            mode=mode,
+            debug=False,
+            define_macros=dict(PLM_THETA=options.plm_theta),
+        )
 
         try:
             bcl, bcr = setup.boundary_condition
