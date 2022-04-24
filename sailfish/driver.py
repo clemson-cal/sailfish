@@ -685,6 +685,12 @@ def main():
         type=float,
         help="when to end the simulation",
     )
+    parser.add_argument(
+        "--event-handlers-file",
+        metavar="F",
+        type=str,
+        help="path to a module defining a get_event_handlers function",
+    )
     exec_group = parser.add_mutually_exclusive_group()
     exec_group.add_argument(
         "--mode",
@@ -731,6 +737,20 @@ def main():
                 or (driver.chkpt_file and os.path.dirname(driver.chkpt_file))
                 or "."
             )
+
+            if args.event_handlers_file is not None:
+                import importlib.util
+
+                spec = importlib.util.spec_from_file_location(
+                    "events_handler_module", args.event_handlers_file
+                )
+                events_handler_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(events_handler_module)
+                events_dict = events_handler_module.get_event_handlers()
+            else:
+                events_dict = dict()
+
+            # events_dict = args.events_file
             for name, number, state in simulate(driver):
                 if name == "timeseries":
                     append_timeseries(state)
@@ -738,6 +758,8 @@ def main():
                     write_checkpoint(number, outdir, state)
                 elif name == "end":
                     write_checkpoint("final", outdir, state)
+                elif name in events_dict:
+                    events_dict[name](number, outdir, state, logger)
                 else:
                     logger.warning(f"unrecognized event {name}")
 
