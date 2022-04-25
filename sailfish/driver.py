@@ -148,6 +148,8 @@ def write_checkpoint(number, outdir, state):
     state_checkpoint_dict = dict(
         iteration=state.iteration,
         time=state.solver.time,
+        timestep_dt=state.timestep_dt,
+        cfl_number=state.cfl_number,
         solution=state.solver.solution,
         primitive=state.solver.primitive,
         timeseries=state.timeseries,
@@ -342,16 +344,20 @@ def simulate(driver):
         try:
             dt = chkpt["timestep_dt"]
         except KeyError:
-            # Forgive missing dt in the checkpoint, this key was added recently
-            # (JZ 4-21-22). Prior to this change, timestep_dt was not stored in
-            # the checkpoint file, and a restarted simulation could end up
-            # different from a continuous one, when: (1) new_timestep_cadence >
-            # 1, and (2) a new dt was not computed just before the checkpoint
-            # was written. The differences would be due to a slightly different
-            # timestep used, after it's recomuted following the restart, and
-            # they would be minor. Still, the code has a policy that restarted
-            # runs should be bitwise identical to continuous ones. Older
-            # checkpoints will still work, but they will not have this garantee.
+            # Forgive missing timestep_dt in the checkpoint, this key was
+            # added recently (JZ 4-25-22). Prior to this change, timestep_dt
+            # was not stored in the checkpoint file, and a restarted
+            # simulation could end up different from a continuous one, when:
+            # (1) new_timestep_cadence > 1, and (2) a new dt was not computed
+            # just before the checkpoint was written. The differences would be
+            # due to a slightly different timestep used, after it's recomputed
+            # following the restart, and they would be minor. Still, restarted
+            # runs are supposed to be bitwise identical continuous ones. Older
+            # checkpoints will still work, but they will not have this
+            # guarantee.
+            logger.warning(
+                "timestep_dt not in checkpoint, will recompute it on first iteration"
+            )
             dt = None
 
         try:
