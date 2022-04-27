@@ -271,7 +271,6 @@ def simulate(driver):
     """
 
     from time import perf_counter
-    from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
     from sailfish import __version__ as version
     from sailfish.kernel.system import configure_build, log_system_info, measure_time
     from sailfish.event import Recurrence
@@ -500,6 +499,7 @@ def init_logging():
     function will do it for you. Note this function is also invoked by the
     `run` function if :code:`quiet=False` is passed to it.
     """
+    from sys import stdout
     from logging import StreamHandler, Formatter, getLogger, INFO
 
     class RunFormatter(Formatter):
@@ -513,7 +513,7 @@ def init_logging():
             else:
                 return f"[{name}:{record.levelname.lower()}] {record.msg}"
 
-    handler = StreamHandler()
+    handler = StreamHandler(stdout)
     handler.setFormatter(RunFormatter())
 
     root_logger = getLogger()
@@ -756,7 +756,6 @@ def main():
             else:
                 events_dict = dict()
 
-            # events_dict = args.events_file
             for name, number, state in simulate(driver):
                 if name == "timeseries":
                     append_timeseries(state)
