@@ -51,8 +51,8 @@ class CylindricalExplosion(Setup):
     """
 
     eos = param("isothermal", "EOS type: either isothermal or gamma-law")
-    smooth = param(False, "Use a smooth initial condition rather than tophat")
-    use_dg = param(False, "Use the DG solver (isothermal only)")
+    smooth = param(6.0, "k to smooth density enhancement, ~exp(-r^k) [0.0 for tophat]")
+    use_dg = param(False, "use the DG solver (isothermal only)")
 
     @property
     def is_isothermal(self):
@@ -64,11 +64,10 @@ class CylindricalExplosion(Setup):
 
     def primitive(self, t, coords, primitive):
         x, y = coords
-        in_cylinder = (x * x + y * y) ** 0.5 < 0.25
         r = (x * x + y * y) ** 0.5
 
-        if self.smooth:
-            f = exp(-((r / 0.25) ** 2.0))
+        if self.smooth != 0.0:
+            f = exp(-((r / 0.25) ** self.smooth))
         else:
             f = float(r < 0.25)
 

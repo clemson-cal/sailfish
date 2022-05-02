@@ -26,14 +26,15 @@ class Options(NamedTuple):
     """
 
     velocity_ceiling: float = 1e12
-    mach_ceiling: float = 1e12
+    rk_order: int = 2
+    limit_slopes: bool = True
 
 
 def primitive_to_conserved(prim, cons):
     sigma, vx, vy = prim
     cons[0] = sigma
     cons[1] = sigma * vx
-    cons[2] = sigma * vx
+    cons[2] = sigma * vy
 
 
 def initial_condition(setup, mesh, time):
@@ -42,45 +43,40 @@ def initial_condition(setup, mesh, time):
     """
     import numpy as np
 
-    ni, nj = mesh.shape
-    dx, dy = mesh.dx, mesh.dy
-    prim_node = np.zeros(NCONS)
-    cons_node = np.zeros(NCONS)
-    weights = np.zeros([ni, nj, NCONS, NPOLY])
-
     g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
     w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
-    # scaled LeGendre polynomials at quadrature points
     p = (
         (+1.000000000000000, +1.000000000000000, +1.000000000000000),
         (-1.341640786499873, +0.000000000000000, +1.341640786499873),
         (+0.894427190999914, -1.118033988749900, +0.894427190999914),
     )
-    phi = np.zeros([3, 3, NPOLY])
 
-    for ip in range(3):
-        for jp in range(3):
-            il = 0
-            for n in range(3):
-                for m in range(3):
-                    if n + m < 3:
-                        phi[ip][jp][il] = p[n][ip] * p[m][jp]
-                        il += 1
+    ni, nj = mesh.shape
+    dx, dy = mesh.dx, mesh.dy
+    prim_node = np.zeros(NCONS)
+    cons_node = np.zeros(NCONS)
+    weights = np.zeros([ni, nj, NCONS, ORDER, ORDER])
 
     for i in range(ni):
         for j in range(nj):
-            for ip in range(3):
-                for jp in range(3):
+            for i_quad in range(ORDER):
+                for j_quad in range(ORDER):
                     xc, yc = mesh.cell_coordinates(i, j)
-                    x = xc + 0.5 * dx * g[ip]
-                    y = yc + 0.5 * dy * g[jp]
+                    x = xc + 0.5 * dx * g[i_quad]
+                    y = yc + 0.5 * dy * g[j_quad]
                     setup.primitive(time, (x, y), prim_node)
                     primitive_to_conserved(prim_node, cons_node)
                     for q in range(NCONS):
-                        for l in range(NPOLY):
-                            weights[i, j, q, l] += (
-                                0.25 * cons_node[q] * phi[ip][jp][l] * w[ip] * w[jp]
-                            )
+                        for m in range(ORDER):
+                            for n in range(ORDER):
+                                weights[i, j, q, m, n] += (
+                                    0.25
+                                    * cons_node[q]
+                                    * p[m][i_quad]
+                                    * p[n][j_quad]
+                                    * w[i_quad]
+                                    * w[j_quad]
+                                )
     return weights
 
 
@@ -212,6 +208,27 @@ class Patch:
         with self.execution_context:
             self.weights0[...] = self.weights1[...]
 
+    def slope_limit(self):
+        """
+        Limit slopes using minmodTVB
+        """
+        m1, m2 = self.physics.point_masses(self.time)
+
+        with self.execution_context:
+            self.lib.cbdisodg_2d_slope_limit[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                m1.position_x,
+                m1.position_y,
+                m2.position_x,
+                m2.position_y,
+                self.weights1,
+                self.weights2,
+            )
+        self.weights1, self.weights2 = self.weights2, self.weights1
+
     def advance_rk(self, rk_param, dt):
         """
         Pass required parameters for time evolution of the setup.
@@ -273,12 +290,13 @@ class Patch:
 
     @property
     def primitive(self):
-        u0 = self.weights1[:, :, :, 0]
-        p0 = self.xp.zeros_like(u0)
-        p0[..., 0] = u0[..., 0]
-        p0[..., 1] = u0[..., 1] / u0[..., 0]
-        p0[..., 2] = u0[..., 2] / u0[..., 0]
-        return p0
+        with self.execution_context:
+            u0 = self.weights1[:, :, :, 0, 0]
+            p0 = self.xp.zeros_like(u0)
+            p0[..., 0] = u0[..., 0]
+            p0[..., 1] = u0[..., 1] / u0[..., 0]
+            p0[..., 2] = u0[..., 2] / u0[..., 0]
+            return p0
 
 
 class Solver(SolverBase):
@@ -332,7 +350,6 @@ class Solver(SolverBase):
         np = NPOLY  # number of polynomials
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        #        lib = Library(code, mode=mode, debug=False)
         lib = Library(code, mode=mode, debug=True)
 
         logger.info(f"initiate with time={time:0.4f}")
@@ -369,7 +386,7 @@ class Solver(SolverBase):
             buffer_surface_density = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
-            weights_patch = numpy.zeros([b - a + 2 * ng, nj + 2 * ng, nq, np])
+            weights_patch = numpy.zeros([b - a + 2 * ng, nj + 2 * ng, nq, ORDER, ORDER])
             weights_patch[ng:-ng, ng:-ng] = weights[a:b]
             patch = Patch(
                 time,
@@ -385,17 +402,24 @@ class Solver(SolverBase):
                 execution_context(mode, device_id=n % num_devices(mode)),
             )
             self.patches.append(patch)
+            self.set_bc("weights1")
 
     @property
     def solution(self):
+        self.set_bc("weights1")
         return concat_on_host(
-            [p.weights1 for p in self.patches], (self.num_guard, self.num_guard)
+            [p.weights1 for p in self.patches],
+            (self.num_guard, self.num_guard),
+            rank=2,
         )
 
     @property
     def primitive(self):
+        self.set_bc("weights1")
         return concat_on_host(
-            [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
+            [p.primitive for p in self.patches],
+            (self.num_guard, self.num_guard),
+            rank=2,
         )
 
     def reductions(self):
@@ -450,33 +474,36 @@ class Solver(SolverBase):
 
     @property
     def maximum_cfl(self):
-        return 0.08
+        return 0.4
 
     def maximum_wavespeed(self):
         """
         Return the global maximum wavespeed over the whole domain.
         """
-        # WARNING! Timestep calculation is disabled
-        return 5.0
-        # return lazy_reduce(
-        #     max,
-        #     float,
-        #     (patch.maximum_wavespeed for patch in self.patches),
-        #     (patch.execution_context for patch in self.patches),
-        # )
-
-    #    def advance(self, dt):
-    #        self.new_iteration()
-    #        self.advance_rk(0.0, dt)
-    #        self.advance_rk(0.5, dt)
+        return lazy_reduce(
+            max,
+            float,
+            (patch.maximum_wavespeed for patch in self.patches),
+            (patch.execution_context for patch in self.patches),
+        )
 
     def advance(self, dt):
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-        self.advance_rk(0.75, dt)
-        self.advance_rk(1.0 / 3.0, dt)
+        if self._options.rk_order == 1:
+            self.advance_rk(0.0, dt)
+        elif self._options.rk_order == 2:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.5, dt)
+        elif self._options.rk_order == 3:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.75, dt)
+            self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
+        if self._options.limit_slopes:
+            self.set_bc("weights1")
+            for patch in self.patches:
+                patch.slope_limit()
         self.set_bc("weights1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)

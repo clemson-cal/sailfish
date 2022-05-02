@@ -161,12 +161,20 @@ def main_cbdiso_2d():
         choices=fields.keys(),
         help="which field to plot",
     )
+    parser.add_argument("--poly", type=int, nargs=2, default=None)
     parser.add_argument(
         "--log",
         "-l",
         default=False,
         action="store_true",
         help="use log scaling",
+    )
+    parser.add_argument(
+        "--scale-by-power",
+        "-s",
+        default=None,
+        type=float,
+        help="scale the field by the given power",
     )
     parser.add_argument(
         "--vmin",
@@ -180,13 +188,34 @@ def main_cbdiso_2d():
         type=float,
         help="maximum value for colormap",
     )
-
+    parser.add_argument(
+        "--cmap",
+        default="magma",
+        help="colormap name",
+    )
+    parser.add_argument(
+        "--radius",
+        default=None,
+        type=float,
+        help="plot the domain out to this radius",
+    )
+    parser.add_argument(
+        "--save",
+        action="store_true",
+        help="save PNG files instead of showing a window",
+    )
+    parser.add_argument(
+        "--draw-lindblad31-radius",
+        action="store_true",
+    )
+    parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
     for filename in args.checkpoints:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
+
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
         else:
@@ -194,6 +223,17 @@ def main_cbdiso_2d():
             prim = chkpt["solution"]
         f = fields[args.field](prim).T
 
+        if args.print_model_parameters:
+            print(chkpt["model_parameters"])
+
+        if args.poly is None:
+            prim = chkpt["primitive"]
+            f = fields[args.field](prim).T
+        else:
+            m, n = args.poly
+            f = chkpt["solution"][:, :, 0, m, n].T
+        if args.scale_by_power is not None:
+            f = f**args.scale_by_power
         if args.log:
             f = np.log10(f)
 
@@ -203,14 +243,37 @@ def main_cbdiso_2d():
             origin="lower",
             vmin=args.vmin,
             vmax=args.vmax,
-            cmap="magma",
+            cmap=args.cmap,
             extent=extent,
         )
+
+        if args.draw_lindblad31_radius:
+            x1 = chkpt["point_masses"][0].position_x
+            y1 = chkpt["point_masses"][0].position_y
+            t = np.linspace(0, 2 * np.pi, 1000)
+            x = x1 + 0.3 * np.cos(t)
+            y = y1 + 0.3 * np.sin(t)
+            a = 1.0
+            q = chkpt["model_parameters"]["mass_ratio"]
+            # Eq. 1 in Franchini & Martin (2019; https://arxiv.org/pdf/1908.02776.pdf)
+            r_res = 3 ** (-2 / 3) * (1 + q) ** (-1 / 3) * a
+            ax.plot(x, y, ls="--", lw=0.75, c="w", alpha=1.0)
+
         ax.set_aspect("equal")
+        if args.radius is not None:
+            ax.set_xlim(-args.radius, args.radius)
+            ax.set_ylim(-args.radius, args.radius)
         fig.colorbar(cm)
         fig.suptitle(filename)
-
-    plt.show()
+        fig.subplots_adjust(
+            left=0.05, right=0.95, bottom=0.05, top=0.95, hspace=0, wspace=0
+        )
+        if args.save:
+            pngname = filename.replace(".pk", ".png")
+            print(pngname)
+            fig.savefig(pngname, dpi=400)
+    if not args.save:
+        plt.show()
 
 
 def main_cbdisodg_2d():
@@ -261,7 +324,7 @@ def main_cbdgam_2d():
     args = parser.parse_args()
 
     for filename in args.checkpoints:
-        fig, ax = plt.subplots()
+        fig, ax = plt.subplots(figsize=[10, 10])
         chkpt = load_checkpoint(filename, require_solver="cbdgam_2d")
         mesh = chkpt["mesh"]
         prim = chkpt["solution"]

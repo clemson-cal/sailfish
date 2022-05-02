@@ -26,7 +26,8 @@ class Options(NamedTuple):
     """
 
     velocity_ceiling: float = 1e12
-    mach_ceiling: float = 1e12
+    density_floor: float = 1e-12
+    rk_order: int = 2
 
 
 def initial_condition(setup, mesh, time):
@@ -238,6 +239,7 @@ class Patch:
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
+                self.options.density_floor,
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.primitive1, self.primitive2 = self.primitive2, self.primitive1
@@ -508,8 +510,15 @@ class Solver(SolverBase):
 
     def advance(self, dt):
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-        self.advance_rk(0.5, dt)
+        if self._options.rk_order == 1:
+            self.advance_rk(0.0, dt)
+        elif self._options.rk_order == 2:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.5, dt)
+        elif self._options.rk_order == 3:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.75, dt)
+            self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
         self.set_bc("primitive1")

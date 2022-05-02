@@ -8,7 +8,7 @@ DESCRIPTION: Isothermal solver for a binary accretion problem in 2D planar
 // ============================ PHYSICS =======================================
 // ============================================================================
 #define NCONS 3
-#define PLM_THETA 1.5
+#define PLM_THETA 1.8
 
 
 // ============================ MATH ==========================================
@@ -116,11 +116,21 @@ PRIVATE void point_mass_source_term(
     double fx = -fgrav_numerator * dx;
     double fy = -fgrav_numerator * dy;
     double sink_rate = (dr < 4.0 * r_sink) ? mass->sink_rate * exp(-pow(dr / r_sink, 4.0)) : 0.0;
-    double mdot = sigma * sink_rate * -1.0;
+    double mdot = 0.0;
 
-    delta_cons[0] = 0.0;
-    delta_cons[1] = fx * dt;
-    delta_cons[2] = fy * dt;
+    if (sink_rate > 0.0)
+    {
+        mdot = -sink_rate * sigma;
+    }
+    else if (sink_rate < 0.0)
+    {
+        mdot = -sink_rate; // add constant M-dot for uniform sink.
+    }
+
+    // gravitational force
+    delta_cons[0] += 0.0;
+    delta_cons[1] += fx * dt;
+    delta_cons[2] += fy * dt;
 
     switch (mass->sink_model)
     {
@@ -170,17 +180,11 @@ PRIVATE void point_masses_source_term(
     double y1,
     double dt,
     double *prim,
-    double *cons)
+    double *delta_cons)
 {
     for (int p = 0; p < 2; ++p)
     {
-        double delta_cons[NCONS];
         point_mass_source_term(&mass_list->masses[p], x1, y1, dt, prim, delta_cons);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            cons[q] += delta_cons[q];
-        }
     }
 }
 
@@ -211,7 +215,8 @@ PRIVATE void buffer_source_term(
     double xc,
     double yc,
     double dt,
-    double *cons)
+    double *cons,
+    double *delta_cons)
 {
     if (buffer->is_enabled)
     {
@@ -225,18 +230,16 @@ PRIVATE void buffer_source_term(
 
         if (rc > onset_radius)
         {
-            double pf = surface_density * sqrt(central_mass / rc);
-            double px = pf * (-yc / rc);
-            double py = pf * ( xc / rc);
+            double v_kep = sqrt(central_mass / rc);
+            double px = surface_density * (-yc / rc) * v_kep;
+            double py = surface_density * (+xc / rc) * v_kep;
             double u0[NCONS] = {surface_density, px, py};
-
             double omega_outer = sqrt(central_mass * pow(onset_radius, -3.0));
-            // double buffer_rate = driving_rate * omega_outer * max2(rc, 1.0);
             double buffer_rate = driving_rate * omega_outer * (rc - onset_radius) / (outer_radius - onset_radius);
 
             for (int q = 0; q < NCONS; ++q)
             {
-                cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
+                delta_cons[q] -= (cons[q] - u0[q]) * buffer_rate * dt;
             }
         }
     }
@@ -265,9 +268,10 @@ PRIVATE void shear_strain(
 PRIVATE void conserved_to_primitive(
     const double *cons,
     double *prim,
-    double velocity_ceiling)
+    double velocity_ceiling,
+    double density_floor)
 {
-    double rho = cons[0];
+    double rho = max2(cons[0], density_floor);
     double px = cons[1];
     double py = cons[2];
     double vx = sign(px) * min2(fabs(px / rho), velocity_ceiling);
@@ -418,7 +422,8 @@ PUBLIC void cbdiso_2d_advance_rk(
     double nu, // kinematic viscosity coefficient
     double a, // RK parameter
     double dt, // timestep
-    double velocity_ceiling)
+    double velocity_ceiling,
+    double density_floor)
 {
     struct KeplerianBuffer buffer = {
         buffer_surface_density,
@@ -428,7 +433,6 @@ PUBLIC void cbdiso_2d_advance_rk(
         buffer_onset_width,
         buffer_is_enabled
     };
-
     struct PointMass m1 = {x1, y1, vx1, vy1, mass1, softening_length1, sink_rate1, sink_radius1, sink_model1};
     struct PointMass m2 = {x2, y2, vx2, vy2, mass2, softening_length2, sink_rate2, sink_radius2, sink_model2};
     struct PointMassList mass_list = {{m1, m2}};
@@ -581,17 +585,21 @@ PUBLIC void cbdiso_2d_advance_rk(
             frj[1] -= 0.5 * nu * (pcc[0] * scc[2] + prj[0] * srj[2]); // y-x
             frj[2] -= 0.5 * nu * (pcc[0] * scc[3] + prj[0] * srj[3]); // y-y
         }
+        double delta_cons[3] = {0.0, 0.0, 0.0};
         primitive_to_conserved(pcc, ucc);
-        buffer_source_term(&buffer, xc, yc, dt, ucc);
-        point_masses_source_term(&mass_list, xc, yc, dt, pcc, ucc);
+        buffer_source_term(&buffer, xc, yc, dt, ucc, delta_cons);
+        point_masses_source_term(&mass_list, xc, yc, dt, pcc, delta_cons);
 
         for (int q = 0; q < NCONS; ++q)
         {
-            ucc[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+            delta_cons[q] -= ((fri[q] - fli[q]) / dx + (frj[q] - flj[q]) / dy) * dt;
+        }
+        for (int q = 0; q < NCONS; ++q)
+        {
+            ucc[q] += delta_cons[q];
             ucc[q] = (1.0 - a) * ucc[q] + a * un[q];
         }
-        double *pout = &primitive_wr[ncc];
-        conserved_to_primitive(ucc, pout, velocity_ceiling);
+        conserved_to_primitive(ucc, &primitive_wr[ncc], velocity_ceiling, density_floor);
     }
 }
 
