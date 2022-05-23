@@ -617,11 +617,11 @@ PUBLIC void srhd_2d_advance_rk(
         double q1 = dq * (j + 1);
         double qc = 0.5 * (q0 + q1);
 
-        if (i == 0 && jet_mdot > 0.0 && qc < jet_theta && time < 1.0 + jet_duration) // assumes the jet starts at t=1.0
+        if (i == 0 && jet_mdot > 0.0 && qc < jet_theta * 2.0 && time < 1.0 + jet_duration) // assumes the jet starts at t=1.0
         {
             double *uwr = &conserved_wr[(i + 0 + ng) * si + (j + 0) * sj];
             double jet_rho = jet_mdot / (4.0 * PI * r0 * r0 * jet_gamma_beta);
-            double jet_prof = exp(-pow(qc / jet_theta, 4.0));
+            double jet_prof = exp(-pow(qc / jet_theta, 2.0));
             double prim[NCONS] = {jet_rho, jet_gamma_beta * jet_prof, 0.0, 1e-6 * jet_rho};
             double dv = cell_volume(r0, r1, q0, q1);
             primitive_to_conserved(prim, uwr, dv);
