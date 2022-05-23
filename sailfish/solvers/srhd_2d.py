@@ -63,6 +63,7 @@ class Options(NamedTuple):
     compute_wavespeed: bool = False
     rk_order: int = 2
     plm_theta: float = 1.5
+    mach_ceiling: float = 1e6
 
 
 class Physics(NamedTuple):
@@ -232,7 +233,10 @@ class Solver(SolverBase):
             code,
             mode=mode,
             debug=False,
-            define_macros=dict(PLM_THETA=options.plm_theta),
+            define_macros=dict(
+                PLM_THETA=options.plm_theta,
+                MACH_CEILING=options.mach_ceiling,
+            ),
         )
 
         try:

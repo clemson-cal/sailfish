@@ -14,6 +14,10 @@ DESCRIPTION:
 #define ADIABATIC_GAMMA (4.0 / 3.0)
 #define PI 3.141592653589793
 
+#ifndef MACH_CEILING
+#define MACH_CEILING 1e6
+#endif
+
 #ifndef RIEMANN_SOLVER
 #define RIEMANN_SOLVER 1 // 0=HLLE 1=HLLC
 #endif
@@ -142,7 +146,7 @@ PRIVATE void conserved_to_primitive(double *cons1, double *cons2, double *prim, 
     prim[3] = p;
     // prim[4] = cons1[4] / cons1[0];
 
-    double mach_ceiling = 1e6;
+    double mach_ceiling = MACH_CEILING;
     double u_squared = prim[1] * prim[1] + prim[2] * prim[2];
     double e = prim[3] / prim[0] * 3.0;
     double emin = u_squared / (1.0 + u_squared) / pow(mach_ceiling, 2.0);
