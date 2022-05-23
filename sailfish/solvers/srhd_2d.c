@@ -626,6 +626,10 @@ PUBLIC void srhd_2d_advance_rk(
             double dv = cell_volume(r0, r1, q0, q1);
             primitive_to_conserved(prim, uwr, dv);
         }
+        else if (jet_mdot > 0.0 && i == 0) // if the jet is enabled, then fix the innermost zone
+        {
+
+        }
         else
         {
             double *urk = &conserved_rk[(i + 0 + ng) * si + (j + 0) * sj];
