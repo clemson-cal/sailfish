@@ -195,7 +195,6 @@ class KitpCodeComparison(Setup):
     use_dg = param(False, "use the DG solver")
 
     def primitive(self, t, coords, primitive):
-        GM = 1.0
         x, y = coords
         r = sqrt(x * x + y * y)
         r_softened = sqrt(x * x + y * y + self.softening_length * self.softening_length)
@@ -330,7 +329,6 @@ class MassTransferBinary(Setup):
     buffer_onset_width = param(0.25, "buffer ramp distance", mutable=True)
 
     def primitive(self, t, coords, primitive):
-        GM = 1.0
         x, y = coords
         r = sqrt(x * x + y * y)
 

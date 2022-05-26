@@ -262,6 +262,13 @@ class Setup(ABC):
         """
         return 10000
 
+    @property
+    def diagnostics(self):
+        """
+        A list of diagnostics to be dispatched to the solver.
+        """
+        return list()
+
     def validate(self):
         """
         Confirm that the model parameters are physically valid.

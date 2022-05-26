@@ -218,24 +218,31 @@ def main_cbdiso_2d():
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
+            if args.poly is None:
+                prim = chkpt["primitive"]
+                f = fields[args.field](prim).T
+            else:
+                m, n = args.poly
+                f = chkpt["solution"][:, :, 0, m, n].T
         else:
             # the cbdiso_2d solver uses primitive data as the solution array
             prim = chkpt["solution"]
+
         f = fields[args.field](prim).T
 
         if args.print_model_parameters:
             print(chkpt["model_parameters"])
 
-        if args.poly is None:
-            prim = chkpt["primitive"]
-            f = fields[args.field](prim).T
-        else:
-            m, n = args.poly
-            f = chkpt["solution"][:, :, 0, m, n].T
         if args.scale_by_power is not None:
             f = f**args.scale_by_power
         if args.log:
             f = np.log10(f)
+
+        # try:
+        #     f -= f0
+        #     print("subtracting the first arg!")
+        # except:
+        #     f0 = f
 
         extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
         cm = ax.imshow(

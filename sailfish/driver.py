@@ -209,6 +209,7 @@ class DriverArgs(NamedTuple):
     num_patches: int = None
     events: Dict[str, Recurrence] = dict()
     new_timestep_cadence: int = None
+    verbose_output: str = ""
 
     def from_namespace(args):
         """
@@ -378,6 +379,15 @@ def simulate(driver):
     reference_time = setup.reference_time_scale
     new_timestep_cadence = driver.new_timestep_cadence or 1
     dt = None
+
+    if "physics" in driver.verbose_output:
+        logger.info(f"physics struct (setup -> solver) {setup.physics}")
+    if (
+        "options" in driver.verbose_output
+        or "solver" in driver.verbose_output
+        or "solver-options" in driver.verbose_output
+    ):
+        logger.info(f"options struct (cmdline -> solver) {driver.solver_options}")
 
     solver = make_solver(
         setup.solver,
@@ -696,6 +706,13 @@ def main():
         metavar="F",
         type=str,
         help="path to a module defining a get_event_handlers function",
+    )
+    parser.add_argument(
+        "--verbose-output",
+        metavar="P",
+        type=str,
+        default="",
+        help="detailed print solver structs [physics,options]",
     )
     exec_group = parser.add_mutually_exclusive_group()
     exec_group.add_argument(
