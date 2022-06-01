@@ -252,6 +252,100 @@ PRIVATE void riemann_hlle(const double *pl, const double *pr, double v_face, dou
     }
 }
 
+PRIVATE void riemann_hllc(const double *pl, const double *pr, double v_face, double *flux)
+{
+    double ul[NCONS];
+    double ur[NCONS];
+    double fl[NCONS];
+    double fr[NCONS];
+    double u_hll[NCONS];
+    double f_hll[NCONS];    
+    double al[2];
+    double ar[2];
+
+    primitive_to_conserved(pl, ul, 1.0);
+    primitive_to_conserved(pr, ur, 1.0);
+    primitive_to_flux(pl, ul, fl);
+    primitive_to_flux(pr, ur, fr);
+    primitive_to_outer_wavespeeds(pl, al);
+    primitive_to_outer_wavespeeds(pr, ar);
+
+    const double am = min2(al[0], ar[0]);
+    const double ap = max2(al[1], ar[1]);
+
+    if (v_face < am)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fl[q] - v_face * ul[q];
+        }
+    }
+    else if (v_face > ap)
+    {
+        for (int q = 0; q < NCONS; ++q)
+        {
+            flux[q] = fr[q] - v_face * ur[q];
+        }
+    }
+    else
+    {    
+        double D_star;
+        double Sr_star;
+        double E_star; // total energy E = tau + D
+        double tau_star;
+        double s_star; // scalar concentration
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            u_hll[q] = (ur[q] * ap - ul[q] * am + (fl[q] - fr[q]))           / (ap - am);
+            f_hll[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
+        }
+
+        double a = f_hll[2] + f_hll[0]; // total energy flux
+        double b = -(u_hll[2] + u_hll[0] + f_hll[1]);
+        double c = u_hll[1];
+        double v_star; 
+        double vl, vr;
+
+        if (fabs(a) < 1e-10)
+        {
+            v_star = -c / b;
+        }
+        else
+        {
+            v_star = (-b - sqrt(b * b - 4.0 * a * c)) / (2.0 * a);
+        }
+
+        double p_star = -a * v_star + f_hll[1];
+
+        if (v_face < v_star) // in left star state
+        {   
+            vl = primitive_to_beta_component(pl);
+            D_star = ul[0] * (am - vl) / (am - v_star);
+            E_star = (am * (ul[2] + ul[0]) - ul[1] + p_star * v_star) / (am - v_star);
+            Sr_star = (E_star + p_star) * v_star;
+            tau_star = E_star - D_star;
+            s_star = ul[3] * (am - vl) / (am - v_star);
+            flux[0] = D_star * v_star - v_face * D_star;
+            flux[1] = Sr_star * v_star + p_star - v_face * Sr_star;
+            flux[2] = Sr_star - D_star * v_star - v_face * tau_star;
+            flux[3] = s_star * v_star - v_face * s_star;
+        }
+        else // in right star state
+        {
+            vr = primitive_to_beta_component(pr);
+            D_star = ur[0] * (ap - vr) / (ap - v_star);
+            E_star = (ap * (ur[2] + ur[0]) - ur[1] + p_star * v_star) / (ap - v_star);
+            Sr_star = (E_star + p_star) * v_star;
+            tau_star = E_star - D_star;
+            s_star = ur[3] * (ap - vr) / (ap - v_star);
+            flux[0] = D_star * v_star - v_face * D_star;
+            flux[1] = Sr_star * v_star + p_star - v_face * Sr_star;
+            flux[2] = Sr_star - D_star * v_star - v_face * tau_star;
+            flux[3] = s_star * v_star - v_face * s_star;
+        }   
+    }
+}
 
 // ============================ GEOMETRY ======================================
 // ============================================================================
@@ -397,60 +491,67 @@ PUBLIC void srhd_1d_advance_rk(
     double time,            // current time
     double rk_param,        // runge-kutta parameter
     double dt,              // timestep size
+    int fix_i0,             // don't evolve the first zone in the patch
+    int fix_i1,             // don't evolve the final zone in the patch
     int coords)             // :: $ in [0, 1]
 {
     int ng = 2; // number of guard zones
 
     FOR_EACH_1D(num_zones)
     {
-        double yl = face_positions[i];
-        double yr = face_positions[i + 1];
-        double xl = yl * (a0 + adot * time);
-        double xr = yr * (a0 + adot * time);
+        int fixed_zone = (fix_i0 && i == 0) || (fix_i1 && i == num_zones - 1);
 
-        double *urk = &conserved_rk[NCONS * (i + ng)];
-        double *urd = &conserved_rd[NCONS * (i + ng)];
-        double *uwr = &conserved_wr[NCONS * (i + ng)];
-        double *prd = &primitive_rd[NCONS * (i + ng)];
-        double *pli = &primitive_rd[NCONS * (i + ng - 1)];
-        double *pri = &primitive_rd[NCONS * (i + ng + 1)];
-        double *pki = &primitive_rd[NCONS * (i + ng - 2)];
-        double *pti = &primitive_rd[NCONS * (i + ng + 2)];
-
-        double plip[NCONS];
-        double plim[NCONS];
-        double prip[NCONS];
-        double prim[NCONS];
-        double gxli[NCONS];
-        double gxri[NCONS];
-        double gxcc[NCONS];
-
-        plm_gradient(pki, pli, prd, gxli);
-        plm_gradient(pli, prd, pri, gxcc);
-        plm_gradient(prd, pri, pti, gxri);
-
-        for (int q = 0; q < NCONS; ++q)
+        if (!fixed_zone)
         {
-            plim[q] = pli[q] + 0.5 * gxli[q];
-            plip[q] = prd[q] - 0.5 * gxcc[q];
-            prim[q] = prd[q] + 0.5 * gxcc[q];
-            prip[q] = pri[q] - 0.5 * gxri[q];
-        }
+            double yl = face_positions[i];
+            double yr = face_positions[i + 1];
+            double xl = yl * (a0 + adot * time);
+            double xr = yr * (a0 + adot * time);
 
-        double fli[NCONS];
-        double fri[NCONS];
-        double sources[NCONS];
-        double dal = face_area(coords, xl);
-        double dar = face_area(coords, xr);
+            double *urk = &conserved_rk[NCONS * (i + ng)];
+            double *urd = &conserved_rd[NCONS * (i + ng)];
+            double *uwr = &conserved_wr[NCONS * (i + ng)];
+            double *prd = &primitive_rd[NCONS * (i + ng)];
+            double *pli = &primitive_rd[NCONS * (i + ng - 1)];
+            double *pri = &primitive_rd[NCONS * (i + ng + 1)];
+            double *pki = &primitive_rd[NCONS * (i + ng - 2)];
+            double *pti = &primitive_rd[NCONS * (i + ng + 2)];
 
-        riemann_hlle(plim, plip, yl * adot, fli);
-        riemann_hlle(prim, prip, yr * adot, fri);
-        geometric_source_terms(coords, xl, xr, prd, sources);
+            double plip[NCONS];
+            double plim[NCONS];
+            double prip[NCONS];
+            double prim[NCONS];
+            double gxli[NCONS];
+            double gxri[NCONS];
+            double gxcc[NCONS];
 
-        for (int q = 0; q < NCONS; ++q)
-        {
-            uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
-            uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            plm_gradient(pki, pli, prd, gxli);
+            plm_gradient(pli, prd, pri, gxcc);
+            plm_gradient(prd, pri, pti, gxri);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                plim[q] = pli[q] + 0.5 * gxli[q];
+                plip[q] = prd[q] - 0.5 * gxcc[q];
+                prim[q] = prd[q] + 0.5 * gxcc[q];
+                prip[q] = pri[q] - 0.5 * gxri[q];
+            }
+
+            double fli[NCONS];
+            double fri[NCONS];
+            double sources[NCONS];
+            double dal = face_area(coords, xl);
+            double dar = face_area(coords, xr);
+
+            riemann_hllc(plim, plip, yl * adot, fli);
+            riemann_hllc(prim, prip, yr * adot, fri);
+            geometric_source_terms(coords, xl, xr, prd, sources);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uwr[q] = urd[q] + (fli[q] * dal - fri[q] * dar + sources[q]) * dt;
+                uwr[q] = (1.0 - rk_param) * uwr[q] + rk_param * urk[q];
+            }
         }
     }
 }

@@ -1,3 +1,7 @@
+"""
+Validation setups for various 1D solvers
+"""
+
 from math import pi, sin
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh

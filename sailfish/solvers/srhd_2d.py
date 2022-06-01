@@ -27,6 +27,24 @@ logger = getLogger(__name__)
 NUM_GUARD = 2
 NUM_CONS = 4
 
+BC_INTERNAL = 0  # internal BC (guard zones overlap a neighbor patch)
+BC_PERIODIC = 1  # period BC (not handled in C)
+BC_OUTFLOW = 2  # zero-gradient BC (not handled in C)
+BC_INFLOW = 3  # user-supplied BC in guard zones (not handled in C)
+BC_REFLECT = 4  # apply reflecting BC in guard zones (not handled in C)
+BC_FIXED = 5  # don't evolve the first (or last) interior zones
+BC_JET = 6  # use a jet inflow boundary condition, with supplied parameters
+
+
+BC_DICT = {
+    "periodic": BC_PERIODIC,
+    "outflow": BC_OUTFLOW,
+    "inflow": BC_INFLOW,
+    "reflect": BC_REFLECT,
+    "fixed": BC_FIXED,
+    "jet": BC_JET,
+}
+
 
 def initial_condition(setup, mesh, i0, i1, j0, j1, time, xp):
     primitive = xp.zeros([i1 - i0, j1 - j0, NUM_CONS])
@@ -44,10 +62,15 @@ def initial_condition(setup, mesh, i0, i1, j0, j1, time, xp):
 class Options(NamedTuple):
     compute_wavespeed: bool = False
     rk_order: int = 2
+    plm_theta: float = 1.5
+    mach_ceiling: float = 1e6
 
 
 class Physics(NamedTuple):
-    pass
+    jet_mdot: float = 0.0
+    jet_gamma_beta: float = 0.0
+    jet_theta: float = 0.0
+    jet_duration: float = 0.0
 
 
 class Patch:
@@ -61,10 +84,12 @@ class Patch:
     def __init__(
         self,
         setup,
+        physics,
         time,
         conserved,
         mesh,
         index_range,
+        num_first_order_zones,
         lib,
         xp,
         execution_context,
@@ -75,6 +100,9 @@ class Patch:
         nj = mesh.shape[1]
         self.lib = lib
         self.xp = xp
+        self.physics = physics
+        self.index_range = index_range
+        self.num_first_order_zones = num_first_order_zones
         self.shape = shape = (i1 - i0, mesh.shape[1])  # not including guard zones
         self.polar_extent = mesh.polar_extent
         self.time = self.time0 = time
@@ -119,10 +147,12 @@ class Patch:
             self.lib.srhd_2d_conserved_to_primitive[self.shape](
                 self.faces,
                 self.conserved1,
+                self.conserved2,
                 self.primitive1,
                 self.polar_extent,
                 self.scale_factor,
             )
+            self.conserved1, self.conserved2 = self.conserved2, self.conserved1
 
     def advance_rk(self, rk_param, dt):
         with self.execution_context:
@@ -138,6 +168,11 @@ class Patch:
                 self.time,
                 rk_param,
                 dt,
+                self.physics.jet_mdot if self.index_range[0] == 0 else 0.0,
+                self.physics.jet_gamma_beta,
+                self.physics.jet_theta,
+                self.physics.jet_duration,
+                self.num_first_order_zones,
             )
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
         self.conserved1, self.conserved2 = self.conserved2, self.conserved1
@@ -190,18 +225,33 @@ class Solver(SolverBase):
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
 
-        xp = get_array_module(mode)
-        lib = Library(code, mode=mode, debug=True)
-
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
+
+        xp = get_array_module(mode)
+        lib = Library(
+            code,
+            mode=mode,
+            debug=False,
+            define_macros=dict(
+                PLM_THETA=options.plm_theta,
+                MACH_CEILING=options.mach_ceiling,
+            ),
+        )
+
+        try:
+            bcl, bcr = setup.boundary_condition
+        except ValueError:
+            bcl = setup.boundary_condition
+            bcr = setup.boundary_condition
+        try:
+            self.boundary_condition = BC_DICT[bcl], BC_DICT[bcr]
+        except KeyError:
+            raise ValueError(f"bad boundary condition {bcl}/{bcr}")
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
         logger.info(f"mesh is {mesh}")
-
-        if setup.boundary_condition != "outflow":
-            raise ValueError(f"solver only supports outflow radial boundaries")
 
         if options.rk_order not in (1, 2, 3):
             raise ValueError("solver only supports rk_order in 1, 2, 3")
@@ -209,12 +259,20 @@ class Solver(SolverBase):
         patches = list()
 
         for n, (a, b) in enumerate(subdivide(mesh.shape[0], num_patches)):
+            if n == 0 and bcl == "jet":
+                # introduction of some extra diffusion near the jet inlet is
+                # effective at preventing crashes
+                num_first_order_zones = 4
+            else:
+                num_first_order_zones = 0
             patch = Patch(
                 setup,
+                physics,
                 time,
                 solution[a:b] if solution is not None else None,
                 mesh,
                 (a, b),
+                num_first_order_zones,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
@@ -304,21 +362,45 @@ class Solver(SolverBase):
             self.set_bc_patch(pl, pc, pr, ic)
 
     def set_bc_patch(self, pl, pc, pr, patch_index):
-        ni, nj = self.mesh.shape
+        t = self.time
+        ni = self.mesh.shape[0]
+        nj = self.mesh.shape[1]
         ng = self.num_guard
+        bcl, bcr = self.boundary_condition
 
         with self.patches[patch_index].execution_context:
-            # 1. write to the guard zones of pc, the internal BC
             pc[:+ng] = pl[-2 * ng : -ng]
             pc[-ng:] = pr[+ng : +2 * ng]
 
-            # 2. Set outflow BC on the inner and outer patch edges
+            def negative_vel(p):
+                return [p[0], -p[1], p[2], p[3]]
+
             if patch_index == 0:
-                for i in range(ng):
-                    pc[i] = pc[ng]
+                if bcl == BC_OUTFLOW:
+                    pc[:+ng] = pc[+ng : +2 * ng]
+                elif bcl == BC_INFLOW:
+                    for i in range(-ng, 0):
+                        for j in range(nj):
+                            x = self.mesh.cell_coordinates(t, i, j)
+                            self.setup.primitive(t, x, pc[i + ng, j])
+                elif bcl == BC_REFLECT:
+                    for j in range(nj):
+                        pc[0, j] = negative_vel(pc[3, j])
+                        pc[1, j] = negative_vel(pc[2, j])
+
             if patch_index == len(self.patches) - 1:
-                for i in range(pc.shape[0] - ng, pc.shape[0]):
-                    pc[i] = pc[-ng - 1]
+                if bcr == BC_OUTFLOW:
+                    pc[-ng:] = pc[-2 * ng : -ng]
+                elif bcr == BC_INFLOW:
+                    i0 = self.patches[patch_index].index_range[0]
+                    for i in range(ni, ni + ng):
+                        for j in range(nj):
+                            x = self.mesh.zone_center(t, i, j)
+                            self.setup.primitive(t, x, pc[i - i0 + ng, j])
+                elif bcr == BC_REFLECT:
+                    for j in range(nj):
+                        pc[-2, j] = negative_vel(pc[-3, j])
+                        pc[-1, j] = negative_vel(pc[-4, j])
 
     def new_iteration(self):
         for patch in self.patches:

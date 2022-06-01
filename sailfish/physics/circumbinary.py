@@ -1,4 +1,4 @@
-from typing import NamedTuple, List, Callable
+from typing import NamedTuple, List, Callable, Union
 from enum import Enum
 
 
@@ -19,6 +19,23 @@ class ViscosityModel(Enum):
     NONE = 0
     CONSTANT_NU = 1
     CONSTANT_ALPHA = 2
+
+
+class Diagnostic(NamedTuple):
+    quantity: str
+    """ time, mdot, ldot, mass_moment, eccentricity_vector """
+
+    gravity: bool = False
+    """ Whether to include the gravity term (if applicable) """
+
+    accretion: bool = False
+    """ Whether to include the accretion term (if applicable) """
+
+    which_mass: Union[int, str] = None
+    """ 1, 2, or 'both' """
+
+    radial_cut: tuple = None
+    """ None is ok, or a radial annulus to include e.g. (1.0, 2.0) """
 
 
 class PointMass(NamedTuple):
@@ -143,7 +160,7 @@ class Physics(NamedTuple):
     """ Square of the Mach number, if EOS type is locally isothermal """
 
     gamma_law_index: float = 5.0 / 3.0
-    """ Adiabatic index, if the EOS type is globally isothermal """
+    """ Adiabatic index, if the EOS type is not isothermal """
 
     viscosity_model: ViscosityModel = ViscosityModel.NONE
     """ Which viscosity model to use (none, nu, alpha) """
@@ -172,9 +189,20 @@ class Physics(NamedTuple):
     constant_softening: bool = True
     """ If local disk height is ignored in gravitational softening """
 
+    diagnostics: List[Diagnostic] = []
+    """ Physics diagnostics to be returned when reductions are computed """
+
+    @property
+    def num_particles(self):
+        if self.point_mass_function is None:
+            return 0
+        else:
+            return len(self.point_mass_function(0.0))
+
     def point_masses(self, time):
         """
-        Generate point masses from the simulation time and supplied callback.
+        Generate two point masses from the simulation time and supplied
+        callback.
         """
         if self.point_mass_function is None:
             return PointMass(), PointMass()

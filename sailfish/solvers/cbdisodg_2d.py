@@ -1,9 +1,9 @@
 """
-Energy-conserving solver for the binary accretion problem in 2D.
+Isothermal solver for the binary accretion problem in 2D planar coordinates.
 """
 
-from typing import NamedTuple
 from logging import getLogger
+from typing import NamedTuple
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
@@ -14,28 +14,70 @@ from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 
 logger = getLogger(__name__)
 
+NCONS = 3
+NPOLY = 6
+ORDER = 3
+GUARD = 1
+
 
 class Options(NamedTuple):
-    pressure_floor: float = 1e-12
-    density_floor: float = 1e-10
-    velocity_ceiling: float = 1e16
-    mach_ceiling: float = 1e5
+    """
+    Contains parameters which are solver specific options.
+    """
+
+    velocity_ceiling: float = 1e12
+    rk_order: int = 2
+    limit_slopes: bool = True
+
+
+def primitive_to_conserved(prim, cons):
+    sigma, vx, vy = prim
+    cons[0] = sigma
+    cons[1] = sigma * vx
+    cons[2] = sigma * vy
 
 
 def initial_condition(setup, mesh, time):
     """
-    Generate a 2D array of primitive data from a mesh and a setup.
+    Generate a 2D array of weights from a mesh and a setup.
     """
     import numpy as np
 
+    g = (-0.774596669241483, +0.000000000000000, +0.774596669241483)
+    w = (+0.555555555555556, +0.888888888888889, +0.555555555555556)
+    p = (
+        (+1.000000000000000, +1.000000000000000, +1.000000000000000),
+        (-1.341640786499873, +0.000000000000000, +1.341640786499873),
+        (+0.894427190999914, -1.118033988749900, +0.894427190999914),
+    )
+
     ni, nj = mesh.shape
-    primitive = np.zeros([ni, nj, 4])
+    dx, dy = mesh.dx, mesh.dy
+    prim_node = np.zeros(NCONS)
+    cons_node = np.zeros(NCONS)
+    weights = np.zeros([ni, nj, NCONS, ORDER, ORDER])
 
     for i in range(ni):
         for j in range(nj):
-            setup.primitive(time, mesh.cell_coordinates(i, j), primitive[i, j])
-
-    return primitive
+            for i_quad in range(ORDER):
+                for j_quad in range(ORDER):
+                    xc, yc = mesh.cell_coordinates(i, j)
+                    x = xc + 0.5 * dx * g[i_quad]
+                    y = yc + 0.5 * dy * g[j_quad]
+                    setup.primitive(time, (x, y), prim_node)
+                    primitive_to_conserved(prim_node, cons_node)
+                    for q in range(NCONS):
+                        for m in range(ORDER):
+                            for n in range(ORDER):
+                                weights[i, j, q, m, n] += (
+                                    0.25
+                                    * cons_node[q]
+                                    * p[m][i_quad]
+                                    * p[n][j_quad]
+                                    * w[i_quad]
+                                    * w[j_quad]
+                                )
+    return weights
 
 
 class Patch:
@@ -47,14 +89,13 @@ class Patch:
     def __init__(
         self,
         time,
-        primitive,
+        weights,
         mesh,
         index_range,
         physics,
         options,
         buffer_outer_radius,
         buffer_surface_density,
-        buffer_surface_pressure,
         lib,
         xp,
         execution_context,
@@ -73,22 +114,29 @@ class Patch:
         self.xr, self.yr = mesh.vertex_coordinates(i1, nj)
         self.buffer_outer_radius = buffer_outer_radius
         self.buffer_surface_density = buffer_surface_density
-        self.buffer_surface_pressure = buffer_surface_pressure
 
         with self.execution_context:
-            self.wavespeeds = self.xp.zeros(primitive.shape[:2])
-            self.primitive1 = self.xp.array(primitive)
-            self.primitive2 = self.xp.array(primitive)
-            self.conserved0 = self.xp.zeros(primitive.shape)
+            self.wavespeeds = xp.zeros(weights.shape[:2])
+            self.weights0 = xp.zeros(weights.shape)  # weights at the timestep start
+            self.weights1 = xp.array(weights)  # weights to be read from
+            self.weights2 = xp.array(weights)  # weights to be written to
 
     def point_mass_source_term(self, which_mass):
+        """
+        Return an array of the rates of conserved quantities, resulting from the application of
+        gravitational and/or accretion source terms due to point masses.
+        """
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
+        ng = GUARD  # number of guard cells
+        ni, nj = self.shape
         m1, m2 = self.physics.point_masses(self.time)
+
         with self.execution_context:
-            cons_rate = self.xp.zeros_like(self.conserved0)
-            self.lib.cbdgam_2d_point_mass_source_term[self.shape](
+            cons_rate = self.xp.zeros([ni + 2 * ng, nj + 2 * ng, NCONS])
+
+            self.lib.cbdiso_2d_point_mass_source_term[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
@@ -111,49 +159,97 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
+                self.options.velocity_ceiling,
                 which_mass,
-                self.primitive1,
+                self.weights1,
                 cons_rate,
-                int(self.physics.constant_softening),
-                self.physics.gamma_law_index,
             )
-            return cons_rate
+        return cons_rate[ng:-ng, ng:-ng]
 
     def maximum_wavespeed(self):
-        with self.execution_context:
-            self.lib.cbdgam_2d_wavespeed[self.shape](
-                self.primitive1,
-                self.wavespeeds,
-                self.physics.gamma_law_index,
-            )
-            return self.wavespeeds.max()
-
-    def recompute_conserved(self):
-        with self.execution_context:
-            return self.lib.cbdgam_2d_primitive_to_conserved[self.shape](
-                self.primitive1,
-                self.conserved0,
-                self.physics.gamma_law_index,
-            )
-
-    def advance_rk(self, rk_param, dt):
+        """
+        Returns the maximum wavespeed over a given patch.
+        """
         m1, m2 = self.physics.point_masses(self.time)
-        buffer_central_mass = m1.mass + m2.mass
-        buffer_surface_density = self.buffer_surface_density
-        buffer_surface_pressure = self.buffer_surface_pressure
-
         with self.execution_context:
-            self.lib.cbdgam_2d_advance_rk[self.shape](
+            self.lib.cbdisodg_2d_wavespeed[self.shape](
                 self.xl,
                 self.xr,
                 self.yl,
                 self.yr,
-                self.conserved0,
-                self.primitive1,
-                self.primitive2,
-                self.physics.gamma_law_index,
+                self.physics.sound_speed**2,
+                self.physics.mach_number**2,
+                self.physics.eos_type.value,
+                m1.position_x,
+                m1.position_y,
+                m1.velocity_x,
+                m1.velocity_y,
+                m1.mass,
+                m1.softening_length,
+                m1.sink_rate,
+                m1.sink_radius,
+                m1.sink_model.value,
+                m2.position_x,
+                m2.position_y,
+                m2.velocity_x,
+                m2.velocity_y,
+                m2.mass,
+                m2.softening_length,
+                m2.sink_rate,
+                m2.sink_radius,
+                m2.sink_model.value,
+                self.options.velocity_ceiling,
+                self.weights1,
+                self.wavespeeds,
+            )
+            return self.wavespeeds.max()
+
+    def copy_weights1_to_weights0(self):
+        with self.execution_context:
+            self.weights0[...] = self.weights1[...]
+
+    def slope_limit(self):
+        """
+        Limit slopes using minmodTVB
+        """
+        m1, m2 = self.physics.point_masses(self.time)
+
+        with self.execution_context:
+            self.lib.cbdisodg_2d_slope_limit[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                m1.position_x,
+                m1.position_y,
+                m2.position_x,
+                m2.position_y,
+                self.weights1,
+                self.weights2,
+            )
+        self.weights1, self.weights2 = self.weights2, self.weights1
+
+    def advance_rk(self, rk_param, dt):
+        """
+        Pass required parameters for time evolution of the setup.
+
+        This function calls the C-module function responsible for performing time evolution using a
+        RK algorithm to update the parameters of the setup.
+        """
+        m1, m2 = self.physics.point_masses(self.time)
+        buffer_central_mass = m1.mass + m2.mass
+        buffer_surface_density = self.buffer_surface_density
+
+        with self.execution_context:
+            self.lib.cbdisodg_2d_advance_rk[self.shape](
+                self.xl,
+                self.xr,
+                self.yl,
+                self.yr,
+                self.weights0,
+                self.weights1,
+                self.weights2,
                 buffer_surface_density,
-                buffer_surface_pressure,
                 buffer_central_mass,
                 self.physics.buffer_driving_rate,
                 self.buffer_outer_radius,
@@ -177,32 +273,35 @@ class Patch:
                 m2.sink_rate,
                 m2.sink_radius,
                 m2.sink_model.value,
-                self.physics.alpha,
+                self.physics.sound_speed**2,
+                self.physics.mach_number**2,
+                self.physics.eos_type.value,
+                self.physics.viscosity_coefficient,
                 rk_param,
                 dt,
                 self.options.velocity_ceiling,
-                self.physics.cooling_coefficient,
-                self.options.mach_ceiling,
-                self.options.density_floor,
-                self.options.pressure_floor,
-                int(self.physics.constant_softening),
             )
-
         self.time = self.time0 * rk_param + (self.time + dt) * (1.0 - rk_param)
-        self.primitive1, self.primitive2 = self.primitive2, self.primitive1
+        self.weights1, self.weights2 = self.weights2, self.weights1
 
     def new_iteration(self):
         self.time0 = self.time
-        self.recompute_conserved()
+        self.copy_weights1_to_weights0()
 
     @property
     def primitive(self):
-        return self.primitive1
+        with self.execution_context:
+            u0 = self.weights1[:, :, :, 0, 0]
+            p0 = self.xp.zeros_like(u0)
+            p0[..., 0] = u0[..., 0]
+            p0[..., 1] = u0[..., 1] / u0[..., 0]
+            p0[..., 2] = u0[..., 2] / u0[..., 0]
+            return p0
 
 
 class Solver(SolverBase):
     """
-    Adapter class to drive the cbdgam_2d C extension module.
+    Adapter class to drive the cbdisodg_2d C extension module.
     """
 
     def __init__(
@@ -216,37 +315,48 @@ class Solver(SolverBase):
         physics=dict(),
         options=dict(),
     ):
-        import numpy as np
+        import numpy
 
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
 
         if type(mesh) is not PlanarCartesian2DMesh:
-            raise ValueError("solver only supports 2D cartesian mesh")
+            raise ValueError("solver only supports 2D Cartesian mesh")
 
         if setup.boundary_condition != "outflow":
             raise ValueError("solver only supports outflow boundary condition")
 
         if physics.viscosity_model not in (
             ViscosityModel.NONE,
-            ViscosityModel.CONSTANT_ALPHA,
+            ViscosityModel.CONSTANT_NU,
         ):
             raise ValueError("solver only supports constant-nu viscosity")
 
-        if physics.eos_type != EquationOfState.GAMMA_LAW:
+        if physics.eos_type not in (
+            EquationOfState.GLOBALLY_ISOTHERMAL,
+            EquationOfState.LOCALLY_ISOTHERMAL,
+        ):
             raise ValueError("solver only supports isothermal equation of states")
 
+        if physics.cooling_coefficient != 0.0:
+            raise ValueError("solver does not support thermal cooling")
+
+        if not physics.constant_softening:
+            raise ValueError("solver only supports constant gravitational softening")
+
         xp = get_array_module(mode)
-        ng = 2  # number of guard zones
-        nq = 4  # number of conserved quantities
+        ng = GUARD  # number of guard zones
+        nq = NCONS  # number of conserved quantities
+        np = NPOLY  # number of polynomials
         with open(__file__.replace(".py", ".c")) as f:
             code = f.read()
-        lib = Library(code, mode=mode, debug=False)
+        lib = Library(code, mode=mode, debug=True)
 
         logger.info(f"initiate with time={time:0.4f}")
         logger.info(f"subdivide grid over {num_patches} patches")
         logger.info(f"mesh is {mesh}")
         logger.info(f"boundary condition is outflow")
+        logger.info(f"viscosity is {physics.viscosity_coefficient}")
 
         self.mesh = mesh
         self.setup = setup
@@ -255,61 +365,62 @@ class Solver(SolverBase):
         self.xp = xp
         self.patches = []
         ni, nj = mesh.shape
-        self.domain_radius = self.mesh.x1
-        self.buffer_onset_width = 0.1
 
         if solution is None:
-            primitive = initial_condition(setup, mesh, time)
+            weights = initial_condition(setup, mesh, time)
         else:
-            primitive = solution
+            weights = solution
 
         if physics.buffer_is_enabled:
             # Here we sample the initial condition at the buffer onset radius
             # to determine the disk surface density at the radius where the
             # buffer begins to ramp up. This procedure makes sense as long as
             # the initial condition is axisymmetric.
-            buffer_prim = [0.0] * 4
+            buffer_prim = [0.0] * 3
             buffer_outer_radius = mesh.x1  # this assumes the mesh is a centered squared
             buffer_onset_radius = buffer_outer_radius - physics.buffer_onset_width
             setup.primitive(time, [buffer_onset_radius, 0.0], buffer_prim)
             buffer_surface_density = buffer_prim[0]
-            buffer_surface_pressure = buffer_prim[3]
         else:
             buffer_outer_radius = 0.0
             buffer_surface_density = 0.0
-            buffer_surface_pressure = 0.0
 
         for n, (a, b) in enumerate(subdivide(ni, num_patches)):
-            prim = np.zeros([b - a + 2 * ng, nj + 2 * ng, nq])
-            prim[ng:-ng, ng:-ng] = primitive[a:b]
+            weights_patch = numpy.zeros([b - a + 2 * ng, nj + 2 * ng, nq, ORDER, ORDER])
+            weights_patch[ng:-ng, ng:-ng] = weights[a:b]
             patch = Patch(
                 time,
-                prim,
+                weights_patch,
                 mesh,
                 (a, b),
                 physics,
                 options,
                 buffer_outer_radius,
                 buffer_surface_density,
-                buffer_surface_pressure,
                 lib,
                 xp,
                 execution_context(mode, device_id=n % num_devices(mode)),
             )
             self.patches.append(patch)
+            self.set_bc("weights1")
 
     @property
     def solution(self):
+        self.set_bc("weights1")
         return concat_on_host(
-            [p.primitive for p in self.patches], (self.num_guard, self.num_guard)
+            [p.weights1 for p in self.patches],
+            (self.num_guard, self.num_guard),
+            rank=2,
         )
 
     @property
     def primitive(self):
-        """
-        This solver uses primitive data as the solution array.
-        """
-        return None
+        self.set_bc("weights1")
+        return concat_on_host(
+            [p.primitive for p in self.patches],
+            (self.num_guard, self.num_guard),
+            rank=2,
+        )
 
     def reductions(self):
         """
@@ -318,8 +429,8 @@ class Solver(SolverBase):
         As of now, the reductions generated are the rates of mass accretion,
         and of x and y momentum (combined gravitational and accretion)
         resulting from each of the point masses. If there are 2 point masses,
-        then the result of this function is a 9-element list: :pyobj:`[time,
-        mdot1, fx1, fy1, edot1, mdot2, fx2, fy2, edot2]`.
+        then the result of this function is a 7-element list: :pyobj:`[time,
+        mdot1, fx1, fy1, mdot2, fx2, fy2]`.
         """
 
         def to_host(a):
@@ -333,29 +444,6 @@ class Solver(SolverBase):
 
         da = self.mesh.dx * self.mesh.dy
         point_mass_reductions = [self.time]
-
-        for n in range(self._physics.num_particles):
-            point_mass_reductions.extend(
-                lazy_reduce(
-                    sum,
-                    to_host,
-                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
-                    (patch.execution_context for patch in self.patches),
-                )
-            )
-        return point_mass_reductions
-
-        def to_host(a):
-            try:
-                return a.get()
-            except AttributeError:
-                return a
-
-        def patch_reduction(patch, which):
-            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
-
-        da = self.mesh.dx * self.mesh.dy
-        point_mass_reductions = list()
 
         for n in range(self._physics.num_particles):
             point_mass_reductions.extend(
@@ -382,13 +470,16 @@ class Solver(SolverBase):
 
     @property
     def recommended_cfl(self):
-        return 0.1
+        return 0.08
 
     @property
     def maximum_cfl(self):
         return 0.4
 
     def maximum_wavespeed(self):
+        """
+        Return the global maximum wavespeed over the whole domain.
+        """
         return lazy_reduce(
             max,
             float,
@@ -398,11 +489,22 @@ class Solver(SolverBase):
 
     def advance(self, dt):
         self.new_iteration()
-        self.advance_rk(0.0, dt)
-        self.advance_rk(0.5, dt)
+        if self._options.rk_order == 1:
+            self.advance_rk(0.0, dt)
+        elif self._options.rk_order == 2:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.5, dt)
+        elif self._options.rk_order == 3:
+            self.advance_rk(0.0, dt)
+            self.advance_rk(0.75, dt)
+            self.advance_rk(1.0 / 3.0, dt)
 
     def advance_rk(self, rk_param, dt):
-        self.set_bc("primitive1")
+        if self._options.limit_slopes:
+            self.set_bc("weights1")
+            for patch in self.patches:
+                patch.slope_limit()
+        self.set_bc("weights1")
         for patch in self.patches:
             patch.advance_rk(rk_param, dt)
 

@@ -2,19 +2,28 @@
 Library functions and command-line access to the simulation driver.
 """
 
-import os, pickle, pathlib, logging
+import os, pickle, pathlib
 from typing import NamedTuple, Dict
-
+from logging import getLogger
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
 from sailfish.setup import Setup, SetupError
-from sailfish.solvers import SolverInitializationError
-from sailfish import setups
+from sailfish.solver import SolverBase
+from sailfish.solvers import (
+    SolverInitializationError,
+    register_solver_extension,
+    make_solver,
+)
 
-logger = logging.getLogger(__name__)
+logger = getLogger(__name__)
+user_build_config = dict()
 
 
 class ConfigurationError(Exception):
     """An invalid runtime configuration"""
+
+
+class ExtensionError(Exception):
+    """An invalid extension was specified"""
 
 
 def keyed_event(item):
@@ -136,12 +145,27 @@ def write_checkpoint(number, outdir, state):
         pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
         filename = os.path.join(outdir, filename)
 
+    state_checkpoint_dict = dict(
+        iteration=state.iteration,
+        time=state.solver.time,
+        timestep_dt=state.timestep_dt,
+        cfl_number=state.cfl_number,
+        solution=state.solver.solution,
+        primitive=state.solver.primitive,
+        timeseries=state.timeseries,
+        solver=state.setup.solver,
+        solver_options=state.solver.options,
+        event_states=state.event_states,
+        driver=state.driver,
+        model_parameters=state.setup.model_parameter_dict(),
+        setup_name=state.setup.dash_case_class_name(),
+        mesh=state.mesh,
+        **state.setup.checkpoint_diagnostics(state.solver.time),
+    )
+
     with open(filename, "wb") as chkpt:
-        if logger is not None:
-            logger.info(f"write checkpoint {chkpt.name}")
-        # TODO: make it an option whether to strip class info from checkpoints
-        # pickle.dump(asdict(state), chkpt)
-        pickle.dump(state, chkpt)
+        logger.info(f"write checkpoint {chkpt.name}")
+        pickle.dump(state_checkpoint_dict, chkpt)
 
 
 def load_checkpoint(chkpt_file):
@@ -150,11 +174,22 @@ def load_checkpoint(chkpt_file):
     """
     try:
         with open(chkpt_file, "rb") as file:
-            # TODO: make it an option whether to strip class info from checkpoints
-            # return fromdict(pickle.load(file))
             return pickle.load(file)
     except FileNotFoundError:
         raise ConfigurationError(f"could not open checkpoint file {chkpt_file}")
+
+
+def append_timeseries(state):
+    """
+    Append to the driver state timeseries for post-processing.
+    """
+    try:
+        state.timeseries.append(state.solver.reductions())
+        logger.info(f"record timeseries event {len(state.timeseries)}")
+    except AttributeError:
+        logger.warning(
+            "timeseries event ignored because solver does not provide reductions"
+        )
 
 
 class DriverArgs(NamedTuple):
@@ -174,6 +209,7 @@ class DriverArgs(NamedTuple):
     num_patches: int = None
     events: Dict[str, Recurrence] = dict()
     new_timestep_cadence: int = None
+    verbose_output: str = ""
 
     def from_namespace(args):
         """
@@ -204,6 +240,25 @@ class DriverArgs(NamedTuple):
         )
 
 
+class DriverState(NamedTuple):
+    """
+    Contains the stateful variables in use by the :pyobj:`simulate` function.
+
+    An instance of this class is yielded by :pyobj:`simulate` each time an
+    event takes place.
+    """
+
+    iteration: int
+    driver: DriverArgs
+    mesh: object
+    timeseries: list
+    event_states: list
+    solver: SolverBase
+    setup: Setup
+    cfl_number: float
+    timestep_dt: float
+
+
 def simulate(driver):
     """
     Main generator for running simulations.
@@ -217,7 +272,6 @@ def simulate(driver):
     """
 
     from time import perf_counter
-    from logging import getLogger, basicConfig, StreamHandler, Formatter, INFO
     from sailfish import __version__ as version
     from sailfish.kernel.system import configure_build, log_system_info, measure_time
     from sailfish.event import Recurrence
@@ -233,7 +287,7 @@ def simulate(driver):
     should also be extensible by a system-specific rc-style configuration
     file.
     """
-    configure_build()
+    configure_build(**user_build_config)
     log_system_info(driver.execution_mode or "cpu")
 
     if driver.setup_name:
@@ -253,6 +307,8 @@ def simulate(driver):
         time = setup.start_time
         event_states = {name: RecurringEvent() for name in driver.events}
         solution = None
+        timeseries = list()
+        dt = None
 
     elif driver.chkpt_file:
         """
@@ -285,6 +341,30 @@ def simulate(driver):
         event_states = chkpt["event_states"]
         solution = chkpt["solution"]
 
+        try:
+            dt = chkpt["timestep_dt"]
+        except KeyError:
+            # Forgive missing timestep_dt in the checkpoint, this key was
+            # added recently (JZ 4-25-22). Prior to this change, timestep_dt
+            # was not stored in the checkpoint file, and a restarted
+            # simulation could end up different from a continuous one, when:
+            # (1) new_timestep_cadence > 1, and (2) a new dt was not computed
+            # just before the checkpoint was written. The differences would be
+            # due to a slightly different timestep used, after it's recomputed
+            # following the restart, and they would be minor. Still, restarted
+            # runs are supposed to be bitwise identical continuous ones. Older
+            # checkpoints will still work, but they will not have this
+            # guarantee.
+            logger.warning(
+                "timestep_dt not in checkpoint, will recompute it on first iteration"
+            )
+            dt = None
+
+        try:
+            timeseries = chkpt["timeseries"]
+        except KeyError:
+            logger.warning("older checkpoint version: no timeseries")
+
         for event in driver.events:
             if event not in event_states:
                 event_states[event] = RecurringEvent()
@@ -296,9 +376,20 @@ def simulate(driver):
     fold = driver.fold or 10
     mesh = setup.mesh(driver.resolution)
     end_time = first_not_none(driver.end_time, setup.default_end_time, float("inf"))
+    reference_time = setup.reference_time_scale
     new_timestep_cadence = driver.new_timestep_cadence or 1
+    dt = None
 
-    solver = solvers.make_solver(
+    if "physics" in driver.verbose_output:
+        logger.info(f"physics struct (setup -> solver) {setup.physics}")
+    if (
+        "options" in driver.verbose_output
+        or "solver" in driver.verbose_output
+        or "solver-options" in driver.verbose_output
+    ):
+        logger.info(f"options struct (cmdline -> solver) {driver.solver_options}")
+
+    solver = make_solver(
         setup.solver,
         setup.physics,
         driver.solver_options,
@@ -324,6 +415,7 @@ def simulate(driver):
 
     logger.info(f"run until t={end_time}")
     logger.info(f"CFL number is {cfl_number}")
+    logger.info(f"simulation time / user time is {reference_time:0.4f}")
     logger.info(f"recompute dt every {new_timestep_cadence} iterations")
     setup.print_model_parameters(newlines=True, logger=main_logger)
 
@@ -332,21 +424,25 @@ def simulate(driver):
         Collect items from the driver and solver state, as well as run
         details, sufficient for restarts and post processing.
         """
-        return dict(
+        return DriverState(
             iteration=iteration,
-            time=solver.time,
-            solution=solver.solution,
-            primitive=solver.primitive,
-            solver=setup.solver,
-            solver_options=solver.options,
-            event_states=event_states,
             driver=driver,
-            model_parameters=setup.model_parameter_dict(),
-            setup_name=setup.dash_case_class_name(),
             mesh=mesh,
+            timeseries=timeseries,
+            event_states=event_states,
+            solver=solver,
+            setup=setup,
+            cfl_number=cfl_number,
+            timestep_dt=dt,
         )
 
-    while end_time is None or end_time > solver.time:
+    while True:
+        siml_time = solver.time
+        user_time = siml_time / reference_time
+
+        if end_time is not None and user_time >= end_time:
+            break
+
         """
         Run the main simulation loop. Iterations are grouped according the
         the fold parameter. Side effects including the iteration message are
@@ -355,21 +451,21 @@ def simulate(driver):
 
         for name, event in driver.events.items():
             state = event_states[name]
-            if event_states[name].is_due(solver.time, event):
-                event_states[name] = state.next(solver.time, event)
+            if event_states[name].is_due(user_time, event):
+                event_states[name] = state.next(user_time, event)
                 yield name, state.number, grab_state()
 
         with measure_time() as fold_time:
             for _ in range(fold):
-                if iteration % new_timestep_cadence == 0:
-                    dx = mesh.min_spacing(solver.time)
+                if dt is None or (iteration % new_timestep_cadence == 0):
+                    dx = mesh.min_spacing(siml_time)
                     dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
 
         Mzps = mesh.num_total_zones / fold_time() * 1e-6 * fold
         main_logger.info(
-            f"[{iteration:04d}] t={solver.time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
+            f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
         )
 
     yield "end", None, grab_state()
@@ -384,6 +480,8 @@ def run(setup_name, quiet=True, **kwargs):
     result themselves. Event monitoring is not supported. If `quiet=True`
     (default) then logging is suppressed.
     """
+    import sailfish.setups
+
     if "events" in kwargs:
         raise ValueError("events are not supported")
 
@@ -391,6 +489,8 @@ def run(setup_name, quiet=True, **kwargs):
 
     if not quiet:
         init_logging()
+
+    load_user_config()
 
     return next(simulate(driver))[2]
 
@@ -409,6 +509,7 @@ def init_logging():
     function will do it for you. Note this function is also invoked by the
     `run` function if :code:`quiet=False` is passed to it.
     """
+    from sys import stdout
     from logging import StreamHandler, Formatter, getLogger, INFO
 
     class RunFormatter(Formatter):
@@ -422,7 +523,7 @@ def init_logging():
             else:
                 return f"[{name}:{record.levelname.lower()}] {record.msg}"
 
-    handler = StreamHandler()
+    handler = StreamHandler(stdout)
     handler.setFormatter(RunFormatter())
 
     root_logger = getLogger()
@@ -430,11 +531,53 @@ def init_logging():
     root_logger.setLevel(INFO)
 
 
+def load_user_config():
+    """
+    Initialize user extensions: setups and solvers outside the main codebase.
+
+    This function is called by the :pyobj:`main` entry point and the
+    :pyobj:`run` API function to load custom setups provided by the user.
+    Extensions are defined in the `extensions` section of the .sailfish
+    file. The .sailfish file is loaded from the current working directory.
+    """
+    from configparser import ConfigParser, ParsingError
+    from importlib import import_module
+
+    try:
+        config = ConfigParser()
+        config.read(".sailfish")
+
+        try:
+            for setup_extension in config["extensions"]["setups"].split():
+                import_module(setup_extension)
+        except KeyError:
+            pass
+
+        try:
+            for solver_extension in config["extensions"]["solvers"].split():
+                register_solver_extension(solver_extension)
+        except KeyError:
+            pass
+
+        try:
+            for key, val in config["build"].items():
+                user_build_config[key] = val
+        except KeyError:
+            pass
+
+    except ModuleNotFoundError as e:
+        raise ExtensionError(e)
+
+    except ParsingError as e:
+        raise ConfigurationError(e)
+
+
 def main():
     """
     General-purpose command line interface.
     """
     import argparse
+    import sailfish.setups
 
     class MakeDict(argparse.Action):
         def __call__(self, parser, namespace, values, option_string=None):
@@ -447,11 +590,10 @@ def main():
 
         return AddDictEntry
 
-    init_logging()
-
     parser = argparse.ArgumentParser(
         prog="sailfish",
-        description="gpu-accelerated astrophysical gasdynamics code",
+        usage=argparse.SUPPRESS,
+        description="sailfish is a gpu-accelerated astrophysical gasdynamics code",
     )
     parser.add_argument(
         "command",
@@ -559,6 +701,19 @@ def main():
         type=float,
         help="when to end the simulation",
     )
+    parser.add_argument(
+        "--event-handlers-file",
+        metavar="F",
+        type=str,
+        help="path to a module defining a get_event_handlers function",
+    )
+    parser.add_argument(
+        "--verbose-output",
+        metavar="P",
+        type=str,
+        default="",
+        help="detailed print solver structs [physics,options]",
+    )
     exec_group = parser.add_mutually_exclusive_group()
     exec_group.add_argument(
         "--mode",
@@ -584,6 +739,9 @@ def main():
     )
 
     try:
+        init_logging()
+        load_user_config()
+
         args = parser.parse_args()
 
         if args.describe and args.command is not None:
@@ -603,16 +761,35 @@ def main():
                 or "."
             )
 
+            if args.event_handlers_file is not None:
+                import importlib.util
+
+                spec = importlib.util.spec_from_file_location(
+                    "events_handler_module", args.event_handlers_file
+                )
+                events_handler_module = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(events_handler_module)
+                events_dict = events_handler_module.get_event_handlers()
+            else:
+                events_dict = dict()
+
             for name, number, state in simulate(driver):
-                if name == "checkpoint":
+                if name == "timeseries":
+                    append_timeseries(state)
+                elif name == "checkpoint":
                     write_checkpoint(number, outdir, state)
                 elif name == "end":
                     write_checkpoint("final", outdir, state)
+                elif name in events_dict:
+                    events_dict[name](number, outdir, state, logger)
                 else:
                     logger.warning(f"unrecognized event {name}")
 
     except ConfigurationError as e:
         print(f"bad configuration: {e}")
+
+    except ExtensionError as e:
+        print(f"bad extension: {e}")
 
     except SetupError as e:
         print(f"setup error: {e}")

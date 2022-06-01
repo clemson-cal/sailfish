@@ -2,20 +2,98 @@
 Contains a setup for studying a relativistic type-II shockwave.
 """
 
-from functools import cache
-from math import pi, exp, log10
+from functools import lru_cache
+from math import pi, exp, atan, log10
 from sailfish.setup import Setup, SetupError, param
 from sailfish.mesh import LogSphericalMesh
 
 __all__ = ["EnvelopeShock"]
 
+t_delay = 1.0
+m1 = 1.0
+psi = 0.25
+m_cloud = 1e5 * m1
+u_wind = 0.1
+mdot_wind = m_cloud / t_delay
+
+
+def shell_time_m(m):
+    return m / mdot_wind
+
+
+def shell_time_mprime(m):
+    return 1.0 / mdot_wind
+
+
+def shell_gamma_beta_m(m):
+    return u_wind + (m / m1) ** (-psi)
+
+
+def shell_gamma_beta_mprime(m):
+    return -((m / m1) ** (-psi)) * psi / m
+
+
+def shell_speed_m(m):
+    u = shell_gamma_beta_m(m)
+    return u / (1 + u**2) ** 0.5
+
+
+def shell_speed_mprime(m):
+    u = shell_gamma_beta_m(m)
+    du_dm = shell_gamma_beta_mprime(m)
+    dv_du = (1 + u**2) ** (-3 / 2)
+    return dv_du * du_dm
+
+
+def shell_radius_mt(m, t):
+    v = shell_speed_m(m)
+    t0 = shell_time_m(m)
+    return v * (t - t0)
+
+
+def shell_density_mt(m, t):
+    t0 = shell_time_m(m)
+    t0_prime = shell_time_mprime(m)
+    u = shell_gamma_beta_m(m)
+    u_prime = shell_gamma_beta_mprime(m)
+    mdot_inverse = t0_prime - u_prime / u * (t - t0) / (1 + u**2)
+    r = shell_radius_mt(m, t)
+    return 1.0 / (4 * pi * r**2 * u * mdot_inverse)
+
+
+def shell_mass_rt(r, t):
+    def f(m):
+        return r - shell_radius_mt(m, t)
+
+    def g(m):
+        v = shell_speed_m(m)
+        t0 = shell_time_m(m)
+        dv = shell_speed_mprime(m)
+        dt0 = shell_time_mprime(m)
+        return -(dv * (t - t0) - v * dt0)
+
+    m = 1e-12
+    n = 0
+
+    while True:
+        fm = f(m)
+        gm = g(m)
+        m -= fm / gm
+
+        if abs(fm) < 1e-10:
+            return m
+        if n > 200:
+            raise ValueError("too many iterations")
+
+        n += 1
+
 
 class EnvelopeShock(Setup):
     """
-    A relativistic shell launched into a homologous, relativistic envelope.
+    A relativistic shell or jet launched into a homologous, relativistic envelope.
     """
 
-    u_shell = param(30.0, "gamma-beta of the launched shell")
+    u_shell = param(30.0, "gamma-beta of the shell [must be zero if jet_energy > 0.0]")
     m_shell = param(1.0, "mass coordinate of the launched shell")
     w_shell = param(1.0, "width of the shell in dm/m")
     q_shell = param(0.1, "opening angle of the shell")
@@ -23,7 +101,18 @@ class EnvelopeShock(Setup):
     r_inner = param(0.1, "inner radius (comoving if expand=True)")
     r_outer = param(1.0, "outer radius (comoving if expand=True)")
     expand = param(True, "whether to expand the mesh homologously")
+    jet_energy = param(0.0, "jet energy, in units of cloud mass c^2 [0.0 for no jet]")
+    jet_gamma_beta = param(10.0, "jet gamma-beta")
+    jet_theta = param(0.1, "jet opening angle [radians]")
+    jet_duration = param(1.0, "jet duration [s]")
     polar_extent = param(0.0, "polar domain extent over pi (equator is 0.5, 1D is 0.0)")
+
+    def validate(self):
+        if self.jet_energy > 0.0:
+            if self.u_shell > 0.0:
+                raise SetupError("we don't simulate a jet and a shell at the same time")
+            if self.polar_extent == 0.0:
+                raise SetupError("the jet boundary condition is only supported in 2d")
 
     @property
     def polar(self):
@@ -31,11 +120,11 @@ class EnvelopeShock(Setup):
 
     def primitive(self, t, coord, primitive):
         r = coord[0] if self.polar else coord
-        m, d, u, p = self.envelope_state(t, r)
+        m, d, u, p = self.envelope_state(r, t)
 
         if not self.polar:
             primitive[0] = d
-            primitive[1] = u + self.shell_u(m)
+            primitive[1] = u + self.shell_u_profile_mass(m)
             primitive[2] = p
 
             if m > self.m_shell and m < self.m_shell * (1.0 + self.w_shell):
@@ -50,6 +139,33 @@ class EnvelopeShock(Setup):
             ) * self.shell_u_profile_polar(q)
             primitive[2] = 0.0
             primitive[3] = p
+
+    @property
+    def physics(self):
+        """
+        This function returns parameters for a jet boundary condition, if needed.
+
+        The isotropic-equivalent jet power is M-dot (Gamma - 1). This should
+        be compared to the mass shell ejected at t = t_delay, which is M_cloud
+        = 1e5 m1 (m1 = 1); jet_energy (which is normalized to m_cloud) is
+        M-dot (Gamma - 1) t_engine / M_cloud:
+
+        jet_energy = 4 pi r^2 rho u (Gamma - 1) t_engine / M_cloud
+        """
+
+        if self.jet_energy == 0.0:
+            return None
+
+        jet_gamma_beta = self.jet_gamma_beta
+        jet_gamma = (jet_gamma_beta * jet_gamma_beta + 1.0) ** 0.5
+        jet_mdot = self.jet_energy / ((jet_gamma - 1.0) * self.jet_duration / m_cloud)
+
+        return dict(
+            jet_mdot=jet_mdot,
+            jet_gamma_beta=jet_gamma_beta,
+            jet_theta=self.jet_theta,
+            jet_duration=self.jet_duration,
+        )
 
     def mesh(self, num_zones_per_decade):
         return LogSphericalMesh(
@@ -74,7 +190,10 @@ class EnvelopeShock(Setup):
 
     @property
     def boundary_condition(self):
-        return "outflow"
+        if self.jet_energy > 0.0:
+            return "jet", "outflow"
+        else:
+            return "outflow"
 
     @property
     def default_end_time(self):
@@ -87,28 +206,31 @@ class EnvelopeShock(Setup):
         else:
             return 20000
 
-    @cache
+    @lru_cache(maxsize=None)
     def shell_u_profile_polar(self, q):
         return exp(-((q / self.q_shell) ** 2))
 
-    @cache
+    @lru_cache(maxsize=None)
     def shell_u_profile_mass(self, m):
         if m < self.m_shell:
             return 0.0
         else:
             return self.u_shell * exp(-(m / self.m_shell - 1.0) / self.w_shell)
 
-    @cache
-    def envelope_state(self, t, r):
-        envelope_fastest_beta = 0.999
-        psi = 0.25
-        m1 = 1.0
+    @lru_cache(maxsize=None)
+    def envelope_state(self, r, t):
+        # These expressions are for the pure-envelope case, with no attached
+        # wind:
+        #
+        # s = r / t
+        # g = (1.0 - s * s) ** -0.5
+        # u = s * g
+        # m = m1 * u ** (-1.0 / psi)
+        # d = m * g / (4 * pi * r ** 3 * psi)
 
-        s = min(r / t, envelope_fastest_beta)
-        g = (1.0 - s * s) ** -0.5
-        u = s * g
-        m = m1 * u ** (-1.0 / psi)
-        d = m * g / (4 * pi * r ** 3 * psi)
+        m = shell_mass_rt(r, t)
+        d = shell_density_mt(m, t)
+        u = shell_gamma_beta_m(m)
         p = 1e-6 * d
         return m, d, u, p
 
