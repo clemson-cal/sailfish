@@ -184,16 +184,18 @@ class KitpCodeComparison(Setup):
     mach_number = 10.0
     eccentricity = 0.0
     mass_ratio = 1.0
-    sink_radius = param(0.05, "sink radius")
-    softening_length = param(0.05, "softening length")
-    nu = 0.001
+    sink_radius = param(0.05, "sink radius", mutable=True)
+    softening_length = param(0.05, "softening length", mutable=True)
+    nu = param(0.001, "kinematic viscosity coefficient", mutable=True)
     single_point_mass = param(False, "put one point mass at the origin (no binary)")
     sink_model = param(
-        "acceleration_free", "sink [acceleration_free|force_free|torque_free]"
+        "acceleration_free",
+        "sink [acceleration_free|force_free|torque_free]",
+        mutable=True,
     )
     domain_radius = param(8.0, "half side length of the square computational domain")
     sink_rate = param(10.0, "component sink rate", mutable=True)
-    buffer_is_enabled = param(True, "whether the buffer zone is enabled")
+    buffer_is_enabled = param(True, "whether the buffer zone is enabled", mutable=True)
     use_dg = param(False, "use the DG solver")
     disk_kick = param(1e-4, "kick velocity to seed eccentric cavity growth")
 
