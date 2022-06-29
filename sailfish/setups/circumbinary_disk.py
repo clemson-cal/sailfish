@@ -184,8 +184,8 @@ class KitpCodeComparison(Setup):
     mach_number = 10.0
     eccentricity = 0.0
     mass_ratio = 1.0
-    sink_radius = 0.05
-    softening_length = 0.05
+    sink_radius = param(0.05, "sink radius")
+    softening_length = param(0.05, "softening length")
     nu = 0.001
     single_point_mass = param(False, "put one point mass at the origin (no binary)")
     sink_model = param(
