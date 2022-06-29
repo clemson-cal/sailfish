@@ -193,6 +193,7 @@ class KitpCodeComparison(Setup):
     sink_rate = param(10.0, "component sink rate", mutable=True)
     buffer_is_enabled = param(True, "whether the buffer zone is enabled")
     use_dg = param(False, "use the DG solver")
+    disk_kick = param(1e-4, "kick velocity to seed eccentric cavity growth")
 
     def primitive(self, t, coords, primitive):
         x, y = coords
@@ -211,7 +212,7 @@ class KitpCodeComparison(Setup):
         omega0 = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
         omega = (omega0**-n + omegaB**-n) ** (-1 / n)
 
-        vr_pert = 1e-3 * y * exp(-((r / 3.5) ** 6))
+        vr_pert = self.disk_kick * y * exp(-((r / 3.5) ** 6))
 
         primitive[0] = sigma
         primitive[1] = omega * -y + vr_pert * x / r
@@ -421,3 +422,87 @@ class MassTransferBinary(Setup):
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
+
+
+class EccentricSingleDisk(Setup):
+    eccentricity = 0.0
+    domain_radius = param(6.0, "half side length of the square computational domain")
+    disk_kick = param(0.1, "velocity of the kick given to the disk")
+    mach_number = param(20.0, "orbital Mach number", mutable=True)
+    sink_rate = param(10.0, "component sink rates", mutable=True)
+    sink_radius = param(0.02, "component sink radii", mutable=True)
+    softening_length = param(0.02, "softening lengths", mutable=True)
+    sigma = param(1e-8, "background surface density")
+    nu = param(0.0, "kinematic viscosity parameter", mutable=True)
+    buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
+    buffer_onset_width = param(0.25, "buffer ramp distance", mutable=True)
+    sink_model = param(
+        "acceleration_free",
+        "sink [acceleration_free|force_free|torque_free]",
+        mutable=True,
+    )
+
+    def primitive(self, t, coords, primitive):
+        x, y = coords
+        r = sqrt(x * x + y * y)
+
+        GM = 1.0
+        omega = (GM / r**3) ** 0.5
+        prof = r * exp(-((r - 1.0) ** 4))
+
+        primitive[0] = self.sigma
+        primitive[1] = omega * -y
+        primitive[2] = omega * +x
+
+        dx = x - 1.0
+        dy = y
+        dr = (dx**2 + dy**2) ** 0.5
+
+        if dr < 0.2:
+            primitive[0] = exp(-((dr / 0.1) ** 2))
+            primitive[2] *= 0.6
+
+    def mesh(self, resolution):
+        return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
+
+    @property
+    def default_resolution(self):
+        return 512
+
+    @property
+    def physics(self):
+        return dict(
+            eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
+            mach_number=self.mach_number,
+            buffer_is_enabled=True,
+            buffer_driving_rate=self.buffer_driving_rate,
+            buffer_onset_width=self.buffer_onset_width,
+            point_mass_function=self.point_masses,
+            viscosity_coefficient=self.nu,
+            diagnostics=self.diagnostics,
+        )
+
+    @property
+    def solver(self):
+        return "cbdiso_2d"
+
+    @property
+    def boundary_condition(self):
+        return "outflow"
+
+    @property
+    def default_end_time(self):
+        return 1.0
+
+    @property
+    def reference_time_scale(self):
+        return 2.0 * pi
+
+    def point_masses(self, time):
+        return PointMass(
+            softening_length=self.softening_length,
+            sink_model=SinkModel[self.sink_model.upper()],
+            sink_rate=self.sink_rate,
+            sink_radius=self.sink_radius,
+            mass=1.0,
+        )
