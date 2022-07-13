@@ -138,8 +138,10 @@ def write_checkpoint(number, outdir, state):
     """
     if type(number) is int:
         filename = f"chkpt.{number:04d}.pk"
+    elif type(number) is str:
+        filename = f"chkpt.{number}.pk"
     else:
-        filename = f"chkpt.final.pk"
+        raise ValueError("number arg must be int or str")
 
     if outdir is not None:
         pathlib.Path(outdir).mkdir(parents=True, exist_ok=True)
@@ -440,9 +442,6 @@ def simulate(driver):
         siml_time = solver.time
         user_time = siml_time / reference_time
 
-        if end_time is not None and user_time >= end_time:
-            break
-
         """
         Run the main simulation loop. Iterations are grouped according the
         the fold parameter. Side effects including the iteration message are
@@ -454,6 +453,9 @@ def simulate(driver):
             if event_states[name].is_due(user_time, event):
                 event_states[name] = state.next(user_time, event)
                 yield name, state.number, grab_state()
+
+        if end_time is not None and user_time >= end_time:
+            break
 
         with measure_time() as fold_time:
             for _ in range(fold):
@@ -649,6 +651,11 @@ def main():
         help="a sequence of events and recurrence rules to be emitted",
     )
     parser.add_argument(
+        "--final-chkpt",
+        action="store_true",
+        help="write chkpt.final.pk on exit",
+    )
+    parser.add_argument(
         "--checkpoint",
         "-c",
         metavar="C",
@@ -779,7 +786,8 @@ def main():
                 elif name == "checkpoint":
                     write_checkpoint(number, outdir, state)
                 elif name == "end":
-                    write_checkpoint("final", outdir, state)
+                    if args.final_chkpt:
+                        write_checkpoint("final", outdir, state)
                 elif name in events_dict:
                     events_dict[name](number, outdir, state, logger)
                 else:

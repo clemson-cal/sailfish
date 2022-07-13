@@ -122,6 +122,7 @@ class CircumbinaryDisk(Setup):
                 buffer_is_enabled=self.buffer_is_enabled,
                 cooling_coefficient=self.cooling_coefficient,
                 constant_softening=self.constant_softening,
+                # BUG! HERE! Need to include alpha!
             )
 
     @property
