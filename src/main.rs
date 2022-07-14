@@ -104,7 +104,8 @@ fn make_state(cline: &CommandLine) -> Result<State, error::Error> {
         if name.ends_with(".sf") {
             State::from_checkpoint(name, &parameters, cline)?
         } else if let Some(ref file) = sailfish::parse::last_in_dir_ending_with(name, ".sf") {
-            State::from_checkpoint(file, &parameters, cline)?
+            let chkpt = std::path::Path::new(name).join(file);
+            State::from_checkpoint(chkpt.to_str().unwrap(), &parameters, cline)?
         } else {
             new_state(cline.clone(), name, &parameters)?
         }

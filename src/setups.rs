@@ -34,7 +34,7 @@ fn setups() -> Vec<(&'static str, SetupFunction)> {
         ("shocktube", setup_builder!(Shocktube)),
         ("wind", setup_builder!(Wind)),
         ("bondi", setup_builder!(Bondi)),
-        ("binary-bondi", setup_builder!(BinaryBondi)),
+        ("BinaryBondi", setup_builder!(BinaryBondi)),
     ]
 }
 
@@ -334,6 +334,7 @@ pub struct BinaryWithThermodynamics {
     pub sink_rate1: f64,
     pub sink_rate2: f64,
     pub sink_model: SinkModel,
+    pub soft_length: f64,
     pub gamma_law_index: f64,
     pub cooling_coefficient: f64,
     pub pressure_floor: f64,
@@ -359,6 +360,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("sink_radius",      "0.05", "sink kernel radii (a)")
             .item("sink_model",         "af", "sink prescription: [none|af|tf|ff]")
             .item("sink_rate",        "10.0", "rate(s) of mass subtraction in the sink (Omega)")
+            .item("soft_length",        0.05, "gravitational softening length (a)")
             .item("q",                   1.0, "system mass ratio: [0-1]")
             .item("e",                   0.0, "orbital eccentricity: [0-1]")
             .item("gamma_law_index",     1.666666666666666, "adiabatic index")
@@ -371,7 +373,7 @@ impl FromStr for BinaryWithThermodynamics {
             .item("mach_ceiling",        1e5, "cooling respects the mach ceiling")
             .item("test_model",        false, "use test model")
             .item("one_body",          false, "use one point mass")
-            .item("constant_softening",false, "use constant gravitational softening = sink_radius")
+            .item("constant_softening",false, "use constant gravitational softening = soft length")
             .merge_string_args_allowing_duplicates(parameters.split(':').filter(|s| !s.is_empty()))
             .map_err(|e| InvalidSetup(format!("{}", e)))?;
 
@@ -389,6 +391,7 @@ impl FromStr for BinaryWithThermodynamics {
             sink_rate1: srate1.unwrap(),
             sink_rate2: srate2.or(srate1).unwrap(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
+            soft_length: form.get("soft_length").into(),
             gamma_law_index: form.get("gamma_law_index").into(),
             cooling_coefficient: form.get("cooling_coefficient").into(),
             pressure_floor: form.get("pressure_floor").into(),
@@ -586,6 +589,10 @@ impl Setup for BinaryWithThermodynamics {
         Some(self.constant_softening)
     }
 
+    fn soft_length(&self) -> Option<f64> {
+        Some(self.soft_length)
+    }
+
     fn mesh(&self, resolution: u32) -> Mesh {
         Mesh::Structured(StructuredMesh::centered_square(
             self.domain_radius,
@@ -704,6 +711,7 @@ pub struct BinaryBondi{
     pub x_bin: f64,
     pub aspect: i64,
     pub height: f64,
+    pub bh_sep: f64,
     pub sink_model: SinkModel,
     form: kind_config::Form,
 }
@@ -721,6 +729,7 @@ impl FromStr for BinaryBondi {
             .item("x_bin",          0.0, "horizontal position of binary COM (with respect to domain centroid)")
             .item("aspect",           2, "aspect ratio for domain")
             .item("height",         1.0, "height")
+            .item("bh_sep",         1.0, "black hole separation")
             .item("sink_model",    "af", "sink prescription: [none|af|tf|ff]")
             .item("q",              1.0, "system mass ratio: [0-1]")
             .item("e",              0.0, "orbital eccentricity: [0-1]")
@@ -735,6 +744,7 @@ impl FromStr for BinaryBondi {
             x_bin: form.get("x_bin").into(),
             aspect: form.get("aspect").into(),
             height: form.get("height").into(),
+            bh_sep: form.get("bh_sep").into(),
             sink_model: SinkModel::from_str(form.get("sink_model").into())?,
             form,
         })
@@ -778,8 +788,8 @@ impl Setup for BinaryBondi {
     }
 
     fn masses(&self, time: f64) -> PointMassList {
-        let a: f64 = 1.0;
-        let m: f64 = 1.0;
+        let a: f64 = self.bh_sep;
+        let m: f64 = self.bh_mass;
         let q: f64 = self.form.get("q").into();
         let e: f64 = self.form.get("e").into();
         let binary = OrbitalElements(a, m, q, e);

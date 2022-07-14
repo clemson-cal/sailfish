@@ -39,20 +39,20 @@ def reconstitute(filename, fieldnum):
 
 nstr       = str(np.char.zfill(str(Nchkpts[0]),4))
 d          = msgpack.load(open(fn+'chkpt.'+nstr+'.sf', 'rb'))
-print(d[b'parameters'])
-DR         = np.float(re.search('domain_radius=(.+?):', d[b'parameters'].decode()).group(1))
+dpar       = d[b'parameters']+':'
+DR         = np.float(re.search('domain_radius=(.+?):', dpar.decode()).group(1))
 N          = d[b'mesh'][b'ni']
 dx         = d[b'mesh'][b'dx']
 dy         = dx*1
 cfl        = d[b'command_line'][b'cfl_number']
-gamma      = np.float(re.search('gamma_law_index=(.+?):', d[b'parameters'].decode()).group(1))
-coolcoef   = np.float(re.search('cooling_coefficient=(.+?):', d[b'parameters'].decode()).group(1))
+gamma      = np.float(re.search('gamma_law_index=(.+?):', dpar.decode()).group(1))
+coolcoef   = np.float(re.search('cooling_coefficient=(.+?):', dpar.decode()).group(1))
 buffrate   = 10.0
 buffwidth  = 0.1
-sinkrad    = np.float(re.search('sink_radius=(.+?):', d[b'parameters'].decode()).group(1))
-sinkrate   = np.float(re.search('sink_rate=(.+?):', d[b'parameters'].decode()).group(1))
+sinkrad    = np.float(re.search('sink_radius=(.+?):', dpar.decode()).group(1))
+sinkrate   = np.float(re.search('sink_rate=(.+?):', dpar.decode()).group(1))
 m1,m2      = d[b'masses'][0][b'mass'], d[b'masses'][1][b'mass']
-alpha      = np.float(re.search('alpha=(.+?):', d[b'parameters'].decode()).group(1))
+alpha      = np.float(re.search('alpha=(.+?):', dpar.decode()).group(1))
 
 x          = np.arange((N))*dx - 2*DR/2. + dx/2.
 xx,yy      = np.zeros((N,N)),np.zeros((N,N))
