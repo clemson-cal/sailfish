@@ -4,7 +4,7 @@
 
 from math import sqrt, exp, pi
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import EquationOfState, PointMass, SinkModel
+from sailfish.physics.circumbinary import EquationOfState, PointMass, SinkModel, ViscosityModel
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup import Setup, SetupError, param
 
@@ -106,11 +106,15 @@ class CircumbinaryDisk(Setup):
             return dict(
                 eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
                 mach_number=self.mach_number,
+                point_mass_function=self.point_masses,
                 buffer_is_enabled=self.buffer_is_enabled,
                 buffer_driving_rate=100.0,
                 buffer_onset_width=1.0,
-                point_mass_function=self.point_masses,
+                cooling_coefficient=0.0,
+                constant_softening=self.constant_softening,
+                viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
                 viscosity_coefficient=self.nu,
+                alpha=0.0,
                 # diagnostics=self.diagnostics,
             )
 
@@ -120,8 +124,13 @@ class CircumbinaryDisk(Setup):
                 gamma_law_index=self.gamma_law_index,
                 point_mass_function=self.point_masses,
                 buffer_is_enabled=self.buffer_is_enabled,
+                buffer_driving_rate=1000.0, # defalut value in circumbinary.py
+                buffer_onset_width=0.1,     # defalut value in circumbinary.py
                 cooling_coefficient=self.cooling_coefficient,
                 constant_softening=self.constant_softening,
+                viscosity_model=ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
+                viscosity_coefficient=0.0,
+                alpha=self.alpha,
             )
 
     @property
@@ -184,15 +193,20 @@ class KitpCodeComparison(Setup):
     mach_number = 10.0
     eccentricity = 0.0
     mass_ratio = 1.0
-    sink_radius = 0.05
-    softening_length = 0.05
-    nu = 0.001
+    sink_radius = param(0.05, "sink radius", mutable=True)
+    softening_length = param(0.05, "softening length", mutable=True)
+    nu = param(0.001, "kinematic viscosity coefficient", mutable=True)
     single_point_mass = param(False, "put one point mass at the origin (no binary)")
-    sink_model = param("torque_free", "sink [acceleration_free|force_free|torque_free]")
+    sink_model = param(
+        "acceleration_free",
+        "sink [acceleration_free|force_free|torque_free]",
+        mutable=True,
+    )
     domain_radius = param(8.0, "half side length of the square computational domain")
     sink_rate = param(10.0, "component sink rate", mutable=True)
-    buffer_is_enabled = param(True, "whether the buffer zone is enabled")
+    buffer_is_enabled = param(True, "whether the buffer zone is enabled", mutable=True)
     use_dg = param(False, "use the DG solver")
+    disk_kick = param(1e-4, "kick velocity to seed eccentric cavity growth")
 
     def primitive(self, t, coords, primitive):
         x, y = coords
@@ -211,7 +225,7 @@ class KitpCodeComparison(Setup):
         omega0 = (GM / r**3 * (1.0 - 1.0 / self.mach_number**2)) ** 0.5
         omega = (omega0**-n + omegaB**-n) ** (-1 / n)
 
-        vr_pert = 1e-3 * y * exp(-((r / 3.5) ** 6))
+        vr_pert = self.disk_kick * y * exp(-((r / 3.5) ** 6))
 
         primitive[0] = sigma
         primitive[1] = omega * -y + vr_pert * x / r
@@ -246,11 +260,12 @@ class KitpCodeComparison(Setup):
         return dict(
             eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
             mach_number=self.mach_number,
+            point_mass_function=self.point_masses,
             buffer_is_enabled=self.buffer_is_enabled,
             buffer_driving_rate=100.0,
             buffer_onset_width=1.0,
-            point_mass_function=self.point_masses,
             viscosity_coefficient=self.nu,
+            viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
             diagnostics=self.diagnostics,
         )
 
@@ -359,11 +374,12 @@ class MassTransferBinary(Setup):
         return dict(
             eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
             mach_number=self.mach_number,
+            point_mass_function=self.point_masses,
             buffer_is_enabled=True,
             buffer_driving_rate=self.buffer_driving_rate,
             buffer_onset_width=self.buffer_onset_width,
-            point_mass_function=self.point_masses,
             viscosity_coefficient=self.nu,
+            viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
             diagnostics=self.diagnostics,
         )
 
@@ -421,3 +437,88 @@ class MassTransferBinary(Setup):
 
     def checkpoint_diagnostics(self, time):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
+
+
+class EccentricSingleDisk(Setup):
+    eccentricity = 0.0
+    domain_radius = param(6.0, "half side length of the square computational domain")
+    disk_kick = param(0.1, "velocity of the kick given to the disk")
+    mach_number = param(20.0, "orbital Mach number", mutable=True)
+    sink_rate = param(10.0, "component sink rates", mutable=True)
+    sink_radius = param(0.02, "component sink radii", mutable=True)
+    softening_length = param(0.02, "softening lengths", mutable=True)
+    sigma = param(1e-8, "background surface density")
+    nu = param(0.0, "kinematic viscosity parameter", mutable=True)
+    buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
+    buffer_onset_width = param(0.25, "buffer ramp distance", mutable=True)
+    sink_model = param(
+        "acceleration_free",
+        "sink [acceleration_free|force_free|torque_free]",
+        mutable=True,
+    )
+
+    def primitive(self, t, coords, primitive):
+        x, y = coords
+        r = sqrt(x * x + y * y)
+
+        GM = 1.0
+        omega = (GM / r**3) ** 0.5
+        prof = r * exp(-((r - 1.0) ** 4))
+
+        primitive[0] = self.sigma
+        primitive[1] = omega * -y
+        primitive[2] = omega * +x
+
+        dx = x - 1.0
+        dy = y
+        dr = (dx**2 + dy**2) ** 0.5
+
+        if dr < 0.2:
+            primitive[0] = exp(-((dr / 0.1) ** 2))
+            primitive[2] *= 0.6
+
+    def mesh(self, resolution):
+        return PlanarCartesian2DMesh.centered_square(self.domain_radius, resolution)
+
+    @property
+    def default_resolution(self):
+        return 512
+
+    @property
+    def physics(self):
+        return dict(
+            eos_type=EquationOfState.LOCALLY_ISOTHERMAL,
+            mach_number=self.mach_number,
+            buffer_is_enabled=True,
+            buffer_driving_rate=self.buffer_driving_rate,
+            buffer_onset_width=self.buffer_onset_width,
+            point_mass_function=self.point_masses,
+            viscosity_coefficient=self.nu,
+            viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+            diagnostics=self.diagnostics,
+        )
+
+    @property
+    def solver(self):
+        return "cbdiso_2d"
+
+    @property
+    def boundary_condition(self):
+        return "outflow"
+
+    @property
+    def default_end_time(self):
+        return 1.0
+
+    @property
+    def reference_time_scale(self):
+        return 2.0 * pi
+
+    def point_masses(self, time):
+        return PointMass(
+            softening_length=self.softening_length,
+            sink_model=SinkModel[self.sink_model.upper()],
+            sink_rate=self.sink_rate,
+            sink_radius=self.sink_radius,
+            mass=1.0,
+        )

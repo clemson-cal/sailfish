@@ -231,7 +231,7 @@ class Solver(SolverBase):
             ViscosityModel.NONE,
             ViscosityModel.CONSTANT_ALPHA,
         ):
-            raise ValueError("solver only supports constant-nu viscosity")
+            raise ValueError("solver only supports constant-alpha viscosity")
 
         if physics.eos_type != EquationOfState.GAMMA_LAW:
             raise ValueError("solver only supports isothermal equation of states")
