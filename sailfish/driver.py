@@ -190,7 +190,17 @@ def newest_chkpt_in_directory(directory_name):
     )
     list_of_matches.sort(key=lambda l: int(l.groups()[0]))
     try:
-        return os.path.join(directory_name, list_of_matches[-1].group())
+        path = os.path.join(directory_name, list_of_matches[-1].group())
+        try:
+            load_checkpoint(path)
+            return path
+        except:
+            print("Checkpoint loaded incorrectly, attempting to load previous.")
+            if len(list_of_matches)<2:
+                raise ConfigurationError(
+                    "the specified directory did not have usable checkpoints"
+                )
+            return os.path.join(directory_name, list_of_matches[-2].group())
     except IndexError:
         raise ConfigurationError(
             "the specified directory did not have usable checkpoints"
