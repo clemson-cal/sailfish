@@ -189,22 +189,16 @@ def newest_chkpt_in_directory(directory_name):
         filter(None, (expr.search(f) for f in os.listdir(directory_name)))
     )
     list_of_matches.sort(key=lambda l: int(l.groups()[0]))
-    try:
-        path = os.path.join(directory_name, list_of_matches[-1].group())
+
+    for match in reversed(list_of_matches):
         try:
-            load_checkpoint(path)
+            path = os.path.join(directory_name, match.group())
+            load_checkpoint(path)  # exception if checkpoint is corrupted
             return path
         except:
-            print("Checkpoint loaded incorrectly, attempting to load previous.")
-            if len(list_of_matches)<2:
-                raise ConfigurationError(
-                    "the specified directory did not have usable checkpoints"
-                )
-            return os.path.join(directory_name, list_of_matches[-2].group())
-    except IndexError:
-        raise ConfigurationError(
-            "the specified directory did not have usable checkpoints"
-        )
+            logger.warning(f"skipping corrupt checkpoint file {path}")
+
+    raise ConfigurationError("the specified directory did not have usable checkpoints")
 
 
 def append_timeseries(state):
