@@ -199,9 +199,9 @@ class CircumbinaryDisk(Setup):
 
 
 class KitpCodeComparison(Setup):
-    mach_number = 10.0
-    eccentricity = 0.0
-    mass_ratio = 1.0
+    mach_number = param(10.0, "nominal orbital Mach number")
+    eccentricity = param(0.0, "orbital eccentricity")
+    mass_ratio = param(1.0, "binary mass ratio M2 / M1")
     sink_radius = param(0.05, "sink radius", mutable=True)
     softening_length = param(0.05, "softening length", mutable=True)
     nu = param(0.001, "kinematic viscosity coefficient", mutable=True)
