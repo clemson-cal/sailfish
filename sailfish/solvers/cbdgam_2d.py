@@ -81,13 +81,16 @@ class Patch:
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.xp.zeros(primitive.shape)
 
-    def point_mass_source_term(self, which_mass):
+    def point_mass_source_term(self, which_mass, gravity=False, accretion=False):
+        ng = 2  # number of guard cells
         if which_mass not in (1, 2):
             raise ValueError("the mass must be either 1 or 2")
 
         m1, m2 = self.physics.point_masses(self.time)
+
         with self.execution_context:
             cons_rate = self.xp.zeros_like(self.conserved0)
+
             self.lib.cbdgam_2d_point_mass_source_term[self.shape](
                 self.xl,
                 self.xr,
@@ -97,18 +100,18 @@ class Patch:
                 m1.position_y,
                 m1.velocity_x,
                 m1.velocity_y,
-                m1.mass,
+                m1.mass * gravity,
                 m1.softening_length,
-                m1.sink_rate,
+                m1.sink_rate * accretion,
                 m1.sink_radius,
                 m1.sink_model.value,
                 m2.position_x,
                 m2.position_y,
                 m2.velocity_x,
                 m2.velocity_y,
-                m2.mass,
+                m2.mass * gravity,
                 m2.softening_length,
-                m2.sink_rate,
+                m2.sink_rate * accretion,
                 m2.sink_radius,
                 m2.sink_model.value,
                 which_mass,
@@ -117,7 +120,7 @@ class Patch:
                 int(self.physics.constant_softening),
                 self.physics.gamma_law_index,
             )
-            return cons_rate
+            return cons_rate[ng:-ng, ng:-ng]
 
     def maximum_wavespeed(self):
         with self.execution_context:
@@ -314,59 +317,163 @@ class Solver(SolverBase):
     def reductions(self):
         """
         Generate runtime reductions on the solution data for time series.
-
-        As of now, the reductions generated are the rates of mass accretion,
-        and of x and y momentum (combined gravitational and accretion)
-        resulting from each of the point masses. If there are 2 point masses,
-        then the result of this function is a 9-element list: :pyobj:`[time,
-        mdot1, fx1, fy1, edot1, mdot2, fx2, fy2, edot2]`.
         """
-
-        def to_host(a):
-            try:
-                return a.get()
-            except AttributeError:
-                return a
-
-        def patch_reduction(patch, which):
-            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
-
+        diagnostics = self._physics.diagnostics
+        udots1_acc = [p.point_mass_source_term(1, accretion=True) for p in self.patches]
+        udots2_acc = [p.point_mass_source_term(2, accretion=True) for p in self.patches]
+        udots1_grv = [p.point_mass_source_term(1, gravity=True) for p in self.patches]
+        udots2_grv = [p.point_mass_source_term(2, gravity=True) for p in self.patches]
         da = self.mesh.dx * self.mesh.dy
-        point_mass_reductions = [self.time]
+        ng = self.num_guard
 
-        for n in range(self._physics.num_particles):
-            point_mass_reductions.extend(
-                lazy_reduce(
-                    sum,
-                    to_host,
-                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
-                    (patch.execution_context for patch in self.patches),
-                )
-            )
-        return point_mass_reductions
+        def get_field(patch, quantity, cut, mass, gravity=False, accretion=False):
+            """
+            Return one of the udot fields: for a particular patch, conserved
+            variable quantity, radial cut (optional), and point mass (either
+            1, 2, or 'both'), term (either 'acc' or 'grv').
+            """
+            x, y = patch.cell_center_coordinate_arrays
+            r = (x**2 + y**2) ** 0.5
 
-        def to_host(a):
-            try:
-                return a.get()
-            except AttributeError:
-                return a
+            def apply_radial_cut(f):
+                if cut is not None:
+                    r0, r1 = cut
+                    return f * (r0 < r) * (r < r1)
+                else:
+                    return f
 
-        def patch_reduction(patch, which):
-            return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+            if quantity == "mdot":
+                return get_field(patch, 0, cut, mass, gravity, accretion)
 
-        da = self.mesh.dx * self.mesh.dy
-        point_mass_reductions = list()
+            if quantity == "torque":
+                fx = get_field(patch, 1, cut, mass, gravity, accretion)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                return x * fy - y * fx
 
-        for n in range(self._physics.num_particles):
-            point_mass_reductions.extend(
-                lazy_reduce(
-                    sum,
-                    to_host,
-                    (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
-                    (patch.execution_context for patch in self.patches),
-                )
-            )
-        return point_mass_reductions
+            if quantity == "sigma_m1":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                cos_phi = x / r
+                sin_phi = y / r
+                return sigma * (cos_phi + 1.0j * sin_phi)
+
+            if quantity == "eccentricity_vector":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                GM = 1.0
+                v_dot_v = vx * vx + vy * vy
+                v_dot_r = vx * x + vy * y
+                ex = (v_dot_v * x - v_dot_r * vx) / GM - x / r
+                ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
+                return sigma * (ex + 1.0j * ey)
+
+            q = quantity
+            i = self.patches.index(patch)
+
+            if accretion:
+                udots1 = udots1_acc
+                udots2 = udots2_acc
+            elif gravity:
+                udots1 = udots1_grv
+                udots2 = udots2_grv
+
+            if mass == "both":
+                f = udots1[i][..., q] + udots2[i][..., q]
+            elif mass == 1:
+                f = udots1[i][..., q]
+            elif mass == 2:
+                f = udots2[i][..., q]
+
+            return apply_radial_cut(f)
+
+        def get_sum_fields(d):
+            result = []
+            for p in self.patches:
+                with p.execution_context:
+                    f = get_field(
+                        p,
+                        d.quantity,
+                        d.radial_cut,
+                        d.which_mass,
+                        gravity=d.gravity,
+                        accretion=d.accretion,
+                    )
+                    result.append(f.sum())
+            return result
+
+        pass1 = []
+        pass2 = []
+
+        for d in diagnostics:
+            if d.quantity == "time":
+                pass1.append(self.time / self.setup.reference_time_scale)
+            else:
+                pass1.append(get_sum_fields(d))
+
+        for item in pass1:
+            if type(item) is not float:
+                pass2.append(sum(to_host(x) for x in item) * da)
+            else:
+                pass2.append(item)
+
+        return pass2
+
+    # def reductions(self):
+    #     """
+    #     Generate runtime reductions on the solution data for time series.
+
+    #     As of now, the reductions generated are the rates of mass accretion,
+    #     and of x and y momentum (combined gravitational and accretion)
+    #     resulting from each of the point masses. If there are 2 point masses,
+    #     then the result of this function is a 9-element list: :pyobj:`[time,
+    #     mdot1, fx1, fy1, edot1, mdot2, fx2, fy2, edot2]`.
+    #     """
+
+    #     def to_host(a):
+    #         try:
+    #             return a.get()
+    #         except AttributeError:
+    #             return a
+
+    #     def patch_reduction(patch, which):
+    #         return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+
+    #     da = self.mesh.dx * self.mesh.dy
+    #     point_mass_reductions = [self.time]
+
+    #     for n in range(self._physics.num_particles):
+    #         point_mass_reductions.extend(
+    #             lazy_reduce(
+    #                 sum,
+    #                 to_host,
+    #                 (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
+    #                 (patch.execution_context for patch in self.patches),
+    #             )
+    #         )
+    #     return point_mass_reductions
+
+    #     def to_host(a):
+    #         try:
+    #             return a.get()
+    #         except AttributeError:
+    #             return a
+
+    #     def patch_reduction(patch, which):
+    #         return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
+
+    #     da = self.mesh.dx * self.mesh.dy
+    #     point_mass_reductions = list()
+
+    #     for n in range(self._physics.num_particles):
+    #         point_mass_reductions.extend(
+    #             lazy_reduce(
+    #                 sum,
+    #                 to_host,
+    #                 (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
+    #                 (patch.execution_context for patch in self.patches),
+    #             )
+    #         )
+    #     return point_mass_reductions
 
     @property
     def time(self):
