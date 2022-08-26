@@ -4,7 +4,12 @@
 
 from math import sqrt, exp, pi
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import EquationOfState, PointMass, SinkModel, ViscosityModel
+from sailfish.physics.circumbinary import (
+    EquationOfState,
+    PointMass,
+    SinkModel,
+    ViscosityModel,
+)
 from sailfish.physics.kepler import OrbitalElements
 from sailfish.setup import Setup, SetupError, param
 
@@ -112,7 +117,9 @@ class CircumbinaryDisk(Setup):
                 buffer_onset_width=1.0,
                 cooling_coefficient=0.0,
                 constant_softening=self.constant_softening,
-                viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+                viscosity_model=ViscosityModel.CONSTANT_NU
+                if self.nu > 0.0
+                else ViscosityModel.NONE,
                 viscosity_coefficient=self.nu,
                 alpha=0.0,
                 # diagnostics=self.diagnostics,
@@ -124,11 +131,13 @@ class CircumbinaryDisk(Setup):
                 gamma_law_index=self.gamma_law_index,
                 point_mass_function=self.point_masses,
                 buffer_is_enabled=self.buffer_is_enabled,
-                buffer_driving_rate=1000.0, # defalut value in circumbinary.py
-                buffer_onset_width=0.1,     # defalut value in circumbinary.py
+                buffer_driving_rate=1000.0,  # defalut value in circumbinary.py
+                buffer_onset_width=0.1,  # defalut value in circumbinary.py
                 cooling_coefficient=self.cooling_coefficient,
                 constant_softening=self.constant_softening,
-                viscosity_model=ViscosityModel.CONSTANT_ALPHA if self.alpha > 0.0 else ViscosityModel.NONE,
+                viscosity_model=ViscosityModel.CONSTANT_ALPHA
+                if self.alpha > 0.0
+                else ViscosityModel.NONE,
                 viscosity_coefficient=0.0,
                 alpha=self.alpha,
             )
@@ -265,7 +274,9 @@ class KitpCodeComparison(Setup):
             buffer_driving_rate=100.0,
             buffer_onset_width=1.0,
             viscosity_coefficient=self.nu,
-            viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+            viscosity_model=ViscosityModel.CONSTANT_NU
+            if self.nu > 0.0
+            else ViscosityModel.NONE,
             diagnostics=self.diagnostics,
         )
 
@@ -367,7 +378,11 @@ class MassTransferBinary(Setup):
 
     @property
     def diagnostics(self):
-        return list()
+        return [
+            dict(quantity="time"),
+            dict(quantity="mdot", which_mass=1, accretion=True),
+            dict(quantity="mdot", which_mass=2, accretion=True),
+        ]
 
     @property
     def physics(self):
@@ -379,7 +394,9 @@ class MassTransferBinary(Setup):
             buffer_driving_rate=self.buffer_driving_rate,
             buffer_onset_width=self.buffer_onset_width,
             viscosity_coefficient=self.nu,
-            viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+            viscosity_model=ViscosityModel.CONSTANT_NU
+            if self.nu > 0.0
+            else ViscosityModel.NONE,
             diagnostics=self.diagnostics,
         )
 
@@ -494,7 +511,9 @@ class EccentricSingleDisk(Setup):
             buffer_onset_width=self.buffer_onset_width,
             point_mass_function=self.point_masses,
             viscosity_coefficient=self.nu,
-            viscosity_model=ViscosityModel.CONSTANT_NU if self.nu > 0.0 else ViscosityModel.NONE,
+            viscosity_model=ViscosityModel.CONSTANT_NU
+            if self.nu > 0.0
+            else ViscosityModel.NONE,
             diagnostics=self.diagnostics,
         )
 
