@@ -108,11 +108,6 @@ class Patch:
         the application of gravitational and/or accretion source terms due to
         point masses.
         """
-        if which_mass == "both":
-            udot1 = self.point_mass_source_term(1, gravity=gravity, accretion=accretion)
-            udot2 = self.point_mass_source_term(2, gravity=gravity, accretion=accretion)
-            return udot1 + udot2
-
         ng = 2  # number of guard cells
         if which_mass not in (1, 2):
             raise ValueError("which_mass must be either 1 or 2")
@@ -131,9 +126,9 @@ class Patch:
                 m.position_y,
                 m.velocity_x,
                 m.velocity_y,
-                m.mass * float(gravity),
+                m.mass * gravity,
                 m.softening_length,
-                m.sink_rate * float(accretion),
+                m.sink_rate * accretion,
                 m.sink_radius,
                 m.sink_model.value,
                 self.primitive1,
