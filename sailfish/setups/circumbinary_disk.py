@@ -251,8 +251,6 @@ class KitpCodeComparison(Setup):
     def diagnostics(self):
         return [
             dict(quantity="time"),
-            dict(quantity="mdot", which_mass=1, accretion=True),
-            dict(quantity="mdot", which_mass=2, accretion=True),
             dict(quantity="torque", which_mass="both", gravity=True),
             dict(
                 quantity="torque",
@@ -260,8 +258,6 @@ class KitpCodeComparison(Setup):
                 gravity=True,
                 radial_cut=(1.0, self.domain_radius),
             ),
-            dict(quantity="sigma_m1"),
-            dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
         ]
 
     @property
