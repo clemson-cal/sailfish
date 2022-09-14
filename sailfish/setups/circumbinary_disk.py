@@ -378,6 +378,8 @@ class MassTransferBinary(Setup):
             dict(quantity="time"),
             dict(quantity="mdot", which_mass=1, accretion=True),
             dict(quantity="mdot", which_mass=2, accretion=True),
+            dict(quantity="torque", which_mass="both", gravity=True),
+            dict(quantity="torque", which_mass="both", accretion=True),
         ]
 
     @property
