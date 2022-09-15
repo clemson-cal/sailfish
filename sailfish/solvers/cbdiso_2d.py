@@ -433,9 +433,9 @@ class Solver(SolverBase):
 
             if mass == "both":
                 f = udots1[i][..., q] + udots2[i][..., q]
-            elif mass in (1, "1"):
+            elif mass == 1:
                 f = udots1[i][..., q]
-            elif mass in (2, "2"):
+            elif mass == 2:
                 f = udots2[i][..., q]
                 
             return apply_radial_cut(f)
