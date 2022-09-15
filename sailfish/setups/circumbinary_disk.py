@@ -251,13 +251,16 @@ class KitpCodeComparison(Setup):
     def diagnostics(self):
         return [
             dict(quantity="time"),
+            dict(quantity="mdot", which_mass=1, gravity=True),
+            dict(quantity="mdot", which_mass=1, accretion=True),
+            dict(quantity="mdot", which_mass=2, gravity=True),
+            dict(quantity="mdot", which_mass=2, accretion=True),
             dict(quantity="torque", which_mass="both", gravity=True),
-            dict(
-                quantity="torque",
-                which_mass="both",
-                gravity=True,
-                radial_cut=(1.0, self.domain_radius),
-            ),
+            dict(quantity="torque", which_mass="both", accretion=True),
+            dict(quantity="power", which_mass=1, gravity=True),
+            dict(quantity="power", which_mass=1, accretion=True),
+            dict(quantity="power", which_mass=2, gravity=True),
+            dict(quantity="power", which_mass=2, accretion=True),
         ]
 
     @property
@@ -378,8 +381,6 @@ class MassTransferBinary(Setup):
             dict(quantity="time"),
             dict(quantity="mdot", which_mass=1, accretion=True),
             dict(quantity="mdot", which_mass=2, accretion=True),
-            dict(quantity="torque", which_mass="both", gravity=True),
-            dict(quantity="torque", which_mass="both", accretion=True),
         ]
 
     @property
