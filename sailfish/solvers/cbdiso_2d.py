@@ -399,6 +399,12 @@ class Solver(SolverBase):
             if quantity == "mdot":
                 return get_field(patch, 0, cut, mass, gravity, accretion)
 
+            if quantity == "fx":
+                return get_field(patch, 1, cut, mass, gravity, accretion)
+
+            if quantity == "fy":
+                return get_field(patch, 2, cut, mass, gravity, accretion)
+
             if quantity == "torque":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion)
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)
