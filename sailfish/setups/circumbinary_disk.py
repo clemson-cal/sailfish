@@ -255,12 +255,14 @@ class KitpCodeComparison(Setup):
             dict(quantity="mdot", which_mass=1, accretion=True),
             dict(quantity="mdot", which_mass=2, gravity=True),
             dict(quantity="mdot", which_mass=2, accretion=True),
-            dict(quantity="torque", which_mass="both", gravity=True),
-            dict(quantity="torque", which_mass="both", accretion=True),
-            dict(quantity="power", which_mass=1, gravity=True),
-            dict(quantity="power", which_mass=1, accretion=True),
-            dict(quantity="power", which_mass=2, gravity=True),
-            dict(quantity="power", which_mass=2, accretion=True),
+            dict(quantity="fx", which_mass=1, gravity=True),
+            dict(quantity="fx", which_mass=1, accretion=True),
+            dict(quantity="fy", which_mass=1, gravity=True),
+            dict(quantity="fy", which_mass=1, accretion=True),
+            dict(quantity="fx", which_mass=2, gravity=True),
+            dict(quantity="fx", which_mass=2, accretion=True),
+            dict(quantity="fy", which_mass=2, gravity=True),
+            dict(quantity="fy", which_mass=2, accretion=True),
         ]
 
     @property
