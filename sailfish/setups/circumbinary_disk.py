@@ -216,6 +216,7 @@ class KitpCodeComparison(Setup):
     buffer_is_enabled = param(True, "whether the buffer zone is enabled", mutable=True)
     use_dg = param(False, "use the DG solver")
     disk_kick = param(1e-4, "kick velocity to seed eccentric cavity growth")
+    which_diagnostics = param("kitp", "output diagnostics option [kitp|forces]")
 
     def primitive(self, t, coords, primitive):
         x, y = coords
@@ -249,20 +250,37 @@ class KitpCodeComparison(Setup):
 
     @property
     def diagnostics(self):
-        return [
-            dict(quantity="time"),
-            dict(quantity="mdot", which_mass=1, accretion=True),
-            dict(quantity="mdot", which_mass=2, accretion=True),
-            dict(quantity="torque", which_mass="both", gravity=True),
-            dict(
-                quantity="torque",
-                which_mass="both",
-                gravity=True,
-                radial_cut=(1.0, self.domain_radius),
-            ),
-            dict(quantity="sigma_m1"),
-            dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
-        ]
+        if self.which_diagnostics == "kitp":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass="both", gravity=True),
+                dict(
+                    quantity="torque",
+                    which_mass="both",
+                    gravity=True,
+                    radial_cut=(1.0, self.domain_radius),
+                ),
+                dict(quantity="sigma_m1"),
+                dict(quantity="eccentricity_vector", radial_cut=(1.0, 6.0)),
+            ]
+        elif self.which_diagnostics == "forces":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, gravity=True),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, gravity=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="fx", which_mass=1, gravity=True),
+                dict(quantity="fx", which_mass=1, accretion=True),
+                dict(quantity="fy", which_mass=1, gravity=True),
+                dict(quantity="fy", which_mass=1, accretion=True),
+                dict(quantity="fx", which_mass=2, gravity=True),
+                dict(quantity="fx", which_mass=2, accretion=True),
+                dict(quantity="fy", which_mass=2, gravity=True),
+                dict(quantity="fy", which_mass=2, accretion=True),
+            ]
 
     @property
     def physics(self):
@@ -297,7 +315,8 @@ class KitpCodeComparison(Setup):
         return 2.0 * pi
 
     def validate(self):
-        pass
+        if self.which_diagnostics not in ["kitp", "forces"]:
+            raise SetupError("Unknown option for diagnostics.")
 
     @property
     def orbital_elements(self):
@@ -382,8 +401,6 @@ class MassTransferBinary(Setup):
             dict(quantity="time"),
             dict(quantity="mdot", which_mass=1, accretion=True),
             dict(quantity="mdot", which_mass=2, accretion=True),
-            dict(quantity="torque", which_mass="both", gravity=True),
-            dict(quantity="torque", which_mass="both", accretion=True),
         ]
 
     @property

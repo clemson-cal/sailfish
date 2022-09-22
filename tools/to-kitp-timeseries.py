@@ -34,7 +34,7 @@ for filename in args.filenames:
     ey = np.array([s[6].imag for s in ts])
 
     for c1, c2, c3, c4, c5, c6, c7, c8, c9 in zip(
-        t, torque_a, torque_b, psir, psii, ex, ey, mdot1, mdot2
+            t, torque_a, torque_b, psir, psii, ex, ey, mdot1, mdot2
     ):
         print(
             f"{c1:+6.5e} {c2:+6.5e} {c3:+6.5e} {c4:+6.5e} {c5:+6.5e} {c6:+6.5e} {c7:+6.5e} {c8:+6.5e} {c9:+6.5e}"

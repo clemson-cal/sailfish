@@ -399,6 +399,12 @@ class Solver(SolverBase):
             if quantity == "mdot":
                 return get_field(patch, 0, cut, mass, gravity, accretion)
 
+            if quantity == "fx":
+                return get_field(patch, 1, cut, mass, gravity, accretion)
+
+            if quantity == "fy":
+                return get_field(patch, 2, cut, mass, gravity, accretion)
+
             if quantity == "torque":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion)
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)
@@ -421,6 +427,21 @@ class Solver(SolverBase):
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
 
+            if quantity == "power":
+                fx = get_field(patch, 1, cut, mass, gravity, accretion)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                if mass == 1:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    vx1, vy1 = m1.velocity_x, m1.velocity_y
+                    return vx1 * fx + vy1 * fy
+                elif mass == 2:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    vx2, vy2 = m2.velocity_x, m2.velocity_y
+                    return vx2 * fx + vy2 * fy
+                else:
+                    raise ValueError("Mass options for "
+                                     "power can only be 1 or 2.")
+
             q = quantity
             i = self.patches.index(patch)
 
@@ -437,7 +458,7 @@ class Solver(SolverBase):
                 f = udots1[i][..., q]
             elif mass == 2:
                 f = udots2[i][..., q]
-
+                
             return apply_radial_cut(f)
 
         def get_sum_fields(d):
