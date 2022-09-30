@@ -359,7 +359,7 @@ class KitpCodeComparison(Setup):
 
 
 class MassTransferBinary(Setup):
-    eccentricity = 0.0
+    eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(2.0, "half side length of the square computational domain")
     mach_number = param(20.0, "orbital Mach number", mutable=True)
     mass_ratio = param(0.2, "component mass ratio m2 / m1 <= 1", mutable=True)
