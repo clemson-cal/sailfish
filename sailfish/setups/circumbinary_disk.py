@@ -268,9 +268,7 @@ class KitpCodeComparison(Setup):
         elif self.which_diagnostics == "forces":
             return [
                 dict(quantity="time"),
-                dict(quantity="mdot", which_mass=1, gravity=True),
                 dict(quantity="mdot", which_mass=1, accretion=True),
-                dict(quantity="mdot", which_mass=2, gravity=True),
                 dict(quantity="mdot", which_mass=2, accretion=True),
                 dict(quantity="fx", which_mass=1, gravity=True),
                 dict(quantity="fx", which_mass=1, accretion=True),
@@ -476,7 +474,7 @@ class MassTransferBinary(Setup):
 
 
 class EccentricSingleDisk(Setup):
-    eccentricity = 0.0
+    eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(6.0, "half side length of the square computational domain")
     disk_kick = param(0.1, "velocity of the kick given to the disk")
     mach_number = param(20.0, "orbital Mach number", mutable=True)
