@@ -71,7 +71,7 @@ def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args
 
     elif platform.system() == "Linux":
         logger.info("configure JIT build for Linux")
-        sys_compile_args = ["-fopenmp"]
+        sys_compile_args = ["-fopenmp", "-std=c99"]
         sys_link_args = ["-fopenmp"]
     else:
         logger.info("configure JIT build for unknown system")
