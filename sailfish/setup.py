@@ -68,8 +68,6 @@ class Setup(ABC):
         for key, val in vars(cls).items():
             if type(val) == Parameter:
                 yield key, val.default, val.about
-            elif hasattr(cls, "__annotations__"):
-                print(cls.__annotations__)
 
     @classmethod
     def immutable_parameter_keys(cls):
