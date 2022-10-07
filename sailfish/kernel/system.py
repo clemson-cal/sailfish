@@ -68,11 +68,14 @@ def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args
         logger.info("configure JIT build for MacOS")
         sys_compile_args = ["-Xpreprocessor", "-fopenmp"]
         sys_link_args = ["-L/usr/local/lib", "-lomp"]
-
     elif platform.system() == "Linux":
         logger.info("configure JIT build for Linux")
         sys_compile_args = ["-fopenmp", "-std=c99"]
         sys_link_args = ["-fopenmp"]
+    elif platform.system() == "Windows":
+        logger.info("configure JIT build for Windows")
+        sys_compile_args = []
+        sys_link_args = []
     else:
         logger.info("configure JIT build for unknown system")
         sys_compile_args = []

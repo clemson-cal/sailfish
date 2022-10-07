@@ -8,6 +8,7 @@ modules are JIT-compiled with cupy. No caching is presently done for the GPU
 modules.
 """
 
+from platform import system
 from ctypes import c_double, c_int, POINTER, CDLL
 from hashlib import sha256
 from logging import getLogger
@@ -189,6 +190,15 @@ class Library:
 
         if mode == "omp" and not build_config["enable_openmp"]:
             raise ValueError("need enable_openmp=True to compile with mode=omp")
+
+        if system() == "Windows":
+            # The ctypes is not finding library symbols for modules
+            # JIT-compiled with the cffi module. We don't know why this is
+            # happening, but there might be clues at the link below. Please
+            # help us.
+            #
+            # https://cffi.readthedocs.io/en/latest/using.html#windows-calling-conventions
+            raise ValueError("CPU execution mode not supported on windows")
 
         exec_mode = dict(cpu=0, omp=1)[mode]
         define_macros = list(define_macros.items()) + [("EXEC_MODE", exec_mode)]
