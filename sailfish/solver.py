@@ -116,3 +116,13 @@ class SolverBase(ABC):
         Advance the solution state by one iteration.
         """
         pass
+
+    def reductions(self):
+        """
+        Return a set of measurements derived from the solution state.
+
+        Solvers do not need to implement this. If they do, the diagnostic
+        outputs they will return when this function is called should be provided
+        to the solver by the setup when the setup is first constructed.
+        """
+        pass

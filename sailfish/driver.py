@@ -205,10 +205,13 @@ def append_timeseries(state):
     """
     Append to the driver state timeseries for post-processing.
     """
-    try:
+
+    reductions = state.solver.reductions()
+
+    if reductions:
         state.timeseries.append(state.solver.reductions())
         logger.info(f"record timeseries event {len(state.timeseries)}")
-    except AttributeError:
+    else:
         logger.warning(
             "timeseries event ignored because solver does not provide reductions"
         )
