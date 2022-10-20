@@ -7,9 +7,14 @@ from logging import getLogger
 from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
-from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
+from sailfish.physics.circumbinary import (
+    Physics,
+    EquationOfState,
+    ViscosityModel,
+    Diagnostic,
+)
 from sailfish.solver import SolverBase
-from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
+from sailfish.subdivide import subdivide, to_host, concat_on_host, lazy_reduce
 
 
 logger = getLogger(__name__)
@@ -76,10 +81,25 @@ class Patch:
         self.buffer_surface_pressure = buffer_surface_pressure
 
         with self.execution_context:
+            x0 = self.xl + 0.5 * mesh.dx
+            x1 = self.xr - 0.5 * mesh.dx
+            y0 = self.yl + 0.5 * mesh.dy
+            y1 = self.yr - 0.5 * mesh.dy
+            self.coordinate_array_x = xp.linspace(x0, x1, ni)[:, None]
+            self.coordinate_array_y = xp.linspace(y0, y1, nj)[None, :]
             self.wavespeeds = self.xp.zeros(primitive.shape[:2])
             self.primitive1 = self.xp.array(primitive)
             self.primitive2 = self.xp.array(primitive)
             self.conserved0 = self.xp.zeros(primitive.shape)
+
+    @property
+    def cell_center_coordinate_arrays(self):
+        """
+        Return two 2d arrays, one with the cell-center X coordinates, and the
+        other with the cell-center Y coordinates. The arrays are either numpy
+        or cupy arrays, allocated for the device this patch is assigned to.
+        """
+        return self.coordinate_array_x, self.coordinate_array_y
 
     def point_mass_source_term(self, which_mass, gravity=False, accretion=False):
         ng = 2  # number of guard cells
@@ -220,6 +240,10 @@ class Solver(SolverBase):
         options=dict(),
     ):
         import numpy as np
+
+        physics["diagnostics"] = [
+            Diagnostic(**v) for v in physics.get("diagnostics", [])
+        ]
 
         self._physics = physics = Physics(**physics)
         self._options = options = Options(**options)
@@ -417,63 +441,6 @@ class Solver(SolverBase):
                 pass2.append(item)
 
         return pass2
-
-    # def reductions(self):
-    #     """
-    #     Generate runtime reductions on the solution data for time series.
-
-    #     As of now, the reductions generated are the rates of mass accretion,
-    #     and of x and y momentum (combined gravitational and accretion)
-    #     resulting from each of the point masses. If there are 2 point masses,
-    #     then the result of this function is a 9-element list: :pyobj:`[time,
-    #     mdot1, fx1, fy1, edot1, mdot2, fx2, fy2, edot2]`.
-    #     """
-
-    #     def to_host(a):
-    #         try:
-    #             return a.get()
-    #         except AttributeError:
-    #             return a
-
-    #     def patch_reduction(patch, which):
-    #         return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
-
-    #     da = self.mesh.dx * self.mesh.dy
-    #     point_mass_reductions = [self.time]
-
-    #     for n in range(self._physics.num_particles):
-    #         point_mass_reductions.extend(
-    #             lazy_reduce(
-    #                 sum,
-    #                 to_host,
-    #                 (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
-    #                 (patch.execution_context for patch in self.patches),
-    #             )
-    #         )
-    #     return point_mass_reductions
-
-    #     def to_host(a):
-    #         try:
-    #             return a.get()
-    #         except AttributeError:
-    #             return a
-
-    #     def patch_reduction(patch, which):
-    #         return patch.point_mass_source_term(which).sum(axis=(0, 1)) * da
-
-    #     da = self.mesh.dx * self.mesh.dy
-    #     point_mass_reductions = list()
-
-    #     for n in range(self._physics.num_particles):
-    #         point_mass_reductions.extend(
-    #             lazy_reduce(
-    #                 sum,
-    #                 to_host,
-    #                 (lambda: patch_reduction(patch, n + 1) for patch in self.patches),
-    #                 (patch.execution_context for patch in self.patches),
-    #             )
-    #         )
-    #     return point_mass_reductions
 
     @property
     def time(self):

@@ -61,6 +61,7 @@ class CircumbinaryDisk(Setup):
     nu = param(0.001, "kinematic viscosity parameter (isothermal)")
     constant_softening = param(True, "whether to use constant softening (gamma-law)")
     gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
+    which_diagnostics = param("none", "diagnostics set to get from solver [none|mdots]")
 
     @property
     def is_isothermal(self):
@@ -122,7 +123,7 @@ class CircumbinaryDisk(Setup):
                 else ViscosityModel.NONE,
                 viscosity_coefficient=self.nu,
                 alpha=0.0,
-                # diagnostics=self.diagnostics,
+                diagnostics=self.diagnostics,
             )
 
         elif self.is_gamma_law:
@@ -140,7 +141,19 @@ class CircumbinaryDisk(Setup):
                 else ViscosityModel.NONE,
                 viscosity_coefficient=0.0,
                 alpha=self.alpha,
+                diagnostics=self.diagnostics,
             )
+
+    @property
+    def diagnostics(self):
+        if self.which_diagnostics != "none":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+            ]
+        else:
+            return []
 
     @property
     def solver(self):
@@ -164,6 +177,10 @@ class CircumbinaryDisk(Setup):
     def validate(self):
         if not self.is_isothermal and not self.is_gamma_law:
             raise SetupError(f"eos must be isothermal or gamma-law, got {self.eos}")
+        if self.which_diagnostics not in ["none", "mdots"]:
+            raise SetupError(
+                f"which_diagnostics must be none or mdots, got {self.which_diagnostics}"
+            )
 
     @property
     def orbital_elements(self):
