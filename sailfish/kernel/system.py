@@ -166,13 +166,11 @@ def measure_time(mode: str) -> float:
             expensive_function()
         print(f"execution took {duration()} seconds")
     """
-    deviceSynchronize = lambda *args: None 
-    if mode == 'gpu':
-        from cupy.cuda.runtime import deviceSynchronize
-        
     try:
         start = time.perf_counter()
         yield lambda: time.perf_counter() - start
     finally:
-        deviceSynchronize()
-            
+        if mode == "gpu":
+            from cupy.cuda.runtime import deviceSynchronize
+
+            deviceSynchronize()
