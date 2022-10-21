@@ -154,7 +154,7 @@ def log_system_info(mode):
 
 
 @contextlib.contextmanager
-def measure_time() -> float:
+def measure_time(mode: str) -> float:
     """
     A context manager to measure the execution time of a piece of code.
 
@@ -166,5 +166,13 @@ def measure_time() -> float:
             expensive_function()
         print(f"execution took {duration()} seconds")
     """
-    start = time.perf_counter()
-    yield lambda: time.perf_counter() - start
+    deviceSynchronize = lambda *args: None 
+    if mode == 'gpu':
+        from cupy.cuda.runtime import deviceSynchronize
+        
+    try:
+        start = time.perf_counter()
+        yield lambda: time.perf_counter() - start
+    finally:
+        deviceSynchronize()
+            

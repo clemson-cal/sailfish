@@ -169,7 +169,7 @@ class Library:
         logger.info(f"debug mode {'enabled' if debug else 'disabled'}")
         logger.info(f"prepare {name} for {mode} execution")
 
-        with measure_time() as prep_time:
+        with measure_time(mode) as prep_time:
             self.debug = debug
             self.cpu_mode = mode != "gpu"
             self.api = parse_api(code)

@@ -298,7 +298,6 @@ def simulate(driver):
     This function is a generator: it yields its state at a sequence of
     pause points, defined by the `events` dictionary.
     """
-
     from time import perf_counter
     from sailfish import __version__ as version
     from sailfish.kernel.system import configure_build, log_system_info, measure_time
@@ -483,14 +482,14 @@ def simulate(driver):
         if end_time is not None and user_time >= end_time:
             break
 
-        with measure_time() as fold_time:
+        with measure_time(mode) as fold_time:
             for _ in range(fold):
                 if dt is None or (iteration % new_timestep_cadence == 0):
                     dx = mesh.min_spacing(siml_time)
                     dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
-
+                
         Mzps = mesh.num_total_zones / fold_time() * 1e-6 * fold
         main_logger.info(
             f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
