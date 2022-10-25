@@ -216,7 +216,7 @@ class CircumbinaryDisk(Setup):
 
 
 class KitpCodeComparison(Setup):
-    mach_number = param(10.0, "nominal orbital Mach number")
+    mach_number = param(10.0, "nominal orbital Mach number", mutable=True)
     eccentricity = param(0.0, "orbital eccentricity")
     mass_ratio = param(1.0, "binary mass ratio M2 / M1")
     sink_radius = param(0.05, "sink radius", mutable=True)
