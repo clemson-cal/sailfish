@@ -63,6 +63,14 @@ class CircumbinaryDisk(Setup):
     gamma_law_index = param(5.0 / 3.0, "adiabatic index (gamma-law)")
     which_diagnostics = param("none", "diagnostics set to get from solver [none|mdots]")
 
+    def validate(self):
+        if not self.is_isothermal and not self.is_gamma_law:
+            raise SetupError(f"eos must be isothermal or gamma-law, got {self.eos}")
+        if self.which_diagnostics not in ["none", "mdots"]:
+            raise SetupError(
+                f"which_diagnostics must be none or mdots, got {self.which_diagnostics}"
+            )
+
     @property
     def is_isothermal(self):
         return self.eos == "isothermal"
@@ -132,8 +140,8 @@ class CircumbinaryDisk(Setup):
                 gamma_law_index=self.gamma_law_index,
                 point_mass_function=self.point_masses,
                 buffer_is_enabled=self.buffer_is_enabled,
-                buffer_driving_rate=1000.0,  # defalut value in circumbinary.py
-                buffer_onset_width=0.1,  # defalut value in circumbinary.py
+                buffer_driving_rate=1000.0,  # default value in circumbinary.py
+                buffer_onset_width=0.1,  # default value in circumbinary.py
                 cooling_coefficient=self.cooling_coefficient,
                 constant_softening=self.constant_softening,
                 viscosity_model=ViscosityModel.CONSTANT_ALPHA
@@ -173,14 +181,6 @@ class CircumbinaryDisk(Setup):
     @property
     def reference_time_scale(self):
         return 2.0 * pi
-
-    def validate(self):
-        if not self.is_isothermal and not self.is_gamma_law:
-            raise SetupError(f"eos must be isothermal or gamma-law, got {self.eos}")
-        if self.which_diagnostics not in ["none", "mdots"]:
-            raise SetupError(
-                f"which_diagnostics must be none or mdots, got {self.which_diagnostics}"
-            )
 
     @property
     def orbital_elements(self):
@@ -234,6 +234,10 @@ class KitpCodeComparison(Setup):
     use_dg = param(False, "use the DG solver")
     disk_kick = param(1e-4, "kick velocity to seed eccentric cavity growth")
     which_diagnostics = param("kitp", "output diagnostics option [kitp|forces]")
+
+    def validate(self):
+        if self.which_diagnostics not in ["kitp", "forces"]:
+            raise SetupError("Unknown option for diagnostics.")
 
     def primitive(self, t, coords, primitive):
         x, y = coords
@@ -329,10 +333,6 @@ class KitpCodeComparison(Setup):
     def reference_time_scale(self):
         return 2.0 * pi
 
-    def validate(self):
-        if self.which_diagnostics not in ["kitp", "forces"]:
-            raise SetupError("Unknown option for diagnostics.")
-
     @property
     def orbital_elements(self):
         return OrbitalElements(
@@ -387,6 +387,16 @@ class MassTransferBinary(Setup):
     nu = param(1e-4, "kinematic viscosity parameter", mutable=True)
     buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
     buffer_onset_width = param(0.25, "buffer ramp distance", mutable=True)
+    which_diagnostics = param("torques", "[torques|forces]")
+
+    def validate(self):
+        for x in self.sink_rate + self.sink_radius + self.softening_length:
+            if type(x) is not float:
+                raise ValueError(
+                    "sink_rate, sink_radius, and softening_length parameters must be float"
+                )
+        if self.which_diagnostics not in ["torques", "forces"]:
+            raise SetupError("Unknown option for diagnostics.")
 
     def primitive(self, t, coords, primitive):
         x, y = coords
@@ -412,13 +422,28 @@ class MassTransferBinary(Setup):
 
     @property
     def diagnostics(self):
-        return [
-            dict(quantity="time"),
-            dict(quantity="mdot", which_mass=1, accretion=True),
-            dict(quantity="mdot", which_mass=2, accretion=True),
-            dict(quantity="torque", which_mass="both", gravity=True),
-            dict(quantity="torque", which_mass="both", accretion=True),
-        ]
+        if self.which_diagnostics == "torques":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="torque", which_mass="both", gravity=True),
+                dict(quantity="torque", which_mass="both", accretion=True),
+            ]
+        elif self.which_diagnostics == "forces":
+            return [
+                dict(quantity="time"),
+                dict(quantity="mdot", which_mass=1, accretion=True),
+                dict(quantity="mdot", which_mass=2, accretion=True),
+                dict(quantity="fx", which_mass=1, gravity=True),
+                dict(quantity="fx", which_mass=1, accretion=True),
+                dict(quantity="fy", which_mass=1, gravity=True),
+                dict(quantity="fy", which_mass=1, accretion=True),
+                dict(quantity="fx", which_mass=2, gravity=True),
+                dict(quantity="fx", which_mass=2, accretion=True),
+                dict(quantity="fy", which_mass=2, gravity=True),
+                dict(quantity="fy", which_mass=2, accretion=True),
+            ]
 
     @property
     def physics(self):
@@ -451,13 +476,6 @@ class MassTransferBinary(Setup):
     @property
     def reference_time_scale(self):
         return 2.0 * pi
-
-    def validate(self):
-        for x in self.sink_rate + self.sink_radius + self.softening_length:
-            if type(x) is not float:
-                raise ValueError(
-                    "sink_rate, sink_radius, and softening_length parameters must be float"
-                )
 
     @property
     def orbital_elements(self):
