@@ -410,11 +410,6 @@ class Solver(SolverBase):
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)
                 return x * fy - y * fx
 
-            if quantity == "power":
-                fx = get_field(patch, 1, cut, mass, gravity, accretion)
-                fy = get_field(patch, 2, cut, mass, gravity, accretion)
-                return x * fx + y * fy
-
             if quantity == "sigma_m1":
                 sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
                 cos_phi = x / r
@@ -431,6 +426,20 @@ class Solver(SolverBase):
                 ex = (v_dot_v * x - v_dot_r * vx) / GM - x / r
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
+
+            if quantity == "power":
+                fx = get_field(patch, 1, cut, mass, gravity, accretion)
+                fy = get_field(patch, 2, cut, mass, gravity, accretion)
+                if mass == 1:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    vx1, vy1 = m1.velocity_x, m1.velocity_y
+                    return vx1 * fx + vy1 * fy
+                elif mass == 2:
+                    m1, m2 = self._physics.point_masses(self.time)
+                    vx2, vy2 = m2.velocity_x, m2.velocity_y
+                    return vx2 * fx + vy2 * fy
+                else:
+                    raise ValueError("Mass option for 'power' must be 1 or 2.")
 
             q = quantity
             i = self.patches.index(patch)
