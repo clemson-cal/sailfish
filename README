@@ -1,9 +1,14 @@
-Sailfish is a gpu-accelerated astrophysical gasdynamics code
+Sailfish is a GPU-accelerated astrophysical gasdynamics code
 
 Authors:
-
     Jonathan Zrake (Clemson)
     Andrew MacFadyen (NYU)
-    Ryan Westernacher-Schneider (Clemson)
+
+Contributors:
+    Alex Pendris (Clemson)
+    Christopher Tiede (Niels Bohr)
+    Jack Hu (Clemson)
+    Marcus DuPont (NYU)
+    Ryan Westernacher-Schneider (Leiden University)
 
 Documentation: https://clemson-cal.github.io/sailfish/index.html
