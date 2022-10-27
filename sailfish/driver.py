@@ -314,7 +314,7 @@ def simulate(driver):
     should also be extensible by a system-specific rc-style configuration
     file.
     """
-    configure_build(**user_build_config)
+    configure_build(**user_build_config, execution_mode=driver.execution_mode)
     log_system_info(driver.execution_mode or "cpu")
 
     if driver.setup_name:

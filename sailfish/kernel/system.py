@@ -45,7 +45,12 @@ build_config = {
 }
 
 
-def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args=None):
+def configure_build(
+    enable_openmp=True,
+    extra_compile_args=None,
+    extra_link_args=None,
+    execution_mode=None,
+):
     """
     Initiate the `build_config` module-level variable.
 
@@ -57,6 +62,8 @@ def configure_build(enable_openmp=True, extra_compile_args=None, extra_link_args
 
     if type(enable_openmp) is str:
         enable_openmp = {"True": True, "False": False}[enable_openmp]
+
+    enable_openmp = enable_openmp and execution_mode == "omp"
 
     if type(extra_compile_args) is str:
         extra_compile_args = extra_compile_args.split()
