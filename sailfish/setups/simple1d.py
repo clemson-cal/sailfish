@@ -3,13 +3,13 @@ Validation setups for various 1D solvers
 """
 
 from math import pi, sin
-from sailfish.setup import Setup, SetupError, param
+from sailfish.setup_base import SetupBase, SetupError, param
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
 
 __all__ = ["Advection", "Burgers", "DensityWave", "Shocktube", "Wind"]
 
 
-class Advection(Setup):
+class Advection(SetupBase):
     """
     Scalar advection, evolution of a smooth wave, using the DG solver.
     """
@@ -39,7 +39,7 @@ class Advection(Setup):
         return 1.0
 
 
-class Burgers(Setup):
+class Burgers(SetupBase):
     """
     Burgers equation, evolution of a smooth wave using the DG solver.
     """
@@ -69,7 +69,7 @@ class Burgers(Setup):
         return 1.0
 
 
-class Shocktube(Setup):
+class Shocktube(SetupBase):
     """
     Discontinuous initial data, with uniform density and pressure to either
     side of the discontintuity at x=0.5.
@@ -99,7 +99,7 @@ class Shocktube(Setup):
         return 0.25
 
 
-class DensityWave(Setup):
+class DensityWave(SetupBase):
     """
     A sinusoidal variation of the gas density, with possible uniform
     translation. The gas pressure is uniform.
@@ -138,7 +138,7 @@ class DensityWave(Setup):
             raise SetupError("amplitude must be less than 1.0")
 
 
-class Wind(Setup):
+class Wind(SetupBase):
     """
     A cold, spherically symmetric relativistic wind.
     """
@@ -146,7 +146,7 @@ class Wind(Setup):
     velocity = param(1.0, "velocity of the wind (gamma-beta if relativistic)")
 
     def primitive(self, t, r, primitive):
-        primitive[0] = 1.0 / r ** 2
+        primitive[0] = 1.0 / r**2
         primitive[1] = self.velocity
         primitive[2] = 1e-4 * primitive[0] ** (4 / 3)
 

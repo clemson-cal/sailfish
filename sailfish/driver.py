@@ -6,8 +6,8 @@ import os, pickle, pathlib
 from typing import NamedTuple, Dict
 from logging import getLogger
 from sailfish.event import Recurrence, RecurringEvent, ParseRecurrenceError
-from sailfish.setup import Setup, SetupError
-from sailfish.solver import SolverBase
+from sailfish.setup_base import SetupBase, SetupError
+from sailfish.solver_base import SolverBase
 from sailfish.solvers import (
     SolverInitializationError,
     register_solver_extension,
@@ -282,7 +282,7 @@ class DriverState(NamedTuple):
     timeseries: list
     event_states: list
     solver: SolverBase
-    setup: Setup
+    setup: SetupBase
     cfl_number: float
     timestep_dt: float
 
@@ -323,7 +323,7 @@ def simulate(driver):
         parametrs, and a setup instance.
         """
         logger.info(f"start new simulation with setup {driver.setup_name}")
-        setup = Setup.find_setup_class(driver.setup_name)(
+        setup = SetupBase.find_setup_class(driver.setup_name)(
             **driver.model_parameters or dict()
         )
         driver = driver._replace(
@@ -347,7 +347,7 @@ def simulate(driver):
         """
         logger.info(f"load checkpoint {driver.chkpt_file}")
         chkpt = load_checkpoint(driver.chkpt_file)
-        setup_class = Setup.find_setup_class(chkpt["setup_name"])
+        setup_class = SetupBase.find_setup_class(chkpt["setup_name"])
         driver = update_where_none(driver, chkpt["driver"], frozen=["resolution"])
 
         update_dict_where_none(
@@ -783,11 +783,11 @@ def main():
 
         if args.describe and args.command is not None:
             setup_name = args.command.split(":")[0]
-            Setup.find_setup_class(setup_name).describe_class()
+            SetupBase.find_setup_class(setup_name).describe_class()
 
         elif args.command is None:
             print("specify setup:")
-            for setup in Setup.__subclasses__():
+            for setup in SetupBase.__subclasses__():
                 print(f"    {setup.dash_case_class_name()}")
 
         else:

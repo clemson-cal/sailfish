@@ -8,7 +8,7 @@ from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import Physics, EquationOfState, ViscosityModel
-from sailfish.solver import SolverBase
+from sailfish.solver_base import SolverBase
 from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 
 

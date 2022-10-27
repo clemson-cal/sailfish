@@ -3,11 +3,11 @@ Setup for a thermal bomb set off inside an 18 solar mass progenitor.
 """
 
 from math import exp
-from sailfish.setup import Setup, param
+from sailfish.setup_base import SetupBase, param
 from sailfish.mesh import LogSphericalMesh
 
 
-class ExplodingStar(Setup):
+class ExplodingStar(SetupBase):
     """
     A star exploding.
 

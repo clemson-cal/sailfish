@@ -20,7 +20,7 @@ from sailfish.kernel.library import Library
 from sailfish.kernel.system import get_array_module, execution_context, num_devices
 from sailfish.subdivide import subdivide, concat_on_host, lazy_reduce
 from sailfish.mesh import PlanarCartesianMesh, LogSphericalMesh
-from sailfish.solver import SolverBase
+from sailfish.solver_base import SolverBase
 
 logger = getLogger(__name__)
 

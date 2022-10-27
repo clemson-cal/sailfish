@@ -4,7 +4,7 @@ An n-th order discontinuous Galerkin solver for 1D scalar advection and inviscid
 
 from typing import NamedTuple
 from sailfish.mesh import PlanarCartesianMesh
-from sailfish.solver import SolverBase
+from sailfish.solver_base import SolverBase
 from sailfish.kernel.library import Library
 from numpy.polynomial.legendre import leggauss, Legendre
 import numpy as np

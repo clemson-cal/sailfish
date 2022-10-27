@@ -29,7 +29,7 @@ class Parameter(NamedTuple):
 param = Parameter
 
 
-class Setup(ABC):
+class SetupBase(ABC):
     """
     Abstract base class to describe a simulation model setup.
 

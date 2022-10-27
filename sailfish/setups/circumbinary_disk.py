@@ -11,10 +11,10 @@ from sailfish.physics.circumbinary import (
     ViscosityModel,
 )
 from sailfish.physics.kepler import OrbitalElements
-from sailfish.setup import Setup, SetupError, param
+from sailfish.setup_base import SetupBase, SetupError, param
 
 
-class CircumbinaryDisk(Setup):
+class CircumbinaryDisk(SetupBase):
     r"""
     A circumbinary disk setup for binary problems, isothermal or gamma-law.
 
@@ -215,7 +215,7 @@ class CircumbinaryDisk(Setup):
         return dict(point_masses=self.point_masses(time))
 
 
-class KitpCodeComparison(Setup):
+class KitpCodeComparison(SetupBase):
     mach_number = param(10.0, "nominal orbital Mach number", mutable=True)
     eccentricity = param(0.0, "orbital eccentricity")
     mass_ratio = param(1.0, "binary mass ratio M2 / M1")
@@ -375,7 +375,7 @@ class KitpCodeComparison(Setup):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
 
 
-class MassTransferBinary(Setup):
+class MassTransferBinary(SetupBase):
     eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(2.0, "half side length of the square computational domain")
     mach_number = param(20.0, "orbital Mach number", mutable=True)
@@ -510,7 +510,7 @@ class MassTransferBinary(Setup):
         return dict(point_masses=self.point_masses(time), diagnostics=self.diagnostics)
 
 
-class EccentricSingleDisk(Setup):
+class EccentricSingleDisk(SetupBase):
     eccentricity = param(0.0, "orbital eccentricity")
     domain_radius = param(6.0, "half side length of the square computational domain")
     disk_kick = param(0.1, "velocity of the kick given to the disk")

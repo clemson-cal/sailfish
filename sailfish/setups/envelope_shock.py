@@ -4,7 +4,7 @@ Contains a setup for studying a relativistic type-II shockwave.
 
 from functools import lru_cache
 from math import pi, exp, atan, log10
-from sailfish.setup import Setup, SetupError, param
+from sailfish.setup_base import SetupBase, SetupError, param
 from sailfish.mesh import LogSphericalMesh
 
 __all__ = ["EnvelopeShock"]
@@ -88,7 +88,7 @@ def shell_mass_rt(r, t):
         n += 1
 
 
-class EnvelopeShock(Setup):
+class EnvelopeShock(SetupBase):
     """
     A relativistic shell or jet launched into a homologous, relativistic envelope.
     """

@@ -13,10 +13,10 @@ as Bondi-Hoyle-Lyttleton accretion. Some references below:
 from sailfish.mesh import PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import SinkModel, PointMass, EquationOfState
 from sailfish.physics.kepler import OrbitalElements
-from sailfish.setup import Setup, param
+from sailfish.setup_base import SetupBase, param
 
 
-class BinaryBondi(Setup):
+class BinaryBondi(SetupBase):
     """
     Simulates Bondi-Hoyle-Lyttleton type accretion in a binary system.
 

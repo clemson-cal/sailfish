@@ -4,13 +4,13 @@ Validation setups for various 2D solvers
 
 from sailfish.mesh import LogSphericalMesh, PlanarCartesian2DMesh
 from sailfish.physics.circumbinary import EquationOfState
-from sailfish.setup import Setup, param
+from sailfish.setup_base import SetupBase, param
 from math import exp
 
 __all__ = ["UniformPolar", "CylindricalExplosion"]
 
 
-class UniformPolar(Setup):
+class UniformPolar(SetupBase):
     """
     Tests the srhd_2d solver geometrical source terms.
     """
@@ -37,7 +37,7 @@ class UniformPolar(Setup):
         return 1.0
 
 
-class CylindricalExplosion(Setup):
+class CylindricalExplosion(SetupBase):
     """
     A cylindrical explosion in 2D planar geometry; isothermal or gamma-law.
 
