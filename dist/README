@@ -1,0 +1,1 @@
+This directory contains files to enable distribution (via pip) or installation (via setup.py) of sailfish as a system module. Presently, we encourage users not to install sailfish as a module, but rather to run it like a script from the project root directory. However the files in this directory could become useful in the future if a pip distribution becomes desirable.
