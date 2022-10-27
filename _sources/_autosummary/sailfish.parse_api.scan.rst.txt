@@ -1,6 +1,0 @@
-sailfish.parse\_api.scan
-========================
-
-.. currentmodule:: sailfish.parse_api
-
-.. autofunction:: scan

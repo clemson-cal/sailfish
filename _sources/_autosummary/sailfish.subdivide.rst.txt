@@ -14,8 +14,11 @@
    .. autosummary::
       :toctree:
    
+      concat_on_host
+      lazy_reduce
       partition
       subdivide
+      to_host
    
    
 

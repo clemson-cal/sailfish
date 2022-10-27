@@ -66,13 +66,21 @@
            <div itemprop="articleBody">
              
   <h1>Source code for sailfish.setups.simple2d</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">LogSphericalMesh</span>
-<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Validation setups for various 2D solvers</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">LogSphericalMesh</span><span class="p">,</span> <span class="n">PlanarCartesian2DMesh</span>
+<span class="kn">from</span> <span class="nn">sailfish.physics.circumbinary</span> <span class="kn">import</span> <span class="n">EquationOfState</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">param</span>
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">exp</span>
+
+<span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;UniformPolar&quot;</span><span class="p">,</span> <span class="s2">&quot;CylindricalExplosion&quot;</span><span class="p">]</span>
 
 
 <div class="viewcode-block" id="UniformPolar"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple2d.UniformPolar.html#sailfish.setups.simple2d.UniformPolar">[docs]</a><span class="k">class</span> <span class="nc">UniformPolar</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Tests the srhd_2d solver goemtrical source terms.</span>
+<span class="sd">    Tests the srhd_2d solver geometrical source terms.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
 
 <div class="viewcode-block" id="UniformPolar.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple2d.UniformPolar.html#sailfish.setups.simple2d.UniformPolar.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
@@ -95,6 +103,83 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="mf">1.0</span></div>
+
+
+<div class="viewcode-block" id="CylindricalExplosion"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple2d.CylindricalExplosion.html#sailfish.setups.simple2d.CylindricalExplosion">[docs]</a><span class="k">class</span> <span class="nc">CylindricalExplosion</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A cylindrical explosion in 2D planar geometry; isothermal or gamma-law.</span>
+
+<span class="sd">    This problem is useful for testing bare-bones setups with minimal physics.</span>
+<span class="sd">    A circular region of high density and pressure is initiated at the center</span>
+<span class="sd">    of a square domain. In isothermal mode, the sound speed is set to 1</span>
+<span class="sd">    everywhere. In gamma-law mode, the adiabatic index is 5/3.</span>
+
+<span class="sd">    Currently this setup can specify either the `cbdiso_2d` or `cbdgam_2d`</span>
+<span class="sd">    solvers.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">eos</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="s2">&quot;isothermal&quot;</span><span class="p">,</span> <span class="s2">&quot;EOS type: either isothermal or gamma-law&quot;</span><span class="p">)</span>
+    <span class="n">smooth</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">6.0</span><span class="p">,</span> <span class="s2">&quot;k to smooth density enhancement, ~exp(-r^k) [0.0 for tophat]&quot;</span><span class="p">)</span>
+    <span class="n">use_dg</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;use the DG solver (isothermal only)&quot;</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_isothermal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">eos</span> <span class="o">==</span> <span class="s2">&quot;isothermal&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_gamma_law</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">eos</span> <span class="o">==</span> <span class="s2">&quot;gamma-law&quot;</span>
+
+<div class="viewcode-block" id="CylindricalExplosion.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple2d.CylindricalExplosion.html#sailfish.setups.simple2d.CylindricalExplosion.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">coords</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">smooth</span> <span class="o">!=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">((</span><span class="n">r</span> <span class="o">/</span> <span class="mf">0.25</span><span class="p">)</span> <span class="o">**</span> <span class="bp">self</span><span class="o">.</span><span class="n">smooth</span><span class="p">))</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">f</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="n">r</span> <span class="o">&lt;</span> <span class="mf">0.25</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span><span class="p">:</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.1</span> <span class="o">+</span> <span class="mf">0.9</span> <span class="o">*</span> <span class="n">f</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.100</span> <span class="o">+</span> <span class="mf">0.900</span> <span class="o">*</span> <span class="n">f</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.125</span> <span class="o">+</span> <span class="mf">0.875</span> <span class="o">*</span> <span class="n">f</span></div>
+
+<div class="viewcode-block" id="CylindricalExplosion.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple2d.CylindricalExplosion.html#sailfish.setups.simple2d.CylindricalExplosion.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesian2DMesh</span><span class="o">.</span><span class="n">centered_square</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">resolution</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">GLOBALLY_ISOTHERMAL</span><span class="p">,</span> <span class="n">sound_speed</span><span class="o">=</span><span class="mf">1.0</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">GAMMA_LAW</span><span class="p">,</span> <span class="n">gamma_law_index</span><span class="o">=</span><span class="mi">5</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;cbdiso_2d&quot;</span> <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_dg</span> <span class="k">else</span> <span class="s2">&quot;cbdisodg_2d&quot;</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;cbdgam_2d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_resolution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">200</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.3</span>
+
+<div class="viewcode-block" id="CylindricalExplosion.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple2d.CylindricalExplosion.html#sailfish.setups.simple2d.CylindricalExplosion.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;eos must be isothermal or gamma-law, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">eos</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_dg</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;DG mode is only available for eos=isothermal&quot;</span><span class="p">)</span></div></div>
 </pre></div>
 
            </div>

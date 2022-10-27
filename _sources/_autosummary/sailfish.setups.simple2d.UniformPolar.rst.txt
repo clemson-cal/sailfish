@@ -17,6 +17,7 @@ sailfish.setups.simple2d.UniformPolar
    .. autosummary::
    
       ~UniformPolar.__init__
+      ~UniformPolar.checkpoint_diagnostics
       ~UniformPolar.dash_case_class_name
       ~UniformPolar.default_model_parameters
       ~UniformPolar.describe_class
@@ -41,7 +42,9 @@ sailfish.setups.simple2d.UniformPolar
       ~UniformPolar.boundary_condition
       ~UniformPolar.default_end_time
       ~UniformPolar.default_resolution
+      ~UniformPolar.diagnostics
       ~UniformPolar.physics
+      ~UniformPolar.reference_time_scale
       ~UniformPolar.solver
       ~UniformPolar.start_time
    

@@ -1,6 +1,0 @@
-sailfish.task.ParseRecurrenceError
-==================================
-
-.. currentmodule:: sailfish.task
-
-.. autoexception:: ParseRecurrenceError

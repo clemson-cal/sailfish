@@ -1,0 +1,33 @@
+sailfish.setups.circumbinary\_disk
+==================================
+
+.. automodule:: sailfish.setups.circumbinary_disk
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      CircumbinaryDisk
+      EccentricSingleDisk
+      KitpCodeComparison
+      MassTransferBinary
+   
+   
+
+   
+   
+   
+
+
+

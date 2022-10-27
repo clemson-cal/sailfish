@@ -1,6 +1,0 @@
-sailfish.driver.fromdict
-========================
-
-.. currentmodule:: sailfish.driver
-
-.. autofunction:: fromdict

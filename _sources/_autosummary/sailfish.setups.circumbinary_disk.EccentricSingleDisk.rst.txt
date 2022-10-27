@@ -1,0 +1,64 @@
+sailfish.setups.circumbinary\_disk.EccentricSingleDisk
+======================================================
+
+.. currentmodule:: sailfish.setups.circumbinary_disk
+
+.. autoclass:: EccentricSingleDisk
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~EccentricSingleDisk.__init__
+      ~EccentricSingleDisk.checkpoint_diagnostics
+      ~EccentricSingleDisk.dash_case_class_name
+      ~EccentricSingleDisk.default_model_parameters
+      ~EccentricSingleDisk.describe_class
+      ~EccentricSingleDisk.find_setup_class
+      ~EccentricSingleDisk.has_model_parameters
+      ~EccentricSingleDisk.immutable_parameter_keys
+      ~EccentricSingleDisk.mesh
+      ~EccentricSingleDisk.model_parameter_dict
+      ~EccentricSingleDisk.model_parameters
+      ~EccentricSingleDisk.point_masses
+      ~EccentricSingleDisk.primitive
+      ~EccentricSingleDisk.print_model_parameters
+      ~EccentricSingleDisk.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~EccentricSingleDisk.boundary_condition
+      ~EccentricSingleDisk.buffer_driving_rate
+      ~EccentricSingleDisk.buffer_onset_width
+      ~EccentricSingleDisk.default_end_time
+      ~EccentricSingleDisk.default_resolution
+      ~EccentricSingleDisk.diagnostics
+      ~EccentricSingleDisk.disk_kick
+      ~EccentricSingleDisk.domain_radius
+      ~EccentricSingleDisk.eccentricity
+      ~EccentricSingleDisk.mach_number
+      ~EccentricSingleDisk.nu
+      ~EccentricSingleDisk.physics
+      ~EccentricSingleDisk.reference_time_scale
+      ~EccentricSingleDisk.sigma
+      ~EccentricSingleDisk.sink_model
+      ~EccentricSingleDisk.sink_radius
+      ~EccentricSingleDisk.sink_rate
+      ~EccentricSingleDisk.softening_length
+      ~EccentricSingleDisk.solver
+      ~EccentricSingleDisk.start_time
+   
+   

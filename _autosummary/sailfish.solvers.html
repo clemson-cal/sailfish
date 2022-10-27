@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -52,8 +51,11 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.solvers</a><ul>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
@@ -89,7 +91,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.solvers">
+  <div class="section" id="module-sailfish.solvers">
 <span id="sailfish-solvers"></span><h1>sailfish.solvers<a class="headerlink" href="#module-sailfish.solvers" title="Permalink to this headline"></a></h1>
 <p>Physics solvers and solution schemes.</p>
 <p class="rubric">Functions</p>
@@ -102,6 +104,21 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.make_solver.html#sailfish.solvers.make_solver" title="sailfish.solvers.make_solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">make_solver</span></code></a>(name, physics, options, **kwargs)</p></td>
 <td><p>Find a solver with the given name and construct it.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.register_solver_extension.html#sailfish.solvers.register_solver_extension" title="sailfish.solvers.register_solver_extension"><code class="xref py py-obj docutils literal notranslate"><span class="pre">register_solver_extension</span></code></a>(solver_name)</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Exceptions</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html#sailfish.solvers.SolverInitializationError" title="sailfish.solvers.SolverInitializationError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SolverInitializationError</span></code></a></p></td>
+<td><p>An invalid runtime configuration</p></td>
+</tr>
 </tbody>
 </table>
 <p class="rubric">Modules</p>
@@ -112,23 +129,26 @@
 </colgroup>
 <tbody>
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html#module-sailfish.solvers.cbdgam_2d" title="sailfish.solvers.cbdgam_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.cbdgam_2d</span></code></a></p></td>
-<td><p>Two-dimensional vertically integrated hydro with gamma-law EOS</p></td>
+<td><p>Energy-conserving solver for the binary accretion problem in 2D.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html#module-sailfish.solvers.cbdiso_2d" title="sailfish.solvers.cbdiso_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.cbdiso_2d</span></code></a></p></td>
 <td><p>Isothermal solver for the binary accretion problem in 2D planar coordinates.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.html#module-sailfish.solvers.scdg_1d" title="sailfish.solvers.scdg_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.scdg_1d</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html#module-sailfish.solvers.cbdisodg_2d" title="sailfish.solvers.cbdisodg_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.cbdisodg_2d</span></code></a></p></td>
+<td><p>Isothermal solver for the binary accretion problem in 2D planar coordinates.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.scdg_1d.html#module-sailfish.solvers.scdg_1d" title="sailfish.solvers.scdg_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.scdg_1d</span></code></a></p></td>
 <td><p>An n-th order discontinuous Galerkin solver for 1D scalar advection and inviscid Burgers eqn.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.srhd_1d.html#module-sailfish.solvers.srhd_1d" title="sailfish.solvers.srhd_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.srhd_1d</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_1d.html#module-sailfish.solvers.srhd_1d" title="sailfish.solvers.srhd_1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.srhd_1d</span></code></a></p></td>
 <td><p>One-dimensional relativistic hydro solver supporting homologous mesh motion.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.html#module-sailfish.solvers.srhd_2d" title="sailfish.solvers.srhd_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.srhd_2d</span></code></a></p></td>
-<td><p>One-dimensional relativistic hydro solver supporting homologous mesh motion.</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.html#module-sailfish.solvers.srhd_2d" title="sailfish.solvers.srhd_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers.srhd_2d</span></code></a></p></td>
+<td><p>Two-dimensional relativistic hydro solver supporting homologous mesh motion.</p></td>
 </tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>

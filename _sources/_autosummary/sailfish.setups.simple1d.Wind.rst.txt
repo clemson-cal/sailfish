@@ -17,6 +17,7 @@ sailfish.setups.simple1d.Wind
    .. autosummary::
    
       ~Wind.__init__
+      ~Wind.checkpoint_diagnostics
       ~Wind.dash_case_class_name
       ~Wind.default_model_parameters
       ~Wind.describe_class
@@ -41,7 +42,9 @@ sailfish.setups.simple1d.Wind
       ~Wind.boundary_condition
       ~Wind.default_end_time
       ~Wind.default_resolution
+      ~Wind.diagnostics
       ~Wind.physics
+      ~Wind.reference_time_scale
       ~Wind.solver
       ~Wind.start_time
       ~Wind.velocity

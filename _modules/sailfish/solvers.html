@@ -70,20 +70,48 @@
 <span class="sd">Physics solvers and solution schemes.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">srhd_1d</span>
-<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">srhd_2d</span>
-<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">scdg_1d</span>
-<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">cbdgam_2d</span>
-<span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">cbdiso_2d</span>
+
+<div class="viewcode-block" id="SolverInitializationError"><a class="viewcode-back" href="../../_autosummary/sailfish.solvers.SolverInitializationError.html#sailfish.solvers.SolverInitializationError">[docs]</a><span class="k">class</span> <span class="nc">SolverInitializationError</span><span class="p">(</span><span class="ne">Exception</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;An invalid runtime configuration&quot;&quot;&quot;</span></div>
+
+
+<span class="n">__solver_extension_modules</span> <span class="o">=</span> <span class="nb">list</span><span class="p">()</span>
+
+
+<div class="viewcode-block" id="register_solver_extension"><a class="viewcode-back" href="../../_autosummary/sailfish.solvers.register_solver_extension.html#sailfish.solvers.register_solver_extension">[docs]</a><span class="k">def</span> <span class="nf">register_solver_extension</span><span class="p">(</span><span class="n">solver_name</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot; &quot;&quot;&quot;</span>
+    <span class="n">__solver_extension_modules</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">solver_name</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="make_solver"><a class="viewcode-back" href="../../_autosummary/sailfish.solvers.make_solver.html#sailfish.solvers.make_solver">[docs]</a><span class="k">def</span> <span class="nf">make_solver</span><span class="p">(</span><span class="n">name</span><span class="p">,</span> <span class="n">physics</span><span class="p">,</span> <span class="n">options</span><span class="p">,</span> <span class="o">**</span><span class="n">kwargs</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Find a solver with the given name and construct it.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">return</span> <span class="nb">globals</span><span class="p">()[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">Solver</span><span class="p">(</span>
-        <span class="n">physics</span><span class="o">=</span><span class="n">physics</span> <span class="ow">or</span> <span class="nb">dict</span><span class="p">(),</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span> <span class="ow">or</span> <span class="nb">dict</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span>
-    <span class="p">)</span></div>
+    <span class="kn">from</span> <span class="nn">importlib</span> <span class="kn">import</span> <span class="n">import_module</span>
+    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">srhd_1d</span>
+    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">srhd_2d</span>
+    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">scdg_1d</span>
+    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">cbdgam_2d</span>
+    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">cbdiso_2d</span>
+    <span class="kn">from</span> <span class="nn">.</span> <span class="kn">import</span> <span class="n">cbdisodg_2d</span>
+
+    <span class="n">solvers</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">(</span>
+        <span class="n">srhd_1d</span><span class="o">=</span><span class="n">srhd_1d</span><span class="p">,</span>
+        <span class="n">srhd_2d</span><span class="o">=</span><span class="n">srhd_2d</span><span class="p">,</span>
+        <span class="n">scdg_1d</span><span class="o">=</span><span class="n">scdg_1d</span><span class="p">,</span>
+        <span class="n">cbdgam_2d</span><span class="o">=</span><span class="n">cbdgam_2d</span><span class="p">,</span>
+        <span class="n">cbdiso_2d</span><span class="o">=</span><span class="n">cbdiso_2d</span><span class="p">,</span>
+        <span class="n">cbdisodg_2d</span><span class="o">=</span><span class="n">cbdisodg_2d</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="k">for</span> <span class="n">ext_name</span> <span class="ow">in</span> <span class="n">__solver_extension_modules</span><span class="p">:</span>
+        <span class="n">solvers</span><span class="p">[</span><span class="n">ext_name</span><span class="p">]</span> <span class="o">=</span> <span class="n">import_module</span><span class="p">(</span><span class="n">ext_name</span><span class="p">)</span>
+
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">solvers</span><span class="p">[</span><span class="n">name</span><span class="p">]</span><span class="o">.</span><span class="n">Solver</span><span class="p">(</span>
+            <span class="n">physics</span><span class="o">=</span><span class="n">physics</span> <span class="ow">or</span> <span class="nb">dict</span><span class="p">(),</span> <span class="n">options</span><span class="o">=</span><span class="n">options</span> <span class="ow">or</span> <span class="nb">dict</span><span class="p">(),</span> <span class="o">**</span><span class="n">kwargs</span>
+        <span class="p">)</span>
+    <span class="k">except</span> <span class="p">(</span><span class="ne">TypeError</span><span class="p">,</span> <span class="ne">ValueError</span><span class="p">)</span> <span class="k">as</span> <span class="n">e</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="n">SolverInitializationError</span><span class="p">(</span><span class="n">e</span><span class="p">)</span></div>
 </pre></div>
 
            </div>

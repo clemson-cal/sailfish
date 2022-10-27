@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solver.SolverBase &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -85,7 +84,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solver-solverbase">
+  <div class="section" id="sailfish-solver-solverbase">
 <h1>sailfish.solver.SolverBase<a class="headerlink" href="#sailfish-solver-solverbase" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solver.SolverBase">
@@ -112,6 +111,9 @@
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.maximum_wavespeed" title="sailfish.solver.SolverBase.maximum_wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></a>()</p></td>
 <td><p>Return the largest wavespeed on the grid.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solver.SolverBase.reductions" title="sailfish.solver.SolverBase.reductions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reductions</span></code></a>()</p></td>
+<td><p>Return a set of measurements derived from the solution state.</p></td>
 </tr>
 </tbody>
 </table>
@@ -208,6 +210,15 @@ runtime post-processing routines.</p>
 <dd><p>Return a recommended CFL number to the driver, default to the maximum.</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solver.SolverBase.reductions">
+<span class="sig-name descname"><span class="pre">reductions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solver.html#SolverBase.reductions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solver.SolverBase.reductions" title="Permalink to this definition"></a></dt>
+<dd><p>Return a set of measurements derived from the solution state.</p>
+<p>Solvers do not need to implement this. If they do, the diagnostic
+outputs they will return when this function is called should be provided
+to the solver by the setup when the setup is first constructed.</p>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="sailfish.solver.SolverBase.solution">
 <em class="property"><span class="pre">abstract</span><span class="w"> </span><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">solution</span></span><a class="headerlink" href="#sailfish.solver.SolverBase.solution" title="Permalink to this definition"></a></dt>
@@ -232,7 +243,7 @@ object from the setup and mesh instances.</p>
 
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>

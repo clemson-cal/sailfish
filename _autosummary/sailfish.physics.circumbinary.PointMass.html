@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.physics.circumbinary.PointMass &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -19,7 +18,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.physics.kepler" href="sailfish.physics.kepler.html" />
+    <link rel="next" title="sailfish.physics.circumbinary.SinkModel" href="sailfish.physics.circumbinary.SinkModel.html" />
     <link rel="prev" title="sailfish.physics.circumbinary.Physics" href="sailfish.physics.circumbinary.Physics.html" /> 
 </head>
 
@@ -49,8 +48,12 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a><ul class="current">
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.physics.circumbinary.html">sailfish.physics.circumbinary</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.Diagnostic.html">sailfish.physics.circumbinary.Diagnostic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.EquationOfState.html">sailfish.physics.circumbinary.EquationOfState</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.Physics.html">sailfish.physics.circumbinary.Physics</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.physics.circumbinary.PointMass</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.SinkModel.html">sailfish.physics.circumbinary.SinkModel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.ViscosityModel.html">sailfish.physics.circumbinary.ViscosityModel</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.physics.kepler.html">sailfish.physics.kepler</a></li>
@@ -92,11 +95,11 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-physics-circumbinary-pointmass">
+  <div class="section" id="sailfish-physics-circumbinary-pointmass">
 <h1>sailfish.physics.circumbinary.PointMass<a class="headerlink" href="#sailfish-physics-circumbinary-pointmass" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.physics.circumbinary.PointMass">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.physics.circumbinary.</span></span><span class="sig-name descname"><span class="pre">PointMass</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mass</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">velocity_x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">velocity_y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">softening_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/physics/circumbinary.html#PointMass"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.circumbinary.PointMass" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.physics.circumbinary.</span></span><span class="sig-name descname"><span class="pre">PointMass</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">mass</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">position_y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">velocity_x</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">velocity_y</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">softening_length</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_model</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="sailfish.physics.circumbinary.SinkModel.html#sailfish.physics.circumbinary.SinkModel" title="sailfish.physics.circumbinary.SinkModel"><span class="pre">sailfish.physics.circumbinary.SinkModel</span></a></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">SinkModel.INACTIVE</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_rate</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sink_radius</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/physics/circumbinary.html#PointMass"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.physics.circumbinary.PointMass" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
 <p>Describes a gravitating point mass</p>
 <p>The point mass’s mass, x-y position, and softening length fully determine
@@ -211,7 +214,7 @@ should not be used in practice.</p>
 
 <dl class="py attribute">
 <dt class="sig sig-object py" id="sailfish.physics.circumbinary.PointMass.sink_model">
-<span class="sig-name descname"><span class="pre">sink_model</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.physics.circumbinary.PointMass.sink_model" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">sink_model</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="sailfish.physics.circumbinary.SinkModel.html#sailfish.physics.circumbinary.SinkModel" title="sailfish.physics.circumbinary.SinkModel"><span class="pre">sailfish.physics.circumbinary.SinkModel</span></a></em><a class="headerlink" href="#sailfish.physics.circumbinary.PointMass.sink_model" title="Permalink to this definition"></a></dt>
 <dd><p>The equation used to control how momentum is subtracted</p>
 </dd></dl>
 
@@ -247,14 +250,14 @@ should not be used in practice.</p>
 
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.physics.circumbinary.Physics.html" class="btn btn-neutral float-left" title="sailfish.physics.circumbinary.Physics" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.physics.kepler.html" class="btn btn-neutral float-right" title="sailfish.physics.kepler" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.physics.circumbinary.SinkModel.html" class="btn btn-neutral float-right" title="sailfish.physics.circumbinary.SinkModel" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

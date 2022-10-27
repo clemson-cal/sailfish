@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.physics.circumbinary &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.physics.circumbinary.Physics" href="sailfish.physics.circumbinary.Physics.html" />
+    <link rel="next" title="sailfish.physics.circumbinary.Diagnostic" href="sailfish.physics.circumbinary.Diagnostic.html" />
     <link rel="prev" title="sailfish.physics" href="sailfish.physics.html" /> 
 </head>
 
@@ -48,8 +47,12 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a><ul class="current">
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.physics.circumbinary</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.Diagnostic.html">sailfish.physics.circumbinary.Diagnostic</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.EquationOfState.html">sailfish.physics.circumbinary.EquationOfState</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.Physics.html">sailfish.physics.circumbinary.Physics</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.PointMass.html">sailfish.physics.circumbinary.PointMass</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.SinkModel.html">sailfish.physics.circumbinary.SinkModel</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.physics.circumbinary.ViscosityModel.html">sailfish.physics.circumbinary.ViscosityModel</a></li>
 </ul>
 </li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.physics.kepler.html">sailfish.physics.kepler</a></li>
@@ -90,7 +93,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.physics.circumbinary">
+  <div class="section" id="module-sailfish.physics.circumbinary">
 <span id="sailfish-physics-circumbinary"></span><h1>sailfish.physics.circumbinary<a class="headerlink" href="#module-sailfish.physics.circumbinary" title="Permalink to this headline"></a></h1>
 <p class="rubric">Classes</p>
 <table class="longtable docutils align-default">
@@ -99,22 +102,34 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.physics.circumbinary.Diagnostic.html#sailfish.physics.circumbinary.Diagnostic" title="sailfish.physics.circumbinary.Diagnostic"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Diagnostic</span></code></a>(quantity, gravity, accretion, ...)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.physics.circumbinary.EquationOfState.html#sailfish.physics.circumbinary.EquationOfState" title="sailfish.physics.circumbinary.EquationOfState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">EquationOfState</span></code></a>(value)</p></td>
+<td><p>An enumeration.</p></td>
+</tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.physics.circumbinary.Physics.html#sailfish.physics.circumbinary.Physics" title="sailfish.physics.circumbinary.Physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Physics</span></code></a>([eos_type, sound_speed, ...])</p></td>
 <td><p>Physics configuration for the binary accretion solvers</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.physics.circumbinary.PointMass.html#sailfish.physics.circumbinary.PointMass" title="sailfish.physics.circumbinary.PointMass"><code class="xref py py-obj docutils literal notranslate"><span class="pre">PointMass</span></code></a>([mass, position_x, position_y, ...])</p></td>
 <td><p>Describes a gravitating point mass</p></td>
 </tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.physics.circumbinary.SinkModel.html#sailfish.physics.circumbinary.SinkModel" title="sailfish.physics.circumbinary.SinkModel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SinkModel</span></code></a>(value)</p></td>
+<td><p>An enumeration.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.physics.circumbinary.ViscosityModel.html#sailfish.physics.circumbinary.ViscosityModel" title="sailfish.physics.circumbinary.ViscosityModel"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ViscosityModel</span></code></a>(value)</p></td>
+<td><p>An enumeration.</p></td>
+</tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.physics.html" class="btn btn-neutral float-left" title="sailfish.physics" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.physics.circumbinary.Physics.html" class="btn btn-neutral float-right" title="sailfish.physics.circumbinary.Physics" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.physics.circumbinary.Diagnostic.html" class="btn btn-neutral float-right" title="sailfish.physics.circumbinary.Diagnostic" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

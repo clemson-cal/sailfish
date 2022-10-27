@@ -1,0 +1,6 @@
+sailfish.setups.envelope\_shock.shell\_density\_mt
+==================================================
+
+.. currentmodule:: sailfish.setups.envelope_shock
+
+.. autofunction:: shell_density_mt

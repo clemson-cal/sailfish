@@ -28,7 +28,8 @@ sailfish.solvers.cbdiso\_2d.Options
 
    .. autosummary::
    
-      ~Options.mach_ceiling
+      ~Options.density_floor
+      ~Options.rk_order
       ~Options.velocity_ceiling
    
    

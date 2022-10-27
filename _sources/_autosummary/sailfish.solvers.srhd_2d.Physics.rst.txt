@@ -1,0 +1,36 @@
+sailfish.solvers.srhd\_2d.Physics
+=================================
+
+.. currentmodule:: sailfish.solvers.srhd_2d
+
+.. autoclass:: Physics
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Physics.__init__
+      ~Physics.count
+      ~Physics.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Physics.jet_duration
+      ~Physics.jet_gamma_beta
+      ~Physics.jet_mdot
+      ~Physics.jet_theta
+   
+   

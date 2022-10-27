@@ -16,7 +16,7 @@ The main repository is hosted here: `github.com/clemson-cal <https://github.com/
 Quick-start
 ~~~~~~~~~~~
 
-Basic use from the command line is like this: ``sailfish shocktube
+Basic use from the command line is like this: ``bin/sailfish shocktube
 --end-time=0.2 --resolution=1000``. This command will run a built-in setup
 called `shocktube` to a simulation time of 0.2 seconds, on a 1d grid with
 1000 zones. The command line tool will print messages to the terminal, and
@@ -34,7 +34,7 @@ code below:
     from matplotlib import pyplot as plt
  
     state = run("shocktube", end_time=0.2, resolution=1000)
-    rho = state["primitive"][:, 0]
+    rho = state.solver.primitive[:, 0]
     plt.plot(rho)
     plt.show()
 

@@ -1,0 +1,647 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.solvers.cbdisodg_2d &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+          <li><a href="../solvers.html">sailfish.solvers</a> &raquo;</li>
+      <li>sailfish.solvers.cbdisodg_2d</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.solvers.cbdisodg_2d</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Isothermal solver for the binary accretion problem in 2D planar coordinates.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span>
+<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
+<span class="kn">from</span> <span class="nn">sailfish.kernel.library</span> <span class="kn">import</span> <span class="n">Library</span>
+<span class="kn">from</span> <span class="nn">sailfish.kernel.system</span> <span class="kn">import</span> <span class="n">get_array_module</span><span class="p">,</span> <span class="n">execution_context</span><span class="p">,</span> <span class="n">num_devices</span>
+<span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesian2DMesh</span>
+<span class="kn">from</span> <span class="nn">sailfish.physics.circumbinary</span> <span class="kn">import</span> <span class="n">Physics</span><span class="p">,</span> <span class="n">EquationOfState</span><span class="p">,</span> <span class="n">ViscosityModel</span>
+<span class="kn">from</span> <span class="nn">sailfish.solver</span> <span class="kn">import</span> <span class="n">SolverBase</span>
+<span class="kn">from</span> <span class="nn">sailfish.subdivide</span> <span class="kn">import</span> <span class="n">subdivide</span><span class="p">,</span> <span class="n">concat_on_host</span><span class="p">,</span> <span class="n">lazy_reduce</span>
+
+
+<span class="n">logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="n">NCONS</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">NPOLY</span> <span class="o">=</span> <span class="mi">6</span>
+<span class="n">ORDER</span> <span class="o">=</span> <span class="mi">3</span>
+<span class="n">GUARD</span> <span class="o">=</span> <span class="mi">1</span>
+
+
+<div class="viewcode-block" id="Options"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Options.html#sailfish.solvers.cbdisodg_2d.Options">[docs]</a><span class="k">class</span> <span class="nc">Options</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Contains parameters which are solver specific options.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">velocity_ceiling</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e12</span>
+    <span class="n">rk_order</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">limit_slopes</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span></div>
+
+
+<div class="viewcode-block" id="primitive_to_conserved"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.primitive_to_conserved.html#sailfish.solvers.cbdisodg_2d.primitive_to_conserved">[docs]</a><span class="k">def</span> <span class="nf">primitive_to_conserved</span><span class="p">(</span><span class="n">prim</span><span class="p">,</span> <span class="n">cons</span><span class="p">):</span>
+    <span class="n">sigma</span><span class="p">,</span> <span class="n">vx</span><span class="p">,</span> <span class="n">vy</span> <span class="o">=</span> <span class="n">prim</span>
+    <span class="n">cons</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma</span>
+    <span class="n">cons</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">vx</span>
+    <span class="n">cons</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma</span> <span class="o">*</span> <span class="n">vy</span></div>
+
+
+<div class="viewcode-block" id="initial_condition"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.initial_condition.html#sailfish.solvers.cbdisodg_2d.initial_condition">[docs]</a><span class="k">def</span> <span class="nf">initial_condition</span><span class="p">(</span><span class="n">setup</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate a 2D array of weights from a mesh and a setup.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+    <span class="n">g</span> <span class="o">=</span> <span class="p">(</span><span class="o">-</span><span class="mf">0.774596669241483</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.000000000000000</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.774596669241483</span><span class="p">)</span>
+    <span class="n">w</span> <span class="o">=</span> <span class="p">(</span><span class="o">+</span><span class="mf">0.555555555555556</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.888888888888889</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.555555555555556</span><span class="p">)</span>
+    <span class="n">p</span> <span class="o">=</span> <span class="p">(</span>
+        <span class="p">(</span><span class="o">+</span><span class="mf">1.000000000000000</span><span class="p">,</span> <span class="o">+</span><span class="mf">1.000000000000000</span><span class="p">,</span> <span class="o">+</span><span class="mf">1.000000000000000</span><span class="p">),</span>
+        <span class="p">(</span><span class="o">-</span><span class="mf">1.341640786499873</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.000000000000000</span><span class="p">,</span> <span class="o">+</span><span class="mf">1.341640786499873</span><span class="p">),</span>
+        <span class="p">(</span><span class="o">+</span><span class="mf">0.894427190999914</span><span class="p">,</span> <span class="o">-</span><span class="mf">1.118033988749900</span><span class="p">,</span> <span class="o">+</span><span class="mf">0.894427190999914</span><span class="p">),</span>
+    <span class="p">)</span>
+
+    <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span>
+    <span class="n">dx</span><span class="p">,</span> <span class="n">dy</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">dx</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">dy</span>
+    <span class="n">prim_node</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">NCONS</span><span class="p">)</span>
+    <span class="n">cons_node</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">NCONS</span><span class="p">)</span>
+    <span class="n">weights</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">ni</span><span class="p">,</span> <span class="n">nj</span><span class="p">,</span> <span class="n">NCONS</span><span class="p">,</span> <span class="n">ORDER</span><span class="p">,</span> <span class="n">ORDER</span><span class="p">])</span>
+
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ni</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">nj</span><span class="p">):</span>
+            <span class="k">for</span> <span class="n">i_quad</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ORDER</span><span class="p">):</span>
+                <span class="k">for</span> <span class="n">j_quad</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ORDER</span><span class="p">):</span>
+                    <span class="n">xc</span><span class="p">,</span> <span class="n">yc</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">cell_coordinates</span><span class="p">(</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">)</span>
+                    <span class="n">x</span> <span class="o">=</span> <span class="n">xc</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">dx</span> <span class="o">*</span> <span class="n">g</span><span class="p">[</span><span class="n">i_quad</span><span class="p">]</span>
+                    <span class="n">y</span> <span class="o">=</span> <span class="n">yc</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">dy</span> <span class="o">*</span> <span class="n">g</span><span class="p">[</span><span class="n">j_quad</span><span class="p">]</span>
+                    <span class="n">setup</span><span class="o">.</span><span class="n">primitive</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">),</span> <span class="n">prim_node</span><span class="p">)</span>
+                    <span class="n">primitive_to_conserved</span><span class="p">(</span><span class="n">prim_node</span><span class="p">,</span> <span class="n">cons_node</span><span class="p">)</span>
+                    <span class="k">for</span> <span class="n">q</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">NCONS</span><span class="p">):</span>
+                        <span class="k">for</span> <span class="n">m</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ORDER</span><span class="p">):</span>
+                            <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ORDER</span><span class="p">):</span>
+                                <span class="n">weights</span><span class="p">[</span><span class="n">i</span><span class="p">,</span> <span class="n">j</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">m</span><span class="p">,</span> <span class="n">n</span><span class="p">]</span> <span class="o">+=</span> <span class="p">(</span>
+                                    <span class="mf">0.25</span>
+                                    <span class="o">*</span> <span class="n">cons_node</span><span class="p">[</span><span class="n">q</span><span class="p">]</span>
+                                    <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="n">m</span><span class="p">][</span><span class="n">i_quad</span><span class="p">]</span>
+                                    <span class="o">*</span> <span class="n">p</span><span class="p">[</span><span class="n">n</span><span class="p">][</span><span class="n">j_quad</span><span class="p">]</span>
+                                    <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="n">i_quad</span><span class="p">]</span>
+                                    <span class="o">*</span> <span class="n">w</span><span class="p">[</span><span class="n">j_quad</span><span class="p">]</span>
+                                <span class="p">)</span>
+    <span class="k">return</span> <span class="n">weights</span></div>
+
+
+<div class="viewcode-block" id="Patch"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Patch.html#sailfish.solvers.cbdisodg_2d.Patch">[docs]</a><span class="k">class</span> <span class="nc">Patch</span><span class="p">:</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Holds the array buffer state for the solution on a subset of the</span>
+<span class="sd">    solution domain.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Patch.__init__"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Patch.html#sailfish.solvers.cbdisodg_2d.Patch.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">time</span><span class="p">,</span>
+        <span class="n">weights</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="p">,</span>
+        <span class="n">index_range</span><span class="p">,</span>
+        <span class="n">physics</span><span class="p">,</span>
+        <span class="n">options</span><span class="p">,</span>
+        <span class="n">buffer_outer_radius</span><span class="p">,</span>
+        <span class="n">buffer_surface_density</span><span class="p">,</span>
+        <span class="n">lib</span><span class="p">,</span>
+        <span class="n">xp</span><span class="p">,</span>
+        <span class="n">execution_context</span><span class="p">,</span>
+    <span class="p">):</span>
+        <span class="n">i0</span><span class="p">,</span> <span class="n">i1</span> <span class="o">=</span> <span class="n">index_range</span>
+        <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="n">i1</span> <span class="o">-</span> <span class="n">i0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">lib</span> <span class="o">=</span> <span class="n">lib</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span> <span class="o">=</span> <span class="n">mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xp</span> <span class="o">=</span> <span class="n">xp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span> <span class="o">=</span> <span class="n">execution_context</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">=</span> <span class="n">time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">i1</span> <span class="o">-</span> <span class="n">i0</span><span class="p">,</span> <span class="n">nj</span><span class="p">)</span>  <span class="c1"># not including guard zones</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">physics</span> <span class="o">=</span> <span class="n">physics</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">vertex_coordinates</span><span class="p">(</span><span class="n">i0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">yr</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">vertex_coordinates</span><span class="p">(</span><span class="n">i1</span><span class="p">,</span> <span class="n">nj</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffer_outer_radius</span> <span class="o">=</span> <span class="n">buffer_outer_radius</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="n">buffer_surface_density</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">weights</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">weights0</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">weights</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span>  <span class="c1"># weights at the timestep start</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>  <span class="c1"># weights to be read from</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">weights2</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">weights</span><span class="p">)</span>  <span class="c1"># weights to be written to</span></div>
+
+<div class="viewcode-block" id="Patch.point_mass_source_term"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Patch.html#sailfish.solvers.cbdisodg_2d.Patch.point_mass_source_term">[docs]</a>    <span class="k">def</span> <span class="nf">point_mass_source_term</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">which_mass</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return an array of the rates of conserved quantities, resulting from the application of</span>
+<span class="sd">        gravitational and/or accretion source terms due to point masses.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="n">which_mass</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;the mass must be either 1 or 2&quot;</span><span class="p">)</span>
+
+        <span class="n">ng</span> <span class="o">=</span> <span class="n">GUARD</span>  <span class="c1"># number of guard cells</span>
+        <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="n">cons_rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">ni</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nj</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">NCONS</span><span class="p">])</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdiso_2d_point_mass_source_term</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yr</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">velocity_ceiling</span><span class="p">,</span>
+                <span class="n">which_mass</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">,</span>
+                <span class="n">cons_rate</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">cons_rate</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span></div>
+
+<div class="viewcode-block" id="Patch.maximum_wavespeed"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Patch.html#sailfish.solvers.cbdisodg_2d.Patch.maximum_wavespeed">[docs]</a>    <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Returns the maximum wavespeed over a given patch.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdisodg_2d_wavespeed</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">sound_speed</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">mach_number</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">eos_type</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">velocity_ceiling</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span><span class="o">.</span><span class="n">max</span><span class="p">()</span></div>
+
+    <span class="k">def</span> <span class="nf">copy_weights1_to_weights0</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">weights0</span><span class="p">[</span><span class="o">...</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">[</span><span class="o">...</span><span class="p">]</span>
+
+<div class="viewcode-block" id="Patch.slope_limit"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Patch.html#sailfish.solvers.cbdisodg_2d.Patch.slope_limit">[docs]</a>    <span class="k">def</span> <span class="nf">slope_limit</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Limit slopes using minmodTVB</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdisodg_2d_slope_limit</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yr</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">weights2</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span></div>
+
+<div class="viewcode-block" id="Patch.advance_rk"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Patch.html#sailfish.solvers.cbdisodg_2d.Patch.advance_rk">[docs]</a>    <span class="k">def</span> <span class="nf">advance_rk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rk_param</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Pass required parameters for time evolution of the setup.</span>
+
+<span class="sd">        This function calls the C-module function responsible for performing time evolution using a</span>
+<span class="sd">        RK algorithm to update the parameters of the setup.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+        <span class="n">buffer_central_mass</span> <span class="o">=</span> <span class="n">m1</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="n">m2</span><span class="o">.</span><span class="n">mass</span>
+        <span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_surface_density</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdisodg_2d_advance_rk</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">weights0</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">weights2</span><span class="p">,</span>
+                <span class="n">buffer_surface_density</span><span class="p">,</span>
+                <span class="n">buffer_central_mass</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">buffer_driving_rate</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">buffer_outer_radius</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">buffer_onset_width</span><span class="p">,</span>
+                <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">buffer_is_enabled</span><span class="p">),</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">sound_speed</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">mach_number</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">eos_type</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">viscosity_coefficient</span><span class="p">,</span>
+                <span class="n">rk_param</span><span class="p">,</span>
+                <span class="n">dt</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">velocity_ceiling</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">*</span> <span class="n">rk_param</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">+</span> <span class="n">dt</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">rk_param</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span></div>
+
+    <span class="k">def</span> <span class="nf">new_iteration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">copy_weights1_to_weights0</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="n">u0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">weights1</span><span class="p">[:,</span> <span class="p">:,</span> <span class="p">:,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">p0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">u0</span><span class="p">)</span>
+            <span class="n">p0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">u0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">p0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">u0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">/</span> <span class="n">u0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="n">p0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">u0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">2</span><span class="p">]</span> <span class="o">/</span> <span class="n">u0</span><span class="p">[</span><span class="o">...</span><span class="p">,</span> <span class="mi">0</span><span class="p">]</span>
+            <span class="k">return</span> <span class="n">p0</span></div>
+
+
+<div class="viewcode-block" id="Solver"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Solver.html#sailfish.solvers.cbdisodg_2d.Solver">[docs]</a><span class="k">class</span> <span class="nc">Solver</span><span class="p">(</span><span class="n">SolverBase</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Adapter class to drive the cbdisodg_2d C extension module.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+<div class="viewcode-block" id="Solver.__init__"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Solver.html#sailfish.solvers.cbdisodg_2d.Solver.__init__">[docs]</a>    <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span>
+        <span class="bp">self</span><span class="p">,</span>
+        <span class="n">setup</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">mesh</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">time</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+        <span class="n">solution</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+        <span class="n">num_patches</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span>
+        <span class="n">mode</span><span class="o">=</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span>
+        <span class="n">physics</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
+        <span class="n">options</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
+    <span class="p">):</span>
+        <span class="kn">import</span> <span class="nn">numpy</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span> <span class="o">=</span> <span class="n">physics</span> <span class="o">=</span> <span class="n">Physics</span><span class="p">(</span><span class="o">**</span><span class="n">physics</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">Options</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">mesh</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">PlanarCartesian2DMesh</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports 2D Cartesian mesh&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">setup</span><span class="o">.</span><span class="n">boundary_condition</span> <span class="o">!=</span> <span class="s2">&quot;outflow&quot;</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports outflow boundary condition&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">viscosity_model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+            <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">CONSTANT_NU</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports constant-nu viscosity&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">eos_type</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="n">EquationOfState</span><span class="o">.</span><span class="n">GLOBALLY_ISOTHERMAL</span><span class="p">,</span>
+            <span class="n">EquationOfState</span><span class="o">.</span><span class="n">LOCALLY_ISOTHERMAL</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports isothermal equation of states&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">cooling_coefficient</span> <span class="o">!=</span> <span class="mf">0.0</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver does not support thermal cooling&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">physics</span><span class="o">.</span><span class="n">constant_softening</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports constant gravitational softening&quot;</span><span class="p">)</span>
+
+        <span class="n">xp</span> <span class="o">=</span> <span class="n">get_array_module</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
+        <span class="n">ng</span> <span class="o">=</span> <span class="n">GUARD</span>  <span class="c1"># number of guard zones</span>
+        <span class="n">nq</span> <span class="o">=</span> <span class="n">NCONS</span>  <span class="c1"># number of conserved quantities</span>
+        <span class="n">np</span> <span class="o">=</span> <span class="n">NPOLY</span>  <span class="c1"># number of polynomials</span>
+        <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="vm">__file__</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.py&quot;</span><span class="p">,</span> <span class="s2">&quot;.c&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
+            <span class="n">code</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
+        <span class="n">lib</span> <span class="o">=</span> <span class="n">Library</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;initiate with time=</span><span class="si">{</span><span class="n">time</span><span class="si">:</span><span class="s2">0.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;subdivide grid over </span><span class="si">{</span><span class="n">num_patches</span><span class="si">}</span><span class="s2"> patches&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;mesh is </span><span class="si">{</span><span class="n">mesh</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;boundary condition is outflow&quot;</span><span class="p">)</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;viscosity is </span><span class="si">{</span><span class="n">physics</span><span class="o">.</span><span class="n">viscosity_coefficient</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span> <span class="o">=</span> <span class="n">mesh</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">setup</span> <span class="o">=</span> <span class="n">setup</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span> <span class="o">=</span> <span class="n">ng</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">num_cons</span> <span class="o">=</span> <span class="n">nq</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xp</span> <span class="o">=</span> <span class="n">xp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">patches</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span>
+
+        <span class="k">if</span> <span class="n">solution</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="n">initial_condition</span><span class="p">(</span><span class="n">setup</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">weights</span> <span class="o">=</span> <span class="n">solution</span>
+
+        <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">buffer_is_enabled</span><span class="p">:</span>
+            <span class="c1"># Here we sample the initial condition at the buffer onset radius</span>
+            <span class="c1"># to determine the disk surface density at the radius where the</span>
+            <span class="c1"># buffer begins to ramp up. This procedure makes sense as long as</span>
+            <span class="c1"># the initial condition is axisymmetric.</span>
+            <span class="n">buffer_prim</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">3</span>
+            <span class="n">buffer_outer_radius</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">x1</span>  <span class="c1"># this assumes the mesh is a centered squared</span>
+            <span class="n">buffer_onset_radius</span> <span class="o">=</span> <span class="n">buffer_outer_radius</span> <span class="o">-</span> <span class="n">physics</span><span class="o">.</span><span class="n">buffer_onset_width</span>
+            <span class="n">setup</span><span class="o">.</span><span class="n">primitive</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="p">[</span><span class="n">buffer_onset_radius</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="n">buffer_prim</span><span class="p">)</span>
+            <span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="n">buffer_prim</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">buffer_outer_radius</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="mf">0.0</span>
+
+        <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">subdivide</span><span class="p">(</span><span class="n">ni</span><span class="p">,</span> <span class="n">num_patches</span><span class="p">)):</span>
+            <span class="n">weights_patch</span> <span class="o">=</span> <span class="n">numpy</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nj</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nq</span><span class="p">,</span> <span class="n">ORDER</span><span class="p">,</span> <span class="n">ORDER</span><span class="p">])</span>
+            <span class="n">weights_patch</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">weights</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
+            <span class="n">patch</span> <span class="o">=</span> <span class="n">Patch</span><span class="p">(</span>
+                <span class="n">time</span><span class="p">,</span>
+                <span class="n">weights_patch</span><span class="p">,</span>
+                <span class="n">mesh</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span>
+                <span class="n">physics</span><span class="p">,</span>
+                <span class="n">options</span><span class="p">,</span>
+                <span class="n">buffer_outer_radius</span><span class="p">,</span>
+                <span class="n">buffer_surface_density</span><span class="p">,</span>
+                <span class="n">lib</span><span class="p">,</span>
+                <span class="n">xp</span><span class="p">,</span>
+                <span class="n">execution_context</span><span class="p">(</span><span class="n">mode</span><span class="p">,</span> <span class="n">device_id</span><span class="o">=</span><span class="n">n</span> <span class="o">%</span> <span class="n">num_devices</span><span class="p">(</span><span class="n">mode</span><span class="p">)),</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;weights1&quot;</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;weights1&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">concat_on_host</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">weights1</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">],</span>
+            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span><span class="p">),</span>
+            <span class="n">rank</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;weights1&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">concat_on_host</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">primitive</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">],</span>
+            <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span><span class="p">),</span>
+            <span class="n">rank</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="Solver.reductions"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Solver.html#sailfish.solvers.cbdisodg_2d.Solver.reductions">[docs]</a>    <span class="k">def</span> <span class="nf">reductions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate runtime reductions on the solution data for time series.</span>
+
+<span class="sd">        As of now, the reductions generated are the rates of mass accretion, and</span>
+<span class="sd">        of x and y momentum (combined gravitational and accretion) resulting</span>
+<span class="sd">        from each of the point masses. If there are 2 point masses, then the</span>
+<span class="sd">        result of this function is a 7-element list: `[time, mdot1, fx1, fy1,</span>
+<span class="sd">        mdot2, fx2, fy2]`.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="nf">to_host</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">a</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+            <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">a</span>
+
+        <span class="k">def</span> <span class="nf">patch_reduction</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">which</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">patch</span><span class="o">.</span><span class="n">point_mass_source_term</span><span class="p">(</span><span class="n">which</span><span class="p">)</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">axis</span><span class="o">=</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">))</span> <span class="o">*</span> <span class="n">da</span>
+
+        <span class="n">da</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dx</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dy</span>
+        <span class="n">point_mass_reductions</span> <span class="o">=</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">]</span>
+
+        <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">_physics</span><span class="o">.</span><span class="n">num_particles</span><span class="p">):</span>
+            <span class="n">point_mass_reductions</span><span class="o">.</span><span class="n">extend</span><span class="p">(</span>
+                <span class="n">lazy_reduce</span><span class="p">(</span>
+                    <span class="nb">sum</span><span class="p">,</span>
+                    <span class="n">to_host</span><span class="p">,</span>
+                    <span class="p">(</span><span class="k">lambda</span><span class="p">:</span> <span class="n">patch_reduction</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">n</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">),</span>
+                    <span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">execution_context</span> <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">),</span>
+                <span class="p">)</span>
+            <span class="p">)</span>
+        <span class="k">return</span> <span class="n">point_mass_reductions</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">time</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">options</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">recommended_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.08</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">maximum_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.4</span>
+
+<div class="viewcode-block" id="Solver.maximum_wavespeed"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Solver.html#sailfish.solvers.cbdisodg_2d.Solver.maximum_wavespeed">[docs]</a>    <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return the global maximum wavespeed over the whole domain.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="n">lazy_reduce</span><span class="p">(</span>
+            <span class="nb">max</span><span class="p">,</span>
+            <span class="nb">float</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">maximum_wavespeed</span> <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">execution_context</span> <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">),</span>
+        <span class="p">)</span></div>
+
+<div class="viewcode-block" id="Solver.advance"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdisodg_2d.Solver.html#sailfish.solvers.cbdisodg_2d.Solver.advance">[docs]</a>    <span class="k">def</span> <span class="nf">advance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">new_iteration</span><span class="p">()</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">rk_order</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">rk_order</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="mf">0.5</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">rk_order</span> <span class="o">==</span> <span class="mi">3</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="mf">0.75</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="mf">3.0</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span></div>
+
+    <span class="k">def</span> <span class="nf">advance_rk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rk_param</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="o">.</span><span class="n">limit_slopes</span><span class="p">:</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;weights1&quot;</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">:</span>
+                <span class="n">patch</span><span class="o">.</span><span class="n">slope_limit</span><span class="p">()</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;weights1&quot;</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">:</span>
+            <span class="n">patch</span><span class="o">.</span><span class="n">advance_rk</span><span class="p">(</span><span class="n">rk_param</span><span class="p">,</span> <span class="n">dt</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">set_bc</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">array</span><span class="p">):</span>
+        <span class="n">ng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span>
+        <span class="n">num_patches</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">i0</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_patches</span><span class="p">):</span>
+            <span class="n">il</span> <span class="o">=</span> <span class="p">(</span><span class="n">i0</span> <span class="o">+</span> <span class="n">num_patches</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">num_patches</span>
+            <span class="n">ir</span> <span class="o">=</span> <span class="p">(</span><span class="n">i0</span> <span class="o">+</span> <span class="n">num_patches</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">%</span> <span class="n">num_patches</span>
+            <span class="n">pl</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">[</span><span class="n">il</span><span class="p">],</span> <span class="n">array</span><span class="p">)</span>
+            <span class="n">pc</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">[</span><span class="n">i0</span><span class="p">],</span> <span class="n">array</span><span class="p">)</span>
+            <span class="n">pr</span> <span class="o">=</span> <span class="nb">getattr</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">[</span><span class="n">ir</span><span class="p">],</span> <span class="n">array</span><span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">set_bc_patch</span><span class="p">(</span><span class="n">pl</span><span class="p">,</span> <span class="n">pc</span><span class="p">,</span> <span class="n">pr</span><span class="p">,</span> <span class="n">i0</span><span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">set_bc_patch</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">pl</span><span class="p">,</span> <span class="n">pc</span><span class="p">,</span> <span class="n">pr</span><span class="p">,</span> <span class="n">patch_index</span><span class="p">):</span>
+        <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">shape</span>
+        <span class="n">ng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">[</span><span class="n">patch_index</span><span class="p">]</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="c1"># 1. write to the guard zones of pc, the internal BC</span>
+            <span class="n">pc</span><span class="p">[:</span><span class="o">+</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">pl</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span> <span class="p">:</span> <span class="o">-</span><span class="n">ng</span><span class="p">]</span>
+            <span class="n">pc</span><span class="p">[</span><span class="o">-</span><span class="n">ng</span><span class="p">:]</span> <span class="o">=</span> <span class="n">pr</span><span class="p">[</span><span class="o">+</span><span class="n">ng</span> <span class="p">:</span> <span class="o">+</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">]</span>
+
+            <span class="c1"># 2. Set outflow BC on the left/right patch edges</span>
+            <span class="k">if</span> <span class="n">patch_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ng</span><span class="p">):</span>
+                    <span class="n">pc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[</span><span class="n">ng</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">patch_index</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">ng</span><span class="p">,</span> <span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                    <span class="n">pc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[</span><span class="o">-</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+
+            <span class="c1"># 3. Set outflow BC on bottom and top edges</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ng</span><span class="p">):</span>
+                <span class="n">pc</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[:,</span> <span class="n">ng</span><span class="p">]</span>
+
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ng</span><span class="p">,</span> <span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="n">pc</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[:,</span> <span class="o">-</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+
+    <span class="k">def</span> <span class="nf">new_iteration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">:</span>
+            <span class="n">patch</span><span class="o">.</span><span class="n">new_iteration</span><span class="p">()</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

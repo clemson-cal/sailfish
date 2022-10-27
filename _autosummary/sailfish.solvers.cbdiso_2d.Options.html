@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.cbdiso_2d.Options &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -52,6 +51,8 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.initial_condition.html">sailfish.solvers.cbdiso_2d.initial_condition</a></li>
@@ -60,6 +61,7 @@
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.Solver.html">sailfish.solvers.cbdiso_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
@@ -97,12 +99,13 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solvers-cbdiso-2d-options">
+  <div class="section" id="sailfish-solvers-cbdiso-2d-options">
 <h1>sailfish.solvers.cbdiso_2d.Options<a class="headerlink" href="#sailfish-solvers-cbdiso-2d-options" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Options">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdiso_2d.</span></span><span class="sig-name descname"><span class="pre">Options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">velocity_ceiling</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mach_ceiling</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Options" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdiso_2d.</span></span><span class="sig-name descname"><span class="pre">Options</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">velocity_ceiling</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1000000000000.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">density_floor</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-12</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">rk_order</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">2</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Options"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Options" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
+<p>Contains parameters which are solver specific options.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Options.__init__">
 <span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Options.__init__" title="Permalink to this definition"></a></dt>
@@ -133,10 +136,13 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Options.mach_ceiling" title="sailfish.solvers.cbdiso_2d.Options.mach_ceiling"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mach_ceiling</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Options.density_floor" title="sailfish.solvers.cbdiso_2d.Options.density_floor"><code class="xref py py-obj docutils literal notranslate"><span class="pre">density_floor</span></code></a></p></td>
 <td><p>Alias for field number 1</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Options.velocity_ceiling" title="sailfish.solvers.cbdiso_2d.Options.velocity_ceiling"><code class="xref py py-obj docutils literal notranslate"><span class="pre">velocity_ceiling</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Options.rk_order" title="sailfish.solvers.cbdiso_2d.Options.rk_order"><code class="xref py py-obj docutils literal notranslate"><span class="pre">rk_order</span></code></a></p></td>
+<td><p>Alias for field number 2</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Options.velocity_ceiling" title="sailfish.solvers.cbdiso_2d.Options.velocity_ceiling"><code class="xref py py-obj docutils literal notranslate"><span class="pre">velocity_ceiling</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
 </tr>
 </tbody>
@@ -147,6 +153,12 @@
 <dd><p>Return number of occurrences of value.</p>
 </dd></dl>
 
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Options.density_floor">
+<span class="sig-name descname"><span class="pre">density_floor</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Options.density_floor" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Options.index">
 <span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9223372036854775807</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Options.index" title="Permalink to this definition"></a></dt>
@@ -155,9 +167,9 @@
 </dd></dl>
 
 <dl class="py attribute">
-<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Options.mach_ceiling">
-<span class="sig-name descname"><span class="pre">mach_ceiling</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Options.mach_ceiling" title="Permalink to this definition"></a></dt>
-<dd><p>Alias for field number 1</p>
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Options.rk_order">
+<span class="sig-name descname"><span class="pre">rk_order</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Options.rk_order" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 2</p>
 </dd></dl>
 
 <dl class="py attribute">
@@ -168,7 +180,7 @@
 
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>

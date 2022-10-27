@@ -36,9 +36,11 @@ sailfish.driver.DriverArgs
       ~DriverArgs.execution_mode
       ~DriverArgs.fold
       ~DriverArgs.model_parameters
+      ~DriverArgs.new_timestep_cadence
       ~DriverArgs.num_patches
       ~DriverArgs.resolution
       ~DriverArgs.setup_name
       ~DriverArgs.solver_options
+      ~DriverArgs.verbose_output
    
    

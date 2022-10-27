@@ -14,14 +14,15 @@
    .. autosummary::
       :toctree:
    
-      asdict
+      append_timeseries
       first_not_none
-      fromdict
       init_logging
       keyed_event
       keyed_value
       load_checkpoint
+      load_user_config
       main
+      newest_chkpt_in_directory
       run
       simulate
       update_dict_where_none
@@ -38,6 +39,7 @@
       :toctree:
    
       DriverArgs
+      DriverState
    
    
 
@@ -49,6 +51,7 @@
       :toctree:
    
       ConfigurationError
+      ExtensionError
    
    
 

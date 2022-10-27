@@ -1,0 +1,6 @@
+sailfish.subdivide.lazy\_reduce
+===============================
+
+.. currentmodule:: sailfish.subdivide
+
+.. autofunction:: lazy_reduce

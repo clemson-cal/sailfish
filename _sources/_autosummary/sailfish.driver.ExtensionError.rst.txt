@@ -1,0 +1,6 @@
+sailfish.driver.ExtensionError
+==============================
+
+.. currentmodule:: sailfish.driver
+
+.. autoexception:: ExtensionError

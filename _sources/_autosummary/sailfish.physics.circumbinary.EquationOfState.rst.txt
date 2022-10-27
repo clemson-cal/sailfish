@@ -1,0 +1,27 @@
+sailfish.physics.circumbinary.EquationOfState
+=============================================
+
+.. currentmodule:: sailfish.physics.circumbinary
+
+.. autoclass:: EquationOfState
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~EquationOfState.GLOBALLY_ISOTHERMAL
+      ~EquationOfState.LOCALLY_ISOTHERMAL
+      ~EquationOfState.GAMMA_LAW
+   
+   

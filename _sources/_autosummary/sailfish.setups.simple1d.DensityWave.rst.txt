@@ -17,6 +17,7 @@ sailfish.setups.simple1d.DensityWave
    .. autosummary::
    
       ~DensityWave.__init__
+      ~DensityWave.checkpoint_diagnostics
       ~DensityWave.dash_case_class_name
       ~DensityWave.default_model_parameters
       ~DensityWave.describe_class
@@ -42,7 +43,9 @@ sailfish.setups.simple1d.DensityWave
       ~DensityWave.boundary_condition
       ~DensityWave.default_end_time
       ~DensityWave.default_resolution
+      ~DensityWave.diagnostics
       ~DensityWave.physics
+      ~DensityWave.reference_time_scale
       ~DensityWave.solver
       ~DensityWave.start_time
       ~DensityWave.velocity

@@ -1,0 +1,30 @@
+sailfish.setups.binary\_bondi
+=============================
+
+.. automodule:: sailfish.setups.binary_bondi
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      BinaryBondi
+   
+   
+
+   
+   
+   
+
+
+

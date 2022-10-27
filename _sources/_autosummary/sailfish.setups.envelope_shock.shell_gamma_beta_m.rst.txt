@@ -1,0 +1,6 @@
+sailfish.setups.envelope\_shock.shell\_gamma\_beta\_m
+=====================================================
+
+.. currentmodule:: sailfish.setups.envelope_shock
+
+.. autofunction:: shell_gamma_beta_m

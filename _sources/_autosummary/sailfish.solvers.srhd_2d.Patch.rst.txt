@@ -18,7 +18,7 @@ sailfish.solvers.srhd\_2d.Patch
    
       ~Patch.__init__
       ~Patch.advance_rk
-      ~Patch.execution_context
+      ~Patch.maximum_wavespeed
       ~Patch.new_iteration
       ~Patch.recompute_primitive
    
@@ -31,7 +31,6 @@ sailfish.solvers.srhd\_2d.Patch
    .. autosummary::
    
       ~Patch.conserved
-      ~Patch.maximum_wavespeed
       ~Patch.primitive
       ~Patch.scale_factor
    

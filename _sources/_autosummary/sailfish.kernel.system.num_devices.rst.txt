@@ -1,0 +1,6 @@
+sailfish.kernel.system.num\_devices
+===================================
+
+.. currentmodule:: sailfish.kernel.system
+
+.. autofunction:: num_devices

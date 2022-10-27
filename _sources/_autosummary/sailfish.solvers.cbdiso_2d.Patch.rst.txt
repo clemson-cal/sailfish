@@ -18,9 +18,9 @@ sailfish.solvers.cbdiso\_2d.Patch
    
       ~Patch.__init__
       ~Patch.advance_rk
-      ~Patch.execution_context
       ~Patch.maximum_wavespeed
       ~Patch.new_iteration
+      ~Patch.point_mass_source_term
       ~Patch.recompute_conserved
    
    
@@ -31,6 +31,7 @@ sailfish.solvers.cbdiso\_2d.Patch
 
    .. autosummary::
    
+      ~Patch.cell_center_coordinate_arrays
       ~Patch.primitive
    
    

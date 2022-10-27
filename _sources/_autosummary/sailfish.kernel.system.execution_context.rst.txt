@@ -1,0 +1,6 @@
+sailfish.kernel.system.execution\_context
+=========================================
+
+.. currentmodule:: sailfish.kernel.system
+
+.. autofunction:: execution_context

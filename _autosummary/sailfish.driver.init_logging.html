@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.driver.init_logging &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -19,7 +18,7 @@
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
     <link rel="next" title="sailfish.driver.keyed_event" href="sailfish.driver.keyed_event.html" />
-    <link rel="prev" title="sailfish.driver.fromdict" href="sailfish.driver.fromdict.html" /> 
+    <link rel="prev" title="sailfish.driver.first_not_none" href="sailfish.driver.first_not_none.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -43,21 +42,24 @@
 <li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.asdict.html">sailfish.driver.asdict</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.append_timeseries.html">sailfish.driver.append_timeseries</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.first_not_none.html">sailfish.driver.first_not_none</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.fromdict.html">sailfish.driver.fromdict</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.driver.init_logging</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_event.html">sailfish.driver.keyed_event</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_value.html">sailfish.driver.keyed_value</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_checkpoint.html">sailfish.driver.load_checkpoint</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_user_config.html">sailfish.driver.load_user_config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.main.html">sailfish.driver.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.newest_chkpt_in_directory.html">sailfish.driver.newest_chkpt_in_directory</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.run.html">sailfish.driver.run</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.simulate.html">sailfish.driver.simulate</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_dict_where_none.html">sailfish.driver.update_dict_where_none</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_where_none.html">sailfish.driver.update_where_none</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.write_checkpoint.html">sailfish.driver.write_checkpoint</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.DriverArgs.html">sailfish.driver.DriverArgs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.DriverState.html">sailfish.driver.DriverState</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ConfigurationError.html">sailfish.driver.ConfigurationError</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ExtensionError.html">sailfish.driver.ExtensionError</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
@@ -99,7 +101,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-driver-init-logging">
+  <div class="section" id="sailfish-driver-init-logging">
 <h1>sailfish.driver.init_logging<a class="headerlink" href="#sailfish-driver-init-logging" title="Permalink to this headline"></a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="sailfish.driver.init_logging">
@@ -116,13 +118,13 @@ function will do it for you. Note this function is also invoked by the
 <cite>run</cite> function if <code class="code docutils literal notranslate"><span class="pre">quiet=False</span></code> is passed to it.</p>
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.driver.fromdict.html" class="btn btn-neutral float-left" title="sailfish.driver.fromdict" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.driver.first_not_none.html" class="btn btn-neutral float-left" title="sailfish.driver.first_not_none" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
         <a href="sailfish.driver.keyed_event.html" class="btn btn-neutral float-right" title="sailfish.driver.keyed_event" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 

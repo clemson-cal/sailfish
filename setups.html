@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>Problem setups &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
@@ -75,7 +74,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="problem-setups">
+  <div class="section" id="problem-setups">
 <h1>Problem setups<a class="headerlink" href="#problem-setups" title="Permalink to this headline"></a></h1>
 <p>Simulations are configured by an object called a <cite>setup</cite>. The setup specifies
 initial conditions, a mesh, boundary conditions, and a solver class, among
@@ -85,7 +84,7 @@ with many internal parameters. The degrees of freedom within a setup are
 called <cite>model parameters</cite>, and these have default values which define a
 fiducial model, but they can also be overridden from command line input
 or other sources of configuration.</p>
-<section id="minimal-example">
+<div class="section" id="minimal-example">
 <h2>Minimal example<a class="headerlink" href="#minimal-example" title="Permalink to this headline"></a></h2>
 <p>Here is a minimal setup, which defines a 1D relativistic hydrodynamics problem
 consisting of a traveling density wave:</p>
@@ -118,8 +117,8 @@ consisting of a traveling density wave:</p>
 cartesian coordinates, on a domain from 0.0 to 1.0. The boundary condition is
 periodic, and the hydrodynamic primitive data so the density has a sinusoidal
 variation, and the velocity is uniform.</p>
-</section>
-<section id="required-methods">
+</div>
+<div class="section" id="required-methods">
 <h2>Required methods<a class="headerlink" href="#required-methods" title="Permalink to this headline"></a></h2>
 <p>Custom setup classes must inherit the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup</span></code></a> base class.
 The setup base class provides a lot of functionality in the form of methods
@@ -156,8 +155,8 @@ in a 3D problem it could be the number of zones on each side of the domain.</p>
 a string to identify the type of boundary condition to be applied. The mesh
 and boundary condition objects must be compatible with (supported by) the
 solver, otherwise the solver will throw an exception when it’s constructed.</p>
-</section>
-<section id="choosing-a-setup">
+</div>
+<div class="section" id="choosing-a-setup">
 <h2>Choosing a setup<a class="headerlink" href="#choosing-a-setup" title="Permalink to this headline"></a></h2>
 <p>The first argument to the sailfish command line tool is the name of a setup
 class, converted to dash-case, i.e. you could run the setup above in a default
@@ -171,8 +170,8 @@ class must be imported before <a class="reference internal" href="_autosummary/s
 new source file to the <a class="reference internal" href="_autosummary/sailfish.setups.html#module-sailfish.setups" title="sailfish.setups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setups</span></code></a> module, you must import that module in
 the <code class="code docutils literal notranslate"><span class="pre">setups/__init__.py</span></code> file for the setup class(es) in it to be
 discovered.</p>
-</section>
-<section id="model-parameters">
+</div>
+<div class="section" id="model-parameters">
 <h2>Model parameters<a class="headerlink" href="#model-parameters" title="Permalink to this headline"></a></h2>
 <p>A setup can have internal degrees of freedom to be configured at runtime,
 which are referred to as <cite>model parameters</cite>. To add a model parameter to a
@@ -195,11 +194,11 @@ sense to make them mutable.</p>
 <p>Model parameters are passed to the setup class from the command line as
 key-value pairs like this:
 <code class="code docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">density-wave</span> <span class="pre">--model</span> <span class="pre">amplitude=0.5</span> <span class="pre">wavenumber=2</span></code>.</p>
-</section>
-<section id="optional-methods">
+</div>
+<div class="section" id="optional-methods">
 <h2>Optional methods<a class="headerlink" href="#optional-methods" title="Permalink to this headline"></a></h2>
-</section>
-</section>
+</div>
+</div>
 
 
            </div>

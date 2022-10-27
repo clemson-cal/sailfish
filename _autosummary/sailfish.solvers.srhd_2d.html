@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.srhd_2d &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -52,13 +51,18 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.solvers.srhd_2d</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.initial_condition.html">sailfish.solvers.srhd_2d.initial_condition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Options.html">sailfish.solvers.srhd_2d.Options</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Patch.html">sailfish.solvers.srhd_2d.Patch</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Physics.html">sailfish.solvers.srhd_2d.Physics</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Solver.html">sailfish.solvers.srhd_2d.Solver</a></li>
 </ul>
 </li>
@@ -95,9 +99,20 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.solvers.srhd_2d">
+  <div class="section" id="module-sailfish.solvers.srhd_2d">
 <span id="sailfish-solvers-srhd-2d"></span><h1>sailfish.solvers.srhd_2d<a class="headerlink" href="#module-sailfish.solvers.srhd_2d" title="Permalink to this headline"></a></h1>
-<p>One-dimensional relativistic hydro solver supporting homologous mesh motion.</p>
+<p>Two-dimensional relativistic hydro solver supporting homologous mesh motion.</p>
+<p>The solver configuration is:</p>
+<ul class="simple">
+<li><p>Spherical polar coordinates in 2d</p></li>
+<li><p>Possible homologous radial expansion</p></li>
+<li><p>Four conserved quantities: D, Sr, Sq, tau</p></li>
+<li><p>Four primitive quantities: rho, ur, uq, p</p></li>
+<li><p>Gamma-law index of 4/3</p></li>
+</ul>
+<p>The Python code assumes RK2 time stepping, although coefficients are written
+below for RK1 and low-storage RK3 as well. The C code hard-codes a PLM theta
+value of 2.0.</p>
 <p class="rubric">Functions</p>
 <table class="longtable docutils align-default">
 <colgroup>
@@ -105,7 +120,7 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.initial_condition.html#sailfish.solvers.srhd_2d.initial_condition" title="sailfish.solvers.srhd_2d.initial_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_condition</span></code></a>(setup, mesh, time)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.initial_condition.html#sailfish.solvers.srhd_2d.initial_condition" title="sailfish.solvers.srhd_2d.initial_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_condition</span></code></a>(setup, mesh, i0, i1, j0, ...)</p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -117,15 +132,21 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.Patch.html#sailfish.solvers.srhd_2d.Patch" title="sailfish.solvers.srhd_2d.Patch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Patch</span></code></a>(time, conserved, mesh, index_range, ...)</p></td>
-<td><p>Holds the array buffer state for the solution on a subset of the solution domain.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.Options.html#sailfish.solvers.srhd_2d.Options" title="sailfish.solvers.srhd_2d.Options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Options</span></code></a>(compute_wavespeed, rk_order, ...)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.Patch.html#sailfish.solvers.srhd_2d.Patch" title="sailfish.solvers.srhd_2d.Patch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Patch</span></code></a>(setup, physics, time, conserved, mesh, ...)</p></td>
+<td><p>Buffers for the solution on a subset of the solution domain.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.Physics.html#sailfish.solvers.srhd_2d.Physics" title="sailfish.solvers.srhd_2d.Physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Physics</span></code></a>(jet_mdot, jet_gamma_beta, jet_theta, ...)</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.srhd_2d.Solver.html#sailfish.solvers.srhd_2d.Solver" title="sailfish.solvers.srhd_2d.Solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Solver</span></code></a>([setup, mesh, time, solution, ...])</p></td>
 <td><p>Adapter class to drive the srhd_1d C extension module.</p></td>
 </tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>

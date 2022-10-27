@@ -15,9 +15,11 @@ sailfish.kernel.system
       :toctree:
    
       configure_build
+      execution_context
       get_array_module
       log_system_info
       measure_time
+      num_devices
    
    
 

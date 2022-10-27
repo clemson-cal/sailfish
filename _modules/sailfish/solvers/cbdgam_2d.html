@@ -68,65 +68,26 @@
              
   <h1>Source code for sailfish.solvers.cbdgam_2d</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">Two-dimensional vertically integrated hydro with gamma-law EOS</span>
-
-<span class="sd">This solver is still a work-in-progress.</span>
-
-<span class="sd">Fill in more details about the physics here:</span>
+<span class="sd">Energy-conserving solver for the binary accretion problem in 2D.</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
 <span class="kn">from</span> <span class="nn">logging</span> <span class="kn">import</span> <span class="n">getLogger</span>
-<span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span>
 <span class="kn">from</span> <span class="nn">sailfish.kernel.library</span> <span class="kn">import</span> <span class="n">Library</span>
-<span class="kn">from</span> <span class="nn">sailfish.kernel.system</span> <span class="kn">import</span> <span class="n">get_array_module</span>
-<span class="kn">from</span> <span class="nn">sailfish.subdivide</span> <span class="kn">import</span> <span class="n">subdivide</span>
+<span class="kn">from</span> <span class="nn">sailfish.kernel.system</span> <span class="kn">import</span> <span class="n">get_array_module</span><span class="p">,</span> <span class="n">execution_context</span><span class="p">,</span> <span class="n">num_devices</span>
 <span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesian2DMesh</span>
+<span class="kn">from</span> <span class="nn">sailfish.physics.circumbinary</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">Physics</span><span class="p">,</span>
+    <span class="n">EquationOfState</span><span class="p">,</span>
+    <span class="n">ViscosityModel</span><span class="p">,</span>
+    <span class="n">Diagnostic</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sailfish.solver</span> <span class="kn">import</span> <span class="n">SolverBase</span>
-<span class="kn">from</span> <span class="nn">sailfish.physics.kepler</span> <span class="kn">import</span> <span class="n">OrbitalElements</span>
+<span class="kn">from</span> <span class="nn">sailfish.subdivide</span> <span class="kn">import</span> <span class="n">subdivide</span><span class="p">,</span> <span class="n">to_host</span><span class="p">,</span> <span class="n">concat_on_host</span><span class="p">,</span> <span class="n">lazy_reduce</span>
 
-<span class="k">try</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">nullcontext</span>
-
-<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
-    <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">AbstractContextManager</span>
-
-    <span class="k">class</span> <span class="nc">nullcontext</span><span class="p">(</span><span class="n">AbstractContextManager</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Scraped from contextlib source in Python &gt;= 3.7 for backwards compatibility.</span>
-<span class="sd">        &quot;&quot;&quot;</span>
-
-        <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enter_result</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">enter_result</span> <span class="o">=</span> <span class="n">enter_result</span>
-
-        <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">enter_result</span>
-
-        <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">excinfo</span><span class="p">):</span>
-            <span class="k">pass</span>
-
-        <span class="k">async</span> <span class="k">def</span> <span class="fm">__aenter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">enter_result</span>
-
-        <span class="k">async</span> <span class="k">def</span> <span class="fm">__aexit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">excinfo</span><span class="p">):</span>
-            <span class="k">pass</span>
 
 <span class="n">logger</span> <span class="o">=</span> <span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
-
-<div class="viewcode-block" id="Physics"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdgam_2d.Physics.html#sailfish.solvers.cbdgam_2d.Physics">[docs]</a><span class="k">class</span> <span class="nc">Physics</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
-    <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span>
-    <span class="n">sink_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">10.0</span>
-    <span class="n">sink_radius</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span>
-    <span class="n">mass_model1</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span> <span class="c1"># [0,1,2,3]: [Inactive, AccelerationFree, TorqueFree, ForceFree]</span>
-    <span class="n">mass_model2</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span>
-    <span class="n">soft_length</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.05</span>
-    <span class="n">q</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
-    <span class="n">e</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
-    <span class="n">gamma_law_index</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span> <span class="o">/</span> <span class="mf">3.0</span>
-    <span class="n">cooling_coefficient</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
-    <span class="n">constant_softening</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">1</span> <span class="c1"># whether to use constant softening</span>
-    <span class="n">kb_mode</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="mi">0</span> <span class="c1"># [0,1]: [no buffer, Keplerian buffer]</span></div>
 
 <div class="viewcode-block" id="Options"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdgam_2d.Options.html#sailfish.solvers.cbdgam_2d.Options">[docs]</a><span class="k">class</span> <span class="nc">Options</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
     <span class="n">pressure_floor</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1e-12</span>
@@ -165,45 +126,93 @@
         <span class="n">index_range</span><span class="p">,</span>
         <span class="n">physics</span><span class="p">,</span>
         <span class="n">options</span><span class="p">,</span>
-        <span class="n">kb_surface_density</span><span class="p">,</span>
-        <span class="n">kb_surface_pressure</span><span class="p">,</span>
+        <span class="n">buffer_outer_radius</span><span class="p">,</span>
+        <span class="n">buffer_surface_density</span><span class="p">,</span>
+        <span class="n">buffer_surface_pressure</span><span class="p">,</span>
         <span class="n">lib</span><span class="p">,</span>
         <span class="n">xp</span><span class="p">,</span>
+        <span class="n">execution_context</span><span class="p">,</span>
     <span class="p">):</span>
         <span class="n">i0</span><span class="p">,</span> <span class="n">i1</span> <span class="o">=</span> <span class="n">index_range</span>
+        <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="n">i1</span> <span class="o">-</span> <span class="n">i0</span><span class="p">,</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">lib</span> <span class="o">=</span> <span class="n">lib</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span> <span class="o">=</span> <span class="n">mesh</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">xp</span> <span class="o">=</span> <span class="n">xp</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span> <span class="o">=</span> <span class="n">execution_context</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">=</span> <span class="n">time</span>
-        <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span><span class="p">()</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">shape</span> <span class="o">=</span> <span class="p">(</span><span class="n">i1</span> <span class="o">-</span> <span class="n">i0</span><span class="p">,</span> <span class="n">nj</span><span class="p">)</span>  <span class="c1"># not including guard zones</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">physics</span> <span class="o">=</span> <span class="n">physics</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">options</span> <span class="o">=</span> <span class="n">options</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">vertex_coordinates</span><span class="p">(</span><span class="n">i0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">yr</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xl</span> <span class="o">+</span> <span class="p">(</span><span class="n">i1</span> <span class="o">-</span> <span class="n">i0</span><span class="p">)</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dx</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">+</span> <span class="n">nj</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dy</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">x1</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kb_outer_radius</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kb_onset_width</span> <span class="o">=</span> <span class="mf">0.1</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kb_surface_density</span> <span class="o">=</span> <span class="n">kb_surface_density</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kb_surface_pressure</span> <span class="o">=</span> <span class="n">kb_surface_pressure</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kb_driving_rate</span> <span class="o">=</span> <span class="mf">1000.0</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kb_central_mass</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">vertex_coordinates</span><span class="p">(</span><span class="n">i0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">yr</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">vertex_coordinates</span><span class="p">(</span><span class="n">i1</span><span class="p">,</span> <span class="n">nj</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffer_outer_radius</span> <span class="o">=</span> <span class="n">buffer_outer_radius</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="n">buffer_surface_density</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffer_surface_pressure</span> <span class="o">=</span> <span class="n">buffer_surface_pressure</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">orbelement</span> <span class="o">=</span> <span class="n">OrbitalElements</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">q</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">e</span><span class="p">)</span>
-        <span class="n">orbstate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbelement</span><span class="o">.</span><span class="n">orbital_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
-
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="n">x0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xl</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">mesh</span><span class="o">.</span><span class="n">dx</span>
+            <span class="n">x1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xr</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">mesh</span><span class="o">.</span><span class="n">dx</span>
+            <span class="n">y0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">yl</span> <span class="o">+</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">mesh</span><span class="o">.</span><span class="n">dy</span>
+            <span class="n">y1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">yr</span> <span class="o">-</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="n">mesh</span><span class="o">.</span><span class="n">dy</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">coordinate_array_x</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">x0</span><span class="p">,</span> <span class="n">x1</span><span class="p">,</span> <span class="n">ni</span><span class="p">)[:,</span> <span class="kc">None</span><span class="p">]</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">coordinate_array_y</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">linspace</span><span class="p">(</span><span class="n">y0</span><span class="p">,</span> <span class="n">y1</span><span class="p">,</span> <span class="n">nj</span><span class="p">)[</span><span class="kc">None</span><span class="p">,</span> <span class="p">:]</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">primitive</span><span class="o">.</span><span class="n">shape</span><span class="p">[:</span><span class="mi">2</span><span class="p">])</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">primitive</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">primitive2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">primitive</span><span class="p">)</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="n">primitive</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span></div>
 
-<div class="viewcode-block" id="Patch.execution_context"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdgam_2d.Patch.html#sailfish.solvers.cbdgam_2d.Patch.execution_context">[docs]</a>    <span class="k">def</span> <span class="nf">execution_context</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="sd">&quot;&quot;&quot;TODO: return a CUDA context for execution on the assigned device&quot;&quot;&quot;</span>
-        <span class="k">return</span> <span class="n">nullcontext</span><span class="p">()</span></div>
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">cell_center_coordinate_arrays</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return two 2d arrays, one with the cell-center X coordinates, and the</span>
+<span class="sd">        other with the cell-center Y coordinates. The arrays are either numpy</span>
+<span class="sd">        or cupy arrays, allocated for the device this patch is assigned to.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">coordinate_array_x</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">coordinate_array_y</span>
+
+    <span class="k">def</span> <span class="nf">point_mass_source_term</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">which_mass</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="n">ng</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># number of guard cells</span>
+        <span class="k">if</span> <span class="n">which_mass</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">2</span><span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;the mass must be either 1 or 2&quot;</span><span class="p">)</span>
+
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="n">cons_rate</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span><span class="p">)</span>
+
+            <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdgam_2d_point_mass_source_term</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yl</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">yr</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">mass</span> <span class="o">*</span> <span class="n">gravity</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_rate</span> <span class="o">*</span> <span class="n">accretion</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">mass</span> <span class="o">*</span> <span class="n">gravity</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_rate</span> <span class="o">*</span> <span class="n">accretion</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">which_mass</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span><span class="p">,</span>
+                <span class="n">cons_rate</span><span class="p">,</span>
+                <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">constant_softening</span><span class="p">),</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">gamma_law_index</span><span class="p">,</span>
+            <span class="p">)</span>
+            <span class="k">return</span> <span class="n">cons_rate</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdgam_2d_wavespeed</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span><span class="p">,</span>
@@ -212,7 +221,7 @@
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">wavespeeds</span><span class="o">.</span><span class="n">max</span><span class="p">()</span>
 
     <span class="k">def</span> <span class="nf">recompute_conserved</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
             <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdgam_2d_primitive_to_conserved</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">conserved0</span><span class="p">,</span>
@@ -220,8 +229,12 @@
             <span class="p">)</span>
 
     <span class="k">def</span> <span class="nf">advance_rk</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">rk_param</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
-        <span class="n">orbstate</span> <span class="o">=</span> <span class="n">OrbitalElements</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">q</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">e</span><span class="p">)</span><span class="o">.</span><span class="n">orbital_state</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
-        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">():</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span><span class="p">)</span>
+        <span class="n">buffer_central_mass</span> <span class="o">=</span> <span class="n">m1</span><span class="o">.</span><span class="n">mass</span> <span class="o">+</span> <span class="n">m2</span><span class="o">.</span><span class="n">mass</span>
+        <span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_surface_density</span>
+        <span class="n">buffer_surface_pressure</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">buffer_surface_pressure</span>
+
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
             <span class="bp">self</span><span class="o">.</span><span class="n">lib</span><span class="o">.</span><span class="n">cbdgam_2d_advance_rk</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">shape</span><span class="p">](</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">xl</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">xr</span><span class="p">,</span>
@@ -231,29 +244,31 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">primitive2</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">gamma_law_index</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">kb_surface_density</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">kb_surface_pressure</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">kb_central_mass</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">kb_driving_rate</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">kb_outer_radius</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">kb_onset_width</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">kb_mode</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">primary</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">primary</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">primary</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">primary</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">primary</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">mass_model1</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">secondary</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">secondary</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">secondary</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">secondary</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
-                <span class="n">orbstate</span><span class="o">.</span><span class="n">secondary</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">mass_model2</span><span class="p">,</span>
+                <span class="n">buffer_surface_density</span><span class="p">,</span>
+                <span class="n">buffer_surface_pressure</span><span class="p">,</span>
+                <span class="n">buffer_central_mass</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">buffer_driving_rate</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">buffer_outer_radius</span><span class="p">,</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">buffer_onset_width</span><span class="p">,</span>
+                <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">buffer_is_enabled</span><span class="p">),</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m1</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">position_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_x</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">velocity_y</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">mass</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">m2</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">value</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">alpha</span><span class="p">,</span>
                 <span class="n">rk_param</span><span class="p">,</span>
                 <span class="n">dt</span><span class="p">,</span>
@@ -262,9 +277,8 @@
                 <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">mach_ceiling</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">density_floor</span><span class="p">,</span>
                 <span class="bp">self</span><span class="o">.</span><span class="n">options</span><span class="o">.</span><span class="n">pressure_floor</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">constant_softening</span><span class="p">,</span>
-                <span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">soft_length</span><span class="p">,</span>
-                <span class="p">)</span>
+                <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">physics</span><span class="o">.</span><span class="n">constant_softening</span><span class="p">),</span>
+            <span class="p">)</span>
 
         <span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">time0</span> <span class="o">*</span> <span class="n">rk_param</span> <span class="o">+</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">+</span> <span class="n">dt</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">rk_param</span><span class="p">)</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primitive2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">primitive2</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">primitive1</span>
@@ -294,21 +308,36 @@
         <span class="n">physics</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
         <span class="n">options</span><span class="o">=</span><span class="nb">dict</span><span class="p">(),</span>
     <span class="p">):</span>
+        <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+        <span class="n">physics</span><span class="p">[</span><span class="s2">&quot;diagnostics&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span>
+            <span class="n">Diagnostic</span><span class="p">(</span><span class="o">**</span><span class="n">v</span><span class="p">)</span> <span class="k">for</span> <span class="n">v</span> <span class="ow">in</span> <span class="n">physics</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="s2">&quot;diagnostics&quot;</span><span class="p">,</span> <span class="p">[])</span>
+        <span class="p">]</span>
+
+        <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span> <span class="o">=</span> <span class="n">physics</span> <span class="o">=</span> <span class="n">Physics</span><span class="p">(</span><span class="o">**</span><span class="n">physics</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">_options</span> <span class="o">=</span> <span class="n">options</span> <span class="o">=</span> <span class="n">Options</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
+
         <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">mesh</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="n">PlanarCartesian2DMesh</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports 2D cartesian mesh&quot;</span><span class="p">)</span>
 
         <span class="k">if</span> <span class="n">setup</span><span class="o">.</span><span class="n">boundary_condition</span> <span class="o">!=</span> <span class="s2">&quot;outflow&quot;</span><span class="p">:</span>
             <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports outflow boundary condition&quot;</span><span class="p">)</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span> <span class="o">=</span> <span class="n">Physics</span><span class="p">(</span><span class="o">**</span><span class="n">physics</span><span class="p">)</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">_options</span> <span class="o">=</span> <span class="n">Options</span><span class="p">(</span><span class="o">**</span><span class="n">options</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">viscosity_model</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">(</span>
+            <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+            <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">CONSTANT_ALPHA</span><span class="p">,</span>
+        <span class="p">):</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports constant-alpha viscosity&quot;</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">eos_type</span> <span class="o">!=</span> <span class="n">EquationOfState</span><span class="o">.</span><span class="n">GAMMA_LAW</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;solver only supports isothermal equation of states&quot;</span><span class="p">)</span>
 
         <span class="n">xp</span> <span class="o">=</span> <span class="n">get_array_module</span><span class="p">(</span><span class="n">mode</span><span class="p">)</span>
         <span class="n">ng</span> <span class="o">=</span> <span class="mi">2</span>  <span class="c1"># number of guard zones</span>
         <span class="n">nq</span> <span class="o">=</span> <span class="mi">4</span>  <span class="c1"># number of conserved quantities</span>
         <span class="k">with</span> <span class="nb">open</span><span class="p">(</span><span class="vm">__file__</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span><span class="s2">&quot;.py&quot;</span><span class="p">,</span> <span class="s2">&quot;.c&quot;</span><span class="p">))</span> <span class="k">as</span> <span class="n">f</span><span class="p">:</span>
             <span class="n">code</span> <span class="o">=</span> <span class="n">f</span><span class="o">.</span><span class="n">read</span><span class="p">()</span>
-        <span class="n">lib</span> <span class="o">=</span> <span class="n">Library</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+        <span class="n">lib</span> <span class="o">=</span> <span class="n">Library</span><span class="p">(</span><span class="n">code</span><span class="p">,</span> <span class="n">mode</span><span class="o">=</span><span class="n">mode</span><span class="p">,</span> <span class="n">debug</span><span class="o">=</span><span class="kc">False</span><span class="p">)</span>
 
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;initiate with time=</span><span class="si">{</span><span class="n">time</span><span class="si">:</span><span class="s2">0.4f</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;subdivide grid over </span><span class="si">{</span><span class="n">num_patches</span><span class="si">}</span><span class="s2"> patches&quot;</span><span class="p">)</span>
@@ -323,39 +352,164 @@
         <span class="bp">self</span><span class="o">.</span><span class="n">patches</span> <span class="o">=</span> <span class="p">[]</span>
         <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">shape</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">x1</span>
-        <span class="bp">self</span><span class="o">.</span><span class="n">kb_onset_width</span> <span class="o">=</span> <span class="mf">0.1</span>
-
-        <span class="n">kb_state</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">4</span>
-        <span class="n">setup</span><span class="o">.</span><span class="n">primitive</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span> <span class="o">-</span> <span class="bp">self</span><span class="o">.</span><span class="n">kb_onset_width</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="n">kb_state</span><span class="p">)</span>
+        <span class="bp">self</span><span class="o">.</span><span class="n">buffer_onset_width</span> <span class="o">=</span> <span class="mf">0.1</span>
 
         <span class="k">if</span> <span class="n">solution</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="n">primitive</span> <span class="o">=</span> <span class="n">initial_condition</span><span class="p">(</span><span class="n">setup</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="n">time</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">primitive</span> <span class="o">=</span> <span class="n">solution</span>
 
-        <span class="k">for</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">in</span> <span class="n">subdivide</span><span class="p">(</span><span class="n">ni</span><span class="p">,</span> <span class="n">num_patches</span><span class="p">):</span>
-            <span class="n">prim</span> <span class="o">=</span> <span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nj</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nq</span><span class="p">])</span>
-            <span class="n">prim</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">primitive</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
-            <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="o">.</span><span class="n">append</span><span class="p">(</span>
-                <span class="n">Patch</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="n">prim</span><span class="p">,</span> <span class="n">mesh</span><span class="p">,</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">_options</span><span class="p">,</span> <span class="n">kb_state</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span> <span class="n">kb_state</span><span class="p">[</span><span class="mi">3</span><span class="p">],</span> <span class="n">lib</span><span class="p">,</span> <span class="n">xp</span><span class="p">)</span>
-            <span class="p">)</span>
+        <span class="k">if</span> <span class="n">physics</span><span class="o">.</span><span class="n">buffer_is_enabled</span><span class="p">:</span>
+            <span class="c1"># Here we sample the initial condition at the buffer onset radius</span>
+            <span class="c1"># to determine the disk surface density at the radius where the</span>
+            <span class="c1"># buffer begins to ramp up. This procedure makes sense as long as</span>
+            <span class="c1"># the initial condition is axisymmetric.</span>
+            <span class="n">buffer_prim</span> <span class="o">=</span> <span class="p">[</span><span class="mf">0.0</span><span class="p">]</span> <span class="o">*</span> <span class="mi">4</span>
+            <span class="n">buffer_outer_radius</span> <span class="o">=</span> <span class="n">mesh</span><span class="o">.</span><span class="n">x1</span>  <span class="c1"># this assumes the mesh is a centered squared</span>
+            <span class="n">buffer_onset_radius</span> <span class="o">=</span> <span class="n">buffer_outer_radius</span> <span class="o">-</span> <span class="n">physics</span><span class="o">.</span><span class="n">buffer_onset_width</span>
+            <span class="n">setup</span><span class="o">.</span><span class="n">primitive</span><span class="p">(</span><span class="n">time</span><span class="p">,</span> <span class="p">[</span><span class="n">buffer_onset_radius</span><span class="p">,</span> <span class="mf">0.0</span><span class="p">],</span> <span class="n">buffer_prim</span><span class="p">)</span>
+            <span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="n">buffer_prim</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+            <span class="n">buffer_surface_pressure</span> <span class="o">=</span> <span class="n">buffer_prim</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">buffer_outer_radius</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="n">buffer_surface_density</span> <span class="o">=</span> <span class="mf">0.0</span>
+            <span class="n">buffer_surface_pressure</span> <span class="o">=</span> <span class="mf">0.0</span>
 
-        <span class="bp">self</span><span class="o">.</span><span class="n">set_bc</span><span class="p">(</span><span class="s2">&quot;primitive1&quot;</span><span class="p">)</span></div>
+        <span class="k">for</span> <span class="n">n</span><span class="p">,</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">)</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">subdivide</span><span class="p">(</span><span class="n">ni</span><span class="p">,</span> <span class="n">num_patches</span><span class="p">)):</span>
+            <span class="n">prim</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nj</span> <span class="o">+</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">,</span> <span class="n">nq</span><span class="p">])</span>
+            <span class="n">prim</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">primitive</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span>
+            <span class="n">patch</span> <span class="o">=</span> <span class="n">Patch</span><span class="p">(</span>
+                <span class="n">time</span><span class="p">,</span>
+                <span class="n">prim</span><span class="p">,</span>
+                <span class="n">mesh</span><span class="p">,</span>
+                <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span>
+                <span class="n">physics</span><span class="p">,</span>
+                <span class="n">options</span><span class="p">,</span>
+                <span class="n">buffer_outer_radius</span><span class="p">,</span>
+                <span class="n">buffer_surface_density</span><span class="p">,</span>
+                <span class="n">buffer_surface_pressure</span><span class="p">,</span>
+                <span class="n">lib</span><span class="p">,</span>
+                <span class="n">xp</span><span class="p">,</span>
+                <span class="n">execution_context</span><span class="p">(</span><span class="n">mode</span><span class="p">,</span> <span class="n">device_id</span><span class="o">=</span><span class="n">n</span> <span class="o">%</span> <span class="n">num_devices</span><span class="p">(</span><span class="n">mode</span><span class="p">)),</span>
+            <span class="p">)</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span></div>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">solution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">primitive</span>
+        <span class="k">return</span> <span class="n">concat_on_host</span><span class="p">(</span>
+            <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">primitive</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">],</span> <span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span><span class="p">)</span>
+        <span class="p">)</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">shape</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        This solver uses primitive data as the solution array.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="kc">None</span>
+
+<div class="viewcode-block" id="Solver.reductions"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdgam_2d.Solver.html#sailfish.solvers.cbdgam_2d.Solver.reductions">[docs]</a>    <span class="k">def</span> <span class="nf">reductions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Generate runtime reductions on the solution data for time series.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="n">diagnostics</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span><span class="o">.</span><span class="n">diagnostics</span>
+        <span class="n">udots1_acc</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">point_mass_source_term</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">]</span>
+        <span class="n">udots2_acc</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">point_mass_source_term</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">]</span>
+        <span class="n">udots1_grv</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">point_mass_source_term</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">]</span>
+        <span class="n">udots2_grv</span> <span class="o">=</span> <span class="p">[</span><span class="n">p</span><span class="o">.</span><span class="n">point_mass_source_term</span><span class="p">(</span><span class="mi">2</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span> <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">]</span>
+        <span class="n">da</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dx</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">dy</span>
         <span class="n">ng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span>
-        <span class="n">nq</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_cons</span>
-        <span class="n">np</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">)</span>
-        <span class="n">primitive</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">xp</span><span class="o">.</span><span class="n">zeros</span><span class="p">([</span><span class="n">ni</span><span class="p">,</span> <span class="n">nj</span><span class="p">,</span> <span class="n">nq</span><span class="p">])</span>
-        <span class="k">for</span> <span class="p">(</span><span class="n">a</span><span class="p">,</span> <span class="n">b</span><span class="p">),</span> <span class="n">patch</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">subdivide</span><span class="p">(</span><span class="n">ni</span><span class="p">,</span> <span class="n">np</span><span class="p">),</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">):</span>
-            <span class="n">primitive</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">primitive</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">]</span>
-        <span class="k">return</span> <span class="n">primitive</span>
+
+        <span class="k">def</span> <span class="nf">get_field</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="n">quantity</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">mass</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+            <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">            Return one of the udot fields: for a particular patch, conserved</span>
+<span class="sd">            variable quantity, radial cut (optional), and point mass (either</span>
+<span class="sd">            1, 2, or &#39;both&#39;), term (either &#39;acc&#39; or &#39;grv&#39;).</span>
+<span class="sd">            &quot;&quot;&quot;</span>
+            <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">patch</span><span class="o">.</span><span class="n">cell_center_coordinate_arrays</span>
+            <span class="n">r</span> <span class="o">=</span> <span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">y</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+
+            <span class="k">def</span> <span class="nf">apply_radial_cut</span><span class="p">(</span><span class="n">f</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">cut</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+                    <span class="n">r0</span><span class="p">,</span> <span class="n">r1</span> <span class="o">=</span> <span class="n">cut</span>
+                    <span class="k">return</span> <span class="n">f</span> <span class="o">*</span> <span class="p">(</span><span class="n">r0</span> <span class="o">&lt;</span> <span class="n">r</span><span class="p">)</span> <span class="o">*</span> <span class="p">(</span><span class="n">r</span> <span class="o">&lt;</span> <span class="n">r1</span><span class="p">)</span>
+                <span class="k">else</span><span class="p">:</span>
+                    <span class="k">return</span> <span class="n">f</span>
+
+            <span class="k">if</span> <span class="n">quantity</span> <span class="o">==</span> <span class="s2">&quot;mdot&quot;</span><span class="p">:</span>
+                <span class="k">return</span> <span class="n">get_field</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">mass</span><span class="p">,</span> <span class="n">gravity</span><span class="p">,</span> <span class="n">accretion</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">quantity</span> <span class="o">==</span> <span class="s2">&quot;torque&quot;</span><span class="p">:</span>
+                <span class="n">fx</span> <span class="o">=</span> <span class="n">get_field</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">mass</span><span class="p">,</span> <span class="n">gravity</span><span class="p">,</span> <span class="n">accretion</span><span class="p">)</span>
+                <span class="n">fy</span> <span class="o">=</span> <span class="n">get_field</span><span class="p">(</span><span class="n">patch</span><span class="p">,</span> <span class="mi">2</span><span class="p">,</span> <span class="n">cut</span><span class="p">,</span> <span class="n">mass</span><span class="p">,</span> <span class="n">gravity</span><span class="p">,</span> <span class="n">accretion</span><span class="p">)</span>
+                <span class="k">return</span> <span class="n">x</span> <span class="o">*</span> <span class="n">fy</span> <span class="o">-</span> <span class="n">y</span> <span class="o">*</span> <span class="n">fx</span>
+
+            <span class="k">if</span> <span class="n">quantity</span> <span class="o">==</span> <span class="s2">&quot;sigma_m1&quot;</span><span class="p">:</span>
+                <span class="n">sigma</span> <span class="o">=</span> <span class="n">apply_radial_cut</span><span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">primitive</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+                <span class="n">cos_phi</span> <span class="o">=</span> <span class="n">x</span> <span class="o">/</span> <span class="n">r</span>
+                <span class="n">sin_phi</span> <span class="o">=</span> <span class="n">y</span> <span class="o">/</span> <span class="n">r</span>
+                <span class="k">return</span> <span class="n">sigma</span> <span class="o">*</span> <span class="p">(</span><span class="n">cos_phi</span> <span class="o">+</span> <span class="mf">1.0</span><span class="n">j</span> <span class="o">*</span> <span class="n">sin_phi</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">quantity</span> <span class="o">==</span> <span class="s2">&quot;eccentricity_vector&quot;</span><span class="p">:</span>
+                <span class="n">sigma</span> <span class="o">=</span> <span class="n">apply_radial_cut</span><span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">primitive</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="mi">0</span><span class="p">])</span>
+                <span class="n">vx</span> <span class="o">=</span> <span class="n">apply_radial_cut</span><span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">primitive</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="mi">1</span><span class="p">])</span>
+                <span class="n">vy</span> <span class="o">=</span> <span class="n">apply_radial_cut</span><span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">primitive</span><span class="p">[</span><span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="n">ng</span><span class="p">:</span><span class="o">-</span><span class="n">ng</span><span class="p">,</span> <span class="mi">2</span><span class="p">])</span>
+                <span class="n">GM</span> <span class="o">=</span> <span class="mf">1.0</span>
+                <span class="n">v_dot_v</span> <span class="o">=</span> <span class="n">vx</span> <span class="o">*</span> <span class="n">vx</span> <span class="o">+</span> <span class="n">vy</span> <span class="o">*</span> <span class="n">vy</span>
+                <span class="n">v_dot_r</span> <span class="o">=</span> <span class="n">vx</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">vy</span> <span class="o">*</span> <span class="n">y</span>
+                <span class="n">ex</span> <span class="o">=</span> <span class="p">(</span><span class="n">v_dot_v</span> <span class="o">*</span> <span class="n">x</span> <span class="o">-</span> <span class="n">v_dot_r</span> <span class="o">*</span> <span class="n">vx</span><span class="p">)</span> <span class="o">/</span> <span class="n">GM</span> <span class="o">-</span> <span class="n">x</span> <span class="o">/</span> <span class="n">r</span>
+                <span class="n">ey</span> <span class="o">=</span> <span class="p">(</span><span class="n">v_dot_v</span> <span class="o">*</span> <span class="n">y</span> <span class="o">-</span> <span class="n">v_dot_r</span> <span class="o">*</span> <span class="n">vy</span><span class="p">)</span> <span class="o">/</span> <span class="n">GM</span> <span class="o">-</span> <span class="n">y</span> <span class="o">/</span> <span class="n">r</span>
+                <span class="k">return</span> <span class="n">sigma</span> <span class="o">*</span> <span class="p">(</span><span class="n">ex</span> <span class="o">+</span> <span class="mf">1.0</span><span class="n">j</span> <span class="o">*</span> <span class="n">ey</span><span class="p">)</span>
+
+            <span class="n">q</span> <span class="o">=</span> <span class="n">quantity</span>
+            <span class="n">i</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="o">.</span><span class="n">index</span><span class="p">(</span><span class="n">patch</span><span class="p">)</span>
+
+            <span class="k">if</span> <span class="n">accretion</span><span class="p">:</span>
+                <span class="n">udots1</span> <span class="o">=</span> <span class="n">udots1_acc</span>
+                <span class="n">udots2</span> <span class="o">=</span> <span class="n">udots2_acc</span>
+            <span class="k">elif</span> <span class="n">gravity</span><span class="p">:</span>
+                <span class="n">udots1</span> <span class="o">=</span> <span class="n">udots1_grv</span>
+                <span class="n">udots2</span> <span class="o">=</span> <span class="n">udots2_grv</span>
+
+            <span class="k">if</span> <span class="n">mass</span> <span class="o">==</span> <span class="s2">&quot;both&quot;</span><span class="p">:</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">udots1</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="n">q</span><span class="p">]</span> <span class="o">+</span> <span class="n">udots2</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="n">q</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">mass</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">udots1</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="n">q</span><span class="p">]</span>
+            <span class="k">elif</span> <span class="n">mass</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+                <span class="n">f</span> <span class="o">=</span> <span class="n">udots2</span><span class="p">[</span><span class="n">i</span><span class="p">][</span><span class="o">...</span><span class="p">,</span> <span class="n">q</span><span class="p">]</span>
+
+            <span class="k">return</span> <span class="n">apply_radial_cut</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+
+        <span class="k">def</span> <span class="nf">get_sum_fields</span><span class="p">(</span><span class="n">d</span><span class="p">):</span>
+            <span class="n">result</span> <span class="o">=</span> <span class="p">[]</span>
+            <span class="k">for</span> <span class="n">p</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">:</span>
+                <span class="k">with</span> <span class="n">p</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+                    <span class="n">f</span> <span class="o">=</span> <span class="n">get_field</span><span class="p">(</span>
+                        <span class="n">p</span><span class="p">,</span>
+                        <span class="n">d</span><span class="o">.</span><span class="n">quantity</span><span class="p">,</span>
+                        <span class="n">d</span><span class="o">.</span><span class="n">radial_cut</span><span class="p">,</span>
+                        <span class="n">d</span><span class="o">.</span><span class="n">which_mass</span><span class="p">,</span>
+                        <span class="n">gravity</span><span class="o">=</span><span class="n">d</span><span class="o">.</span><span class="n">gravity</span><span class="p">,</span>
+                        <span class="n">accretion</span><span class="o">=</span><span class="n">d</span><span class="o">.</span><span class="n">accretion</span><span class="p">,</span>
+                    <span class="p">)</span>
+                    <span class="n">result</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">f</span><span class="o">.</span><span class="n">sum</span><span class="p">())</span>
+            <span class="k">return</span> <span class="n">result</span>
+
+        <span class="n">pass1</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">pass2</span> <span class="o">=</span> <span class="p">[]</span>
+
+        <span class="k">for</span> <span class="n">d</span> <span class="ow">in</span> <span class="n">diagnostics</span><span class="p">:</span>
+            <span class="k">if</span> <span class="n">d</span><span class="o">.</span><span class="n">quantity</span> <span class="o">==</span> <span class="s2">&quot;time&quot;</span><span class="p">:</span>
+                <span class="n">pass1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">time</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">setup</span><span class="o">.</span><span class="n">reference_time_scale</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pass1</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">get_sum_fields</span><span class="p">(</span><span class="n">d</span><span class="p">))</span>
+
+        <span class="k">for</span> <span class="n">item</span> <span class="ow">in</span> <span class="n">pass1</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">item</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">float</span><span class="p">:</span>
+                <span class="n">pass2</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="nb">sum</span><span class="p">(</span><span class="n">to_host</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">item</span><span class="p">)</span> <span class="o">*</span> <span class="n">da</span><span class="p">)</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">pass2</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">item</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="n">pass2</span></div>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -370,11 +524,20 @@
         <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">_physics</span><span class="o">.</span><span class="n">_asdict</span><span class="p">()</span>
 
     <span class="nd">@property</span>
-    <span class="k">def</span> <span class="nf">maximum_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+    <span class="k">def</span> <span class="nf">recommended_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">return</span> <span class="mf">0.1</span>
 
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">maximum_cfl</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">0.4</span>
+
 <div class="viewcode-block" id="Solver.maximum_wavespeed"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdgam_2d.Solver.html#sailfish.solvers.cbdgam_2d.Solver.maximum_wavespeed">[docs]</a>    <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
-        <span class="k">return</span> <span class="nb">max</span><span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">maximum_wavespeed</span><span class="p">()</span> <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">)</span></div>
+        <span class="k">return</span> <span class="n">lazy_reduce</span><span class="p">(</span>
+            <span class="nb">max</span><span class="p">,</span>
+            <span class="nb">float</span><span class="p">,</span>
+            <span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">maximum_wavespeed</span> <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">),</span>
+            <span class="p">(</span><span class="n">patch</span><span class="o">.</span><span class="n">execution_context</span> <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">),</span>
+        <span class="p">)</span></div>
 
 <div class="viewcode-block" id="Solver.advance"><a class="viewcode-back" href="../../../_autosummary/sailfish.solvers.cbdgam_2d.Solver.html#sailfish.solvers.cbdgam_2d.Solver.advance">[docs]</a>    <span class="k">def</span> <span class="nf">advance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
         <span class="bp">self</span><span class="o">.</span><span class="n">new_iteration</span><span class="p">()</span>
@@ -401,24 +564,25 @@
         <span class="n">ni</span><span class="p">,</span> <span class="n">nj</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">mesh</span><span class="o">.</span><span class="n">shape</span>
         <span class="n">ng</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">num_guard</span>
 
-        <span class="c1"># 1. write to the guard zones of pc, the internal BC</span>
-        <span class="n">pc</span><span class="p">[:</span><span class="o">+</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">pl</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span> <span class="p">:</span> <span class="o">-</span><span class="n">ng</span><span class="p">]</span>
-        <span class="n">pc</span><span class="p">[</span><span class="o">-</span><span class="n">ng</span><span class="p">:]</span> <span class="o">=</span> <span class="n">pr</span><span class="p">[</span><span class="o">+</span><span class="n">ng</span> <span class="p">:</span> <span class="o">+</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">]</span>
+        <span class="k">with</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">[</span><span class="n">patch_index</span><span class="p">]</span><span class="o">.</span><span class="n">execution_context</span><span class="p">:</span>
+            <span class="c1"># 1. write to the guard zones of pc, the internal BC</span>
+            <span class="n">pc</span><span class="p">[:</span><span class="o">+</span><span class="n">ng</span><span class="p">]</span> <span class="o">=</span> <span class="n">pl</span><span class="p">[</span><span class="o">-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span> <span class="p">:</span> <span class="o">-</span><span class="n">ng</span><span class="p">]</span>
+            <span class="n">pc</span><span class="p">[</span><span class="o">-</span><span class="n">ng</span><span class="p">:]</span> <span class="o">=</span> <span class="n">pr</span><span class="p">[</span><span class="o">+</span><span class="n">ng</span> <span class="p">:</span> <span class="o">+</span><span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span><span class="p">]</span>
 
-        <span class="c1"># 2. Set outflow BC on the left/right patch edges</span>
-        <span class="k">if</span> <span class="n">patch_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="c1"># 2. Set outflow BC on the left/right patch edges</span>
+            <span class="k">if</span> <span class="n">patch_index</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ng</span><span class="p">):</span>
+                    <span class="n">pc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[</span><span class="n">ng</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">patch_index</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
+                <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">ng</span><span class="p">,</span> <span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
+                    <span class="n">pc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[</span><span class="o">-</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+
+            <span class="c1"># 3. Set outflow BC on bottom and top edges</span>
             <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ng</span><span class="p">):</span>
-                <span class="n">pc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[</span><span class="n">ng</span><span class="p">]</span>
-        <span class="k">if</span> <span class="n">patch_index</span> <span class="o">==</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span><span class="p">:</span>
-            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">ng</span><span class="p">,</span> <span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]):</span>
-                <span class="n">pc</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[</span><span class="o">-</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+                <span class="n">pc</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[:,</span> <span class="n">ng</span><span class="p">]</span>
 
-        <span class="c1"># 3. Set outflow BC on bottom and top edges</span>
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">ng</span><span class="p">):</span>
-            <span class="n">pc</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[:,</span> <span class="n">ng</span><span class="p">]</span>
-
-        <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ng</span><span class="p">,</span> <span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
-            <span class="n">pc</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[:,</span> <span class="o">-</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="n">ng</span><span class="p">,</span> <span class="n">pc</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]):</span>
+                <span class="n">pc</span><span class="p">[:,</span> <span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">pc</span><span class="p">[:,</span> <span class="o">-</span><span class="n">ng</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]</span>
 
     <span class="k">def</span> <span class="nf">new_iteration</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="k">for</span> <span class="n">patch</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">patches</span><span class="p">:</span>

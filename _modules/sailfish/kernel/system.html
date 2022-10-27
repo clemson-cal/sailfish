@@ -76,35 +76,85 @@
 <span class="kn">import</span> <span class="nn">platform</span>
 <span class="kn">import</span> <span class="nn">time</span>
 
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">nullcontext</span>
+
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="kn">from</span> <span class="nn">contextlib</span> <span class="kn">import</span> <span class="n">AbstractContextManager</span>
+
+    <span class="k">class</span> <span class="nc">nullcontext</span><span class="p">(</span><span class="n">AbstractContextManager</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Scraped from contextlib source in Python &gt;= 3.7 for backwards compatibility.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+
+        <span class="k">def</span> <span class="fm">__init__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">enter_result</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">enter_result</span> <span class="o">=</span> <span class="n">enter_result</span>
+
+        <span class="k">def</span> <span class="fm">__enter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">enter_result</span>
+
+        <span class="k">def</span> <span class="fm">__exit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">excinfo</span><span class="p">):</span>
+            <span class="k">pass</span>
+
+        <span class="k">async</span> <span class="k">def</span> <span class="fm">__aenter__</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+            <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">enter_result</span>
+
+        <span class="k">async</span> <span class="k">def</span> <span class="fm">__aexit__</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="o">*</span><span class="n">excinfo</span><span class="p">):</span>
+            <span class="k">pass</span>
+
+
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
 <span class="n">build_config</span> <span class="o">=</span> <span class="p">{</span>
+    <span class="s2">&quot;enable_openmp&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span>
     <span class="s2">&quot;extra_compile_args&quot;</span><span class="p">:</span> <span class="p">[],</span>
     <span class="s2">&quot;extra_link_args&quot;</span><span class="p">:</span> <span class="p">[],</span>
 <span class="p">}</span>
 
 
-<div class="viewcode-block" id="configure_build"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.configure_build.html#sailfish.kernel.system.configure_build">[docs]</a><span class="k">def</span> <span class="nf">configure_build</span><span class="p">():</span>
+<div class="viewcode-block" id="configure_build"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.configure_build.html#sailfish.kernel.system.configure_build">[docs]</a><span class="k">def</span> <span class="nf">configure_build</span><span class="p">(</span><span class="n">enable_openmp</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span> <span class="n">extra_compile_args</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">extra_link_args</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Initiate the `build_config` module-level variable.</span>
 
-<span class="sd">    The build configuration is presently inferred from a crude check to see</span>
-<span class="sd">    whether we&#39;re on Linux or MacOS. This procedure can be easily generalized</span>
-<span class="sd">    to accommodate other or more specific platforms, check for hardware or</span>
-<span class="sd">    software availability, or read a bulid configuration from a user or</span>
-<span class="sd">    site-specified machine file.</span>
+<span class="sd">    A default build configuration is inferred on MacOS or Linux. Defaults for</span>
+<span class="sd">    Windows platforms and specific Linux flavors should be added soon. The</span>
+<span class="sd">    keyword arguemnts may be Python objects, or strings to facilitate passing</span>
+<span class="sd">    values right from a configparser instance.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">enable_openmp</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">enable_openmp</span> <span class="o">=</span> <span class="p">{</span><span class="s2">&quot;True&quot;</span><span class="p">:</span> <span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;False&quot;</span><span class="p">:</span> <span class="kc">False</span><span class="p">}[</span><span class="n">enable_openmp</span><span class="p">]</span>
+
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">extra_compile_args</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">extra_compile_args</span> <span class="o">=</span> <span class="n">extra_compile_args</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
+    <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">extra_link_args</span><span class="p">)</span> <span class="ow">is</span> <span class="nb">str</span><span class="p">:</span>
+        <span class="n">extra_link_args</span> <span class="o">=</span> <span class="n">extra_link_args</span><span class="o">.</span><span class="n">split</span><span class="p">()</span>
+
     <span class="k">if</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Darwin&quot;</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for MacOS&quot;</span><span class="p">)</span>
-        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_compile_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-Xpreprocessor&quot;</span><span class="p">,</span> <span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
-        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_link_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-lomp&quot;</span><span class="p">]</span>
+        <span class="n">sys_compile_args</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-Xpreprocessor&quot;</span><span class="p">,</span> <span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
+        <span class="n">sys_link_args</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-L/usr/local/lib&quot;</span><span class="p">,</span> <span class="s2">&quot;-lomp&quot;</span><span class="p">]</span>
     <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Linux&quot;</span><span class="p">:</span>
         <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for Linux&quot;</span><span class="p">)</span>
-        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_compile_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
-        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_link_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
+        <span class="n">sys_compile_args</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-fopenmp&quot;</span><span class="p">,</span> <span class="s2">&quot;-std=c99&quot;</span><span class="p">]</span>
+        <span class="n">sys_link_args</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;-fopenmp&quot;</span><span class="p">]</span>
+    <span class="k">elif</span> <span class="n">platform</span><span class="o">.</span><span class="n">system</span><span class="p">()</span> <span class="o">==</span> <span class="s2">&quot;Windows&quot;</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for Windows&quot;</span><span class="p">)</span>
+        <span class="n">sys_compile_args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">sys_link_args</span> <span class="o">=</span> <span class="p">[]</span>
     <span class="k">else</span><span class="p">:</span>
-        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for unknown system&quot;</span><span class="p">)</span></div>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;configure JIT build for unknown system&quot;</span><span class="p">)</span>
+        <span class="n">sys_compile_args</span> <span class="o">=</span> <span class="p">[]</span>
+        <span class="n">sys_link_args</span> <span class="o">=</span> <span class="p">[]</span>
+
+    <span class="k">if</span> <span class="n">enable_openmp</span><span class="p">:</span>
+        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_compile_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">extra_compile_args</span> <span class="ow">or</span> <span class="n">sys_compile_args</span>
+        <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;extra_link_args&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">extra_link_args</span> <span class="ow">or</span> <span class="n">sys_link_args</span>
+
+    <span class="n">build_config</span><span class="p">[</span><span class="s2">&quot;enable_openmp&quot;</span><span class="p">]</span> <span class="o">=</span> <span class="n">enable_openmp</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;OpenMP is </span><span class="si">{</span><span class="s1">&#39;enabled&#39;</span> <span class="k">if</span> <span class="n">enable_openmp</span> <span class="k">else</span> <span class="s1">&#39;disabled&#39;</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span></div>
 
 
 <div class="viewcode-block" id="get_array_module"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.get_array_module.html#sailfish.kernel.system.get_array_module">[docs]</a><span class="k">def</span> <span class="nf">get_array_module</span><span class="p">(</span><span class="n">mode</span><span class="p">):</span>
@@ -130,6 +180,32 @@
         <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;unknown execution mode </span><span class="si">{</span><span class="n">mode</span><span class="si">}</span><span class="s2">, must be [cpu|omp|gpu]&quot;</span><span class="p">)</span></div>
 
 
+<div class="viewcode-block" id="execution_context"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.execution_context.html#sailfish.kernel.system.execution_context">[docs]</a><span class="k">def</span> <span class="nf">execution_context</span><span class="p">(</span><span class="n">mode</span><span class="p">,</span> <span class="n">device_id</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Return a context manager appropriate for the given exuction mode.</span>
+
+<span class="sd">    If `mode` is &quot;gpu&quot;, then a specific device id may be provided to specify</span>
+<span class="sd">    the GPU onto which kernel launches should be spawned.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="s2">&quot;omp&quot;</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="n">nullcontext</span><span class="p">()</span>
+
+    <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">cupy.cuda</span> <span class="kn">import</span> <span class="n">Device</span>
+
+        <span class="k">return</span> <span class="n">Device</span><span class="p">(</span><span class="n">device_id</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="num_devices"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.num_devices.html#sailfish.kernel.system.num_devices">[docs]</a><span class="k">def</span> <span class="nf">num_devices</span><span class="p">(</span><span class="n">mode</span><span class="p">):</span>
+    <span class="k">if</span> <span class="n">mode</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;cpu&quot;</span><span class="p">,</span> <span class="s2">&quot;omp&quot;</span><span class="p">]:</span>
+        <span class="k">return</span> <span class="mi">1</span>
+
+    <span class="k">elif</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span><span class="p">:</span>
+        <span class="kn">from</span> <span class="nn">cupy.cuda.runtime</span> <span class="kn">import</span> <span class="n">getDeviceCount</span>
+
+        <span class="k">return</span> <span class="n">getDeviceCount</span><span class="p">()</span></div>
+
+
 <div class="viewcode-block" id="log_system_info"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.log_system_info.html#sailfish.kernel.system.log_system_info">[docs]</a><span class="k">def</span> <span class="nf">log_system_info</span><span class="p">(</span><span class="n">mode</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Log relevant details of the system&#39;s compute capabilities.</span>
@@ -146,7 +222,7 @@
 
 
 <div class="viewcode-block" id="measure_time"><a class="viewcode-back" href="../../../_autosummary/sailfish.kernel.system.measure_time.html#sailfish.kernel.system.measure_time">[docs]</a><span class="nd">@contextlib</span><span class="o">.</span><span class="n">contextmanager</span>
-<span class="k">def</span> <span class="nf">measure_time</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
+<span class="k">def</span> <span class="nf">measure_time</span><span class="p">(</span><span class="n">mode</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">float</span><span class="p">:</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A context manager to measure the execution time of a piece of code.</span>
 
@@ -158,8 +234,14 @@
 <span class="sd">            expensive_function()</span>
 <span class="sd">        print(f&quot;execution took {duration()} seconds&quot;)</span>
 <span class="sd">    &quot;&quot;&quot;</span>
-    <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
-    <span class="k">yield</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span></div>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">start</span> <span class="o">=</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span>
+        <span class="k">yield</span> <span class="k">lambda</span><span class="p">:</span> <span class="n">time</span><span class="o">.</span><span class="n">perf_counter</span><span class="p">()</span> <span class="o">-</span> <span class="n">start</span>
+    <span class="k">finally</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">mode</span> <span class="o">==</span> <span class="s2">&quot;gpu&quot;</span><span class="p">:</span>
+            <span class="kn">from</span> <span class="nn">cupy.cuda.runtime</span> <span class="kn">import</span> <span class="n">deviceSynchronize</span>
+
+            <span class="n">deviceSynchronize</span><span class="p">()</span></div>
 </pre></div>
 
            </div>

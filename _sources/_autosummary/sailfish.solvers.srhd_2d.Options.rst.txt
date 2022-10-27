@@ -1,0 +1,36 @@
+sailfish.solvers.srhd\_2d.Options
+=================================
+
+.. currentmodule:: sailfish.solvers.srhd_2d
+
+.. autoclass:: Options
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Options.__init__
+      ~Options.count
+      ~Options.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Options.compute_wavespeed
+      ~Options.mach_ceiling
+      ~Options.plm_theta
+      ~Options.rk_order
+   
+   

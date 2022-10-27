@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.cbdiso_2d &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -52,6 +51,8 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.solvers.cbdiso_2d</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.initial_condition.html">sailfish.solvers.cbdiso_2d.initial_condition</a></li>
@@ -60,6 +61,7 @@
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.Solver.html">sailfish.solvers.cbdiso_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
@@ -96,7 +98,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.solvers.cbdiso_2d">
+  <div class="section" id="module-sailfish.solvers.cbdiso_2d">
 <span id="sailfish-solvers-cbdiso-2d"></span><h1>sailfish.solvers.cbdiso_2d<a class="headerlink" href="#module-sailfish.solvers.cbdiso_2d" title="Permalink to this headline"></a></h1>
 <p>Isothermal solver for the binary accretion problem in 2D planar coordinates.</p>
 <p class="rubric">Functions</p>
@@ -118,8 +120,8 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdiso_2d.Options.html#sailfish.solvers.cbdiso_2d.Options" title="sailfish.solvers.cbdiso_2d.Options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Options</span></code></a>(velocity_ceiling, mach_ceiling)</p></td>
-<td><p></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.solvers.cbdiso_2d.Options.html#sailfish.solvers.cbdiso_2d.Options" title="sailfish.solvers.cbdiso_2d.Options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Options</span></code></a>([velocity_ceiling, density_floor, ...])</p></td>
+<td><p>Contains parameters which are solver specific options.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.solvers.cbdiso_2d.Patch.html#sailfish.solvers.cbdiso_2d.Patch" title="sailfish.solvers.cbdiso_2d.Patch"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Patch</span></code></a>(time, primitive, mesh, index_range, ...)</p></td>
 <td><p>Holds the array buffer state for the solution on a subset of the solution domain.</p></td>
@@ -129,7 +131,7 @@
 </tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>

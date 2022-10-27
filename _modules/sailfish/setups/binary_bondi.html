@@ -1,0 +1,200 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.setups.binary_bondi &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.setups.binary_bondi</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.setups.binary_bondi</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Orbiting binary embedded in a wind</span>
+
+<span class="sd">This code sets up a binary black hole in a wind of uniform density and Mach</span>
+<span class="sd">number, to inspect the accretion rate of matter onto the binary under</span>
+<span class="sd">different conditions. The accretion process in such scenarios is referred to</span>
+<span class="sd">as Bondi-Hoyle-Lyttleton accretion. Some references below:</span>
+
+<span class="sd">.. _Comerford &amp; Izzard (2019): https://arxiv.org/abs/1910.13353</span>
+<span class="sd">.. _Soker (2004): https://academic.oup.com/mnras/article/350/4/1366/986224</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesian2DMesh</span>
+<span class="kn">from</span> <span class="nn">sailfish.physics.circumbinary</span> <span class="kn">import</span> <span class="n">SinkModel</span><span class="p">,</span> <span class="n">PointMass</span><span class="p">,</span> <span class="n">EquationOfState</span>
+<span class="kn">from</span> <span class="nn">sailfish.physics.kepler</span> <span class="kn">import</span> <span class="n">OrbitalElements</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">param</span>
+
+
+<div class="viewcode-block" id="BinaryBondi"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.binary_bondi.BinaryBondi.html#sailfish.setups.binary_bondi.BinaryBondi">[docs]</a><span class="k">class</span> <span class="nc">BinaryBondi</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Simulates Bondi-Hoyle-Lyttleton type accretion in a binary system.</span>
+
+<span class="sd">    The gas is isothermal with uniform sound speed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">aspect</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;aspect ratio of the domain, width / height&quot;</span><span class="p">)</span>
+    <span class="n">height</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;domain height in units of the binary separation&quot;</span><span class="p">)</span>
+    <span class="n">x_bin</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;horizontal offset of binary COM from domain center&quot;</span><span class="p">)</span>
+    <span class="n">sound_speed</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;speed of sound (uniform)&quot;</span><span class="p">)</span>
+    <span class="n">wind_vel</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;horizontal speed of the background flow&quot;</span><span class="p">)</span>
+    <span class="n">bh_sep</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="s2">&quot;black hole semi-major axis&quot;</span><span class="p">)</span>
+    <span class="n">bh_mass</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;mass of the primary&quot;</span><span class="p">)</span>
+    <span class="n">sink_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="s2">&quot;black hole sink radius&quot;</span><span class="p">)</span>
+    <span class="n">sink_model</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="s2">&quot;acceleration_free&quot;</span><span class="p">,</span> <span class="s2">&quot;sink prescription&quot;</span><span class="p">)</span>
+    <span class="n">sink_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e2</span><span class="p">,</span> <span class="s2">&quot;sink rate&quot;</span><span class="p">)</span>
+    <span class="n">mass_ratio</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;system mass ratio: [0.0-1.0]&quot;</span><span class="p">)</span>
+    <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;eccentricity&quot;</span><span class="p">)</span>
+    <span class="n">softening_length</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="s2">&quot;gravitational softening length&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+
+<div class="viewcode-block" id="BinaryBondi.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.binary_bondi.BinaryBondi.html#sailfish.setups.binary_bondi.BinaryBondi.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">wind_vel</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">0.0</span></div>
+
+<div class="viewcode-block" id="BinaryBondi.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.binary_bondi.BinaryBondi.html#sailfish.setups.binary_bondi.BinaryBondi.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesian2DMesh</span><span class="o">.</span><span class="n">centered_rectangle</span><span class="p">(</span>
+            <span class="bp">self</span><span class="o">.</span><span class="n">height</span><span class="p">,</span> <span class="n">resolution</span><span class="p">,</span> <span class="nb">int</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">aspect</span><span class="p">)</span>
+        <span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_resolution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">1000</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">GLOBALLY_ISOTHERMAL</span><span class="p">,</span>
+            <span class="n">sound_speed</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sound_speed</span><span class="p">,</span>
+            <span class="n">point_mass_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;cbdiso_2d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">10.0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">orbital_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">OrbitalElements</span><span class="p">(</span>
+            <span class="n">semimajor_axis</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bh_sep</span><span class="p">,</span>
+            <span class="n">total_mass</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">bh_mass</span> <span class="o">*</span> <span class="p">(</span><span class="mi">1</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">mass_ratio</span><span class="p">),</span>
+            <span class="n">mass_ratio</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mass_ratio</span><span class="p">,</span>
+            <span class="n">eccentricity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eccentricity</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_elements</span><span class="o">.</span><span class="n">orbital_state</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+        <span class="n">m1</span> <span class="o">=</span> <span class="n">m1</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">position_x</span><span class="o">=</span><span class="n">m1</span><span class="o">.</span><span class="n">position_x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_bin</span><span class="p">)</span>
+        <span class="n">m2</span> <span class="o">=</span> <span class="n">m2</span><span class="o">.</span><span class="n">_replace</span><span class="p">(</span><span class="n">position_x</span><span class="o">=</span><span class="n">m2</span><span class="o">.</span><span class="n">position_x</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">x_bin</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">PointMass</span><span class="p">(</span>
+                <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+                <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">m1</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+            <span class="p">),</span>
+            <span class="n">PointMass</span><span class="p">(</span>
+                <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+                <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">m2</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+            <span class="p">),</span>
+        <span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

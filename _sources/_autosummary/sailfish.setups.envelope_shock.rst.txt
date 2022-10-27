@@ -9,6 +9,21 @@ sailfish.setups.envelope\_shock
 
    
    
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      shell_density_mt
+      shell_gamma_beta_m
+      shell_gamma_beta_mprime
+      shell_mass_rt
+      shell_radius_mt
+      shell_speed_m
+      shell_speed_mprime
+      shell_time_m
+      shell_time_mprime
+   
    
 
    

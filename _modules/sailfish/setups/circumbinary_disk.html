@@ -1,0 +1,695 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.setups.circumbinary_disk &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../../../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
+        <script src="../../../_static/jquery.js"></script>
+        <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/doctools.js"></script>
+    <script src="../../../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../../../genindex.html" />
+    <link rel="search" title="Search" href="../../../search.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../../../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../../../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul>
+<li class="toctree-l1"><a class="reference internal" href="../../../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../../../api.html">API documentation</a></li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../../../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../../../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../../index.html">Module code</a> &raquo;</li>
+      <li>sailfish.setups.circumbinary_disk</li>
+      <li class="wy-breadcrumbs-aside">
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <h1>Source code for sailfish.setups.circumbinary_disk</h1><div class="highlight"><pre>
+<span></span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">2D disk setups for binary problems.</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sqrt</span><span class="p">,</span> <span class="n">exp</span><span class="p">,</span> <span class="n">pi</span>
+<span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">LogSphericalMesh</span><span class="p">,</span> <span class="n">PlanarCartesian2DMesh</span>
+<span class="kn">from</span> <span class="nn">sailfish.physics.circumbinary</span> <span class="kn">import</span> <span class="p">(</span>
+    <span class="n">EquationOfState</span><span class="p">,</span>
+    <span class="n">PointMass</span><span class="p">,</span>
+    <span class="n">SinkModel</span><span class="p">,</span>
+    <span class="n">ViscosityModel</span><span class="p">,</span>
+<span class="p">)</span>
+<span class="kn">from</span> <span class="nn">sailfish.physics.kepler</span> <span class="kn">import</span> <span class="n">OrbitalElements</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">SetupError</span><span class="p">,</span> <span class="n">param</span>
+
+
+<div class="viewcode-block" id="CircumbinaryDisk"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.html#sailfish.setups.circumbinary_disk.CircumbinaryDisk">[docs]</a><span class="k">class</span> <span class="nc">CircumbinaryDisk</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    A circumbinary disk setup for binary problems, isothermal or gamma-law.</span>
+
+<span class="sd">    This problem is the primary science setup for the cbdiso_2d and cbdgam_2d</span>
+<span class="sd">    solvers. The initial data consists of nearly stationary axisymmetric</span>
+<span class="sd">    solutions, which partly means that Keplerian velocity profiles are imposed</span>
+<span class="sd">    with a softened radial coordinate.</span>
+
+<span class="sd">    In isothermal mode, since only constant-nu viscosity is supported, the</span>
+<span class="sd">    disk is constant density = 1.0. Note that the overall scale of the density</span>
+<span class="sd">    is not physically meaningful for the isothermal hydro equations, since</span>
+<span class="sd">    those equations are invariant under uniform rescalings of the density.</span>
+
+<span class="sd">    In gamma-law mode, since only constant-alpha viscosity is supported, the</span>
+<span class="sd">    disk is nominally `Shakura &amp; Sunyaev (1973)`_. However, we follow the</span>
+<span class="sd">    purely Newtonian treatment given in `Goodman (2003)`_, setting radiation</span>
+<span class="sd">    pressure to zero. In particular, we impose the following power law</span>
+<span class="sd">    profiles on the surface density :math:`\Sigma` and vertically-integrated</span>
+<span class="sd">    pressure :math:`\mathcal{P}`:</span>
+
+<span class="sd">    .. math::</span>
+<span class="sd">        \Sigma \propto r^{-3/5}, \, \mathcal{P} \propto r^{-3/2}</span>
+
+<span class="sd">    .. _Shakura &amp; Sunyaev (1973): https://ui.adsabs.harvard.edu/abs/1973A%26A....24..337S</span>
+<span class="sd">    .. _Goodman (2003): https://ui.adsabs.harvard.edu/abs/2003MNRAS.339..937G</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="n">eos</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="s2">&quot;isothermal&quot;</span><span class="p">,</span> <span class="s2">&quot;EOS type: either isothermal or gamma-law&quot;</span><span class="p">)</span>
+    <span class="n">domain_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">12.0</span><span class="p">,</span> <span class="s2">&quot;half side length of the square computational domain&quot;</span><span class="p">)</span>
+    <span class="n">mach_number</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s2">&quot;orbital Mach number (isothermal)&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;orbital eccentricity of the binary&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">mass_ratio</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;component mass ratio m2 / m1 &lt;= 1&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s2">&quot;component sink rate&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="s2">&quot;component sink radius&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">softening_length</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="s2">&quot;gravitational softening length&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">buffer_is_enabled</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;whether the buffer zone is enabled&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_model</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span>
+        <span class="s2">&quot;torque_free&quot;</span><span class="p">,</span> <span class="s2">&quot;sink [acceleration_free|force_free|torque_free]&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span>
+    <span class="p">)</span>
+    <span class="n">initial_sigma</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;initial disk surface density at r=a (gamma-law)&quot;</span><span class="p">)</span>
+    <span class="n">initial_pressure</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e-2</span><span class="p">,</span> <span class="s2">&quot;initial disk surface pressure at r=a (gamma-law)&quot;</span><span class="p">)</span>
+    <span class="n">cooling_coefficient</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;strength of the cooling term (gamma-law)&quot;</span><span class="p">)</span>
+    <span class="n">alpha</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="s2">&quot;alpha-viscosity parameter (gamma-law)&quot;</span><span class="p">)</span>
+    <span class="n">nu</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.001</span><span class="p">,</span> <span class="s2">&quot;kinematic viscosity parameter (isothermal)&quot;</span><span class="p">)</span>
+    <span class="n">constant_softening</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;whether to use constant softening (gamma-law)&quot;</span><span class="p">)</span>
+    <span class="n">gamma_law_index</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">5.0</span> <span class="o">/</span> <span class="mf">3.0</span><span class="p">,</span> <span class="s2">&quot;adiabatic index (gamma-law)&quot;</span><span class="p">)</span>
+    <span class="n">which_diagnostics</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="s2">&quot;none&quot;</span><span class="p">,</span> <span class="s2">&quot;diagnostics set to get from solver [none|mdots]&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="CircumbinaryDisk.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.html#sailfish.setups.circumbinary_disk.CircumbinaryDisk.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span> <span class="ow">and</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="k">raise</span> <span class="n">SetupError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;eos must be isothermal or gamma-law, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">eos</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;none&quot;</span><span class="p">,</span> <span class="s2">&quot;mdots&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="n">SetupError</span><span class="p">(</span>
+                <span class="sa">f</span><span class="s2">&quot;which_diagnostics must be none or mdots, got </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span><span class="si">}</span><span class="s2">&quot;</span>
+            <span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_isothermal</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">eos</span> <span class="o">==</span> <span class="s2">&quot;isothermal&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">is_gamma_law</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="bp">self</span><span class="o">.</span><span class="n">eos</span> <span class="o">==</span> <span class="s2">&quot;gamma-law&quot;</span>
+
+<div class="viewcode-block" id="CircumbinaryDisk.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.html#sailfish.setups.circumbinary_disk.CircumbinaryDisk.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">GM</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">coords</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">r_softened</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">)</span>
+        <span class="n">phi_hat_x</span> <span class="o">=</span> <span class="o">-</span><span class="n">y</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
+        <span class="n">phi_hat_y</span> <span class="o">=</span> <span class="o">+</span><span class="n">x</span> <span class="o">/</span> <span class="nb">max</span><span class="p">(</span><span class="n">r</span><span class="p">,</span> <span class="mf">1e-12</span><span class="p">)</span>
+
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span><span class="p">:</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">initial_sigma</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">GM</span> <span class="o">/</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">r_softened</span><span class="p">)</span> <span class="o">*</span> <span class="n">phi_hat_x</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">GM</span> <span class="o">/</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">r_softened</span><span class="p">)</span> <span class="o">*</span> <span class="n">phi_hat_y</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="c1"># See eq. (A2) from Goodman (2003)</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">initial_sigma</span>
+                <span class="o">*</span> <span class="n">r_softened</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mf">3.0</span> <span class="o">/</span> <span class="mf">5.0</span><span class="p">)</span>
+                <span class="o">*</span> <span class="p">(</span><span class="mf">0.0001</span> <span class="o">+</span> <span class="mf">0.9999</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">((</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">r_softened</span><span class="p">)</span> <span class="o">**</span> <span class="mi">30</span><span class="p">)))</span>
+            <span class="p">)</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">GM</span> <span class="o">/</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">r_softened</span><span class="p">)</span> <span class="o">*</span> <span class="n">phi_hat_x</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">GM</span> <span class="o">/</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">r_softened</span><span class="p">)</span> <span class="o">*</span> <span class="n">phi_hat_y</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">3</span><span class="p">]</span> <span class="o">=</span> <span class="p">(</span>
+                <span class="bp">self</span><span class="o">.</span><span class="n">initial_pressure</span>
+                <span class="o">*</span> <span class="n">r_softened</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mf">3.0</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span>
+                <span class="o">*</span> <span class="p">(</span><span class="mf">0.0001</span> <span class="o">+</span> <span class="mf">0.9999</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">((</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">r_softened</span><span class="p">)</span> <span class="o">**</span> <span class="mi">30</span><span class="p">)))</span>
+            <span class="p">)</span></div>
+
+<div class="viewcode-block" id="CircumbinaryDisk.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.html#sailfish.setups.circumbinary_disk.CircumbinaryDisk.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesian2DMesh</span><span class="o">.</span><span class="n">centered_square</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span><span class="p">,</span> <span class="n">resolution</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_resolution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">512</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+                <span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">LOCALLY_ISOTHERMAL</span><span class="p">,</span>
+                <span class="n">mach_number</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mach_number</span><span class="p">,</span>
+                <span class="n">point_mass_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">,</span>
+                <span class="n">buffer_is_enabled</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_is_enabled</span><span class="p">,</span>
+                <span class="n">buffer_driving_rate</span><span class="o">=</span><span class="mf">100.0</span><span class="p">,</span>
+                <span class="n">buffer_onset_width</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+                <span class="n">cooling_coefficient</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+                <span class="n">constant_softening</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">constant_softening</span><span class="p">,</span>
+                <span class="n">viscosity_model</span><span class="o">=</span><span class="n">ViscosityModel</span><span class="o">.</span><span class="n">CONSTANT_NU</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+                <span class="k">else</span> <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+                <span class="n">viscosity_coefficient</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">nu</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+                <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">,</span>
+            <span class="p">)</span>
+
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+                <span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">GAMMA_LAW</span><span class="p">,</span>
+                <span class="n">gamma_law_index</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">gamma_law_index</span><span class="p">,</span>
+                <span class="n">point_mass_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">,</span>
+                <span class="n">buffer_is_enabled</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_is_enabled</span><span class="p">,</span>
+                <span class="n">buffer_driving_rate</span><span class="o">=</span><span class="mf">1000.0</span><span class="p">,</span>  <span class="c1"># default value in circumbinary.py</span>
+                <span class="n">buffer_onset_width</span><span class="o">=</span><span class="mf">0.1</span><span class="p">,</span>  <span class="c1"># default value in circumbinary.py</span>
+                <span class="n">cooling_coefficient</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">cooling_coefficient</span><span class="p">,</span>
+                <span class="n">constant_softening</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">constant_softening</span><span class="p">,</span>
+                <span class="n">viscosity_model</span><span class="o">=</span><span class="n">ViscosityModel</span><span class="o">.</span><span class="n">CONSTANT_ALPHA</span>
+                <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">alpha</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+                <span class="k">else</span> <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+                <span class="n">viscosity_coefficient</span><span class="o">=</span><span class="mf">0.0</span><span class="p">,</span>
+                <span class="n">alpha</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">alpha</span><span class="p">,</span>
+                <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">,</span>
+            <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="o">!=</span> <span class="s2">&quot;none&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;time&quot;</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_isothermal</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;cbdiso_2d&quot;</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">is_gamma_law</span><span class="p">:</span>
+            <span class="k">return</span> <span class="s2">&quot;cbdgam_2d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1000.0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">reference_time_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">pi</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">orbital_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">OrbitalElements</span><span class="p">(</span>
+            <span class="n">semimajor_axis</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">total_mass</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">mass_ratio</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mass_ratio</span><span class="p">,</span>
+            <span class="n">eccentricity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eccentricity</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_elements</span><span class="o">.</span><span class="n">orbital_state</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">PointMass</span><span class="p">(</span>
+                <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+                <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">m1</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+            <span class="p">),</span>
+            <span class="n">PointMass</span><span class="p">(</span>
+                <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+                <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="o">**</span><span class="n">m2</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="CircumbinaryDisk.checkpoint_diagnostics"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.html#sailfish.setups.circumbinary_disk.CircumbinaryDisk.checkpoint_diagnostics">[docs]</a>    <span class="k">def</span> <span class="nf">checkpoint_diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">point_masses</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="n">time</span><span class="p">))</span></div></div>
+
+
+<div class="viewcode-block" id="KitpCodeComparison"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.KitpCodeComparison.html#sailfish.setups.circumbinary_disk.KitpCodeComparison">[docs]</a><span class="k">class</span> <span class="nc">KitpCodeComparison</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="n">mach_number</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s2">&quot;nominal orbital Mach number&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;orbital eccentricity&quot;</span><span class="p">)</span>
+    <span class="n">mass_ratio</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;binary mass ratio M2 / M1&quot;</span><span class="p">)</span>
+    <span class="n">sink_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="s2">&quot;sink radius&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">softening_length</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.05</span><span class="p">,</span> <span class="s2">&quot;softening length&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">nu</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.001</span><span class="p">,</span> <span class="s2">&quot;kinematic viscosity coefficient&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">single_point_mass</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;put one point mass at the origin (no binary)&quot;</span><span class="p">)</span>
+    <span class="n">sink_model</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span>
+        <span class="s2">&quot;acceleration_free&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;sink [acceleration_free|force_free|torque_free]&quot;</span><span class="p">,</span>
+        <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+    <span class="n">domain_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">8.0</span><span class="p">,</span> <span class="s2">&quot;half side length of the square computational domain&quot;</span><span class="p">)</span>
+    <span class="n">sink_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s2">&quot;component sink rate&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">buffer_is_enabled</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="kc">True</span><span class="p">,</span> <span class="s2">&quot;whether the buffer zone is enabled&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">use_dg</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="kc">False</span><span class="p">,</span> <span class="s2">&quot;use the DG solver&quot;</span><span class="p">)</span>
+    <span class="n">disk_kick</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e-4</span><span class="p">,</span> <span class="s2">&quot;kick velocity to seed eccentric cavity growth&quot;</span><span class="p">)</span>
+    <span class="n">which_diagnostics</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="s2">&quot;kitp&quot;</span><span class="p">,</span> <span class="s2">&quot;output diagnostics option [kitp|forces]&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="KitpCodeComparison.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.KitpCodeComparison.html#sailfish.setups.circumbinary_disk.KitpCodeComparison.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;kitp&quot;</span><span class="p">,</span> <span class="s2">&quot;forces&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="n">SetupError</span><span class="p">(</span><span class="s2">&quot;Unknown option for diagnostics.&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="KitpCodeComparison.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.KitpCodeComparison.html#sailfish.setups.circumbinary_disk.KitpCodeComparison.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">coords</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+        <span class="n">r_softened</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span> <span class="o">*</span> <span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">)</span>
+
+        <span class="n">r_cav</span> <span class="o">=</span> <span class="mf">2.5</span>
+        <span class="n">delta0</span> <span class="o">=</span> <span class="mf">1e-5</span>
+        <span class="n">sigma0</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">sigma</span> <span class="o">=</span> <span class="n">sigma0</span> <span class="o">*</span> <span class="p">(</span><span class="n">delta0</span> <span class="o">+</span> <span class="p">(</span><span class="mi">1</span> <span class="o">-</span> <span class="n">delta0</span><span class="p">)</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">((</span><span class="n">r_cav</span> <span class="o">/</span> <span class="n">r</span><span class="p">)</span> <span class="o">**</span> <span class="mi">12</span><span class="p">)))</span>
+
+        <span class="n">GM</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="mf">4.0</span>
+        <span class="n">omegaB</span> <span class="o">=</span> <span class="p">(</span><span class="n">GM</span> <span class="o">/</span> <span class="n">a</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+        <span class="n">omega0</span> <span class="o">=</span> <span class="p">(</span><span class="n">GM</span> <span class="o">/</span> <span class="n">r</span><span class="o">**</span><span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">mach_number</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span> <span class="o">**</span> <span class="mf">0.5</span>
+        <span class="n">omega</span> <span class="o">=</span> <span class="p">(</span><span class="n">omega0</span><span class="o">**-</span><span class="n">n</span> <span class="o">+</span> <span class="n">omegaB</span><span class="o">**-</span><span class="n">n</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span> <span class="o">/</span> <span class="n">n</span><span class="p">)</span>
+
+        <span class="n">vr_pert</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">disk_kick</span> <span class="o">*</span> <span class="n">y</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">((</span><span class="n">r</span> <span class="o">/</span> <span class="mf">3.5</span><span class="p">)</span> <span class="o">**</span> <span class="mi">6</span><span class="p">))</span>
+
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">sigma</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">omega</span> <span class="o">*</span> <span class="o">-</span><span class="n">y</span> <span class="o">+</span> <span class="n">vr_pert</span> <span class="o">*</span> <span class="n">x</span> <span class="o">/</span> <span class="n">r</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">omega</span> <span class="o">*</span> <span class="o">+</span><span class="n">x</span> <span class="o">+</span> <span class="n">vr_pert</span> <span class="o">*</span> <span class="n">y</span> <span class="o">/</span> <span class="n">r</span></div>
+
+<div class="viewcode-block" id="KitpCodeComparison.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.KitpCodeComparison.html#sailfish.setups.circumbinary_disk.KitpCodeComparison.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesian2DMesh</span><span class="o">.</span><span class="n">centered_square</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span><span class="p">,</span> <span class="n">resolution</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_resolution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">200</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="o">==</span> <span class="s2">&quot;kitp&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;time&quot;</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;torque&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span>
+                    <span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;torque&quot;</span><span class="p">,</span>
+                    <span class="n">which_mass</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span>
+                    <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+                    <span class="n">radial_cut</span><span class="o">=</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span><span class="p">),</span>
+                <span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;sigma_m1&quot;</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;eccentricity_vector&quot;</span><span class="p">,</span> <span class="n">radial_cut</span><span class="o">=</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="mf">6.0</span><span class="p">)),</span>
+            <span class="p">]</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="o">==</span> <span class="s2">&quot;forces&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;time&quot;</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">LOCALLY_ISOTHERMAL</span><span class="p">,</span>
+            <span class="n">mach_number</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mach_number</span><span class="p">,</span>
+            <span class="n">point_mass_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">,</span>
+            <span class="n">buffer_is_enabled</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_is_enabled</span><span class="p">,</span>
+            <span class="n">buffer_driving_rate</span><span class="o">=</span><span class="mf">100.0</span><span class="p">,</span>
+            <span class="n">buffer_onset_width</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">viscosity_coefficient</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">nu</span><span class="p">,</span>
+            <span class="n">viscosity_model</span><span class="o">=</span><span class="n">ViscosityModel</span><span class="o">.</span><span class="n">CONSTANT_NU</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+            <span class="k">else</span> <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+            <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;cbdiso_2d&quot;</span> <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">use_dg</span> <span class="k">else</span> <span class="s2">&quot;cbdisodg_2d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">reference_time_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">pi</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">orbital_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">OrbitalElements</span><span class="p">(</span>
+            <span class="n">semimajor_axis</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">total_mass</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">mass_ratio</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mass_ratio</span><span class="p">,</span>
+            <span class="n">eccentricity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eccentricity</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">single_point_mass</span><span class="p">:</span>
+            <span class="k">return</span> <span class="n">PointMass</span><span class="p">(</span>
+                <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+                <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                <span class="n">mass</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="p">)</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_elements</span><span class="o">.</span><span class="n">orbital_state</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+
+            <span class="k">return</span> <span class="p">(</span>
+                <span class="n">PointMass</span><span class="p">(</span>
+                    <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                    <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+                    <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                    <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">m1</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+                <span class="p">),</span>
+                <span class="n">PointMass</span><span class="p">(</span>
+                    <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+                    <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+                    <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+                    <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+                    <span class="o">**</span><span class="n">m2</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+                <span class="p">),</span>
+            <span class="p">)</span>
+
+<div class="viewcode-block" id="KitpCodeComparison.checkpoint_diagnostics"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.KitpCodeComparison.html#sailfish.setups.circumbinary_disk.KitpCodeComparison.checkpoint_diagnostics">[docs]</a>    <span class="k">def</span> <span class="nf">checkpoint_diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">point_masses</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="n">time</span><span class="p">),</span> <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="MassTransferBinary"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary">[docs]</a><span class="k">class</span> <span class="nc">MassTransferBinary</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;orbital eccentricity&quot;</span><span class="p">)</span>
+    <span class="n">domain_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="s2">&quot;half side length of the square computational domain&quot;</span><span class="p">)</span>
+    <span class="n">mach_number</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="s2">&quot;orbital Mach number&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">mass_ratio</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.2</span><span class="p">,</span> <span class="s2">&quot;component mass ratio m2 / m1 &lt;= 1&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">((</span><span class="o">-</span><span class="mf">0.1</span><span class="p">,</span> <span class="mf">10.0</span><span class="p">),</span> <span class="s2">&quot;component sink rates&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">((</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.2</span><span class="p">),</span> <span class="s2">&quot;component sink radii&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">softening_length</span> <span class="o">=</span> <span class="n">param</span><span class="p">((</span><span class="mf">0.01</span><span class="p">,</span> <span class="mf">0.01</span><span class="p">),</span> <span class="s2">&quot;softening lengths&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e-8</span><span class="p">,</span> <span class="s2">&quot;background surface density&quot;</span><span class="p">)</span>
+    <span class="n">nu</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e-4</span><span class="p">,</span> <span class="s2">&quot;kinematic viscosity parameter&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">buffer_driving_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e2</span><span class="p">,</span> <span class="s2">&quot;rate of driving in the buffer&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">buffer_onset_width</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="s2">&quot;buffer ramp distance&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">which_diagnostics</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="s2">&quot;torques&quot;</span><span class="p">,</span> <span class="s2">&quot;[torques|forces]&quot;</span><span class="p">)</span>
+
+<div class="viewcode-block" id="MassTransferBinary.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span> <span class="o">+</span> <span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">:</span>
+            <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">x</span><span class="p">)</span> <span class="ow">is</span> <span class="ow">not</span> <span class="nb">float</span><span class="p">:</span>
+                <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span>
+                    <span class="s2">&quot;sink_rate, sink_radius, and softening_length parameters must be float&quot;</span>
+                <span class="p">)</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="ow">not</span> <span class="ow">in</span> <span class="p">[</span><span class="s2">&quot;torques&quot;</span><span class="p">,</span> <span class="s2">&quot;forces&quot;</span><span class="p">]:</span>
+            <span class="k">raise</span> <span class="n">SetupError</span><span class="p">(</span><span class="s2">&quot;Unknown option for diagnostics.&quot;</span><span class="p">)</span></div>
+
+<div class="viewcode-block" id="MassTransferBinary.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">coords</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+
+        <span class="n">GM</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">n</span> <span class="o">=</span> <span class="mf">4.0</span>
+        <span class="n">omegaB</span> <span class="o">=</span> <span class="p">(</span><span class="n">GM</span> <span class="o">/</span> <span class="n">a</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+        <span class="n">omega0</span> <span class="o">=</span> <span class="p">(</span><span class="n">GM</span> <span class="o">/</span> <span class="n">r</span><span class="o">**</span><span class="mi">3</span> <span class="o">*</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="bp">self</span><span class="o">.</span><span class="n">mach_number</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span> <span class="o">**</span> <span class="mf">0.5</span>
+        <span class="n">omega</span> <span class="o">=</span> <span class="p">(</span><span class="n">omega0</span><span class="o">**-</span><span class="n">n</span> <span class="o">+</span> <span class="n">omegaB</span><span class="o">**-</span><span class="n">n</span><span class="p">)</span> <span class="o">**</span> <span class="p">(</span><span class="o">-</span><span class="mi">1</span> <span class="o">/</span> <span class="n">n</span><span class="p">)</span>
+
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">omega</span> <span class="o">*</span> <span class="o">-</span><span class="n">y</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">omega</span> <span class="o">*</span> <span class="o">+</span><span class="n">x</span></div>
+
+<div class="viewcode-block" id="MassTransferBinary.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesian2DMesh</span><span class="o">.</span><span class="n">centered_square</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span><span class="p">,</span> <span class="n">resolution</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_resolution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">256</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="o">==</span> <span class="s2">&quot;torques&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;time&quot;</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;torque&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;torque&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="p">]</span>
+        <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="o">==</span> <span class="s2">&quot;forces&quot;</span><span class="p">:</span>
+            <span class="k">return</span> <span class="p">[</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;time&quot;</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fx&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;fy&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+            <span class="p">]</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">LOCALLY_ISOTHERMAL</span><span class="p">,</span>
+            <span class="n">mach_number</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mach_number</span><span class="p">,</span>
+            <span class="n">point_mass_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">,</span>
+            <span class="n">buffer_is_enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">buffer_driving_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_driving_rate</span><span class="p">,</span>
+            <span class="n">buffer_onset_width</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_onset_width</span><span class="p">,</span>
+            <span class="n">viscosity_coefficient</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">nu</span><span class="p">,</span>
+            <span class="n">viscosity_model</span><span class="o">=</span><span class="n">ViscosityModel</span><span class="o">.</span><span class="n">CONSTANT_NU</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+            <span class="k">else</span> <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+            <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;cbdiso_2d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">reference_time_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">pi</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">orbital_elements</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">OrbitalElements</span><span class="p">(</span>
+            <span class="n">semimajor_axis</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">total_mass</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+            <span class="n">mass_ratio</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mass_ratio</span><span class="p">,</span>
+            <span class="n">eccentricity</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">eccentricity</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="k">def</span> <span class="nf">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="n">m1</span><span class="p">,</span> <span class="n">m2</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">orbital_elements</span><span class="o">.</span><span class="n">orbital_state</span><span class="p">(</span><span class="n">time</span><span class="p">)</span>
+
+        <span class="k">return</span> <span class="p">(</span>
+            <span class="n">PointMass</span><span class="p">(</span>
+                <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="o">.</span><span class="n">ACCELERATION_FREE</span><span class="p">,</span>
+                <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
+                <span class="o">**</span><span class="n">m1</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+            <span class="p">),</span>
+            <span class="n">PointMass</span><span class="p">(</span>
+                <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="o">.</span><span class="n">ACCELERATION_FREE</span><span class="p">,</span>
+                <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
+                <span class="o">**</span><span class="n">m2</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
+            <span class="p">),</span>
+        <span class="p">)</span>
+
+<div class="viewcode-block" id="MassTransferBinary.checkpoint_diagnostics"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary.checkpoint_diagnostics">[docs]</a>    <span class="k">def</span> <span class="nf">checkpoint_diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">point_masses</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="n">time</span><span class="p">),</span> <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">)</span></div></div>
+
+
+<div class="viewcode-block" id="EccentricSingleDisk"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.EccentricSingleDisk.html#sailfish.setups.circumbinary_disk.EccentricSingleDisk">[docs]</a><span class="k">class</span> <span class="nc">EccentricSingleDisk</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+    <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;orbital eccentricity&quot;</span><span class="p">)</span>
+    <span class="n">domain_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">6.0</span><span class="p">,</span> <span class="s2">&quot;half side length of the square computational domain&quot;</span><span class="p">)</span>
+    <span class="n">disk_kick</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="s2">&quot;velocity of the kick given to the disk&quot;</span><span class="p">)</span>
+    <span class="n">mach_number</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="s2">&quot;orbital Mach number&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s2">&quot;component sink rates&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.02</span><span class="p">,</span> <span class="s2">&quot;component sink radii&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">softening_length</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.02</span><span class="p">,</span> <span class="s2">&quot;softening lengths&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sigma</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e-8</span><span class="p">,</span> <span class="s2">&quot;background surface density&quot;</span><span class="p">)</span>
+    <span class="n">nu</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;kinematic viscosity parameter&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">buffer_driving_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e2</span><span class="p">,</span> <span class="s2">&quot;rate of driving in the buffer&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">buffer_onset_width</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="s2">&quot;buffer ramp distance&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_model</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span>
+        <span class="s2">&quot;acceleration_free&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;sink [acceleration_free|force_free|torque_free]&quot;</span><span class="p">,</span>
+        <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
+
+<div class="viewcode-block" id="EccentricSingleDisk.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.EccentricSingleDisk.html#sailfish.setups.circumbinary_disk.EccentricSingleDisk.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">coords</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
+        <span class="n">x</span><span class="p">,</span> <span class="n">y</span> <span class="o">=</span> <span class="n">coords</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="n">sqrt</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">x</span> <span class="o">+</span> <span class="n">y</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+
+        <span class="n">GM</span> <span class="o">=</span> <span class="mf">1.0</span>
+        <span class="n">omega</span> <span class="o">=</span> <span class="p">(</span><span class="n">GM</span> <span class="o">/</span> <span class="n">r</span><span class="o">**</span><span class="mi">3</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+        <span class="n">prof</span> <span class="o">=</span> <span class="n">r</span> <span class="o">*</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">((</span><span class="n">r</span> <span class="o">-</span> <span class="mf">1.0</span><span class="p">)</span> <span class="o">**</span> <span class="mi">4</span><span class="p">))</span>
+
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">sigma</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">omega</span> <span class="o">*</span> <span class="o">-</span><span class="n">y</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">omega</span> <span class="o">*</span> <span class="o">+</span><span class="n">x</span>
+
+        <span class="n">dx</span> <span class="o">=</span> <span class="n">x</span> <span class="o">-</span> <span class="mf">1.0</span>
+        <span class="n">dy</span> <span class="o">=</span> <span class="n">y</span>
+        <span class="n">dr</span> <span class="o">=</span> <span class="p">(</span><span class="n">dx</span><span class="o">**</span><span class="mi">2</span> <span class="o">+</span> <span class="n">dy</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span> <span class="o">**</span> <span class="mf">0.5</span>
+
+        <span class="k">if</span> <span class="n">dr</span> <span class="o">&lt;</span> <span class="mf">0.2</span><span class="p">:</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">exp</span><span class="p">(</span><span class="o">-</span><span class="p">((</span><span class="n">dr</span> <span class="o">/</span> <span class="mf">0.1</span><span class="p">)</span> <span class="o">**</span> <span class="mi">2</span><span class="p">))</span>
+            <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">*=</span> <span class="mf">0.6</span></div>
+
+<div class="viewcode-block" id="EccentricSingleDisk.mesh"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.EccentricSingleDisk.html#sailfish.setups.circumbinary_disk.EccentricSingleDisk.mesh">[docs]</a>    <span class="k">def</span> <span class="nf">mesh</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">resolution</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PlanarCartesian2DMesh</span><span class="o">.</span><span class="n">centered_square</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">domain_radius</span><span class="p">,</span> <span class="n">resolution</span><span class="p">)</span></div>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_resolution</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mi">512</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">physics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span>
+            <span class="n">eos_type</span><span class="o">=</span><span class="n">EquationOfState</span><span class="o">.</span><span class="n">LOCALLY_ISOTHERMAL</span><span class="p">,</span>
+            <span class="n">mach_number</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">mach_number</span><span class="p">,</span>
+            <span class="n">buffer_is_enabled</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+            <span class="n">buffer_driving_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_driving_rate</span><span class="p">,</span>
+            <span class="n">buffer_onset_width</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">buffer_onset_width</span><span class="p">,</span>
+            <span class="n">point_mass_function</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">,</span>
+            <span class="n">viscosity_coefficient</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">nu</span><span class="p">,</span>
+            <span class="n">viscosity_model</span><span class="o">=</span><span class="n">ViscosityModel</span><span class="o">.</span><span class="n">CONSTANT_NU</span>
+            <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">nu</span> <span class="o">&gt;</span> <span class="mf">0.0</span>
+            <span class="k">else</span> <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span><span class="p">,</span>
+            <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">,</span>
+        <span class="p">)</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">solver</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;cbdiso_2d&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">boundary_condition</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="s2">&quot;outflow&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">reference_time_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">return</span> <span class="mf">2.0</span> <span class="o">*</span> <span class="n">pi</span>
+
+    <span class="k">def</span> <span class="nf">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="k">return</span> <span class="n">PointMass</span><span class="p">(</span>
+            <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">,</span>
+            <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
+            <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">,</span>
+            <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">,</span>
+            <span class="n">mass</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span>
+        <span class="p">)</span></div>
+</pre></div>
+
+           </div>
+          </div>
+          <footer>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

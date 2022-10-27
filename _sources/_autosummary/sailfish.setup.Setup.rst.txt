@@ -17,6 +17,7 @@ sailfish.setup.Setup
    .. autosummary::
    
       ~Setup.__init__
+      ~Setup.checkpoint_diagnostics
       ~Setup.dash_case_class_name
       ~Setup.default_model_parameters
       ~Setup.describe_class
@@ -41,7 +42,9 @@ sailfish.setup.Setup
       ~Setup.boundary_condition
       ~Setup.default_end_time
       ~Setup.default_resolution
+      ~Setup.diagnostics
       ~Setup.physics
+      ~Setup.reference_time_scale
       ~Setup.solver
       ~Setup.start_time
    

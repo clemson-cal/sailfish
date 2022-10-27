@@ -66,17 +66,44 @@
            <div itemprop="articleBody">
              
   <h1>Source code for sailfish.physics.circumbinary</h1><div class="highlight"><pre>
-<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Callable</span>
+<span></span><span class="kn">from</span> <span class="nn">typing</span> <span class="kn">import</span> <span class="n">NamedTuple</span><span class="p">,</span> <span class="n">List</span><span class="p">,</span> <span class="n">Callable</span><span class="p">,</span> <span class="n">Union</span>
+<span class="kn">from</span> <span class="nn">enum</span> <span class="kn">import</span> <span class="n">Enum</span>
 
 
-<span class="n">SINK_MODEL_INACTIVE</span> <span class="o">=</span> <span class="mi">0</span>
-<span class="n">SINK_MODEL_ACCELERATION_FREE</span> <span class="o">=</span> <span class="mi">1</span>
-<span class="n">SINK_MODEL_TORQUE_FREE</span> <span class="o">=</span> <span class="mi">2</span>
-<span class="n">SINK_MODEL_FORCE_FREE</span> <span class="o">=</span> <span class="mi">3</span>
+<div class="viewcode-block" id="SinkModel"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.SinkModel.html#sailfish.physics.circumbinary.SinkModel">[docs]</a><span class="k">class</span> <span class="nc">SinkModel</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">INACTIVE</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">ACCELERATION_FREE</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">TORQUE_FREE</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">FORCE_FREE</span> <span class="o">=</span> <span class="mi">3</span></div>
 
-<span class="n">EOS_TYPE_GLOBALLY_ISOTHERMAL</span> <span class="o">=</span> <span class="mi">1</span>
-<span class="n">EOS_TYPE_LOCALLY_ISOTHERMAL</span> <span class="o">=</span> <span class="mi">2</span>
-<span class="n">EOS_TYPE_GAMMA_LAW</span> <span class="o">=</span> <span class="mi">3</span>
+
+<div class="viewcode-block" id="EquationOfState"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.EquationOfState.html#sailfish.physics.circumbinary.EquationOfState">[docs]</a><span class="k">class</span> <span class="nc">EquationOfState</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">GLOBALLY_ISOTHERMAL</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">LOCALLY_ISOTHERMAL</span> <span class="o">=</span> <span class="mi">2</span>
+    <span class="n">GAMMA_LAW</span> <span class="o">=</span> <span class="mi">3</span></div>
+
+
+<div class="viewcode-block" id="ViscosityModel"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.ViscosityModel.html#sailfish.physics.circumbinary.ViscosityModel">[docs]</a><span class="k">class</span> <span class="nc">ViscosityModel</span><span class="p">(</span><span class="n">Enum</span><span class="p">):</span>
+    <span class="n">NONE</span> <span class="o">=</span> <span class="mi">0</span>
+    <span class="n">CONSTANT_NU</span> <span class="o">=</span> <span class="mi">1</span>
+    <span class="n">CONSTANT_ALPHA</span> <span class="o">=</span> <span class="mi">2</span></div>
+
+
+<div class="viewcode-block" id="Diagnostic"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.Diagnostic.html#sailfish.physics.circumbinary.Diagnostic">[docs]</a><span class="k">class</span> <span class="nc">Diagnostic</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
+    <span class="n">quantity</span><span class="p">:</span> <span class="nb">str</span>
+    <span class="sd">&quot;&quot;&quot; time, mdot, ldot, mass_moment, eccentricity_vector &quot;&quot;&quot;</span>
+
+    <span class="n">gravity</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="sd">&quot;&quot;&quot; Whether to include the gravity term (if applicable) &quot;&quot;&quot;</span>
+
+    <span class="n">accretion</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="sd">&quot;&quot;&quot; Whether to include the accretion term (if applicable) &quot;&quot;&quot;</span>
+
+    <span class="n">which_mass</span><span class="p">:</span> <span class="n">Union</span><span class="p">[</span><span class="nb">int</span><span class="p">,</span> <span class="nb">str</span><span class="p">]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot; 1, 2, or &#39;both&#39; &quot;&quot;&quot;</span>
+
+    <span class="n">radial_cut</span><span class="p">:</span> <span class="nb">tuple</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="sd">&quot;&quot;&quot; None is ok, or a radial annulus to include e.g. (1.0, 2.0) &quot;&quot;&quot;</span></div>
 
 
 <div class="viewcode-block" id="PointMass"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.PointMass.html#sailfish.physics.circumbinary.PointMass">[docs]</a><span class="k">class</span> <span class="nc">PointMass</span><span class="p">(</span><span class="n">NamedTuple</span><span class="p">):</span>
@@ -126,7 +153,7 @@
     <span class="n">softening_length</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
     <span class="sd">&quot;&quot;&quot; Gravitational softening length &quot;&quot;&quot;</span>
 
-    <span class="n">sink_model</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">SINK_MODEL_INACTIVE</span>
+    <span class="n">sink_model</span><span class="p">:</span> <span class="n">SinkModel</span> <span class="o">=</span> <span class="n">SinkModel</span><span class="o">.</span><span class="n">INACTIVE</span>
     <span class="sd">&quot;&quot;&quot; The equation used to control how momentum is subtracted &quot;&quot;&quot;</span>
 
     <span class="n">sink_rate</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
@@ -189,10 +216,9 @@
 <span class="sd">       between the domain radius (the half-width of a square domain), extending</span>
 <span class="sd">       inwards by an amount specified by the :obj:`buffer_onset_width`</span>
 <span class="sd">       parameter.</span>
-
 <span class="sd">    &quot;&quot;&quot;</span>
 
-    <span class="n">eos_type</span><span class="p">:</span> <span class="nb">int</span> <span class="o">=</span> <span class="n">EOS_TYPE_GLOBALLY_ISOTHERMAL</span>
+    <span class="n">eos_type</span><span class="p">:</span> <span class="n">EquationOfState</span> <span class="o">=</span> <span class="n">EquationOfState</span><span class="o">.</span><span class="n">GLOBALLY_ISOTHERMAL</span>
     <span class="sd">&quot;&quot;&quot; EOS type: globally or locally isothermal &quot;&quot;&quot;</span>
 
     <span class="n">sound_speed</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">1.0</span>
@@ -202,10 +228,16 @@
     <span class="sd">&quot;&quot;&quot; Square of the Mach number, if EOS type is locally isothermal &quot;&quot;&quot;</span>
 
     <span class="n">gamma_law_index</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">5.0</span> <span class="o">/</span> <span class="mf">3.0</span>
-    <span class="sd">&quot;&quot;&quot; Adiabatic index, if the EOS type is globally isothermal &quot;&quot;&quot;</span>
+    <span class="sd">&quot;&quot;&quot; Adiabatic index, if the EOS type is not isothermal &quot;&quot;&quot;</span>
 
-    <span class="n">viscosity_coefficient</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.01</span>
-    <span class="sd">&quot;&quot;&quot; Kinematic viscosity value, in units of a^2 Omega &quot;&quot;&quot;</span>
+    <span class="n">viscosity_model</span><span class="p">:</span> <span class="n">ViscosityModel</span> <span class="o">=</span> <span class="n">ViscosityModel</span><span class="o">.</span><span class="n">NONE</span>
+    <span class="sd">&quot;&quot;&quot; Which viscosity model to use (none, nu, alpha) &quot;&quot;&quot;</span>
+
+    <span class="n">viscosity_coefficient</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; Kinematic viscosity value (a^2 Omega) if viscosity is nu &quot;&quot;&quot;</span>
+
+    <span class="n">alpha</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; Alpha parameter, if viscosity model is alpha &quot;&quot;&quot;</span>
 
     <span class="n">buffer_is_enabled</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">False</span>
     <span class="sd">&quot;&quot;&quot; Whether the buffer zone is enabled &quot;&quot;&quot;</span>
@@ -216,12 +248,29 @@
     <span class="n">buffer_onset_width</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.1</span>
     <span class="sd">&quot;&quot;&quot; Distance over which the buffer ramps up &quot;&quot;&quot;</span>
 
-    <span class="n">point_mass_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[</span><span class="nb">float</span><span class="p">,</span> <span class="n">List</span><span class="p">[</span><span class="n">PointMass</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="n">point_mass_function</span><span class="p">:</span> <span class="n">Callable</span><span class="p">[[</span><span class="nb">float</span><span class="p">],</span> <span class="n">List</span><span class="p">[</span><span class="n">PointMass</span><span class="p">]]</span> <span class="o">=</span> <span class="kc">None</span>
     <span class="sd">&quot;&quot;&quot; Callback function to supply point masses as a function of time &quot;&quot;&quot;</span>
+
+    <span class="n">cooling_coefficient</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.0</span>
+    <span class="sd">&quot;&quot;&quot; Strength of the cooling term &quot;&quot;&quot;</span>
+
+    <span class="n">constant_softening</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">=</span> <span class="kc">True</span>
+    <span class="sd">&quot;&quot;&quot; If local disk height is ignored in gravitational softening &quot;&quot;&quot;</span>
+
+    <span class="n">diagnostics</span><span class="p">:</span> <span class="n">List</span><span class="p">[</span><span class="n">Diagnostic</span><span class="p">]</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="sd">&quot;&quot;&quot; Physics diagnostics to be returned when reductions are computed &quot;&quot;&quot;</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">num_particles</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">point_mass_function</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="k">return</span> <span class="mi">0</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="k">return</span> <span class="nb">len</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">point_mass_function</span><span class="p">(</span><span class="mf">0.0</span><span class="p">))</span>
 
 <div class="viewcode-block" id="Physics.point_masses"><a class="viewcode-back" href="../../../_autosummary/sailfish.physics.circumbinary.Physics.html#sailfish.physics.circumbinary.Physics.point_masses">[docs]</a>    <span class="k">def</span> <span class="nf">point_masses</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Generate point masses from the simulation time and supplied callback.</span>
+<span class="sd">        Generate two point masses from the simulation time and supplied</span>
+<span class="sd">        callback.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">point_mass_function</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
             <span class="k">return</span> <span class="n">PointMass</span><span class="p">(),</span> <span class="n">PointMass</span><span class="p">()</span>

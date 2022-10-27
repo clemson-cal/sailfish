@@ -19,6 +19,7 @@ sailfish.solvers.scdg\_1d.Solver
       ~Solver.__init__
       ~Solver.advance
       ~Solver.maximum_wavespeed
+      ~Solver.reductions
    
    
 

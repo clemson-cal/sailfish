@@ -1,0 +1,6 @@
+sailfish.driver.append\_timeseries
+==================================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: append_timeseries

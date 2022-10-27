@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.subdivide &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.subdivide.partition" href="sailfish.subdivide.partition.html" />
+    <link rel="next" title="sailfish.subdivide.concat_on_host" href="sailfish.subdivide.concat_on_host.html" />
     <link rel="prev" title="sailfish.solvers.srhd_2d.Solver" href="sailfish.solvers.srhd_2d.Solver.html" /> 
 </head>
 
@@ -52,8 +51,11 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.subdivide</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.subdivide.concat_on_host.html">sailfish.subdivide.concat_on_host</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.subdivide.lazy_reduce.html">sailfish.subdivide.lazy_reduce</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.subdivide.partition.html">sailfish.subdivide.partition</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.subdivide.subdivide.html">sailfish.subdivide.subdivide</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.subdivide.to_host.html">sailfish.subdivide.to_host</a></li>
 </ul>
 </li>
 </ul>
@@ -85,7 +87,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.subdivide">
+  <div class="section" id="module-sailfish.subdivide">
 <span id="sailfish-subdivide"></span><h1>sailfish.subdivide<a class="headerlink" href="#module-sailfish.subdivide" title="Permalink to this headline"></a></h1>
 <p>Utility functions for domain decomposition.</p>
 <p class="rubric">Functions</p>
@@ -95,22 +97,31 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.subdivide.concat_on_host.html#sailfish.subdivide.concat_on_host" title="sailfish.subdivide.concat_on_host"><code class="xref py py-obj docutils literal notranslate"><span class="pre">concat_on_host</span></code></a>(arrays[, num_guard, rank])</p></td>
+<td><p>Concatenate a list of arrays, which may be allocated on different devices.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.subdivide.lazy_reduce.html#sailfish.subdivide.lazy_reduce" title="sailfish.subdivide.lazy_reduce"><code class="xref py py-obj docutils literal notranslate"><span class="pre">lazy_reduce</span></code></a>(reduction, block, launches, contexts)</p></td>
+<td><p>Applies a reduction over a sequence of parallelizable device operations.</p></td>
+</tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.subdivide.partition.html#sailfish.subdivide.partition" title="sailfish.subdivide.partition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">partition</span></code></a>(elements, num_parts)</p></td>
 <td><p>Equitably divide the given number of elements into <cite>num_parts</cite> partitions.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.subdivide.subdivide.html#sailfish.subdivide.subdivide" title="sailfish.subdivide.subdivide"><code class="xref py py-obj docutils literal notranslate"><span class="pre">subdivide</span></code></a>(interval, num_parts)</p></td>
 <td><p>Divide an interval into non-overlapping contiguous sub-intervals.</p></td>
 </tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.subdivide.to_host.html#sailfish.subdivide.to_host" title="sailfish.subdivide.to_host"><code class="xref py py-obj docutils literal notranslate"><span class="pre">to_host</span></code></a>(a)</p></td>
+<td><p></p></td>
+</tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.solvers.srhd_2d.Solver.html" class="btn btn-neutral float-left" title="sailfish.solvers.srhd_2d.Solver" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.subdivide.partition.html" class="btn btn-neutral float-right" title="sailfish.subdivide.partition" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.subdivide.concat_on_host.html" class="btn btn-neutral float-right" title="sailfish.subdivide.concat_on_host" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

@@ -17,6 +17,7 @@ sailfish.setups.simple1d.Shocktube
    .. autosummary::
    
       ~Shocktube.__init__
+      ~Shocktube.checkpoint_diagnostics
       ~Shocktube.dash_case_class_name
       ~Shocktube.default_model_parameters
       ~Shocktube.describe_class
@@ -41,7 +42,9 @@ sailfish.setups.simple1d.Shocktube
       ~Shocktube.boundary_condition
       ~Shocktube.default_end_time
       ~Shocktube.default_resolution
+      ~Shocktube.diagnostics
       ~Shocktube.physics
+      ~Shocktube.reference_time_scale
       ~Shocktube.solver
       ~Shocktube.start_time
    

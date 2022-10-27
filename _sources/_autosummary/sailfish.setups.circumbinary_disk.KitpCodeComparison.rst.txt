@@ -1,0 +1,67 @@
+sailfish.setups.circumbinary\_disk.KitpCodeComparison
+=====================================================
+
+.. currentmodule:: sailfish.setups.circumbinary_disk
+
+.. autoclass:: KitpCodeComparison
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~KitpCodeComparison.__init__
+      ~KitpCodeComparison.checkpoint_diagnostics
+      ~KitpCodeComparison.dash_case_class_name
+      ~KitpCodeComparison.default_model_parameters
+      ~KitpCodeComparison.describe_class
+      ~KitpCodeComparison.find_setup_class
+      ~KitpCodeComparison.has_model_parameters
+      ~KitpCodeComparison.immutable_parameter_keys
+      ~KitpCodeComparison.mesh
+      ~KitpCodeComparison.model_parameter_dict
+      ~KitpCodeComparison.model_parameters
+      ~KitpCodeComparison.point_masses
+      ~KitpCodeComparison.primitive
+      ~KitpCodeComparison.print_model_parameters
+      ~KitpCodeComparison.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~KitpCodeComparison.boundary_condition
+      ~KitpCodeComparison.buffer_is_enabled
+      ~KitpCodeComparison.default_end_time
+      ~KitpCodeComparison.default_resolution
+      ~KitpCodeComparison.diagnostics
+      ~KitpCodeComparison.disk_kick
+      ~KitpCodeComparison.domain_radius
+      ~KitpCodeComparison.eccentricity
+      ~KitpCodeComparison.mach_number
+      ~KitpCodeComparison.mass_ratio
+      ~KitpCodeComparison.nu
+      ~KitpCodeComparison.orbital_elements
+      ~KitpCodeComparison.physics
+      ~KitpCodeComparison.reference_time_scale
+      ~KitpCodeComparison.single_point_mass
+      ~KitpCodeComparison.sink_model
+      ~KitpCodeComparison.sink_radius
+      ~KitpCodeComparison.sink_rate
+      ~KitpCodeComparison.softening_length
+      ~KitpCodeComparison.solver
+      ~KitpCodeComparison.start_time
+      ~KitpCodeComparison.use_dg
+      ~KitpCodeComparison.which_diagnostics
+   
+   

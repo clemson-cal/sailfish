@@ -1,6 +1,0 @@
-sailfish.driver.asdict
-======================
-
-.. currentmodule:: sailfish.driver
-
-.. autofunction:: asdict

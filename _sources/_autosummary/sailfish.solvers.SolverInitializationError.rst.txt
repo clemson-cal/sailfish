@@ -1,0 +1,6 @@
+sailfish.solvers.SolverInitializationError
+==========================================
+
+.. currentmodule:: sailfish.solvers
+
+.. autoexception:: SolverInitializationError

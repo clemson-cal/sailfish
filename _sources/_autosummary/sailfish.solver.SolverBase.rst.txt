@@ -19,6 +19,7 @@ sailfish.solver.SolverBase
       ~SolverBase.__init__
       ~SolverBase.advance
       ~SolverBase.maximum_wavespeed
+      ~SolverBase.reductions
    
    
 

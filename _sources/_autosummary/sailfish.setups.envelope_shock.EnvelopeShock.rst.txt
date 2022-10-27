@@ -17,9 +17,11 @@ sailfish.setups.envelope\_shock.EnvelopeShock
    .. autosummary::
    
       ~EnvelopeShock.__init__
+      ~EnvelopeShock.checkpoint_diagnostics
       ~EnvelopeShock.dash_case_class_name
       ~EnvelopeShock.default_model_parameters
       ~EnvelopeShock.describe_class
+      ~EnvelopeShock.envelope_state
       ~EnvelopeShock.find_setup_class
       ~EnvelopeShock.has_model_parameters
       ~EnvelopeShock.immutable_parameter_keys
@@ -28,6 +30,8 @@ sailfish.setups.envelope\_shock.EnvelopeShock
       ~EnvelopeShock.model_parameters
       ~EnvelopeShock.primitive
       ~EnvelopeShock.print_model_parameters
+      ~EnvelopeShock.shell_u_profile_mass
+      ~EnvelopeShock.shell_u_profile_polar
       ~EnvelopeShock.validate
    
    
@@ -41,7 +45,12 @@ sailfish.setups.envelope\_shock.EnvelopeShock
       ~EnvelopeShock.boundary_condition
       ~EnvelopeShock.default_end_time
       ~EnvelopeShock.default_resolution
+      ~EnvelopeShock.diagnostics
       ~EnvelopeShock.expand
+      ~EnvelopeShock.jet_duration
+      ~EnvelopeShock.jet_energy
+      ~EnvelopeShock.jet_gamma_beta
+      ~EnvelopeShock.jet_theta
       ~EnvelopeShock.m_shell
       ~EnvelopeShock.physics
       ~EnvelopeShock.polar
@@ -49,6 +58,7 @@ sailfish.setups.envelope\_shock.EnvelopeShock
       ~EnvelopeShock.q_shell
       ~EnvelopeShock.r_inner
       ~EnvelopeShock.r_outer
+      ~EnvelopeShock.reference_time_scale
       ~EnvelopeShock.solver
       ~EnvelopeShock.start_time
       ~EnvelopeShock.t_start

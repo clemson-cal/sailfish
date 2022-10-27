@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.driver &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.driver.asdict" href="sailfish.driver.asdict.html" />
+    <link rel="next" title="sailfish.driver.append_timeseries" href="sailfish.driver.append_timeseries.html" />
     <link rel="prev" title="API documentation" href="../api.html" /> 
 </head>
 
@@ -43,21 +42,24 @@
 <li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
 <li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.driver</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.asdict.html">sailfish.driver.asdict</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.append_timeseries.html">sailfish.driver.append_timeseries</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.first_not_none.html">sailfish.driver.first_not_none</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.fromdict.html">sailfish.driver.fromdict</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.init_logging.html">sailfish.driver.init_logging</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_event.html">sailfish.driver.keyed_event</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_value.html">sailfish.driver.keyed_value</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_checkpoint.html">sailfish.driver.load_checkpoint</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_user_config.html">sailfish.driver.load_user_config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.main.html">sailfish.driver.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.newest_chkpt_in_directory.html">sailfish.driver.newest_chkpt_in_directory</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.run.html">sailfish.driver.run</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.simulate.html">sailfish.driver.simulate</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_dict_where_none.html">sailfish.driver.update_dict_where_none</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_where_none.html">sailfish.driver.update_where_none</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.write_checkpoint.html">sailfish.driver.write_checkpoint</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.DriverArgs.html">sailfish.driver.DriverArgs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.DriverState.html">sailfish.driver.DriverState</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ConfigurationError.html">sailfish.driver.ConfigurationError</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ExtensionError.html">sailfish.driver.ExtensionError</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
@@ -98,7 +100,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.driver">
+  <div class="section" id="module-sailfish.driver">
 <span id="sailfish-driver"></span><h1>sailfish.driver<a class="headerlink" href="#module-sailfish.driver" title="Permalink to this headline"></a></h1>
 <p>Library functions and command-line access to the simulation driver.</p>
 <p class="rubric">Functions</p>
@@ -108,43 +110,46 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.asdict.html#sailfish.driver.asdict" title="sailfish.driver.asdict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">asdict</span></code></a>(t)</p></td>
-<td><p>Convert named tuple instances to dictionaries.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.append_timeseries.html#sailfish.driver.append_timeseries" title="sailfish.driver.append_timeseries"><code class="xref py py-obj docutils literal notranslate"><span class="pre">append_timeseries</span></code></a>(state)</p></td>
+<td><p>Append to the driver state timeseries for post-processing.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.first_not_none.html#sailfish.driver.first_not_none" title="sailfish.driver.first_not_none"><code class="xref py py-obj docutils literal notranslate"><span class="pre">first_not_none</span></code></a>(*args)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.fromdict.html#sailfish.driver.fromdict" title="sailfish.driver.fromdict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">fromdict</span></code></a>(d)</p></td>
-<td><p>Convert from dictionaries to named tuples.</p></td>
-</tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.init_logging.html#sailfish.driver.init_logging" title="sailfish.driver.init_logging"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_logging</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.init_logging.html#sailfish.driver.init_logging" title="sailfish.driver.init_logging"><code class="xref py py-obj docutils literal notranslate"><span class="pre">init_logging</span></code></a>()</p></td>
 <td><p>Convenience method to enable logging to standard output.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.keyed_event.html#sailfish.driver.keyed_event" title="sailfish.driver.keyed_event"><code class="xref py py-obj docutils literal notranslate"><span class="pre">keyed_event</span></code></a>(item)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.keyed_event.html#sailfish.driver.keyed_event" title="sailfish.driver.keyed_event"><code class="xref py py-obj docutils literal notranslate"><span class="pre">keyed_event</span></code></a>(item)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.keyed_value.html#sailfish.driver.keyed_value" title="sailfish.driver.keyed_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">keyed_value</span></code></a>(item)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.keyed_value.html#sailfish.driver.keyed_value" title="sailfish.driver.keyed_value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">keyed_value</span></code></a>(item)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.load_checkpoint.html#sailfish.driver.load_checkpoint" title="sailfish.driver.load_checkpoint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_checkpoint</span></code></a>(chkpt_file)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.load_checkpoint.html#sailfish.driver.load_checkpoint" title="sailfish.driver.load_checkpoint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_checkpoint</span></code></a>(chkpt_file)</p></td>
 <td><p>Load the simulation state from a pickle file.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.load_user_config.html#sailfish.driver.load_user_config" title="sailfish.driver.load_user_config"><code class="xref py py-obj docutils literal notranslate"><span class="pre">load_user_config</span></code></a>()</p></td>
+<td><p>Initialize user extensions: setups and solvers outside the main codebase.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.main.html#sailfish.driver.main" title="sailfish.driver.main"><code class="xref py py-obj docutils literal notranslate"><span class="pre">main</span></code></a>()</p></td>
 <td><p>General-purpose command line interface.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.run.html#sailfish.driver.run" title="sailfish.driver.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a>(setup_name[, quiet])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.newest_chkpt_in_directory.html#sailfish.driver.newest_chkpt_in_directory" title="sailfish.driver.newest_chkpt_in_directory"><code class="xref py py-obj docutils literal notranslate"><span class="pre">newest_chkpt_in_directory</span></code></a>(directory_name)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.run.html#sailfish.driver.run" title="sailfish.driver.run"><code class="xref py py-obj docutils literal notranslate"><span class="pre">run</span></code></a>(setup_name[, quiet])</p></td>
 <td><p>Run a simulation with no side-effects, and return the final state.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.simulate.html#sailfish.driver.simulate" title="sailfish.driver.simulate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulate</span></code></a>(driver)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.simulate.html#sailfish.driver.simulate" title="sailfish.driver.simulate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">simulate</span></code></a>(driver)</p></td>
 <td><p>Main generator for running simulations.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.update_dict_where_none.html#sailfish.driver.update_dict_where_none" title="sailfish.driver.update_dict_where_none"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_dict_where_none</span></code></a>(new_dict, old_dict[, ...])</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.update_dict_where_none.html#sailfish.driver.update_dict_where_none" title="sailfish.driver.update_dict_where_none"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_dict_where_none</span></code></a>(new_dict, old_dict[, ...])</p></td>
 <td><p>Like <cite>dict.update</cite>, except <cite>key=value</cite> pairs in <cite>old_dict</cite> are only used to add / overwrite values in <cite>new_dict</cite> if they are <cite>None</cite> or missing.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.update_where_none.html#sailfish.driver.update_where_none" title="sailfish.driver.update_where_none"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_where_none</span></code></a>(new, old[, frozen])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.update_where_none.html#sailfish.driver.update_where_none" title="sailfish.driver.update_where_none"><code class="xref py py-obj docutils literal notranslate"><span class="pre">update_where_none</span></code></a>(new, old[, frozen])</p></td>
 <td><p>Same as <cite>update_dict_where_none</cite>, except operates on (immutable) named tuple instances and returns a new named tuple.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.write_checkpoint.html#sailfish.driver.write_checkpoint" title="sailfish.driver.write_checkpoint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_checkpoint</span></code></a>(number, outdir, state)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.write_checkpoint.html#sailfish.driver.write_checkpoint" title="sailfish.driver.write_checkpoint"><code class="xref py py-obj docutils literal notranslate"><span class="pre">write_checkpoint</span></code></a>(number, outdir, state)</p></td>
 <td><p>Write the simulation state to a file, as a pickle.</p></td>
 </tr>
 </tbody>
@@ -159,6 +164,9 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs" title="sailfish.driver.DriverArgs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DriverArgs</span></code></a>([setup_name, chkpt_file, ...])</p></td>
 <td><p>Contains data used by the driver.</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.DriverState.html#sailfish.driver.DriverState" title="sailfish.driver.DriverState"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DriverState</span></code></a>(iteration, driver, mesh, ...)</p></td>
+<td><p>Contains the stateful variables in use by the <cite>simulate</cite> function.</p></td>
+</tr>
 </tbody>
 </table>
 <p class="rubric">Exceptions</p>
@@ -171,16 +179,19 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.driver.ConfigurationError.html#sailfish.driver.ConfigurationError" title="sailfish.driver.ConfigurationError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ConfigurationError</span></code></a></p></td>
 <td><p>An invalid runtime configuration</p></td>
 </tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.driver.ExtensionError.html#sailfish.driver.ExtensionError" title="sailfish.driver.ExtensionError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">ExtensionError</span></code></a></p></td>
+<td><p>An invalid extension was specified</p></td>
+</tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="../api.html" class="btn btn-neutral float-left" title="API documentation" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.driver.asdict.html" class="btn btn-neutral float-right" title="sailfish.driver.asdict" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.driver.append_timeseries.html" class="btn btn-neutral float-right" title="sailfish.driver.append_timeseries" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

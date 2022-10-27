@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.kernel.system.configure_build &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.kernel.system.get_array_module" href="sailfish.kernel.system.get_array_module.html" />
+    <link rel="next" title="sailfish.kernel.system.execution_context" href="sailfish.kernel.system.execution_context.html" />
     <link rel="prev" title="sailfish.kernel.system" href="sailfish.kernel.system.html" /> 
 </head>
 
@@ -49,9 +48,11 @@
 <li class="toctree-l3"><a class="reference internal" href="sailfish.kernel.parse_api.html">sailfish.kernel.parse_api</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.kernel.system.html">sailfish.kernel.system</a><ul class="current">
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.kernel.system.configure_build</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.execution_context.html">sailfish.kernel.system.execution_context</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.get_array_module.html">sailfish.kernel.system.get_array_module</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.log_system_info.html">sailfish.kernel.system.log_system_info</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.measure_time.html">sailfish.kernel.system.measure_time</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.num_devices.html">sailfish.kernel.system.num_devices</a></li>
 </ul>
 </li>
 </ul>
@@ -94,27 +95,26 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-kernel-system-configure-build">
+  <div class="section" id="sailfish-kernel-system-configure-build">
 <h1>sailfish.kernel.system.configure_build<a class="headerlink" href="#sailfish-kernel-system-configure-build" title="Permalink to this headline"></a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="sailfish.kernel.system.configure_build">
-<span class="sig-prename descclassname"><span class="pre">sailfish.kernel.system.</span></span><span class="sig-name descname"><span class="pre">configure_build</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/kernel/system.html#configure_build"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.kernel.system.configure_build" title="Permalink to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">sailfish.kernel.system.</span></span><span class="sig-name descname"><span class="pre">configure_build</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">enable_openmp</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_compile_args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">extra_link_args</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/kernel/system.html#configure_build"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.kernel.system.configure_build" title="Permalink to this definition"></a></dt>
 <dd><p>Initiate the <cite>build_config</cite> module-level variable.</p>
-<p>The build configuration is presently inferred from a crude check to see
-whether we’re on Linux or MacOS. This procedure can be easily generalized
-to accommodate other or more specific platforms, check for hardware or
-software availability, or read a bulid configuration from a user or
-site-specified machine file.</p>
+<p>A default build configuration is inferred on MacOS or Linux. Defaults for
+Windows platforms and specific Linux flavors should be added soon. The
+keyword arguemnts may be Python objects, or strings to facilitate passing
+values right from a configparser instance.</p>
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.kernel.system.html" class="btn btn-neutral float-left" title="sailfish.kernel.system" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.kernel.system.get_array_module.html" class="btn btn-neutral float-right" title="sailfish.kernel.system.get_array_module" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.kernel.system.execution_context.html" class="btn btn-neutral float-right" title="sailfish.kernel.system.execution_context" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

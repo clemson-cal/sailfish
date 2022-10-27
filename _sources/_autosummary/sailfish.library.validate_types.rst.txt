@@ -1,6 +1,0 @@
-sailfish.library.validate\_types
-================================
-
-.. currentmodule:: sailfish.library
-
-.. autofunction:: validate_types

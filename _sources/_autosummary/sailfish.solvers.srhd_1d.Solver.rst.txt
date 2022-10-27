@@ -21,7 +21,7 @@ sailfish.solvers.srhd\_1d.Solver
       ~Solver.advance_rk
       ~Solver.maximum_wavespeed
       ~Solver.new_iteration
-      ~Solver.reconstruct
+      ~Solver.reductions
       ~Solver.set_bc
       ~Solver.set_bc_patch
    

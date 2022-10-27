@@ -29,14 +29,20 @@ sailfish.physics.circumbinary.Physics
 
    .. autosummary::
    
+      ~Physics.alpha
       ~Physics.buffer_driving_rate
       ~Physics.buffer_is_enabled
       ~Physics.buffer_onset_width
+      ~Physics.constant_softening
+      ~Physics.cooling_coefficient
+      ~Physics.diagnostics
       ~Physics.eos_type
       ~Physics.gamma_law_index
       ~Physics.mach_number
+      ~Physics.num_particles
       ~Physics.point_mass_function
       ~Physics.sound_speed
       ~Physics.viscosity_coefficient
+      ~Physics.viscosity_model
    
    

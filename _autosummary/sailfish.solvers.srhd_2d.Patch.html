@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.srhd_2d.Patch &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,8 +17,8 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.srhd_2d.Solver" href="sailfish.solvers.srhd_2d.Solver.html" />
-    <link rel="prev" title="sailfish.solvers.srhd_2d.initial_condition" href="sailfish.solvers.srhd_2d.initial_condition.html" /> 
+    <link rel="next" title="sailfish.solvers.srhd_2d.Physics" href="sailfish.solvers.srhd_2d.Physics.html" />
+    <link rel="prev" title="sailfish.solvers.srhd_2d.Options" href="sailfish.solvers.srhd_2d.Options.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -52,13 +51,18 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.initial_condition.html">sailfish.solvers.srhd_2d.initial_condition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Options.html">sailfish.solvers.srhd_2d.Options</a></li>
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.srhd_2d.Patch</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Physics.html">sailfish.solvers.srhd_2d.Physics</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Solver.html">sailfish.solvers.srhd_2d.Solver</a></li>
 </ul>
 </li>
@@ -96,17 +100,18 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solvers-srhd-2d-patch">
+  <div class="section" id="sailfish-solvers-srhd-2d-patch">
 <h1>sailfish.solvers.srhd_2d.Patch<a class="headerlink" href="#sailfish-solvers-srhd-2d-patch" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Patch">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_2d.</span></span><span class="sig-name descname"><span class="pre">Patch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conserved</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_2d.html#Patch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_2d.Patch" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_2d.</span></span><span class="sig-name descname"><span class="pre">Patch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conserved</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_first_order_zones</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execution_context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_2d.html#Patch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_2d.Patch" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
-<p>Holds the array buffer state for the solution on a subset of the
-solution domain.</p>
+<p>Buffers for the solution on a subset of the solution domain.</p>
+<p>This class also takes care of generating initial conditions if needed, and
+issuing calls to the solver kernel functions.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Patch.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conserved</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_2d.html#Patch.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_2d.Patch.__init__" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conserved</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_first_order_zones</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execution_context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_2d.html#Patch.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_2d.Patch.__init__" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
@@ -116,14 +121,14 @@ solution domain.</p>
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Patch.__init__" title="sailfish.solvers.srhd_2d.Patch.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(time, conserved, mesh, index_range, ...)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Patch.__init__" title="sailfish.solvers.srhd_2d.Patch.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(setup, physics, time, conserved, ...)</p></td>
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance_rk</span></code>(rk_param, dt)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Patch.execution_context" title="sailfish.solvers.srhd_2d.Patch.execution_context"><code class="xref py py-obj docutils literal notranslate"><span class="pre">execution_context</span></code></a>()</p></td>
-<td><p>TODO: return a CUDA context for execution on the assigned device</p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code>()</p></td>
+<td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
 <td><p></p></td>
@@ -143,33 +148,24 @@ solution domain.</p>
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">conserved</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_factor</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">scale_factor</span></code></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
 </table>
-<dl class="py method">
-<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Patch.execution_context">
-<span class="sig-name descname"><span class="pre">execution_context</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_2d.html#Patch.execution_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_2d.Patch.execution_context" title="Permalink to this definition"></a></dt>
-<dd><p>TODO: return a CUDA context for execution on the assigned device</p>
 </dd></dl>
 
-</dd></dl>
-
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.solvers.srhd_2d.initial_condition.html" class="btn btn-neutral float-left" title="sailfish.solvers.srhd_2d.initial_condition" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.srhd_2d.Solver.html" class="btn btn-neutral float-right" title="sailfish.solvers.srhd_2d.Solver" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solvers.srhd_2d.Options.html" class="btn btn-neutral float-left" title="sailfish.solvers.srhd_2d.Options" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.solvers.srhd_2d.Physics.html" class="btn btn-neutral float-right" title="sailfish.solvers.srhd_2d.Physics" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

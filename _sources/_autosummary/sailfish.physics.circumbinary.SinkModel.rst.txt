@@ -1,0 +1,28 @@
+sailfish.physics.circumbinary.SinkModel
+=======================================
+
+.. currentmodule:: sailfish.physics.circumbinary
+
+.. autoclass:: SinkModel
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SinkModel.INACTIVE
+      ~SinkModel.ACCELERATION_FREE
+      ~SinkModel.TORQUE_FREE
+      ~SinkModel.FORCE_FREE
+   
+   

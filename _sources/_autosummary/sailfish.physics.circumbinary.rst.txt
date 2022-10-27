@@ -18,8 +18,12 @@ sailfish.physics.circumbinary
    .. autosummary::
       :toctree:
    
+      Diagnostic
+      EquationOfState
       Physics
       PointMass
+      SinkModel
+      ViscosityModel
    
    
 

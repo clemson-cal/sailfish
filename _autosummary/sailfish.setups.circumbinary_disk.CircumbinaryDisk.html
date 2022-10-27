@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.setups.circumbinary_disk.CircumbinaryDisk &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script async="async" src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.setups.circumbinary_disk.EccentricSingleDisk" href="sailfish.setups.circumbinary_disk.EccentricSingleDisk.html" />
+    <link rel="prev" title="sailfish.setups.circumbinary_disk" href="sailfish.setups.circumbinary_disk.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.binary_bondi.html">sailfish.setups.binary_bondi</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="sailfish.setups.circumbinary_disk.html">sailfish.setups.circumbinary_disk</a><ul class="current">
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.setups.circumbinary_disk.CircumbinaryDisk</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.circumbinary_disk.EccentricSingleDisk.html">sailfish.setups.circumbinary_disk.EccentricSingleDisk</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.circumbinary_disk.KitpCodeComparison.html">sailfish.setups.circumbinary_disk.KitpCodeComparison</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.setups.circumbinary_disk.MassTransferBinary.html">sailfish.setups.circumbinary_disk.MassTransferBinary</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.envelope_shock.html">sailfish.setups.envelope_shock</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.exploding_star.html">sailfish.setups.exploding_star</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.simple1d.html">sailfish.setups.simple1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.simple2d.html">sailfish.setups.simple2d</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
+          <li><a href="sailfish.setups.html">sailfish.setups</a> &raquo;</li>
+          <li><a href="sailfish.setups.circumbinary_disk.html">sailfish.setups.circumbinary_disk</a> &raquo;</li>
+      <li>sailfish.setups.circumbinary_disk.CircumbinaryDisk</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="sailfish-setups-circumbinary-disk-circumbinarydisk">
+<h1>sailfish.setups.circumbinary_disk.CircumbinaryDisk<a class="headerlink" href="#sailfish-setups-circumbinary-disk-circumbinarydisk" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.setups.circumbinary_disk.</span></span><span class="sig-name descname"><span class="pre">CircumbinaryDisk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/circumbinary_disk.html#CircumbinaryDisk"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code></a></p>
+<p>A circumbinary disk setup for binary problems, isothermal or gamma-law.</p>
+<p>This problem is the primary science setup for the cbdiso_2d and cbdgam_2d
+solvers. The initial data consists of nearly stationary axisymmetric
+solutions, which partly means that Keplerian velocity profiles are imposed
+with a softened radial coordinate.</p>
+<p>In isothermal mode, since only constant-nu viscosity is supported, the
+disk is constant density = 1.0. Note that the overall scale of the density
+is not physically meaningful for the isothermal hydro equations, since
+those equations are invariant under uniform rescalings of the density.</p>
+<p>In gamma-law mode, since only constant-alpha viscosity is supported, the
+disk is nominally <a class="reference external" href="https://ui.adsabs.harvard.edu/abs/1973A%26A....24..337S">Shakura &amp; Sunyaev (1973)</a>. However, we follow the
+purely Newtonian treatment given in <a class="reference external" href="https://ui.adsabs.harvard.edu/abs/2003MNRAS.339..937G">Goodman (2003)</a>, setting radiation
+pressure to zero. In particular, we impose the following power law
+profiles on the surface density <span class="math notranslate nohighlight">\(\Sigma\)</span> and vertically-integrated
+pressure <span class="math notranslate nohighlight">\(\mathcal{P}\)</span>:</p>
+<div class="math notranslate nohighlight">
+\[\Sigma \propto r^{-3/5}, \, \mathcal{P} \propto r^{-3/2}\]</div>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="o"><span class="pre">**</span></span><span class="n"><span class="pre">kwargs</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.__init__" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.__init__" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(**kwargs)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.checkpoint_diagnostics" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.checkpoint_diagnostics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">checkpoint_diagnostics</span></code></a>(time)</p></td>
+<td><p>Return a dict of post-processing data to include in checkpoint files.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.dash_case_class_name" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.dash_case_class_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dash_case_class_name</span></code></a>()</p></td>
+<td><p>Return a <cite>dash-case</cite> name of this setup class.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_model_parameters" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_model_parameters</span></code></a>()</p></td>
+<td><p>Return an iterator over the default model parameters for this class.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.describe_class" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.describe_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">describe_class</span></code></a>()</p></td>
+<td><p>Print formatted text describing the setup.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.find_setup_class" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.find_setup_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">find_setup_class</span></code></a>(name)</p></td>
+<td><p>Finds a setup class with the given name.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.has_model_parameters" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.has_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has_model_parameters</span></code></a>()</p></td>
+<td><p>Determine if this class has any model parameters.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.immutable_parameter_keys" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.immutable_parameter_keys"><code class="xref py py-obj docutils literal notranslate"><span class="pre">immutable_parameter_keys</span></code></a>()</p></td>
+<td><p>Return an iterator over the immutable model parameter keys.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.mesh" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a>(resolution)</p></td>
+<td><p>Return a mesh instance describing the problem domain.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameter_dict" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameter_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameter_dict</span></code></a>()</p></td>
+<td><p>Return a dictionary of the model parameters.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameters" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameters</span></code></a>()</p></td>
+<td><p>Return an iterator over the model parameters chosen for this setup.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">point_masses</span></code>(time)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.primitive" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a>(t, coords, primitive)</p></td>
+<td><p>Set initial or boundary data at a point.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.print_model_parameters" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.print_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">print_model_parameters</span></code></a>([logger, newlines])</p></td>
+<td><p>Print parameter names, values, and about messages to <cite>stdout</cite>.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.validate" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.validate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate</span></code></a>()</p></td>
+<td><p>Confirm that the model parameters are physically valid.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">alpha</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.boundary_condition" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">boundary_condition</span></code></a></p></td>
+<td><p>Return a boundary condition mode.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">buffer_is_enabled</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">constant_softening</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">cooling_coefficient</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_end_time" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_end_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_end_time</span></code></a></p></td>
+<td><p>Provide a default end-time to the simulation driven.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_resolution" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
+<td><p>Provide a default grid resolution.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.diagnostics" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.diagnostics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">diagnostics</span></code></a></p></td>
+<td><p>A list of diagnostics to be dispatched to the solver.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">domain_radius</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">eccentricity</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">eos</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">gamma_law_index</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_pressure</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">initial_sigma</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_gamma_law</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">is_isothermal</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">mach_number</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">mass_ratio</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">nu</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">orbital_elements</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.physics" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<td><p>Return physics parameters used by the solver: EOS, gravity, etc.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.reference_time_scale" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.reference_time_scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reference_time_scale</span></code></a></p></td>
+<td><p>The time scale used to convert raw simulation time to user time.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">sink_model</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">sink_radius</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">sink_rate</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">softening_length</span></code></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.solver" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
+<td><p>Return the name of the setup class.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.start_time" title="sailfish.setups.circumbinary_disk.CircumbinaryDisk.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
+<td><p>The start time for the simulation.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">which_diagnostics</span></code></p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.boundary_condition">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">boundary_condition</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.boundary_condition" title="Permalink to this definition"></a></dt>
+<dd><p>Return a boundary condition mode.</p>
+<p>This method must be overridden, and the mode must be supported by the
+solver. 1D solvers should accept either a single return value
+specifying the BC mode at both the domain edges, or a pair of modes,
+one for each edge.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.checkpoint_diagnostics">
+<span class="sig-name descname"><span class="pre">checkpoint_diagnostics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/circumbinary_disk.html#CircumbinaryDisk.checkpoint_diagnostics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.checkpoint_diagnostics" title="Permalink to this definition"></a></dt>
+<dd><p>Return a dict of post-processing data to include in checkpoint files.</p>
+<p>An example use case is to record the positions of point masses (with
+prescribed trajectory) in a gravitating hydrodynmics problem.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.dash_case_class_name">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">dash_case_class_name</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.dash_case_class_name" title="Permalink to this definition"></a></dt>
+<dd><p>Return a <cite>dash-case</cite> name of this setup class.</p>
+<p>Dash case is used in configuration, including the setup name passed to
+the driver, and written in checkpoint files.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_end_time">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">default_end_time</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_end_time" title="Permalink to this definition"></a></dt>
+<dd><p>Provide a default end-time to the simulation driven.</p>
+<p>This value will be superceded if a non-None end time was provided to
+the driver. If neither the driver nor the setup has an end time, then
+the simulation runs until it’s killed.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_model_parameters">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">default_model_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_model_parameters" title="Permalink to this definition"></a></dt>
+<dd><p>Return an iterator over the default model parameters for this class.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_resolution">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">default_resolution</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.default_resolution" title="Permalink to this definition"></a></dt>
+<dd><p>Provide a default grid resolution.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.describe_class">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">describe_class</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.describe_class" title="Permalink to this definition"></a></dt>
+<dd><p>Print formatted text describing the setup.</p>
+<p>The output will include a normlized version of the class doc string,
+and the model parameter names, default values, and about message.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.diagnostics">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">diagnostics</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.diagnostics" title="Permalink to this definition"></a></dt>
+<dd><p>A list of diagnostics to be dispatched to the solver.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.find_setup_class">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">find_setup_class</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">name</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.find_setup_class" title="Permalink to this definition"></a></dt>
+<dd><p>Finds a setup class with the given name.</p>
+<p>The class name is expected in dash-case format. If no setup is found,
+a <cite>SetupError</cite> exception is raised.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.has_model_parameters">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">has_model_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.has_model_parameters" title="Permalink to this definition"></a></dt>
+<dd><p>Determine if this class has any model parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.immutable_parameter_keys">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">immutable_parameter_keys</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.immutable_parameter_keys" title="Permalink to this definition"></a></dt>
+<dd><p>Return an iterator over the immutable model parameter keys.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.mesh">
+<span class="sig-name descname"><span class="pre">mesh</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">resolution</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/circumbinary_disk.html#CircumbinaryDisk.mesh"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.mesh" title="Permalink to this definition"></a></dt>
+<dd><p>Return a mesh instance describing the problem domain.</p>
+<p>This method must be overridden, and the domain type must be supported
+by the solver. A resolution parameter is passed here from the driver.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameter_dict">
+<span class="sig-name descname"><span class="pre">model_parameter_dict</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameter_dict" title="Permalink to this definition"></a></dt>
+<dd><p>Return a dictionary of the model parameters.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameters">
+<span class="sig-name descname"><span class="pre">model_parameters</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.model_parameters" title="Permalink to this definition"></a></dt>
+<dd><p>Return an iterator over the model parameters chosen for this setup.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.physics">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">physics</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.physics" title="Permalink to this definition"></a></dt>
+<dd><p>Return physics parameters used by the solver: EOS, gravity, etc.</p>
+<p>Physics parameters should be distinct from the solver options, such as
+PLM theta value, RK integration type, or DG order.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.primitive">
+<span class="sig-name descname"><span class="pre">primitive</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">t</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">coords</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/circumbinary_disk.html#CircumbinaryDisk.primitive"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.primitive" title="Permalink to this definition"></a></dt>
+<dd><p>Set initial or boundary data at a point.</p>
+<p>This method must be overridden to set the primitive hydrodynamic
+variables at a single point (given by <cite>coordinate</cite>) and time. The
+meaning of the coordinate is influenced by the type of mesh being
+used. Data is written to the output variable <cite>primitive</cite> for
+efficiency, since otherwise a tiny allocation is made for each zone in
+the simulation grid.</p>
+<p>The time coordinate enables the use of a time-dependent boundary
+condition.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.print_model_parameters">
+<span class="sig-name descname"><span class="pre">print_model_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">logger</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">newlines</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.print_model_parameters" title="Permalink to this definition"></a></dt>
+<dd><p>Print parameter names, values, and about messages to <cite>stdout</cite>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.reference_time_scale">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">reference_time_scale</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.reference_time_scale" title="Permalink to this definition"></a></dt>
+<dd><p>The time scale used to convert raw simulation time to user time.</p>
+<p>Typically the reference time can be 1.0, meaning that raw simulation
+time and user time are the same. However it sometimes makes sense for
+the user time to be something else, like the orbital period of 2 pi
+for example. The <cite>start_time</cite> and <cite>default_time_time</cite> properties are
+in uner time, not raw simulation time. Similarly, messages written to
+stdout, and event recurrences are both in user time, i.e. if the
+reference time is 2 pi and <cite>–checkpoint=1.0</cite>, you’ll get one
+checkpoint written per orbital period. The “time” field of the
+checkpoint file contains the raw simulation time, not the user time.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.solver">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">solver</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.solver" title="Permalink to this definition"></a></dt>
+<dd><p>Return the name of the setup class.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.start_time">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start_time</span></span><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.start_time" title="Permalink to this definition"></a></dt>
+<dd><p>The start time for the simulation. This is 0.0 by default.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.circumbinary_disk.CircumbinaryDisk.validate">
+<span class="sig-name descname"><span class="pre">validate</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/setups/circumbinary_disk.html#CircumbinaryDisk.validate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.setups.circumbinary_disk.CircumbinaryDisk.validate" title="Permalink to this definition"></a></dt>
+<dd><p>Confirm that the model parameters are physically valid.</p>
+<p>This method should be overridden to indicate a failure by throwing a
+<cite>SetupError</cite> exception.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.setups.circumbinary_disk.html" class="btn btn-neutral float-left" title="sailfish.setups.circumbinary_disk" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.setups.circumbinary_disk.EccentricSingleDisk.html" class="btn btn-neutral float-right" title="sailfish.setups.circumbinary_disk.EccentricSingleDisk" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.cbdiso_2d.Solver &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.scdg_1d" href="sailfish.solvers.scdg_1d.html" />
+    <link rel="next" title="sailfish.solvers.cbdisodg_2d" href="sailfish.solvers.cbdisodg_2d.html" />
     <link rel="prev" title="sailfish.solvers.cbdiso_2d.Patch" href="sailfish.solvers.cbdiso_2d.Patch.html" /> 
 </head>
 
@@ -52,6 +51,8 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.initial_condition.html">sailfish.solvers.cbdiso_2d.initial_condition</a></li>
@@ -60,6 +61,7 @@
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.cbdiso_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
@@ -97,7 +99,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solvers-cbdiso-2d-solver">
+  <div class="section" id="sailfish-solvers-cbdiso-2d-solver">
 <h1>sailfish.solvers.cbdiso_2d.Solver<a class="headerlink" href="#sailfish-solvers-cbdiso-2d-solver" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Solver">
@@ -126,15 +128,18 @@
 <td><p></p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Solver.maximum_wavespeed" title="sailfish.solvers.cbdiso_2d.Solver.maximum_wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></a>()</p></td>
-<td><p>Return the largest wavespeed on the grid.</p></td>
+<td><p>Return the global maximum wavespeed over the whole domain.</p></td>
 </tr>
 <tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc</span></code>(array)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Solver.reductions" title="sailfish.solvers.cbdiso_2d.Solver.reductions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reductions</span></code></a>()</p></td>
+<td><p>Generate runtime reductions on the solution data for time series.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc</span></code>(array)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc_patch</span></code>(pl, pc, pr, patch_index)</p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc_patch</span></code>(pl, pc, pr, patch_index)</p></td>
 <td><p></p></td>
 </tr>
 </tbody>
@@ -156,7 +161,7 @@
 <td><p>A dictionary describing the physics parameters of the system.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Solver.primitive" title="sailfish.solvers.cbdiso_2d.Solver.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
-<td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
+<td><p>This solver uses primitive data as the solution array.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Solver.recommended_cfl" title="sailfish.solvers.cbdiso_2d.Solver.recommended_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recommended_cfl</span></code></a></p></td>
 <td><p>Return a recommended CFL number to the driver, default to the maximum.</p></td>
@@ -184,9 +189,7 @@
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Solver.maximum_wavespeed">
 <span class="sig-name descname"><span class="pre">maximum_wavespeed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Solver.maximum_wavespeed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Solver.maximum_wavespeed" title="Permalink to this definition"></a></dt>
-<dd><p>Return the largest wavespeed on the grid.</p>
-<p>This function is not implemented as a property, to emphasize that it
-might be relatively expensive to compute.</p>
+<dd><p>Return the global maximum wavespeed over the whole domain.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -219,17 +222,19 @@ through the setup’s model parameters.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Solver.primitive">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">primitive</span></span><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Solver.primitive" title="Permalink to this definition"></a></dt>
-<dd><p>Return primitive hydrodynamic data for use in plotting.</p>
-<p>The primitive variable data returned from this function could be
-written to checkpoint files, but it might also be written to
-non-checkpoint output files for offline analysis, or passed along to
-runtime post-processing routines.</p>
+<dd><p>This solver uses primitive data as the solution array.</p>
 </dd></dl>
 
 <dl class="py property">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Solver.recommended_cfl">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">recommended_cfl</span></span><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Solver.recommended_cfl" title="Permalink to this definition"></a></dt>
 <dd><p>Return a recommended CFL number to the driver, default to the maximum.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Solver.reductions">
+<span class="sig-name descname"><span class="pre">reductions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Solver.reductions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Solver.reductions" title="Permalink to this definition"></a></dt>
+<dd><p>Generate runtime reductions on the solution data for time series.</p>
 </dd></dl>
 
 <dl class="py property">
@@ -256,14 +261,14 @@ object from the setup and mesh instances.</p>
 
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.solvers.cbdiso_2d.Patch.html" class="btn btn-neutral float-left" title="sailfish.solvers.cbdiso_2d.Patch" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.scdg_1d.html" class="btn btn-neutral float-right" title="sailfish.solvers.scdg_1d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solvers.cbdisodg_2d.html" class="btn btn-neutral float-right" title="sailfish.solvers.cbdisodg_2d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

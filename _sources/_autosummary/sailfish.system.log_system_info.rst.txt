@@ -1,6 +1,0 @@
-sailfish.system.log\_system\_info
-=================================
-
-.. currentmodule:: sailfish.system
-
-.. autofunction:: log_system_info

@@ -27,7 +27,6 @@ sailfish.solvers.cbdgam\_2d
    
       Options
       Patch
-      Physics
       Solver
    
    

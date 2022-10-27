@@ -18,6 +18,7 @@ sailfish.setups.simple2d
    .. autosummary::
       :toctree:
    
+      CylindricalExplosion
       UniformPolar
    
    

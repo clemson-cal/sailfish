@@ -1,0 +1,6 @@
+sailfish.solvers.cbdisodg\_2d.primitive\_to\_conserved
+======================================================
+
+.. currentmodule:: sailfish.solvers.cbdisodg_2d
+
+.. autofunction:: primitive_to_conserved

@@ -25,7 +25,9 @@ sailfish.solvers.srhd\_2d
    .. autosummary::
       :toctree:
    
+      Options
       Patch
+      Physics
       Solver
    
    

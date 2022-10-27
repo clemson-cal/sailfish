@@ -1,0 +1,66 @@
+sailfish.setups.binary\_bondi.BinaryBondi
+=========================================
+
+.. currentmodule:: sailfish.setups.binary_bondi
+
+.. autoclass:: BinaryBondi
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~BinaryBondi.__init__
+      ~BinaryBondi.checkpoint_diagnostics
+      ~BinaryBondi.dash_case_class_name
+      ~BinaryBondi.default_model_parameters
+      ~BinaryBondi.describe_class
+      ~BinaryBondi.find_setup_class
+      ~BinaryBondi.has_model_parameters
+      ~BinaryBondi.immutable_parameter_keys
+      ~BinaryBondi.mesh
+      ~BinaryBondi.model_parameter_dict
+      ~BinaryBondi.model_parameters
+      ~BinaryBondi.point_masses
+      ~BinaryBondi.primitive
+      ~BinaryBondi.print_model_parameters
+      ~BinaryBondi.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~BinaryBondi.aspect
+      ~BinaryBondi.bh_mass
+      ~BinaryBondi.bh_sep
+      ~BinaryBondi.boundary_condition
+      ~BinaryBondi.default_end_time
+      ~BinaryBondi.default_resolution
+      ~BinaryBondi.diagnostics
+      ~BinaryBondi.eccentricity
+      ~BinaryBondi.height
+      ~BinaryBondi.mass_ratio
+      ~BinaryBondi.orbital_elements
+      ~BinaryBondi.physics
+      ~BinaryBondi.reference_time_scale
+      ~BinaryBondi.sink_model
+      ~BinaryBondi.sink_radius
+      ~BinaryBondi.sink_rate
+      ~BinaryBondi.softening_length
+      ~BinaryBondi.solver
+      ~BinaryBondi.sound_speed
+      ~BinaryBondi.start_time
+      ~BinaryBondi.wind_vel
+      ~BinaryBondi.x_bin
+   
+   

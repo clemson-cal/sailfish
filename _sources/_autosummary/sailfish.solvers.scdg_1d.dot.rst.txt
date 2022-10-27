@@ -1,6 +1,0 @@
-sailfish.solvers.scdg\_1d.dot
-=============================
-
-.. currentmodule:: sailfish.solvers.scdg_1d
-
-.. autofunction:: dot

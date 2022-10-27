@@ -1,0 +1,37 @@
+sailfish.solvers.cbdisodg\_2d.Patch
+===================================
+
+.. currentmodule:: sailfish.solvers.cbdisodg_2d
+
+.. autoclass:: Patch
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Patch.__init__
+      ~Patch.advance_rk
+      ~Patch.copy_weights1_to_weights0
+      ~Patch.maximum_wavespeed
+      ~Patch.new_iteration
+      ~Patch.point_mass_source_term
+      ~Patch.slope_limit
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Patch.primitive
+   
+   

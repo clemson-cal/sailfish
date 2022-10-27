@@ -1,0 +1,6 @@
+sailfish.driver.load\_user\_config
+==================================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: load_user_config

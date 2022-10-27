@@ -1,0 +1,6 @@
+sailfish.solvers.cbdisodg\_2d.initial\_condition
+================================================
+
+.. currentmodule:: sailfish.solvers.cbdisodg_2d
+
+.. autofunction:: initial_condition

@@ -71,6 +71,35 @@
 <span class="sd">&quot;&quot;&quot;</span>
 
 
+<div class="viewcode-block" id="to_host"><a class="viewcode-back" href="../../_autosummary/sailfish.subdivide.to_host.html#sailfish.subdivide.to_host">[docs]</a><span class="k">def</span> <span class="nf">to_host</span><span class="p">(</span><span class="n">a</span><span class="p">):</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">a</span><span class="o">.</span><span class="n">get</span><span class="p">()</span>
+    <span class="k">except</span> <span class="ne">AttributeError</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">a</span></div>
+
+
+<div class="viewcode-block" id="lazy_reduce"><a class="viewcode-back" href="../../_autosummary/sailfish.subdivide.lazy_reduce.html#sailfish.subdivide.lazy_reduce">[docs]</a><span class="k">def</span> <span class="nf">lazy_reduce</span><span class="p">(</span><span class="n">reduction</span><span class="p">,</span> <span class="n">block</span><span class="p">,</span> <span class="n">launches</span><span class="p">,</span> <span class="n">contexts</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Applies a reduction over a sequence of parallelizable device operations.</span>
+
+<span class="sd">    The reduction can be something like built-in `max` or `min`. The</span>
+<span class="sd">    `launches` argument is a sequence of callables which trigger the</span>
+<span class="sd">    asynchronous calculation and return a &quot;token&quot; (in the case of a cupy</span>
+<span class="sd">    reduction, the token is a device array). The `block` argument is a</span>
+<span class="sd">    callable which operates on the token, blocking until the underlying</span>
+<span class="sd">    operation is completed, and then returns a value (`block` is probably</span>
+<span class="sd">    built-in `float`). The `contexts` argument is a sequence of execution</span>
+<span class="sd">    contexts which should switch to the device on which the respective launch</span>
+<span class="sd">    callable was executed.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">tokens</span> <span class="o">=</span> <span class="p">[</span><span class="n">launch</span><span class="p">()</span> <span class="k">for</span> <span class="n">launch</span> <span class="ow">in</span> <span class="n">launches</span><span class="p">]</span>
+    <span class="n">results</span> <span class="o">=</span> <span class="p">[]</span>
+    <span class="k">for</span> <span class="n">token</span><span class="p">,</span> <span class="n">context</span> <span class="ow">in</span> <span class="nb">zip</span><span class="p">(</span><span class="n">tokens</span><span class="p">,</span> <span class="n">contexts</span><span class="p">):</span>
+        <span class="k">with</span> <span class="n">context</span><span class="p">:</span>
+            <span class="n">results</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">block</span><span class="p">(</span><span class="n">token</span><span class="p">))</span>
+    <span class="k">return</span> <span class="n">reduction</span><span class="p">(</span><span class="n">results</span><span class="p">)</span></div>
+
+
 <div class="viewcode-block" id="partition"><a class="viewcode-back" href="../../_autosummary/sailfish.subdivide.partition.html#sailfish.subdivide.partition">[docs]</a><span class="k">def</span> <span class="nf">partition</span><span class="p">(</span><span class="n">elements</span><span class="p">,</span> <span class="n">num_parts</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Equitably divide the given number of elements into `num_parts` partitions.</span>
@@ -97,6 +126,68 @@
     <span class="k">for</span> <span class="n">n</span> <span class="ow">in</span> <span class="n">partition</span><span class="p">(</span><span class="n">b</span> <span class="o">-</span> <span class="n">a</span><span class="p">,</span> <span class="n">num_parts</span><span class="p">):</span>
         <span class="k">yield</span> <span class="n">a</span><span class="p">,</span> <span class="n">a</span> <span class="o">+</span> <span class="n">n</span>
         <span class="n">a</span> <span class="o">+=</span> <span class="n">n</span></div>
+
+
+<div class="viewcode-block" id="concat_on_host"><a class="viewcode-back" href="../../_autosummary/sailfish.subdivide.concat_on_host.html#sailfish.subdivide.concat_on_host">[docs]</a><span class="k">def</span> <span class="nf">concat_on_host</span><span class="p">(</span><span class="n">arrays</span><span class="p">:</span> <span class="nb">list</span><span class="p">,</span> <span class="n">num_guard</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">rank</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+    <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Concatenate a list of arrays, which may be allocated on different devices.</span>
+
+<span class="sd">    The array returned is allocated on the host. The concatenation is</span>
+<span class="sd">    performed on the first axis.</span>
+
+<span class="sd">    Arrays represent fields of data on either 1d or 2d grids (rank of either 1</span>
+<span class="sd">    or 2). If rank is None, it is assumed that only the final axis contains</span>
+<span class="sd">    fields, so rank is inferred to be len(array.shape) - 1. If several</span>
+<span class="sd">    trailing axes represent more fields, then rank must be given explicitly.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+
+    <span class="k">def</span> <span class="nf">all_equal</span><span class="p">(</span><span class="n">seq</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">x</span> <span class="ow">in</span> <span class="n">seq</span><span class="p">:</span>
+            <span class="k">try</span><span class="p">:</span>
+                <span class="k">if</span> <span class="n">x</span> <span class="o">!=</span> <span class="n">y</span><span class="p">:</span>
+                    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;got distinct values&quot;</span><span class="p">)</span>
+            <span class="k">except</span> <span class="ne">UnboundLocalError</span><span class="p">:</span>
+                <span class="n">y</span> <span class="o">=</span> <span class="n">x</span>
+        <span class="k">return</span> <span class="n">x</span>
+
+    <span class="k">if</span> <span class="n">rank</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">rank</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">arrays</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span><span class="o">.</span><span class="n">shape</span><span class="p">)</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># TODO: 1d case</span>
+        <span class="n">ng</span> <span class="o">=</span> <span class="n">num_guard</span> <span class="ow">or</span> <span class="mi">0</span>
+        <span class="n">ni</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">)</span>
+        <span class="n">nq</span> <span class="o">=</span> <span class="n">all_equal</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">:]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">)</span>
+        <span class="n">si</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">ng</span><span class="p">,</span> <span class="o">-</span><span class="n">ng</span><span class="p">)</span> <span class="k">if</span> <span class="n">ng</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ni</span><span class="p">,)</span> <span class="o">+</span> <span class="n">nq</span><span class="p">)</span>
+        <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">array</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">:</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ng</span>
+            <span class="n">i</span> <span class="o">+=</span> <span class="n">b</span> <span class="o">-</span> <span class="n">a</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span> <span class="o">=</span> <span class="n">to_host</span><span class="p">(</span><span class="n">array</span><span class="p">[</span><span class="n">si</span><span class="p">])</span>
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">if</span> <span class="n">rank</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">ngi</span><span class="p">,</span> <span class="n">ngj</span> <span class="o">=</span> <span class="n">num_guard</span> <span class="ow">or</span> <span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">)</span>
+        <span class="n">ni</span> <span class="o">=</span> <span class="nb">sum</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ngi</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">)</span>
+        <span class="n">nj</span> <span class="o">=</span> <span class="n">all_equal</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ngj</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">)</span>
+        <span class="n">nq</span> <span class="o">=</span> <span class="n">all_equal</span><span class="p">(</span><span class="n">a</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">2</span><span class="p">:]</span> <span class="k">for</span> <span class="n">a</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">)</span>
+        <span class="n">si</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">ngi</span><span class="p">,</span> <span class="o">-</span><span class="n">ngi</span><span class="p">)</span> <span class="k">if</span> <span class="n">ngi</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">sj</span> <span class="o">=</span> <span class="nb">slice</span><span class="p">(</span><span class="n">ngj</span><span class="p">,</span> <span class="o">-</span><span class="n">ngj</span><span class="p">)</span> <span class="k">if</span> <span class="n">ngj</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="nb">slice</span><span class="p">(</span><span class="kc">None</span><span class="p">)</span>
+        <span class="n">result</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">ni</span><span class="p">,</span> <span class="n">nj</span><span class="p">)</span> <span class="o">+</span> <span class="n">nq</span><span class="p">)</span>
+
+        <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span>
+        <span class="k">for</span> <span class="n">array</span> <span class="ow">in</span> <span class="n">arrays</span><span class="p">:</span>
+            <span class="n">a</span> <span class="o">=</span> <span class="n">i</span>
+            <span class="n">b</span> <span class="o">=</span> <span class="n">i</span> <span class="o">+</span> <span class="n">array</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">ngi</span>
+            <span class="n">i</span> <span class="o">+=</span> <span class="n">b</span> <span class="o">-</span> <span class="n">a</span>
+            <span class="n">result</span><span class="p">[</span><span class="n">a</span><span class="p">:</span><span class="n">b</span><span class="p">]</span> <span class="o">=</span> <span class="n">to_host</span><span class="p">(</span><span class="n">array</span><span class="p">[</span><span class="n">si</span><span class="p">,</span> <span class="n">sj</span><span class="p">])</span>
+
+        <span class="k">return</span> <span class="n">result</span>
+
+    <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;concatenation for arrays of rank </span><span class="si">{</span><span class="n">rank</span><span class="si">}</span><span class="s2"> not supported&quot;</span><span class="p">)</span></div>
 </pre></div>
 
            </div>

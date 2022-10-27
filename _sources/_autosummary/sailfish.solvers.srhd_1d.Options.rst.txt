@@ -1,0 +1,34 @@
+sailfish.solvers.srhd\_1d.Options
+=================================
+
+.. currentmodule:: sailfish.solvers.srhd_1d
+
+.. autoclass:: Options
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Options.__init__
+      ~Options.count
+      ~Options.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Options.compute_wavespeed
+      ~Options.rk_order
+   
+   

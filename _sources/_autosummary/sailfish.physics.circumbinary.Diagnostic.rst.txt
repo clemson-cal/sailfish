@@ -1,0 +1,37 @@
+sailfish.physics.circumbinary.Diagnostic
+========================================
+
+.. currentmodule:: sailfish.physics.circumbinary
+
+.. autoclass:: Diagnostic
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Diagnostic.__init__
+      ~Diagnostic.count
+      ~Diagnostic.index
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Diagnostic.accretion
+      ~Diagnostic.gravity
+      ~Diagnostic.quantity
+      ~Diagnostic.radial_cut
+      ~Diagnostic.which_mass
+   
+   

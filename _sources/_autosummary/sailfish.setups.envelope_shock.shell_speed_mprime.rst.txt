@@ -1,0 +1,6 @@
+sailfish.setups.envelope\_shock.shell\_speed\_mprime
+====================================================
+
+.. currentmodule:: sailfish.setups.envelope_shock
+
+.. autofunction:: shell_speed_mprime

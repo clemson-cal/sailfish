@@ -17,6 +17,7 @@ sailfish.setups.exploding\_star.ExplodingStar
    .. autosummary::
    
       ~ExplodingStar.__init__
+      ~ExplodingStar.checkpoint_diagnostics
       ~ExplodingStar.dash_case_class_name
       ~ExplodingStar.default_model_parameters
       ~ExplodingStar.describe_class
@@ -41,10 +42,12 @@ sailfish.setups.exploding\_star.ExplodingStar
       ~ExplodingStar.boundary_condition
       ~ExplodingStar.default_end_time
       ~ExplodingStar.default_resolution
+      ~ExplodingStar.diagnostics
       ~ExplodingStar.physics
       ~ExplodingStar.r_inner
       ~ExplodingStar.r_outer
       ~ExplodingStar.r_shell
+      ~ExplodingStar.reference_time_scale
       ~ExplodingStar.solver
       ~ExplodingStar.start_time
    

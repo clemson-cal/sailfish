@@ -1,0 +1,6 @@
+sailfish.solvers.register\_solver\_extension
+============================================
+
+.. currentmodule:: sailfish.solvers
+
+.. autofunction:: register_solver_extension

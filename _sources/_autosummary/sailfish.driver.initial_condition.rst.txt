@@ -1,6 +1,0 @@
-sailfish.driver.initial\_condition
-==================================
-
-.. currentmodule:: sailfish.driver
-
-.. autofunction:: initial_condition

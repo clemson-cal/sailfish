@@ -135,9 +135,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">for</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span> <span class="ow">in</span> <span class="nb">vars</span><span class="p">(</span><span class="bp">cls</span><span class="p">)</span><span class="o">.</span><span class="n">items</span><span class="p">():</span>
             <span class="k">if</span> <span class="nb">type</span><span class="p">(</span><span class="n">val</span><span class="p">)</span> <span class="o">==</span> <span class="n">Parameter</span><span class="p">:</span>
-                <span class="k">yield</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">about</span>
-            <span class="k">elif</span> <span class="nb">hasattr</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="s2">&quot;__annotations__&quot;</span><span class="p">):</span>
-                <span class="nb">print</span><span class="p">(</span><span class="bp">cls</span><span class="o">.</span><span class="vm">__annotations__</span><span class="p">)</span></div>
+                <span class="k">yield</span> <span class="n">key</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">default</span><span class="p">,</span> <span class="n">val</span><span class="o">.</span><span class="n">about</span></div>
 
 <div class="viewcode-block" id="Setup.immutable_parameter_keys"><a class="viewcode-back" href="../../_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.immutable_parameter_keys">[docs]</a>    <span class="nd">@classmethod</span>
     <span class="k">def</span> <span class="nf">immutable_parameter_keys</span><span class="p">(</span><span class="bp">cls</span><span class="p">):</span>
@@ -211,7 +209,7 @@
         <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">has_model_parameters</span><span class="p">():</span>
             <span class="n">_p</span><span class="p">(</span><span class="s2">&quot;model parameters:</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
             <span class="k">for</span> <span class="n">name</span><span class="p">,</span> <span class="n">val</span><span class="p">,</span> <span class="n">about</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">model_parameters</span><span class="p">():</span>
-                <span class="n">_p</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">.&lt;16s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="si">:</span><span class="s2">&lt;8</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">about</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+                <span class="n">_p</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">name</span><span class="si">:</span><span class="s2">.&lt;20s</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="nb">str</span><span class="p">(</span><span class="n">val</span><span class="p">)</span><span class="si">:</span><span class="s2">&lt;12</span><span class="si">}</span><span class="s2"> </span><span class="si">{</span><span class="n">about</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
         <span class="k">else</span><span class="p">:</span>
             <span class="n">_p</span><span class="p">(</span><span class="s2">&quot;setup has no model parameters&quot;</span><span class="p">)</span>
         <span class="k">if</span> <span class="n">newlines</span><span class="p">:</span>
@@ -291,9 +289,26 @@
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">start_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">        Provide a start time for the simulation. This is 0.0 by default.</span>
+<span class="sd">        The start time for the simulation. This is 0.0 by default.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mf">0.0</span>
+
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">reference_time_scale</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        The time scale used to convert raw simulation time to user time.</span>
+
+<span class="sd">        Typically the reference time can be 1.0, meaning that raw simulation</span>
+<span class="sd">        time and user time are the same. However it sometimes makes sense for</span>
+<span class="sd">        the user time to be something else, like the orbital period of 2 pi</span>
+<span class="sd">        for example. The `start_time` and `default_time_time` properties are</span>
+<span class="sd">        in uner time, not raw simulation time. Similarly, messages written to</span>
+<span class="sd">        stdout, and event recurrences are both in user time, i.e. if the</span>
+<span class="sd">        reference time is 2 pi and `--checkpoint=1.0`, you&#39;ll get one</span>
+<span class="sd">        checkpoint written per orbital period. The &quot;time&quot; field of the</span>
+<span class="sd">        checkpoint file contains the raw simulation time, not the user time.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="mf">1.0</span>
 
     <span class="nd">@property</span>
     <span class="k">def</span> <span class="nf">default_end_time</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -313,6 +328,13 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">return</span> <span class="mi">10000</span>
 
+    <span class="nd">@property</span>
+    <span class="k">def</span> <span class="nf">diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        A list of diagnostics to be dispatched to the solver.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">list</span><span class="p">()</span>
+
 <div class="viewcode-block" id="Setup.validate"><a class="viewcode-back" href="../../_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Confirm that the model parameters are physically valid.</span>
@@ -320,7 +342,16 @@
 <span class="sd">        This method should be overridden to indicate a failure by throwing a</span>
 <span class="sd">        `SetupError` exception.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
-        <span class="k">pass</span></div></div>
+        <span class="k">pass</span></div>
+
+<div class="viewcode-block" id="Setup.checkpoint_diagnostics"><a class="viewcode-back" href="../../_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.checkpoint_diagnostics">[docs]</a>    <span class="k">def</span> <span class="nf">checkpoint_diagnostics</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">time</span><span class="p">):</span>
+        <span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">        Return a dict of post-processing data to include in checkpoint files.</span>
+
+<span class="sd">        An example use case is to record the positions of point masses (with</span>
+<span class="sd">        prescribed trajectory) in a gravitating hydrodynmics problem.</span>
+<span class="sd">        &quot;&quot;&quot;</span>
+        <span class="k">return</span> <span class="nb">dict</span><span class="p">()</span></div></div>
 </pre></div>
 
            </div>

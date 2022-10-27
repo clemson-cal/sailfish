@@ -1,0 +1,40 @@
+sailfish.solvers.cbdisodg\_2d
+=============================
+
+.. automodule:: sailfish.solvers.cbdisodg_2d
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Functions
+
+   .. autosummary::
+      :toctree:
+   
+      initial_condition
+      primitive_to_conserved
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      Options
+      Patch
+      Solver
+   
+   
+
+   
+   
+   
+
+
+

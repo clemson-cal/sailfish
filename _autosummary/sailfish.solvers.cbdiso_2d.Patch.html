@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.cbdiso_2d.Patch &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -52,6 +51,8 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.initial_condition.html">sailfish.solvers.cbdiso_2d.initial_condition</a></li>
@@ -60,6 +61,7 @@
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.Solver.html">sailfish.solvers.cbdiso_2d.Solver</a></li>
 </ul>
 </li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
@@ -97,17 +99,17 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solvers-cbdiso-2d-patch">
+  <div class="section" id="sailfish-solvers-cbdiso-2d-patch">
 <h1>sailfish.solvers.cbdiso_2d.Patch<a class="headerlink" href="#sailfish-solvers-cbdiso-2d-patch" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdiso_2d.</span></span><span class="sig-name descname"><span class="pre">Patch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_outer_radius</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_surface_density</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdiso_2d.</span></span><span class="sig-name descname"><span class="pre">Patch</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_outer_radius</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_surface_density</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execution_context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
 <p>Holds the array buffer state for the solution on a subset of the
 solution domain.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch.__init__">
-<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_outer_radius</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_surface_density</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.__init__" title="Permalink to this definition"></a></dt>
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">primitive</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">index_range</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_outer_radius</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">buffer_surface_density</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">lib</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execution_context</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.__init__" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
@@ -120,20 +122,20 @@ solution domain.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Patch.__init__" title="sailfish.solvers.cbdiso_2d.Patch.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(time, primitive, mesh, index_range, ...)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance_rk</span></code>(rk_param, dt)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Patch.advance_rk" title="sailfish.solvers.cbdiso_2d.Patch.advance_rk"><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance_rk</span></code></a>(rk_param, dt)</p></td>
+<td><p>Pass required parameters for time evolution of the setup.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Patch.maximum_wavespeed" title="sailfish.solvers.cbdiso_2d.Patch.maximum_wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></a>()</p></td>
+<td><p>Return the maximum wavespeed over a given patch.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Patch.execution_context" title="sailfish.solvers.cbdiso_2d.Patch.execution_context"><code class="xref py py-obj docutils literal notranslate"><span class="pre">execution_context</span></code></a>()</p></td>
-<td><p>TODO: return a CUDA context for execution on the assigned device</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Patch.point_mass_source_term" title="sailfish.solvers.cbdiso_2d.Patch.point_mass_source_term"><code class="xref py py-obj docutils literal notranslate"><span class="pre">point_mass_source_term</span></code></a>(which_mass[, ...])</p></td>
+<td><p>Return an array of the rates of conserved quantities, resulting from the application of gravitational and/or accretion source terms due to point masses.</p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code>()</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
-<td><p></p></td>
-</tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">recompute_conserved</span></code>()</p></td>
-<td><p></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Patch.recompute_conserved" title="sailfish.solvers.cbdiso_2d.Patch.recompute_conserved"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recompute_conserved</span></code></a>()</p></td>
+<td><p>Convert the most recent primitive array to conserved.</p></td>
 </tr>
 </tbody>
 </table>
@@ -144,20 +146,53 @@ solution domain.</p>
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdiso_2d.Patch.cell_center_coordinate_arrays" title="sailfish.solvers.cbdiso_2d.Patch.cell_center_coordinate_arrays"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cell_center_coordinate_arrays</span></code></a></p></td>
+<td><p>Return two 2d arrays, one with the cell-center X coordinates, and the other with the cell-center Y coordinates.</p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></p></td>
 <td><p></p></td>
 </tr>
 </tbody>
 </table>
 <dl class="py method">
-<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch.execution_context">
-<span class="sig-name descname"><span class="pre">execution_context</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch.execution_context"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.execution_context" title="Permalink to this definition"></a></dt>
-<dd><p>TODO: return a CUDA context for execution on the assigned device</p>
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch.advance_rk">
+<span class="sig-name descname"><span class="pre">advance_rk</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">rk_param</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">dt</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch.advance_rk"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.advance_rk" title="Permalink to this definition"></a></dt>
+<dd><p>Pass required parameters for time evolution of the setup.</p>
+<p>This function calls the C-module function responsible for performing time evolution using a
+RK algorithm to update the parameters of the setup.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch.cell_center_coordinate_arrays">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">cell_center_coordinate_arrays</span></span><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.cell_center_coordinate_arrays" title="Permalink to this definition"></a></dt>
+<dd><p>Return two 2d arrays, one with the cell-center X coordinates, and the
+other with the cell-center Y coordinates. The arrays are either numpy
+or cupy arrays, allocated for the device this patch is assigned to.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch.maximum_wavespeed">
+<span class="sig-name descname"><span class="pre">maximum_wavespeed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch.maximum_wavespeed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.maximum_wavespeed" title="Permalink to this definition"></a></dt>
+<dd><p>Return the maximum wavespeed over a given patch.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch.point_mass_source_term">
+<span class="sig-name descname"><span class="pre">point_mass_source_term</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">which_mass</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">gravity</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">accretion</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch.point_mass_source_term"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.point_mass_source_term" title="Permalink to this definition"></a></dt>
+<dd><p>Return an array of the rates of conserved quantities, resulting from
+the application of gravitational and/or accretion source terms due to
+point masses.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Patch.recompute_conserved">
+<span class="sig-name descname"><span class="pre">recompute_conserved</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Patch.recompute_conserved"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Patch.recompute_conserved" title="Permalink to this definition"></a></dt>
+<dd><p>Convert the most recent primitive array to conserved.</p>
 </dd></dl>
 
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>

@@ -1,0 +1,27 @@
+sailfish.physics.circumbinary.ViscosityModel
+============================================
+
+.. currentmodule:: sailfish.physics.circumbinary
+
+.. autoclass:: ViscosityModel
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~ViscosityModel.NONE
+      ~ViscosityModel.CONSTANT_NU
+      ~ViscosityModel.CONSTANT_ALPHA
+   
+   

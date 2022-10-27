@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.driver.DriverState &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.driver.ConfigurationError" href="sailfish.driver.ConfigurationError.html" />
+    <link rel="prev" title="sailfish.driver.DriverArgs" href="sailfish.driver.DriverArgs.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.append_timeseries.html">sailfish.driver.append_timeseries</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.first_not_none.html">sailfish.driver.first_not_none</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.init_logging.html">sailfish.driver.init_logging</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_event.html">sailfish.driver.keyed_event</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_value.html">sailfish.driver.keyed_value</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_checkpoint.html">sailfish.driver.load_checkpoint</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_user_config.html">sailfish.driver.load_user_config</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.main.html">sailfish.driver.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.newest_chkpt_in_directory.html">sailfish.driver.newest_chkpt_in_directory</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.run.html">sailfish.driver.run</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.simulate.html">sailfish.driver.simulate</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_dict_where_none.html">sailfish.driver.update_dict_where_none</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_where_none.html">sailfish.driver.update_where_none</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.write_checkpoint.html">sailfish.driver.write_checkpoint</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.DriverArgs.html">sailfish.driver.DriverArgs</a></li>
+<li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.driver.DriverState</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ConfigurationError.html">sailfish.driver.ConfigurationError</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ExtensionError.html">sailfish.driver.ExtensionError</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
+          <li><a href="sailfish.driver.html">sailfish.driver</a> &raquo;</li>
+      <li>sailfish.driver.DriverState</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.driver.DriverState.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="sailfish-driver-driverstate">
+<h1>sailfish.driver.DriverState<a class="headerlink" href="#sailfish-driver-driverstate" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.driver.</span></span><span class="sig-name descname"><span class="pre">DriverState</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">iteration</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">driver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs" title="sailfish.driver.DriverArgs"><span class="pre">sailfish.driver.DriverArgs</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">object</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timeseries</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">event_states</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">list</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="sailfish.solver.SolverBase.html#sailfish.solver.SolverBase" title="sailfish.solver.SolverBase"><span class="pre">sailfish.solver.SolverBase</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><span class="pre">sailfish.setup.Setup</span></a></span></em>, <em class="sig-param"><span class="n"><span class="pre">cfl_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">timestep_dt</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/driver.html#DriverState"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.driver.DriverState" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
+<p>Contains the stateful variables in use by the <cite>simulate</cite> function.</p>
+<p>An instance of this class is yielded by <cite>simulate</cite> each time an event takes
+place.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.driver.DriverState.__init__" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.__init__" title="sailfish.driver.DriverState.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.count" title="sailfish.driver.DriverState.count"><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code></a>(value, /)</p></td>
+<td><p>Return number of occurrences of value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.index" title="sailfish.driver.DriverState.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
+<td><p>Return first index of value.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.cfl_number" title="sailfish.driver.DriverState.cfl_number"><code class="xref py py-obj docutils literal notranslate"><span class="pre">cfl_number</span></code></a></p></td>
+<td><p>Alias for field number 7</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.driver" title="sailfish.driver.DriverState.driver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">driver</span></code></a></p></td>
+<td><p>Alias for field number 1</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.event_states" title="sailfish.driver.DriverState.event_states"><code class="xref py py-obj docutils literal notranslate"><span class="pre">event_states</span></code></a></p></td>
+<td><p>Alias for field number 4</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.iteration" title="sailfish.driver.DriverState.iteration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">iteration</span></code></a></p></td>
+<td><p>Alias for field number 0</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.mesh" title="sailfish.driver.DriverState.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a></p></td>
+<td><p>Alias for field number 2</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.setup" title="sailfish.driver.DriverState.setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup</span></code></a></p></td>
+<td><p>Alias for field number 6</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.solver" title="sailfish.driver.DriverState.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
+<td><p>Alias for field number 5</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.timeseries" title="sailfish.driver.DriverState.timeseries"><code class="xref py py-obj docutils literal notranslate"><span class="pre">timeseries</span></code></a></p></td>
+<td><p>Alias for field number 3</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverState.timestep_dt" title="sailfish.driver.DriverState.timestep_dt"><code class="xref py py-obj docutils literal notranslate"><span class="pre">timestep_dt</span></code></a></p></td>
+<td><p>Alias for field number 8</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.cfl_number">
+<span class="sig-name descname"><span class="pre">cfl_number</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.driver.DriverState.cfl_number" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 7</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.count">
+<span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.driver.DriverState.count" title="Permalink to this definition"></a></dt>
+<dd><p>Return number of occurrences of value.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.driver">
+<span class="sig-name descname"><span class="pre">driver</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs" title="sailfish.driver.DriverArgs"><span class="pre">sailfish.driver.DriverArgs</span></a></em><a class="headerlink" href="#sailfish.driver.DriverState.driver" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.event_states">
+<span class="sig-name descname"><span class="pre">event_states</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span></em><a class="headerlink" href="#sailfish.driver.DriverState.event_states" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 4</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.index">
+<span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9223372036854775807</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.driver.DriverState.index" title="Permalink to this definition"></a></dt>
+<dd><p>Return first index of value.</p>
+<p>Raises ValueError if the value is not present.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.iteration">
+<span class="sig-name descname"><span class="pre">iteration</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.driver.DriverState.iteration" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.mesh">
+<span class="sig-name descname"><span class="pre">mesh</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">object</span></em><a class="headerlink" href="#sailfish.driver.DriverState.mesh" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.setup">
+<span class="sig-name descname"><span class="pre">setup</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><span class="pre">sailfish.setup.Setup</span></a></em><a class="headerlink" href="#sailfish.driver.DriverState.setup" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 6</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.solver">
+<span class="sig-name descname"><span class="pre">solver</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><a class="reference internal" href="sailfish.solver.SolverBase.html#sailfish.solver.SolverBase" title="sailfish.solver.SolverBase"><span class="pre">sailfish.solver.SolverBase</span></a></em><a class="headerlink" href="#sailfish.driver.DriverState.solver" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 5</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.timeseries">
+<span class="sig-name descname"><span class="pre">timeseries</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">list</span></em><a class="headerlink" href="#sailfish.driver.DriverState.timeseries" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverState.timestep_dt">
+<span class="sig-name descname"><span class="pre">timestep_dt</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.driver.DriverState.timestep_dt" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 8</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.driver.DriverArgs.html" class="btn btn-neutral float-left" title="sailfish.driver.DriverArgs" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.driver.ConfigurationError.html" class="btn btn-neutral float-right" title="sailfish.driver.ConfigurationError" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

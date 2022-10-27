@@ -17,6 +17,7 @@ sailfish.setups.simple1d.Burgers
    .. autosummary::
    
       ~Burgers.__init__
+      ~Burgers.checkpoint_diagnostics
       ~Burgers.dash_case_class_name
       ~Burgers.default_model_parameters
       ~Burgers.describe_class
@@ -41,7 +42,9 @@ sailfish.setups.simple1d.Burgers
       ~Burgers.boundary_condition
       ~Burgers.default_end_time
       ~Burgers.default_resolution
+      ~Burgers.diagnostics
       ~Burgers.physics
+      ~Burgers.reference_time_scale
       ~Burgers.solver
       ~Burgers.start_time
    

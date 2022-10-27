@@ -1,0 +1,73 @@
+sailfish.setups.circumbinary\_disk.CircumbinaryDisk
+===================================================
+
+.. currentmodule:: sailfish.setups.circumbinary_disk
+
+.. autoclass:: CircumbinaryDisk
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~CircumbinaryDisk.__init__
+      ~CircumbinaryDisk.checkpoint_diagnostics
+      ~CircumbinaryDisk.dash_case_class_name
+      ~CircumbinaryDisk.default_model_parameters
+      ~CircumbinaryDisk.describe_class
+      ~CircumbinaryDisk.find_setup_class
+      ~CircumbinaryDisk.has_model_parameters
+      ~CircumbinaryDisk.immutable_parameter_keys
+      ~CircumbinaryDisk.mesh
+      ~CircumbinaryDisk.model_parameter_dict
+      ~CircumbinaryDisk.model_parameters
+      ~CircumbinaryDisk.point_masses
+      ~CircumbinaryDisk.primitive
+      ~CircumbinaryDisk.print_model_parameters
+      ~CircumbinaryDisk.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~CircumbinaryDisk.alpha
+      ~CircumbinaryDisk.boundary_condition
+      ~CircumbinaryDisk.buffer_is_enabled
+      ~CircumbinaryDisk.constant_softening
+      ~CircumbinaryDisk.cooling_coefficient
+      ~CircumbinaryDisk.default_end_time
+      ~CircumbinaryDisk.default_resolution
+      ~CircumbinaryDisk.diagnostics
+      ~CircumbinaryDisk.domain_radius
+      ~CircumbinaryDisk.eccentricity
+      ~CircumbinaryDisk.eos
+      ~CircumbinaryDisk.gamma_law_index
+      ~CircumbinaryDisk.initial_pressure
+      ~CircumbinaryDisk.initial_sigma
+      ~CircumbinaryDisk.is_gamma_law
+      ~CircumbinaryDisk.is_isothermal
+      ~CircumbinaryDisk.mach_number
+      ~CircumbinaryDisk.mass_ratio
+      ~CircumbinaryDisk.nu
+      ~CircumbinaryDisk.orbital_elements
+      ~CircumbinaryDisk.physics
+      ~CircumbinaryDisk.reference_time_scale
+      ~CircumbinaryDisk.sink_model
+      ~CircumbinaryDisk.sink_radius
+      ~CircumbinaryDisk.sink_rate
+      ~CircumbinaryDisk.softening_length
+      ~CircumbinaryDisk.solver
+      ~CircumbinaryDisk.start_time
+      ~CircumbinaryDisk.which_diagnostics
+   
+   

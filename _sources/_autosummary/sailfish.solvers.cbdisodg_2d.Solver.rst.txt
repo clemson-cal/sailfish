@@ -1,0 +1,44 @@
+sailfish.solvers.cbdisodg\_2d.Solver
+====================================
+
+.. currentmodule:: sailfish.solvers.cbdisodg_2d
+
+.. autoclass:: Solver
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Solver.__init__
+      ~Solver.advance
+      ~Solver.advance_rk
+      ~Solver.maximum_wavespeed
+      ~Solver.new_iteration
+      ~Solver.reductions
+      ~Solver.set_bc
+      ~Solver.set_bc_patch
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Solver.maximum_cfl
+      ~Solver.options
+      ~Solver.physics
+      ~Solver.primitive
+      ~Solver.recommended_cfl
+      ~Solver.solution
+      ~Solver.time
+   
+   

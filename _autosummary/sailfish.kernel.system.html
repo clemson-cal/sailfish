@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.kernel.system &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -49,9 +48,11 @@
 <li class="toctree-l3"><a class="reference internal" href="sailfish.kernel.parse_api.html">sailfish.kernel.parse_api</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.kernel.system</a><ul>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.configure_build.html">sailfish.kernel.system.configure_build</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.execution_context.html">sailfish.kernel.system.execution_context</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.get_array_module.html">sailfish.kernel.system.get_array_module</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.log_system_info.html">sailfish.kernel.system.log_system_info</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.measure_time.html">sailfish.kernel.system.measure_time</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.kernel.system.num_devices.html">sailfish.kernel.system.num_devices</a></li>
 </ul>
 </li>
 </ul>
@@ -93,7 +94,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.kernel.system">
+  <div class="section" id="module-sailfish.kernel.system">
 <span id="sailfish-kernel-system"></span><h1>sailfish.kernel.system<a class="headerlink" href="#module-sailfish.kernel.system" title="Permalink to this headline"></a></h1>
 <p>Functions for querying compute capabilities and configuring JIT builds.</p>
 <p class="rubric">Functions</p>
@@ -103,21 +104,27 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.system.configure_build.html#sailfish.kernel.system.configure_build" title="sailfish.kernel.system.configure_build"><code class="xref py py-obj docutils literal notranslate"><span class="pre">configure_build</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.system.configure_build.html#sailfish.kernel.system.configure_build" title="sailfish.kernel.system.configure_build"><code class="xref py py-obj docutils literal notranslate"><span class="pre">configure_build</span></code></a>([enable_openmp, ...])</p></td>
 <td><p>Initiate the <cite>build_config</cite> module-level variable.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.system.get_array_module.html#sailfish.kernel.system.get_array_module" title="sailfish.kernel.system.get_array_module"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_array_module</span></code></a>(mode)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.system.execution_context.html#sailfish.kernel.system.execution_context" title="sailfish.kernel.system.execution_context"><code class="xref py py-obj docutils literal notranslate"><span class="pre">execution_context</span></code></a>(mode[, device_id])</p></td>
+<td><p>Return a context manager appropriate for the given exuction mode.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.system.get_array_module.html#sailfish.kernel.system.get_array_module" title="sailfish.kernel.system.get_array_module"><code class="xref py py-obj docutils literal notranslate"><span class="pre">get_array_module</span></code></a>(mode)</p></td>
 <td><p>Return either the numpy or cupy module, depending on the value of mode.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.system.log_system_info.html#sailfish.kernel.system.log_system_info" title="sailfish.kernel.system.log_system_info"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_system_info</span></code></a>(mode)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.system.log_system_info.html#sailfish.kernel.system.log_system_info" title="sailfish.kernel.system.log_system_info"><code class="xref py py-obj docutils literal notranslate"><span class="pre">log_system_info</span></code></a>(mode)</p></td>
 <td><p>Log relevant details of the system's compute capabilities.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.system.measure_time.html#sailfish.kernel.system.measure_time" title="sailfish.kernel.system.measure_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">measure_time</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.kernel.system.measure_time.html#sailfish.kernel.system.measure_time" title="sailfish.kernel.system.measure_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">measure_time</span></code></a>(mode)</p></td>
 <td><p>A context manager to measure the execution time of a piece of code.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.kernel.system.num_devices.html#sailfish.kernel.system.num_devices" title="sailfish.kernel.system.num_devices"><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_devices</span></code></a>(mode)</p></td>
+<td><p></p></td>
 </tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>

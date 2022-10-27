@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.solvers.srhd_2d.Physics &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.solvers.srhd_2d.Solver" href="sailfish.solvers.srhd_2d.Solver.html" />
+    <link rel="prev" title="sailfish.solvers.srhd_2d.Patch" href="sailfish.solvers.srhd_2d.Patch.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.initial_condition.html">sailfish.solvers.srhd_2d.initial_condition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Options.html">sailfish.solvers.srhd_2d.Options</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Patch.html">sailfish.solvers.srhd_2d.Patch</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.srhd_2d.Physics</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_2d.Solver.html">sailfish.solvers.srhd_2d.Solver</a></li>
+</ul>
+</li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
+          <li><a href="sailfish.solvers.html">sailfish.solvers</a> &raquo;</li>
+          <li><a href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a> &raquo;</li>
+      <li>sailfish.solvers.srhd_2d.Physics</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.solvers.srhd_2d.Physics.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="sailfish-solvers-srhd-2d-physics">
+<h1>sailfish.solvers.srhd_2d.Physics<a class="headerlink" href="#sailfish-solvers-srhd-2d-physics" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_2d.</span></span><span class="sig-name descname"><span class="pre">Physics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">jet_mdot</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jet_gamma_beta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jet_theta</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">jet_duration</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_2d.html#Physics"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics.__init__" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Physics.__init__" title="sailfish.solvers.srhd_2d.Physics.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Physics.count" title="sailfish.solvers.srhd_2d.Physics.count"><code class="xref py py-obj docutils literal notranslate"><span class="pre">count</span></code></a>(value, /)</p></td>
+<td><p>Return number of occurrences of value.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Physics.index" title="sailfish.solvers.srhd_2d.Physics.index"><code class="xref py py-obj docutils literal notranslate"><span class="pre">index</span></code></a>(value[, start, stop])</p></td>
+<td><p>Return first index of value.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Physics.jet_duration" title="sailfish.solvers.srhd_2d.Physics.jet_duration"><code class="xref py py-obj docutils literal notranslate"><span class="pre">jet_duration</span></code></a></p></td>
+<td><p>Alias for field number 3</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Physics.jet_gamma_beta" title="sailfish.solvers.srhd_2d.Physics.jet_gamma_beta"><code class="xref py py-obj docutils literal notranslate"><span class="pre">jet_gamma_beta</span></code></a></p></td>
+<td><p>Alias for field number 1</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Physics.jet_mdot" title="sailfish.solvers.srhd_2d.Physics.jet_mdot"><code class="xref py py-obj docutils literal notranslate"><span class="pre">jet_mdot</span></code></a></p></td>
+<td><p>Alias for field number 0</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.srhd_2d.Physics.jet_theta" title="sailfish.solvers.srhd_2d.Physics.jet_theta"><code class="xref py py-obj docutils literal notranslate"><span class="pre">jet_theta</span></code></a></p></td>
+<td><p>Alias for field number 2</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics.count">
+<span class="sig-name descname"><span class="pre">count</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics.count" title="Permalink to this definition"></a></dt>
+<dd><p>Return number of occurrences of value.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics.index">
+<span class="sig-name descname"><span class="pre">index</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">start</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">stop</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">9223372036854775807</span></span></em>, <em class="sig-param"><span class="o"><span class="pre">/</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics.index" title="Permalink to this definition"></a></dt>
+<dd><p>Return first index of value.</p>
+<p>Raises ValueError if the value is not present.</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics.jet_duration">
+<span class="sig-name descname"><span class="pre">jet_duration</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics.jet_duration" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 3</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics.jet_gamma_beta">
+<span class="sig-name descname"><span class="pre">jet_gamma_beta</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics.jet_gamma_beta" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 1</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics.jet_mdot">
+<span class="sig-name descname"><span class="pre">jet_mdot</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics.jet_mdot" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 0</p>
+</dd></dl>
+
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.solvers.srhd_2d.Physics.jet_theta">
+<span class="sig-name descname"><span class="pre">jet_theta</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">float</span></em><a class="headerlink" href="#sailfish.solvers.srhd_2d.Physics.jet_theta" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 2</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.solvers.srhd_2d.Patch.html" class="btn btn-neutral float-left" title="sailfish.solvers.srhd_2d.Patch" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.solvers.srhd_2d.Solver.html" class="btn btn-neutral float-right" title="sailfish.solvers.srhd_2d.Solver" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

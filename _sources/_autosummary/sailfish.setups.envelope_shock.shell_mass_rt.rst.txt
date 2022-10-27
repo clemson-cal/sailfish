@@ -1,0 +1,6 @@
+sailfish.setups.envelope\_shock.shell\_mass\_rt
+===============================================
+
+.. currentmodule:: sailfish.setups.envelope_shock
+
+.. autofunction:: shell_mass_rt

@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.setups &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.setups.cylindrical_explosion" href="sailfish.setups.cylindrical_explosion.html" />
+    <link rel="next" title="sailfish.setups.binary_bondi" href="sailfish.setups.binary_bondi.html" />
     <link rel="prev" title="sailfish.setup.SetupError" href="sailfish.setup.SetupError.html" /> 
 </head>
 
@@ -49,8 +48,8 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
 <li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.setups</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.cylindrical_explosion.html">sailfish.setups.cylindrical_explosion</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.cylindrical_explosion_cbgdam_2d.html">sailfish.setups.cylindrical_explosion_cbgdam_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.binary_bondi.html">sailfish.setups.binary_bondi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.circumbinary_disk.html">sailfish.setups.circumbinary_disk</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.envelope_shock.html">sailfish.setups.envelope_shock</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.exploding_star.html">sailfish.setups.exploding_star</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.simple1d.html">sailfish.setups.simple1d</a></li>
@@ -89,7 +88,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="module-sailfish.setups">
+  <div class="section" id="module-sailfish.setups">
 <span id="sailfish-setups"></span><h1>sailfish.setups<a class="headerlink" href="#module-sailfish.setups" title="Permalink to this headline"></a></h1>
 <p class="rubric">Modules</p>
 <table class="longtable docutils align-default">
@@ -98,11 +97,11 @@
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.cylindrical_explosion.html#module-sailfish.setups.cylindrical_explosion" title="sailfish.setups.cylindrical_explosion"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.cylindrical_explosion</span></code></a></p></td>
-<td><p>Setup for a thermal bomb set off inside an 18 solar mass progenitor.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.binary_bondi.html#module-sailfish.setups.binary_bondi" title="sailfish.setups.binary_bondi"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.binary_bondi</span></code></a></p></td>
+<td><p>Orbiting binary embedded in a wind</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.cylindrical_explosion_cbgdam_2d.html#module-sailfish.setups.cylindrical_explosion_cbgdam_2d" title="sailfish.setups.cylindrical_explosion_cbgdam_2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.cylindrical_explosion_cbgdam_2d</span></code></a></p></td>
-<td><p>A cylindrical shock tube test for cbdgam_2d</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.circumbinary_disk.html#module-sailfish.setups.circumbinary_disk" title="sailfish.setups.circumbinary_disk"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.circumbinary_disk</span></code></a></p></td>
+<td><p>2D disk setups for binary problems.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.envelope_shock.html#module-sailfish.setups.envelope_shock" title="sailfish.setups.envelope_shock"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.envelope_shock</span></code></a></p></td>
 <td><p>Contains a setup for studying a relativistic type-II shockwave.</p></td>
@@ -111,21 +110,21 @@
 <td><p>Setup for a thermal bomb set off inside an 18 solar mass progenitor.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setups.simple1d.html#module-sailfish.setups.simple1d" title="sailfish.setups.simple1d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.simple1d</span></code></a></p></td>
-<td><p></p></td>
+<td><p>Validation setups for various 1D solvers</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="sailfish.setups.simple2d.html#module-sailfish.setups.simple2d" title="sailfish.setups.simple2d"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups.simple2d</span></code></a></p></td>
-<td><p></p></td>
+<td><p>Validation setups for various 2D solvers</p></td>
 </tr>
 </tbody>
 </table>
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.setup.SetupError.html" class="btn btn-neutral float-left" title="sailfish.setup.SetupError" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.setups.cylindrical_explosion.html" class="btn btn-neutral float-right" title="sailfish.setups.cylindrical_explosion" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.setups.binary_bondi.html" class="btn btn-neutral float-right" title="sailfish.setups.binary_bondi" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

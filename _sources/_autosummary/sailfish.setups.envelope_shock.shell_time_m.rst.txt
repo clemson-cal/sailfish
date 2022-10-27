@@ -1,0 +1,6 @@
+sailfish.setups.envelope\_shock.shell\_time\_m
+==============================================
+
+.. currentmodule:: sailfish.setups.envelope_shock
+
+.. autofunction:: shell_time_m

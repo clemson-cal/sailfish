@@ -1,0 +1,6 @@
+sailfish.subdivide.to\_host
+===========================
+
+.. currentmodule:: sailfish.subdivide
+
+.. autofunction:: to_host

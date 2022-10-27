@@ -1,6 +1,0 @@
-sailfish.system.measure\_time
-=============================
-
-.. currentmodule:: sailfish.system
-
-.. autofunction:: measure_time

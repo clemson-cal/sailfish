@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.scdg_1d.Solver &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -52,8 +51,11 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a><ul class="current">
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.rhs.html">sailfish.solvers.scdg_1d.rhs</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.scdg_1d.CellData.html">sailfish.solvers.scdg_1d.CellData</a></li>
@@ -98,7 +100,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solvers-scdg-1d-solver">
+  <div class="section" id="sailfish-solvers-scdg-1d-solver">
 <h1>sailfish.solvers.scdg_1d.Solver<a class="headerlink" href="#sailfish-solvers-scdg-1d-solver" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Solver">
@@ -132,6 +134,9 @@
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.maximum_wavespeed" title="sailfish.solvers.scdg_1d.Solver.maximum_wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></a>()</p></td>
 <td><p>Return the largest wavespeed on the grid.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.scdg_1d.Solver.reductions" title="sailfish.solvers.scdg_1d.Solver.reductions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reductions</span></code></a>()</p></td>
+<td><p>Return a set of measurements derived from the solution state.</p></td>
 </tr>
 </tbody>
 </table>
@@ -228,6 +233,15 @@ runtime post-processing routines.</p>
 <dd><p>Return a recommended CFL number to the driver, default to the maximum.</p>
 </dd></dl>
 
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Solver.reductions">
+<span class="sig-name descname"><span class="pre">reductions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.solvers.scdg_1d.Solver.reductions" title="Permalink to this definition"></a></dt>
+<dd><p>Return a set of measurements derived from the solution state.</p>
+<p>Solvers do not need to implement this. If they do, the diagnostic
+outputs they will return when this function is called should be provided
+to the solver by the setup when the setup is first constructed.</p>
+</dd></dl>
+
 <dl class="py property">
 <dt class="sig sig-object py" id="sailfish.solvers.scdg_1d.Solver.solution">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">solution</span></span><a class="headerlink" href="#sailfish.solvers.scdg_1d.Solver.solution" title="Permalink to this definition"></a></dt>
@@ -252,7 +266,7 @@ object from the setup and mesh instances.</p>
 
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>

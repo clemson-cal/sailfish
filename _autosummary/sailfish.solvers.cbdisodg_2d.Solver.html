@@ -1,0 +1,307 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.solvers.cbdisodg_2d.Solver &mdash; sailfish 0.4.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/doctools.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.solvers.scdg_1d" href="sailfish.solvers.scdg_1d.html" />
+    <link rel="prev" title="sailfish.solvers.cbdisodg_2d.Patch" href="sailfish.solvers.cbdisodg_2d.Patch.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
+<li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a><ul class="current">
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.initial_condition.html">sailfish.solvers.cbdisodg_2d.initial_condition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.primitive_to_conserved.html">sailfish.solvers.cbdisodg_2d.primitive_to_conserved</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.Options.html">sailfish.solvers.cbdisodg_2d.Options</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.Patch.html">sailfish.solvers.cbdisodg_2d.Patch</a></li>
+<li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.cbdisodg_2d.Solver</a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.srhd_2d.html">sailfish.solvers.srhd_2d</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
+          <li><a href="sailfish.solvers.html">sailfish.solvers</a> &raquo;</li>
+          <li><a href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a> &raquo;</li>
+      <li>sailfish.solvers.cbdisodg_2d.Solver</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.solvers.cbdisodg_2d.Solver.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <div class="section" id="sailfish-solvers-cbdisodg-2d-solver">
+<h1>sailfish.solvers.cbdisodg_2d.Solver<a class="headerlink" href="#sailfish-solvers-cbdisodg-2d-solver" title="Permalink to this headline"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdisodg_2d.</span></span><span class="sig-name descname"><span class="pre">Solver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdisodg_2d.html#Solver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <a class="reference internal" href="sailfish.solver.SolverBase.html#sailfish.solver.SolverBase" title="sailfish.solver.SolverBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.solver.SolverBase</span></code></a></p>
+<p>Adapter class to drive the cbdisodg_2d C extension module.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdisodg_2d.html#Solver.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.__init__" title="Permalink to this definition"></a></dt>
+<dd></dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.__init__" title="sailfish.solvers.cbdisodg_2d.Solver.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([setup, mesh, time, solution, ...])</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.advance" title="sailfish.solvers.cbdisodg_2d.Solver.advance"><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance</span></code></a>(dt)</p></td>
+<td><p>Advance the solution state by one iteration.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">advance_rk</span></code>(rk_param, dt)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.maximum_wavespeed" title="sailfish.solvers.cbdisodg_2d.Solver.maximum_wavespeed"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_wavespeed</span></code></a>()</p></td>
+<td><p>Return the global maximum wavespeed over the whole domain.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_iteration</span></code>()</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.reductions" title="sailfish.solvers.cbdisodg_2d.Solver.reductions"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reductions</span></code></a>()</p></td>
+<td><p>Generate runtime reductions on the solution data for time series.</p></td>
+</tr>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc</span></code>(array)</p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">set_bc_patch</span></code>(pl, pc, pr, patch_index)</p></td>
+<td><p></p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.maximum_cfl" title="sailfish.solvers.cbdisodg_2d.Solver.maximum_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">maximum_cfl</span></code></a></p></td>
+<td><p>Return the largest CFL number that should be used for this solver.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.options" title="sailfish.solvers.cbdisodg_2d.Solver.options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">options</span></code></a></p></td>
+<td><p>A dictionary that reflects the solver solution scheme.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.physics" title="sailfish.solvers.cbdisodg_2d.Solver.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<td><p>A dictionary describing the physics parameters of the system.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.primitive" title="sailfish.solvers.cbdisodg_2d.Solver.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a></p></td>
+<td><p>Return primitive hydrodynamic data for use in plotting.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.recommended_cfl" title="sailfish.solvers.cbdisodg_2d.Solver.recommended_cfl"><code class="xref py py-obj docutils literal notranslate"><span class="pre">recommended_cfl</span></code></a></p></td>
+<td><p>Return a recommended CFL number to the driver, default to the maximum.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.solution" title="sailfish.solvers.cbdisodg_2d.Solver.solution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solution</span></code></a></p></td>
+<td><p>Return an object representing the solution state.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.solvers.cbdisodg_2d.Solver.time" title="sailfish.solvers.cbdisodg_2d.Solver.time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">time</span></code></a></p></td>
+<td><p>Return the simulation time.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.advance">
+<span class="sig-name descname"><span class="pre">advance</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">dt</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdisodg_2d.html#Solver.advance"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.advance" title="Permalink to this definition"></a></dt>
+<dd><p>Advance the solution state by one iteration.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.maximum_cfl">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">maximum_cfl</span></span><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.maximum_cfl" title="Permalink to this definition"></a></dt>
+<dd><p>Return the largest CFL number that should be used for this solver.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.maximum_wavespeed">
+<span class="sig-name descname"><span class="pre">maximum_wavespeed</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdisodg_2d.html#Solver.maximum_wavespeed"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.maximum_wavespeed" title="Permalink to this definition"></a></dt>
+<dd><p>Return the global maximum wavespeed over the whole domain.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.options">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">options</span></span><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.options" title="Permalink to this definition"></a></dt>
+<dd><p>A dictionary that reflects the solver solution scheme.</p>
+<p>An example of an options object would be <code class="xref py py-obj docutils literal notranslate"><span class="pre">dict(plm=1.5,</span>
+<span class="pre">rk=2)</span></code>. The items should describe the solver algorithm, not the
+parameters of the physical system being solved, such as an equation of
+state or cooling prescription.</p>
+<p>Solver options and physics parameters are kept logically separate
+because their configuration comes from different places: the physics
+parameters come from the <a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code></a> class instance
+(which can in turn be set from model parameters), whereas the solver
+options come directly from the driver instance (i.e. command line
+<code class="code docutils literal notranslate"><span class="pre">--solver</span> <span class="pre">key=val</span></code> if sailfish is invoked as an executable).</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.physics">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">physics</span></span><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.physics" title="Permalink to this definition"></a></dt>
+<dd><p>A dictionary describing the physics parameters of the system.</p>
+<p>The physics parameters are supplied by the setup. They can include
+things like an equation of state, a cooling prescription, external
+gravity, a wavespeed in the case of passive scalar advection, fluid
+viscocity model, etc. These items can still be influenced at runtime
+through the setup’s model parameters.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.primitive">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">primitive</span></span><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.primitive" title="Permalink to this definition"></a></dt>
+<dd><p>Return primitive hydrodynamic data for use in plotting.</p>
+<p>The primitive variable data returned from this function could be
+written to checkpoint files, but it might also be written to
+non-checkpoint output files for offline analysis, or passed along to
+runtime post-processing routines.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.recommended_cfl">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">recommended_cfl</span></span><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.recommended_cfl" title="Permalink to this definition"></a></dt>
+<dd><p>Return a recommended CFL number to the driver, default to the maximum.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.reductions">
+<span class="sig-name descname"><span class="pre">reductions</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdisodg_2d.html#Solver.reductions"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.reductions" title="Permalink to this definition"></a></dt>
+<dd><p>Generate runtime reductions on the solution data for time series.</p>
+<p>As of now, the reductions generated are the rates of mass accretion, and
+of x and y momentum (combined gravitational and accretion) resulting
+from each of the point masses. If there are 2 point masses, then the
+result of this function is a 7-element list: <cite>[time, mdot1, fx1, fy1,
+mdot2, fx2, fy2]</cite>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.solution">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">solution</span></span><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.solution" title="Permalink to this definition"></a></dt>
+<dd><p>Return an object representing the solution state.</p>
+<p>The solution object is generally going to be either an array of
+primitive hydrodynamic data, or of conserved quantities, depending on
+which the solver considers to be more fundamental. If the solver
+maintains state in addition to the hydrodynamic data, such as a list
+of tracer or star particles, then objects like that should also be
+returned as part of the solution object.</p>
+<p>The solution object will be written to the checkpoint file, read back
+on restarts, and passed to the solver constructor. When the run is not
+a restart, the solver should instead construct its initial solution
+object from the setup and mesh instances.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.solvers.cbdisodg_2d.Solver.time">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">time</span></span><a class="headerlink" href="#sailfish.solvers.cbdisodg_2d.Solver.time" title="Permalink to this definition"></a></dt>
+<dd><p>Return the simulation time.</p>
+</dd></dl>
+
+</dd></dl>
+
+</div>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.solvers.cbdisodg_2d.Patch.html" class="btn btn-neutral float-left" title="sailfish.solvers.cbdisodg_2d.Patch" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.solvers.scdg_1d.html" class="btn btn-neutral float-right" title="sailfish.solvers.scdg_1d" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

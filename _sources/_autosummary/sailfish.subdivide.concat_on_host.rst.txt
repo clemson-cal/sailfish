@@ -1,0 +1,6 @@
+sailfish.subdivide.concat\_on\_host
+===================================
+
+.. currentmodule:: sailfish.subdivide
+
+.. autofunction:: concat_on_host

@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.setups.exploding_star.ExplodingStar &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -49,8 +48,8 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.cylindrical_explosion.html">sailfish.setups.cylindrical_explosion</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.cylindrical_explosion_cbgdam_2d.html">sailfish.setups.cylindrical_explosion_cbgdam_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.binary_bondi.html">sailfish.setups.binary_bondi</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setups.circumbinary_disk.html">sailfish.setups.circumbinary_disk</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.setups.envelope_shock.html">sailfish.setups.envelope_shock</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.setups.exploding_star.html">sailfish.setups.exploding_star</a><ul class="current">
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.setups.exploding_star.ExplodingStar</a></li>
@@ -94,7 +93,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-setups-exploding-star-explodingstar">
+  <div class="section" id="sailfish-setups-exploding-star-explodingstar">
 <h1>sailfish.setups.exploding_star.ExplodingStar<a class="headerlink" href="#sailfish-setups-exploding-star-explodingstar" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar">
@@ -118,40 +117,43 @@ Marcus Dupont’s setup in Simbi.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.__init__" title="sailfish.setups.exploding_star.ExplodingStar.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>(**kwargs)</p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.dash_case_class_name" title="sailfish.setups.exploding_star.ExplodingStar.dash_case_class_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dash_case_class_name</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.checkpoint_diagnostics" title="sailfish.setups.exploding_star.ExplodingStar.checkpoint_diagnostics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">checkpoint_diagnostics</span></code></a>(time)</p></td>
+<td><p>Return a dict of post-processing data to include in checkpoint files.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.dash_case_class_name" title="sailfish.setups.exploding_star.ExplodingStar.dash_case_class_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">dash_case_class_name</span></code></a>()</p></td>
 <td><p>Return a <cite>dash-case</cite> name of this setup class.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.default_model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.default_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_model_parameters</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.default_model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.default_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_model_parameters</span></code></a>()</p></td>
 <td><p>Return an iterator over the default model parameters for this class.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.describe_class" title="sailfish.setups.exploding_star.ExplodingStar.describe_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">describe_class</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.describe_class" title="sailfish.setups.exploding_star.ExplodingStar.describe_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">describe_class</span></code></a>()</p></td>
 <td><p>Print formatted text describing the setup.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.find_setup_class" title="sailfish.setups.exploding_star.ExplodingStar.find_setup_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">find_setup_class</span></code></a>(name)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.find_setup_class" title="sailfish.setups.exploding_star.ExplodingStar.find_setup_class"><code class="xref py py-obj docutils literal notranslate"><span class="pre">find_setup_class</span></code></a>(name)</p></td>
 <td><p>Finds a setup class with the given name.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.has_model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.has_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has_model_parameters</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.has_model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.has_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">has_model_parameters</span></code></a>()</p></td>
 <td><p>Determine if this class has any model parameters.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.immutable_parameter_keys" title="sailfish.setups.exploding_star.ExplodingStar.immutable_parameter_keys"><code class="xref py py-obj docutils literal notranslate"><span class="pre">immutable_parameter_keys</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.immutable_parameter_keys" title="sailfish.setups.exploding_star.ExplodingStar.immutable_parameter_keys"><code class="xref py py-obj docutils literal notranslate"><span class="pre">immutable_parameter_keys</span></code></a>()</p></td>
 <td><p>Return an iterator over the immutable model parameter keys.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.mesh" title="sailfish.setups.exploding_star.ExplodingStar.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a>(num_zones_per_decade)</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.mesh" title="sailfish.setups.exploding_star.ExplodingStar.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a>(num_zones_per_decade)</p></td>
 <td><p>Return a mesh instance describing the problem domain.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.model_parameter_dict" title="sailfish.setups.exploding_star.ExplodingStar.model_parameter_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameter_dict</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.model_parameter_dict" title="sailfish.setups.exploding_star.ExplodingStar.model_parameter_dict"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameter_dict</span></code></a>()</p></td>
 <td><p>Return a dictionary of the model parameters.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameters</span></code></a>()</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameters</span></code></a>()</p></td>
 <td><p>Return an iterator over the model parameters chosen for this setup.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.primitive" title="sailfish.setups.exploding_star.ExplodingStar.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a>(t, r, primitive)</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.primitive" title="sailfish.setups.exploding_star.ExplodingStar.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a>(t, r, primitive)</p></td>
 <td><p>Approximate density profile of a MESA star.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.print_model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.print_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">print_model_parameters</span></code></a>([logger, newlines])</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.print_model_parameters" title="sailfish.setups.exploding_star.ExplodingStar.print_model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">print_model_parameters</span></code></a>([logger, newlines])</p></td>
 <td><p>Print parameter names, values, and about messages to <cite>stdout</cite>.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.validate" title="sailfish.setups.exploding_star.ExplodingStar.validate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate</span></code></a>()</p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.validate" title="sailfish.setups.exploding_star.ExplodingStar.validate"><code class="xref py py-obj docutils literal notranslate"><span class="pre">validate</span></code></a>()</p></td>
 <td><p>Confirm that the model parameters are physically valid.</p></td>
 </tr>
 </tbody>
@@ -172,23 +174,29 @@ Marcus Dupont’s setup in Simbi.</p>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.default_resolution" title="sailfish.setups.exploding_star.ExplodingStar.default_resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">default_resolution</span></code></a></p></td>
 <td><p>Provide a default grid resolution.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.physics" title="sailfish.setups.exploding_star.ExplodingStar.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.diagnostics" title="sailfish.setups.exploding_star.ExplodingStar.diagnostics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">diagnostics</span></code></a></p></td>
+<td><p>A list of diagnostics to be dispatched to the solver.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.physics" title="sailfish.setups.exploding_star.ExplodingStar.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">physics</span></code></a></p></td>
 <td><p>Return physics parameters used by the solver: EOS, gravity, etc.</p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_inner</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_inner</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_outer</span></code></p></td>
+<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_outer</span></code></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-odd"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_shell</span></code></p></td>
+<tr class="row-even"><td><p><code class="xref py py-obj docutils literal notranslate"><span class="pre">r_shell</span></code></p></td>
 <td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.reference_time_scale" title="sailfish.setups.exploding_star.ExplodingStar.reference_time_scale"><code class="xref py py-obj docutils literal notranslate"><span class="pre">reference_time_scale</span></code></a></p></td>
+<td><p>The time scale used to convert raw simulation time to user time.</p></td>
 </tr>
 <tr class="row-even"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.solver" title="sailfish.setups.exploding_star.ExplodingStar.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a></p></td>
 <td><p>Return the name of the setup class.</p></td>
 </tr>
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.setups.exploding_star.ExplodingStar.start_time" title="sailfish.setups.exploding_star.ExplodingStar.start_time"><code class="xref py py-obj docutils literal notranslate"><span class="pre">start_time</span></code></a></p></td>
-<td><p>Provide a start time for the simulation.</p></td>
+<td><p>The start time for the simulation.</p></td>
 </tr>
 </tbody>
 </table>
@@ -200,6 +208,14 @@ Marcus Dupont’s setup in Simbi.</p>
 solver. 1D solvers should accept either a single return value
 specifying the BC mode at both the domain edges, or a pair of modes,
 one for each edge.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar.checkpoint_diagnostics">
+<span class="sig-name descname"><span class="pre">checkpoint_diagnostics</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">time</span></span></em><span class="sig-paren">)</span><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar.checkpoint_diagnostics" title="Permalink to this definition"></a></dt>
+<dd><p>Return a dict of post-processing data to include in checkpoint files.</p>
+<p>An example use case is to record the positions of point masses (with
+prescribed trajectory) in a gravitating hydrodynmics problem.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -237,6 +253,12 @@ the simulation runs until it’s killed.</p>
 <dd><p>Print formatted text describing the setup.</p>
 <p>The output will include a normlized version of the class doc string,
 and the model parameter names, default values, and about message.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar.diagnostics">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">diagnostics</span></span><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar.diagnostics" title="Permalink to this definition"></a></dt>
+<dd><p>A list of diagnostics to be dispatched to the solver.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -301,6 +323,21 @@ PLM theta value, RK integration type, or DG order.</p>
 </dd></dl>
 
 <dl class="py property">
+<dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar.reference_time_scale">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">reference_time_scale</span></span><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar.reference_time_scale" title="Permalink to this definition"></a></dt>
+<dd><p>The time scale used to convert raw simulation time to user time.</p>
+<p>Typically the reference time can be 1.0, meaning that raw simulation
+time and user time are the same. However it sometimes makes sense for
+the user time to be something else, like the orbital period of 2 pi
+for example. The <cite>start_time</cite> and <cite>default_time_time</cite> properties are
+in uner time, not raw simulation time. Similarly, messages written to
+stdout, and event recurrences are both in user time, i.e. if the
+reference time is 2 pi and <cite>–checkpoint=1.0</cite>, you’ll get one
+checkpoint written per orbital period. The “time” field of the
+checkpoint file contains the raw simulation time, not the user time.</p>
+</dd></dl>
+
+<dl class="py property">
 <dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar.solver">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">solver</span></span><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar.solver" title="Permalink to this definition"></a></dt>
 <dd><p>Return the name of the setup class.</p>
@@ -309,7 +346,7 @@ PLM theta value, RK integration type, or DG order.</p>
 <dl class="py property">
 <dt class="sig sig-object py" id="sailfish.setups.exploding_star.ExplodingStar.start_time">
 <em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">start_time</span></span><a class="headerlink" href="#sailfish.setups.exploding_star.ExplodingStar.start_time" title="Permalink to this definition"></a></dt>
-<dd><p>Provide a start time for the simulation. This is 0.0 by default.</p>
+<dd><p>The start time for the simulation. This is 0.0 by default.</p>
 </dd></dl>
 
 <dl class="py method">
@@ -322,7 +359,7 @@ PLM theta value, RK integration type, or DG order.</p>
 
 </dd></dl>
 
-</section>
+</div>
 
 
            </div>

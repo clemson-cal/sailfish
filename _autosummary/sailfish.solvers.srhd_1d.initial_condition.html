@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.solvers.srhd_1d.initial_condition &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.solvers.srhd_1d.Patch" href="sailfish.solvers.srhd_1d.Patch.html" />
+    <link rel="next" title="sailfish.solvers.srhd_1d.Options" href="sailfish.solvers.srhd_1d.Options.html" />
     <link rel="prev" title="sailfish.solvers.srhd_1d" href="sailfish.solvers.srhd_1d.html" /> 
 </head>
 
@@ -52,12 +51,17 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.SolverInitializationError.html">sailfish.solvers.SolverInitializationError</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdgam_2d.html">sailfish.solvers.cbdgam_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdiso_2d.html">sailfish.solvers.cbdiso_2d</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.cbdisodg_2d.html">sailfish.solvers.cbdisodg_2d</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.scdg_1d.html">sailfish.solvers.scdg_1d</a></li>
 <li class="toctree-l3 current"><a class="reference internal" href="sailfish.solvers.srhd_1d.html">sailfish.solvers.srhd_1d</a><ul class="current">
 <li class="toctree-l4 current"><a class="current reference internal" href="#">sailfish.solvers.srhd_1d.initial_condition</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_1d.Options.html">sailfish.solvers.srhd_1d.Options</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_1d.Patch.html">sailfish.solvers.srhd_1d.Patch</a></li>
+<li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_1d.Physics.html">sailfish.solvers.srhd_1d.Physics</a></li>
 <li class="toctree-l4"><a class="reference internal" href="sailfish.solvers.srhd_1d.Solver.html">sailfish.solvers.srhd_1d.Solver</a></li>
 </ul>
 </li>
@@ -96,21 +100,21 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-solvers-srhd-1d-initial-condition">
+  <div class="section" id="sailfish-solvers-srhd-1d-initial-condition">
 <h1>sailfish.solvers.srhd_1d.initial_condition<a class="headerlink" href="#sailfish-solvers-srhd-1d-initial-condition" title="Permalink to this headline"></a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="sailfish.solvers.srhd_1d.initial_condition">
-<span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_1d.</span></span><span class="sig-name descname"><span class="pre">initial_condition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#initial_condition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.initial_condition" title="Permalink to this definition"></a></dt>
+<span class="sig-prename descclassname"><span class="pre">sailfish.solvers.srhd_1d.</span></span><span class="sig-name descname"><span class="pre">initial_condition</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">i1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">xp</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/srhd_1d.html#initial_condition"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.srhd_1d.initial_condition" title="Permalink to this definition"></a></dt>
 <dd></dd></dl>
 
-</section>
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.solvers.srhd_1d.html" class="btn btn-neutral float-left" title="sailfish.solvers.srhd_1d" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.solvers.srhd_1d.Patch.html" class="btn btn-neutral float-right" title="sailfish.solvers.srhd_1d.Patch" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.solvers.srhd_1d.Options.html" class="btn btn-neutral float-right" title="sailfish.solvers.srhd_1d.Options" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

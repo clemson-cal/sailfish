@@ -1,6 +1,0 @@
-sailfish.library.type\_error
-============================
-
-.. currentmodule:: sailfish.library
-
-.. autofunction:: type_error

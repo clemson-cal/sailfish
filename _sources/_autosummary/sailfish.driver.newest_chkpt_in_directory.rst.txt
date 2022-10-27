@@ -1,0 +1,6 @@
+sailfish.driver.newest\_chkpt\_in\_directory
+============================================
+
+.. currentmodule:: sailfish.driver
+
+.. autofunction:: newest_chkpt_in_directory

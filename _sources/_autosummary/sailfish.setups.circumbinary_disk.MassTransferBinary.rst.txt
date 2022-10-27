@@ -1,0 +1,65 @@
+sailfish.setups.circumbinary\_disk.MassTransferBinary
+=====================================================
+
+.. currentmodule:: sailfish.setups.circumbinary_disk
+
+.. autoclass:: MassTransferBinary
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~MassTransferBinary.__init__
+      ~MassTransferBinary.checkpoint_diagnostics
+      ~MassTransferBinary.dash_case_class_name
+      ~MassTransferBinary.default_model_parameters
+      ~MassTransferBinary.describe_class
+      ~MassTransferBinary.find_setup_class
+      ~MassTransferBinary.has_model_parameters
+      ~MassTransferBinary.immutable_parameter_keys
+      ~MassTransferBinary.mesh
+      ~MassTransferBinary.model_parameter_dict
+      ~MassTransferBinary.model_parameters
+      ~MassTransferBinary.point_masses
+      ~MassTransferBinary.primitive
+      ~MassTransferBinary.print_model_parameters
+      ~MassTransferBinary.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~MassTransferBinary.boundary_condition
+      ~MassTransferBinary.buffer_driving_rate
+      ~MassTransferBinary.buffer_onset_width
+      ~MassTransferBinary.default_end_time
+      ~MassTransferBinary.default_resolution
+      ~MassTransferBinary.diagnostics
+      ~MassTransferBinary.domain_radius
+      ~MassTransferBinary.eccentricity
+      ~MassTransferBinary.mach_number
+      ~MassTransferBinary.mass_ratio
+      ~MassTransferBinary.nu
+      ~MassTransferBinary.orbital_elements
+      ~MassTransferBinary.physics
+      ~MassTransferBinary.reference_time_scale
+      ~MassTransferBinary.sigma
+      ~MassTransferBinary.sink_radius
+      ~MassTransferBinary.sink_rate
+      ~MassTransferBinary.softening_length
+      ~MassTransferBinary.solver
+      ~MassTransferBinary.start_time
+      ~MassTransferBinary.which_diagnostics
+   
+   

@@ -1,6 +1,0 @@
-sailfish.library.validate\_constraints
-======================================
-
-.. currentmodule:: sailfish.library
-
-.. autofunction:: validate_constraints

@@ -1,8 +1,7 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
-
+  <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>sailfish.driver.DriverArgs &mdash; sailfish 0.4.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
@@ -18,7 +17,7 @@
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.driver.ConfigurationError" href="sailfish.driver.ConfigurationError.html" />
+    <link rel="next" title="sailfish.driver.DriverState" href="sailfish.driver.DriverState.html" />
     <link rel="prev" title="sailfish.driver.write_checkpoint" href="sailfish.driver.write_checkpoint.html" /> 
 </head>
 
@@ -43,21 +42,24 @@
 <li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
 <li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.asdict.html">sailfish.driver.asdict</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.append_timeseries.html">sailfish.driver.append_timeseries</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.first_not_none.html">sailfish.driver.first_not_none</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.fromdict.html">sailfish.driver.fromdict</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.init_logging.html">sailfish.driver.init_logging</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_event.html">sailfish.driver.keyed_event</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.keyed_value.html">sailfish.driver.keyed_value</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_checkpoint.html">sailfish.driver.load_checkpoint</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.load_user_config.html">sailfish.driver.load_user_config</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.main.html">sailfish.driver.main</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.newest_chkpt_in_directory.html">sailfish.driver.newest_chkpt_in_directory</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.run.html">sailfish.driver.run</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.simulate.html">sailfish.driver.simulate</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_dict_where_none.html">sailfish.driver.update_dict_where_none</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.update_where_none.html">sailfish.driver.update_where_none</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.write_checkpoint.html">sailfish.driver.write_checkpoint</a></li>
 <li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.driver.DriverArgs</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.DriverState.html">sailfish.driver.DriverState</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ConfigurationError.html">sailfish.driver.ConfigurationError</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.driver.ExtensionError.html">sailfish.driver.ExtensionError</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
@@ -99,11 +101,11 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <section id="sailfish-driver-driverargs">
+  <div class="section" id="sailfish-driver-driverargs">
 <h1>sailfish.driver.DriverArgs<a class="headerlink" href="#sailfish-driver-driverargs" title="Permalink to this headline"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.driver.DriverArgs">
-<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.driver.</span></span><span class="sig-name descname"><span class="pre">DriverArgs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chkpt_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver_options</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cfl_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execution_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="sailfish.event.Recurrence.html#sailfish.event.Recurrence" title="sailfish.event.Recurrence"><span class="pre">sailfish.event.Recurrence</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/driver.html#DriverArgs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.driver.DriverArgs" title="Permalink to this definition"></a></dt>
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.driver.</span></span><span class="sig-name descname"><span class="pre">DriverArgs</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup_name</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">chkpt_file</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">model_parameters</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solver_options</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">dict</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">cfl_number</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">end_time</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">float</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">execution_mode</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fold</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">resolution</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">events</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Dict</span><span class="p"><span class="pre">[</span></span><span class="pre">str</span><span class="p"><span class="pre">,</span></span><span class="w"> </span><a class="reference internal" href="sailfish.event.Recurrence.html#sailfish.event.Recurrence" title="sailfish.event.Recurrence"><span class="pre">sailfish.event.Recurrence</span></a><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">new_timestep_cadence</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">Optional</span><span class="p"><span class="pre">[</span></span><span class="pre">int</span><span class="p"><span class="pre">]</span></span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose_output</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">str</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">''</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/driver.html#DriverArgs"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.driver.DriverArgs" title="Permalink to this definition"></a></dt>
 <dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">NamedTuple</span></code></p>
 <p>Contains data used by the driver.</p>
 <dl class="py method">
@@ -160,17 +162,23 @@
 <tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.model_parameters" title="sailfish.driver.DriverArgs.model_parameters"><code class="xref py py-obj docutils literal notranslate"><span class="pre">model_parameters</span></code></a></p></td>
 <td><p>Alias for field number 2</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.num_patches" title="sailfish.driver.DriverArgs.num_patches"><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_patches</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.new_timestep_cadence" title="sailfish.driver.DriverArgs.new_timestep_cadence"><code class="xref py py-obj docutils literal notranslate"><span class="pre">new_timestep_cadence</span></code></a></p></td>
+<td><p>Alias for field number 11</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.num_patches" title="sailfish.driver.DriverArgs.num_patches"><code class="xref py py-obj docutils literal notranslate"><span class="pre">num_patches</span></code></a></p></td>
 <td><p>Alias for field number 9</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.resolution" title="sailfish.driver.DriverArgs.resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">resolution</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.resolution" title="sailfish.driver.DriverArgs.resolution"><code class="xref py py-obj docutils literal notranslate"><span class="pre">resolution</span></code></a></p></td>
 <td><p>Alias for field number 8</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.setup_name" title="sailfish.driver.DriverArgs.setup_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup_name</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.setup_name" title="sailfish.driver.DriverArgs.setup_name"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setup_name</span></code></a></p></td>
 <td><p>Alias for field number 0</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.solver_options" title="sailfish.driver.DriverArgs.solver_options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver_options</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.solver_options" title="sailfish.driver.DriverArgs.solver_options"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver_options</span></code></a></p></td>
 <td><p>Alias for field number 3</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.driver.DriverArgs.verbose_output" title="sailfish.driver.DriverArgs.verbose_output"><code class="xref py py-obj docutils literal notranslate"><span class="pre">verbose_output</span></code></a></p></td>
+<td><p>Alias for field number 12</p></td>
 </tr>
 </tbody>
 </table>
@@ -236,6 +244,12 @@
 </dd></dl>
 
 <dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverArgs.new_timestep_cadence">
+<span class="sig-name descname"><span class="pre">new_timestep_cadence</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.driver.DriverArgs.new_timestep_cadence" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 11</p>
+</dd></dl>
+
+<dl class="py attribute">
 <dt class="sig sig-object py" id="sailfish.driver.DriverArgs.num_patches">
 <span class="sig-name descname"><span class="pre">num_patches</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">int</span></em><a class="headerlink" href="#sailfish.driver.DriverArgs.num_patches" title="Permalink to this definition"></a></dt>
 <dd><p>Alias for field number 9</p>
@@ -259,16 +273,22 @@
 <dd><p>Alias for field number 3</p>
 </dd></dl>
 
+<dl class="py attribute">
+<dt class="sig sig-object py" id="sailfish.driver.DriverArgs.verbose_output">
+<span class="sig-name descname"><span class="pre">verbose_output</span></span><em class="property"><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="pre">str</span></em><a class="headerlink" href="#sailfish.driver.DriverArgs.verbose_output" title="Permalink to this definition"></a></dt>
+<dd><p>Alias for field number 12</p>
 </dd></dl>
 
-</section>
+</dd></dl>
+
+</div>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.driver.write_checkpoint.html" class="btn btn-neutral float-left" title="sailfish.driver.write_checkpoint" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.driver.ConfigurationError.html" class="btn btn-neutral float-right" title="sailfish.driver.ConfigurationError" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.driver.DriverState.html" class="btn btn-neutral float-right" title="sailfish.driver.DriverState" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>

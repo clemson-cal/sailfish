@@ -17,6 +17,7 @@ sailfish.setups.simple1d.Advection
    .. autosummary::
    
       ~Advection.__init__
+      ~Advection.checkpoint_diagnostics
       ~Advection.dash_case_class_name
       ~Advection.default_model_parameters
       ~Advection.describe_class
@@ -41,7 +42,9 @@ sailfish.setups.simple1d.Advection
       ~Advection.boundary_condition
       ~Advection.default_end_time
       ~Advection.default_resolution
+      ~Advection.diagnostics
       ~Advection.physics
+      ~Advection.reference_time_scale
       ~Advection.solver
       ~Advection.start_time
    
