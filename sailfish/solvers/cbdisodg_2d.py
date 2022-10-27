@@ -426,11 +426,11 @@ class Solver(SolverBase):
         """
         Generate runtime reductions on the solution data for time series.
 
-        As of now, the reductions generated are the rates of mass accretion,
-        and of x and y momentum (combined gravitational and accretion)
-        resulting from each of the point masses. If there are 2 point masses,
-        then the result of this function is a 7-element list: :pyobj:`[time,
-        mdot1, fx1, fy1, mdot2, fx2, fy2]`.
+        As of now, the reductions generated are the rates of mass accretion, and
+        of x and y momentum (combined gravitational and accretion) resulting
+        from each of the point masses. If there are 2 point masses, then the
+        result of this function is a 7-element list: `[time, mdot1, fx1, fy1,
+        mdot2, fx2, fy2]`.
         """
 
         def to_host(a):

@@ -270,10 +270,10 @@ class DriverArgs(NamedTuple):
 
 class DriverState(NamedTuple):
     """
-    Contains the stateful variables in use by the :pyobj:`simulate` function.
+    Contains the stateful variables in use by the `simulate` function.
 
-    An instance of this class is yielded by :pyobj:`simulate` each time an
-    event takes place.
+    An instance of this class is yielded by `simulate` each time an event takes
+    place.
     """
 
     iteration: int
@@ -489,7 +489,7 @@ def simulate(driver):
                     dt = dx / solver.maximum_wavespeed() * cfl_number
                 solver.advance(dt)
                 iteration += 1
-                
+
         Mzps = mesh.num_total_zones / fold_time() * 1e-6 * fold
         main_logger.info(
             f"[{iteration:04d}] t={user_time:0.3f} dt={dt:.3e} Mzps={Mzps:.3f}"
@@ -562,10 +562,10 @@ def load_user_config():
     """
     Initialize user extensions: setups and solvers outside the main codebase.
 
-    This function is called by the :pyobj:`main` entry point and the
-    :pyobj:`run` API function to load custom setups provided by the user.
-    Extensions are defined in the `extensions` section of the .sailfish
-    file. The .sailfish file is loaded from the current working directory.
+    This function is called by the `main` entry point and the `run` API function
+    to load custom setups provided by the user. Extensions are defined in the
+    `extensions` section of the .sailfish file. The .sailfish file is loaded
+    from the current working directory.
     """
     from configparser import ConfigParser, ParsingError
     from importlib import import_module
