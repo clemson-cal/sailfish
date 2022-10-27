@@ -1,8 +1,7 @@
+#!/usr/bin/env python3
+
 """
 A script to invoke the sailfish command line entry point.
-
-This script is just here for backwards compatibility. Its official location is
-now bin/sailfish.
 """
 
 from sys import path

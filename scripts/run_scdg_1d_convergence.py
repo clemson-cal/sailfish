@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Measure the L1 error with respect to the analytic solution by integrating L1 =
 1/V Integral(abs(u_computed-u_analytic)) dV over the cell using Gaussian
@@ -28,29 +26,34 @@ def analytic(t, x):
     wavespeed = 1.0
     return 1.0 + a * sin(k * (x - wavespeed * t))
 
+
 def burgers(t, x):
     """
     Analytic solution from initial condition from Burgers setup in
-    sailfish/setups/simple1d.py 
-    u(x,t) > 0 for this setup 
+    sailfish/setups/simple1d.py
+    u(x,t) > 0 for this setup
     Use root finder to find xsi such that xsi - x + f(xsi) * t = 0
     """
     from scipy import optimize
+
     a = 0.1
     k = 2.0 * pi
     average_wavespeed = 1.0
-    
+
     def f(xsi):
         return xsi - x + t * (1.0 + a * sin(k * xsi))
+
     def fder(xsi):
-        return        1.0 + t * k * a * cos(k * xsi)
+        return 1.0 + t * k * a * cos(k * xsi)
+
     def fder2(xsi):
-        return         -t * k * k * a * sin(k * xsi)
+        return -t * k * k * a * sin(k * xsi)
 
     # xsi0 is initial guess for xsi
-    xsi0 = x - average_wavespeed * t 
+    xsi0 = x - average_wavespeed * t
     xsi = optimize.newton(f, xsi0, fprime=fder, fprime2=fder2)
     return 1.0 + a * sin(k * xsi)
+
 
 def leg(x, n):
     """
@@ -65,7 +68,7 @@ def dot(u, p):
 
 
 def compute_error(state):
-    scheme_order = state["solver_options"]["order"]
+    scheme_order = state.solver.options["order"]
 
     # Schaal+15 recommends computing the L1 error using order p + 2 quadrature,
     # where p is the order at which the simulation was run.
@@ -77,11 +80,11 @@ def compute_error(state):
     # Value of basis functions at the quadrature points
     phi_value = array([[leg(x, n) for n in range(l1_order)] for x in gauss_points])
 
-    time = state["time"]
-    mesh = state["mesh"]
+    time = state.solver.time
+    mesh = state.mesh
     xc = mesh.zone_centers(time)
     dx = mesh.dx
-    uw = state["solution"]
+    uw = state.solver.solution
     num_zones = mesh.shape[0]
     num_points = len(gauss_points)
     l1 = 0.0
@@ -91,7 +94,7 @@ def compute_error(state):
             xsi = gauss_points[j]
             xj = xc[i] + xsi * 0.5 * dx
             u_analytic = analytic(time, xj)
-            u_computed = dot(uw[i,0,:], phi_value[j])
+            u_computed = dot(uw[i, 0, :], phi_value[j])
             l1 += abs(u_computed - u_analytic) * weights[j]
 
     return l1 * dx
@@ -120,14 +123,17 @@ def main(args):
         errors.append(err)
         print(f"run with res = {res} error = {err:.3e}")
 
-    time = state["time"]
-    mesh = state["mesh"]
+    time = state.solver.time
+    mesh = state.mesh
     num_zones = mesh.shape[0]
     uan = np.zeros(num_zones)
-    xc = mesh.zone_centers(time) 
-    for i in range(num_zones): uan[i] = analytic(time,xc[i])
-    plt.plot(xc,state["solution"][:,0,0],"-o")
-    plt.plot(xc,uan)
+    xc = mesh.zone_centers(time)
+
+    for i in range(num_zones):
+        uan[i] = analytic(time, xc[i])
+
+    plt.plot(xc, state.solver.solution[:, 0, 0], "-o")
+    plt.plot(xc, uan)
     plt.show()
 
     expected = (
