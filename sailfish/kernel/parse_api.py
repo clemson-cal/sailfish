@@ -59,13 +59,12 @@ def parse_api(code):
     """
     Parse a C-like source file to extract a public API.
 
-    The C code needs to conform to a set of conventions, which are still
-    evolving but will be documented soon. This function returns a dictionary
-    whose keys are the names of the public functions (or kernels) in the code,
-    and the values are lists of the (positional) arguments describing the
-    function signature. Each function argument is (currently) a tuple of the
-    data type, the argument name, and an optional constraint which could be
-    validated at runtime.
+    The C code needs to conform to a set of conventions, which still need to be
+    fully documented. This function returns a dictionary whose keys are the
+    names of the public functions (or kernels) in the code, and the values are
+    lists of the (positional) arguments describing the function signature. Each
+    function argument is a tuple of the data type, the argument name, and an
+    optional constraint which could be validated at runtime.
     """
     api = dict()
     for event, value in scan(code.splitlines()):
