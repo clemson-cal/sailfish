@@ -604,6 +604,7 @@ def main():
     General-purpose command line interface.
     """
     import argparse
+    import sailfish
     import sailfish.setups
 
     class MakeDict(argparse.Action):
@@ -620,7 +621,12 @@ def main():
     parser = argparse.ArgumentParser(
         prog="sailfish",
         usage=argparse.SUPPRESS,
-        description="sailfish is a gpu-accelerated astrophysical gasdynamics code",
+        description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
+    )
+    parser.add_argument(
+        "--version",
+        action="version",
+        version=f"%(prog)s {sailfish.__version__}",
     )
     parser.add_argument(
         "command",
