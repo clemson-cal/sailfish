@@ -27,11 +27,19 @@ class ExtensionError(Exception):
 
 
 def keyed_event(item):
+    """
+    Return a key, val pair where the value string describes a recurrence rule.
+    """
     key, val = item.split("=")
     return key, Recurrence.from_str(val)
 
 
 def keyed_value(item):
+    """
+    Return a key, val pair from a "key=val" string.
+
+    The value string is python-eval'd so it must be a valid Python expression.
+    """
     try:
         key, val = item.split("=")
         return key, eval(val)
@@ -198,7 +206,7 @@ def newest_chkpt_in_directory(directory_name):
         except:
             logger.warning(f"skipping corrupt checkpoint file {path}")
 
-    raise ConfigurationError("the specified directory did not have usable checkpoints")
+    raise ConfigurationError("the specified directory did not have a usable checkpoint")
 
 
 def append_timeseries(state):
@@ -308,11 +316,10 @@ def simulate(driver):
     main_logger.info(f"\nsailfish {version}\n")
 
     """
-    Initialize and log state in the the system module. The build system
-    influences JIT-compiled module code. Currently the build parameters are
-    inferred from the platform (Linux or MacOS), but in the future these
-    should also be extensible by a system-specific rc-style configuration
-    file.
+    Initialize and log state in the system module. The build system influences
+    JIT-compiled module code. Currently the build parameters are inferred from
+    the platform (Linux or MacOS), but in the future these should also be
+    extensible by a system-specific rc-style configuration file.
     """
     configure_build(**user_build_config, execution_mode=driver.execution_mode)
     log_system_info(driver.execution_mode or "cpu")
@@ -341,9 +348,9 @@ def simulate(driver):
         """
         Load driver state from a checkpoint file. The setup model parameters
         are updated with any items given on the command line after the setup
-        name. All command line arguments are also restorted from the
-        previous session, but are updated with the command line argument
-        given for this session, except for "frozen" arguments.
+        name. All command line arguments are also restorted from the previous
+        session, but are updated with the command line argument given for this
+        session, except for "frozen" arguments.
         """
         logger.info(f"load checkpoint {driver.chkpt_file}")
         chkpt = load_checkpoint(driver.chkpt_file)
@@ -379,8 +386,8 @@ def simulate(driver):
             # just before the checkpoint was written. The differences would be
             # due to a slightly different timestep used, after it's recomputed
             # following the restart, and they would be minor. Still, restarted
-            # runs are supposed to be bitwise identical continuous ones. Older
-            # checkpoints will still work, but they will not have this
+            # runs are supposed to be bitwise identical to continuous ones.
+            # Older checkpoints will still work, but they will not have this
             # guarantee.
             logger.warning(
                 "timestep_dt not in checkpoint, will recompute it on first iteration"
