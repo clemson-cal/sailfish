@@ -315,20 +315,12 @@ def simulate(driver):
     main_logger = getLogger("main_logger")
     main_logger.info(f"\nsailfish {version}\n")
 
-    """
-    Initialize and log state in the system module. The build system influences
-    JIT-compiled module code. Currently the build parameters are inferred from
-    the platform (Linux or MacOS), but in the future these should also be
-    extensible by a system-specific rc-style configuration file.
-    """
-    configure_build(**user_build_config, execution_mode=driver.execution_mode)
-    log_system_info(driver.execution_mode or "cpu")
-
     if driver.setup_name:
         """
         Generate an initial driver state from command line arguments, model
         parametrs, and a setup instance.
         """
+
         logger.info(f"start new simulation with setup {driver.setup_name}")
         setup = SetupBase.find_setup_class(driver.setup_name)(
             **driver.model_parameters or dict()
@@ -405,6 +397,15 @@ def simulate(driver):
 
     else:
         raise ConfigurationError("driver args must specify setup_name or chkpt_file")
+
+    """
+    Initialize and log state in the system module. The build system influences
+    JIT-compiled module code. Currently the build parameters are inferred from
+    the platform (Linux or MacOS), but in the future these should also be
+    extensible by a system-specific rc-style configuration file.
+    """
+    configure_build(**user_build_config, execution_mode=driver.execution_mode)
+    log_system_info(driver.execution_mode or "cpu")
 
     mode = driver.execution_mode or "cpu"
     fold = driver.fold or 10
