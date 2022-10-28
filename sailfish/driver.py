@@ -217,7 +217,7 @@ def append_timeseries(state):
     reductions = state.solver.reductions()
 
     if reductions:
-        state.timeseries.append(state.solver.reductions())
+        state.timeseries.append(reductions)
         logger.info(f"record timeseries event {len(state.timeseries)}")
     else:
         logger.warning(
