@@ -147,6 +147,7 @@ def main_cbdiso_2d():
         "sigma": lambda p: p[:, :, 0],
         "vx": lambda p: p[:, :, 1],
         "vy": lambda p: p[:, :, 2],
+        "torque": None,
     }
 
     parser = argparse.ArgumentParser()
@@ -209,10 +210,52 @@ def main_cbdiso_2d():
     parser.add_argument("-m", "--print-model-parameters", action="store_true")
     args = parser.parse_args()
 
+    class TorqueCalculation:
+        def __init__(self, mesh, masses):
+            self.mesh = mesh
+            self.masses = masses
+
+        def __call__(self, primitive):
+            mesh = self.mesh
+            ni, nj = mesh.shape
+            dx = mesh.dx
+            dy = mesh.dy
+            da = dx * dy
+            x = np.array([mesh.cell_coordinates(i, 0)[0] for i in range(ni)])[:, None]
+            y = np.array([mesh.cell_coordinates(0, j)[1] for j in range(nj)])[None, :]
+
+            x1 = self.masses[0].position_x
+            y1 = self.masses[0].position_y
+            x2 = self.masses[1].position_x
+            y2 = self.masses[1].position_y
+            m1 = self.masses[0].mass
+            m2 = self.masses[1].mass
+            rs1 = self.masses[0].softening_length
+            rs2 = self.masses[1].softening_length
+
+            sigma = primitive[:, :, 0]
+            delx1 = x - x1
+            dely1 = y - y1
+            delx2 = x - x2
+            dely2 = y - y2
+
+            # forces on the gas
+            fx1 = -sigma * da * m1 * delx1 / (delx1**2 + dely1**2 + rs1**2) ** 1.5
+            fy1 = -sigma * da * m1 * dely1 / (delx1**2 + dely1**2 + rs1**2) ** 1.5
+            fx2 = -sigma * da * m2 * delx2 / (delx2**2 + dely2**2 + rs2**2) ** 1.5
+            fy2 = -sigma * da * m2 * dely2 / (delx2**2 + dely2**2 + rs2**2) ** 1.5
+
+            t1 = x * fy1 - y * fx1
+            t2 = x * fy2 - y * fx2
+            t = t1 + t2
+            print("total torque:", t.sum())
+            return np.abs(t) ** 0.125 * np.sign(t)
+
     for filename in args.checkpoints:
         fig, ax = plt.subplots(figsize=[12, 9])
         chkpt = load_checkpoint(filename)
         mesh = chkpt["mesh"]
+        fields["torque"] = TorqueCalculation(mesh, chkpt["point_masses"])
 
         if chkpt["solver"] == "cbdisodg_2d":
             prim = chkpt["primitive"]
@@ -235,12 +278,6 @@ def main_cbdiso_2d():
             f = f**args.scale_by_power
         if args.log:
             f = np.log10(f)
-
-        # try:
-        #     f -= f0
-        #     print("subtracting the first arg!")
-        # except:
-        #     f0 = f
 
         extent = mesh.x0, mesh.x1, mesh.y0, mesh.y1
         cm = ax.imshow(
