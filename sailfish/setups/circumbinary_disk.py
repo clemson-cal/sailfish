@@ -387,6 +387,11 @@ class MassTransferBinary(SetupBase):
     nu = param(1e-4, "kinematic viscosity parameter", mutable=True)
     buffer_driving_rate = param(1e2, "rate of driving in the buffer", mutable=True)
     buffer_onset_width = param(0.25, "buffer ramp distance", mutable=True)
+    sink_model = param(
+        "acceleration_free",
+        "sink [acceleration_free|force_free|torque_free]",
+        mutable=True,
+    )
     which_diagnostics = param("torques", "[torques|forces]")
 
     def validate(self):
@@ -492,14 +497,14 @@ class MassTransferBinary(SetupBase):
         return (
             PointMass(
                 softening_length=self.softening_length[0],
-                sink_model=SinkModel.ACCELERATION_FREE,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate[0],
                 sink_radius=self.sink_radius[0],
                 **m1._asdict(),
             ),
             PointMass(
                 softening_length=self.softening_length[1],
-                sink_model=SinkModel.ACCELERATION_FREE,
+                sink_model=SinkModel[self.sink_model.upper()],
                 sink_rate=self.sink_rate[1],
                 sink_radius=self.sink_radius[1],
                 **m2._asdict(),
