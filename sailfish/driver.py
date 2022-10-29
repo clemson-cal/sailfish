@@ -494,7 +494,8 @@ def simulate(driver):
         performed between fold boundaries.
         """
 
-        for name, event in driver.events.items():
+        for name in event_states:
+            event = driver.events[name]
             state = event_states[name]
             if event_states[name].is_due(user_time, event):
                 event_states[name] = state.next(user_time, event)
