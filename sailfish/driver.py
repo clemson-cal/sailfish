@@ -399,6 +399,19 @@ def simulate(driver):
         raise ConfigurationError("driver args must specify setup_name or chkpt_file")
 
     """
+    This line ensures that if a checkpoint event is present, then it is
+    emitted last, ensuring that any modifications to the driver state (e.g.
+    time series sample) happening in response to other events triggered in the
+    same iteration, are reflected in the checkpoint file that is written.
+
+    Note: The Python 3.7+ specifications guarantee to that dictionary
+    iteration order reflects the insertion order. This behavior is also
+    present in the CPython implementation of Python 3.6
+    """
+    if "checkpoint" in event_states:
+        event_states["checkpoint"] = event_states.pop("checkpoint")
+
+    """
     Initialize and log state in the system module. The build system influences
     JIT-compiled module code. Currently the build parameters are inferred from
     the platform (Linux or MacOS), but in the future these should also be
