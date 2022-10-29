@@ -427,6 +427,12 @@ class Solver(SolverBase):
                 ey = (v_dot_v * y - v_dot_r * vy) / GM - y / r
                 return sigma * (ex + 1.0j * ey)
 
+            if quantity == "angular_momentum":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                vx = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 1])
+                vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
+                return sigma * (x * vy - y * vx)
+
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion)
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)

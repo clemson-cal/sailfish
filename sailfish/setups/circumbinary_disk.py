@@ -434,6 +434,7 @@ class MassTransferBinary(SetupBase):
                 dict(quantity="mdot", which_mass=2, accretion=True),
                 dict(quantity="torque", which_mass="both", gravity=True),
                 dict(quantity="torque", which_mass="both", accretion=True),
+                dict(quantity="angular_momentum"),
             ]
         elif self.which_diagnostics == "forces":
             return [
