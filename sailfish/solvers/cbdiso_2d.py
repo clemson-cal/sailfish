@@ -433,6 +433,10 @@ class Solver(SolverBase):
                 vy = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 2])
                 return sigma * (x * vy - y * vx)
 
+            if quantity == "mass":
+                sigma = apply_radial_cut(patch.primitive[ng:-ng, ng:-ng, 0])
+                return sigma
+
             if quantity == "power":
                 fx = get_field(patch, 1, cut, mass, gravity, accretion)
                 fy = get_field(patch, 2, cut, mass, gravity, accretion)
