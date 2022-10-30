@@ -20,7 +20,7 @@ import sailfish
 # -- Project information -----------------------------------------------------
 
 project = "sailfish"
-copyright = "2021, Jonathan Zrake"
+copyright = "2022, Jonathan Zrake"
 author = "Jonathan Zrake"
 
 # The full version, including alpha/beta/rc tags
