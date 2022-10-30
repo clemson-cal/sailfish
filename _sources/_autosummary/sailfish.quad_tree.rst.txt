@@ -1,7 +1,7 @@
-﻿sailfish.solver
-===============
+﻿sailfish.quad\_tree
+===================
 
-.. automodule:: sailfish.solver
+.. automodule:: sailfish.quad_tree
 
    
    
@@ -18,7 +18,8 @@
    .. autosummary::
       :toctree:
    
-      SolverBase
+      Node
+      NodeList
    
    
 

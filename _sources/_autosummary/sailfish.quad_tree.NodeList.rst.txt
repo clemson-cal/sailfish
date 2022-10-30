@@ -1,0 +1,25 @@
+sailfish.quad\_tree.NodeList
+============================
+
+.. currentmodule:: sailfish.quad_tree
+
+.. autoclass:: NodeList
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~NodeList.__init__
+   
+   
+
+   
+   
+   

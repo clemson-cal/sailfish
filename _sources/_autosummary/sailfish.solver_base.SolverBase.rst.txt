@@ -1,7 +1,7 @@
-sailfish.solver.SolverBase
-==========================
+sailfish.solver\_base.SolverBase
+================================
 
-.. currentmodule:: sailfish.solver
+.. currentmodule:: sailfish.solver_base
 
 .. autoclass:: SolverBase
    :members:

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.kernel.parse_api.parse_api &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.kernel.parse_api.parse_api &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +14,9 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -58,9 +61,9 @@
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup_base.html">sailfish.setup_base</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver_base.html">sailfish.solver_base</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
 </ul>
@@ -94,22 +97,21 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="sailfish-kernel-parse-api-parse-api">
-<h1>sailfish.kernel.parse_api.parse_api<a class="headerlink" href="#sailfish-kernel-parse-api-parse-api" title="Permalink to this headline"></a></h1>
+  <section id="sailfish-kernel-parse-api-parse-api">
+<h1>sailfish.kernel.parse_api.parse_api<a class="headerlink" href="#sailfish-kernel-parse-api-parse-api" title="Permalink to this heading"></a></h1>
 <dl class="py function">
 <dt class="sig sig-object py" id="sailfish.kernel.parse_api.parse_api">
 <span class="sig-prename descclassname"><span class="pre">sailfish.kernel.parse_api.</span></span><span class="sig-name descname"><span class="pre">parse_api</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">code</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/kernel/parse_api.html#parse_api"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.kernel.parse_api.parse_api" title="Permalink to this definition"></a></dt>
 <dd><p>Parse a C-like source file to extract a public API.</p>
-<p>The C code needs to conform to a set of conventions, which are still
-evolving but will be documented soon. This function returns a dictionary
-whose keys are the names of the public functions (or kernels) in the code,
-and the values are lists of the (positional) arguments describing the
-function signature. Each function argument is (currently) a tuple of the
-data type, the argument name, and an optional constraint which could be
-validated at runtime.</p>
+<p>The C code needs to conform to a set of conventions, which still need to be
+fully documented. This function returns a dictionary whose keys are the
+names of the public functions (or kernels) in the code, and the values are
+lists of the (positional) arguments describing the function signature. Each
+function argument is a tuple of the data type, the argument name, and an
+optional constraint which could be validated at runtime.</p>
 </dd></dl>
 
-</div>
+</section>
 
 
            </div>
@@ -122,7 +124,7 @@ validated at runtime.</p>
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

@@ -1,0 +1,30 @@
+﻿sailfish.solver\_base
+=====================
+
+.. automodule:: sailfish.solver_base
+
+   
+   
+   
+
+   
+   
+   
+
+   
+   
+   .. rubric:: Classes
+
+   .. autosummary::
+      :toctree:
+   
+      SolverBase
+   
+   
+
+   
+   
+   
+
+
+

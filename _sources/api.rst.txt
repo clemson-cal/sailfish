@@ -10,8 +10,9 @@ API documentation
    sailfish.kernel
    sailfish.mesh
    sailfish.physics
-   sailfish.setup
+   sailfish.quad_tree
+   sailfish.setup_base
    sailfish.setups
-   sailfish.solver
+   sailfish.solver_base
    sailfish.solvers
    sailfish.subdivide

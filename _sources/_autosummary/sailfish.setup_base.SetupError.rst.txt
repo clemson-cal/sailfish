@@ -1,0 +1,6 @@
+sailfish.setup\_base.SetupError
+===============================
+
+.. currentmodule:: sailfish.setup_base
+
+.. autoexception:: SetupError

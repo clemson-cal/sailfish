@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.kernel.parse_api &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.kernel.parse_api &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +13,9 @@
         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
         <script src="../../../_static/jquery.js"></script>
         <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/sphinx_highlight.js"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" /> 
@@ -127,13 +129,12 @@
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Parse a C-like source file to extract a public API.</span>
 
-<span class="sd">    The C code needs to conform to a set of conventions, which are still</span>
-<span class="sd">    evolving but will be documented soon. This function returns a dictionary</span>
-<span class="sd">    whose keys are the names of the public functions (or kernels) in the code,</span>
-<span class="sd">    and the values are lists of the (positional) arguments describing the</span>
-<span class="sd">    function signature. Each function argument is (currently) a tuple of the</span>
-<span class="sd">    data type, the argument name, and an optional constraint which could be</span>
-<span class="sd">    validated at runtime.</span>
+<span class="sd">    The C code needs to conform to a set of conventions, which still need to be</span>
+<span class="sd">    fully documented. This function returns a dictionary whose keys are the</span>
+<span class="sd">    names of the public functions (or kernels) in the code, and the values are</span>
+<span class="sd">    lists of the (positional) arguments describing the function signature. Each</span>
+<span class="sd">    function argument is a tuple of the data type, the argument name, and an</span>
+<span class="sd">    optional constraint which could be validated at runtime.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">api</span> <span class="o">=</span> <span class="nb">dict</span><span class="p">()</span>
     <span class="k">for</span> <span class="n">event</span><span class="p">,</span> <span class="n">value</span> <span class="ow">in</span> <span class="n">scan</span><span class="p">(</span><span class="n">code</span><span class="o">.</span><span class="n">splitlines</span><span class="p">()):</span>
@@ -178,7 +179,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

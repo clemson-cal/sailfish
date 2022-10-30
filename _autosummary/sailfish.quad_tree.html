@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.setup &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.quad_tree &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,11 +14,13 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.setup.Parameter" href="sailfish.setup.Parameter.html" />
+    <link rel="next" title="sailfish.quad_tree.Node" href="sailfish.quad_tree.Node.html" />
     <link rel="prev" title="sailfish.physics.kepler.PointMass" href="sailfish.physics.kepler.PointMass.html" /> 
 </head>
 
@@ -46,15 +49,14 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
-<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.setup</a><ul>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.Parameter.html">sailfish.setup.Parameter</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.Setup.html">sailfish.setup.Setup</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.param.html">sailfish.setup.param</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.SetupError.html">sailfish.setup.SetupError</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.quad_tree</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.quad_tree.Node.html">sailfish.quad_tree.Node</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.quad_tree.NodeList.html">sailfish.quad_tree.NodeList</a></li>
 </ul>
 </li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup_base.html">sailfish.setup_base</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver_base.html">sailfish.solver_base</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
 </ul>
@@ -76,9 +78,9 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
           <li><a href="../api.html">API documentation</a> &raquo;</li>
-      <li>sailfish.setup</li>
+      <li>sailfish.quad_tree</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/_autosummary/sailfish.setup.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/_autosummary/sailfish.quad_tree.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -86,53 +88,37 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="module-sailfish.setup">
-<span id="sailfish-setup"></span><h1>sailfish.setup<a class="headerlink" href="#module-sailfish.setup" title="Permalink to this headline"></a></h1>
-<p>The <cite>Setup</cite> class dictates physics and solver choices to the driver.</p>
+  <section id="module-sailfish.quad_tree">
+<span id="sailfish-quad-tree"></span><h1>sailfish.quad_tree<a class="headerlink" href="#module-sailfish.quad_tree" title="Permalink to this heading"></a></h1>
 <p class="rubric">Classes</p>
-<table class="longtable docutils align-default">
+<table class="autosummary longtable docutils align-default">
 <colgroup>
 <col style="width: 10%" />
 <col style="width: 90%" />
 </colgroup>
 <tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setup.Parameter.html#sailfish.setup.Parameter" title="sailfish.setup.Parameter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Parameter</span></code></a>(default, about[, mutable])</p></td>
-<td><p>A model parameter: enables runtime configuring of a setup.</p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.quad_tree.Node.html#sailfish.quad_tree.Node" title="sailfish.quad_tree.Node"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Node</span></code></a>([value, children, items])</p></td>
+<td><p>Represents a node in a self-similar n-tree.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup</span></code></a>(**kwargs)</p></td>
-<td><p>Abstract base class to describe a simulation model setup.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setup.param.html#sailfish.setup.param" title="sailfish.setup.param"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param</span></code></a></p></td>
-<td><p>alias of <a class="reference internal" href="sailfish.setup.Parameter.html#sailfish.setup.Parameter" title="sailfish.setup.Parameter"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.setup.Parameter</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.quad_tree.NodeList.html#sailfish.quad_tree.NodeList" title="sailfish.quad_tree.NodeList"><code class="xref py py-obj docutils literal notranslate"><span class="pre">NodeList</span></code></a>(children)</p></td>
+<td><p>A restricted container to hold n-tree nodes.</p></td>
 </tr>
 </tbody>
 </table>
-<p class="rubric">Exceptions</p>
-<table class="longtable docutils align-default">
-<colgroup>
-<col style="width: 10%" />
-<col style="width: 90%" />
-</colgroup>
-<tbody>
-<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setup.SetupError.html#sailfish.setup.SetupError" title="sailfish.setup.SetupError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SetupError</span></code></a></p></td>
-<td><p>Something went wrong during setup configuration</p></td>
-</tr>
-</tbody>
-</table>
-</div>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
         <a href="sailfish.physics.kepler.PointMass.html" class="btn btn-neutral float-left" title="sailfish.physics.kepler.PointMass" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.setup.Parameter.html" class="btn btn-neutral float-right" title="sailfish.setup.Parameter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.quad_tree.Node.html" class="btn btn-neutral float-right" title="sailfish.quad_tree.Node" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

@@ -55,6 +55,7 @@ sailfish.setups.circumbinary\_disk.MassTransferBinary
       ~MassTransferBinary.physics
       ~MassTransferBinary.reference_time_scale
       ~MassTransferBinary.sigma
+      ~MassTransferBinary.sink_model
       ~MassTransferBinary.sink_radius
       ~MassTransferBinary.sink_rate
       ~MassTransferBinary.softening_length

@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.setups.simple1d &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.setups.simple1d &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +13,9 @@
         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
         <script src="../../../_static/jquery.js"></script>
         <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/sphinx_highlight.js"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" /> 
@@ -71,13 +73,13 @@
 <span class="sd">&quot;&quot;&quot;</span>
 
 <span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">pi</span><span class="p">,</span> <span class="n">sin</span>
-<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">SetupError</span><span class="p">,</span> <span class="n">param</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup_base</span> <span class="kn">import</span> <span class="n">SetupBase</span><span class="p">,</span> <span class="n">SetupError</span><span class="p">,</span> <span class="n">param</span>
 <span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesianMesh</span><span class="p">,</span> <span class="n">LogSphericalMesh</span>
 
 <span class="n">__all__</span> <span class="o">=</span> <span class="p">[</span><span class="s2">&quot;Advection&quot;</span><span class="p">,</span> <span class="s2">&quot;Burgers&quot;</span><span class="p">,</span> <span class="s2">&quot;DensityWave&quot;</span><span class="p">,</span> <span class="s2">&quot;Shocktube&quot;</span><span class="p">,</span> <span class="s2">&quot;Wind&quot;</span><span class="p">]</span>
 
 
-<div class="viewcode-block" id="Advection"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Advection.html#sailfish.setups.simple1d.Advection">[docs]</a><span class="k">class</span> <span class="nc">Advection</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="Advection"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Advection.html#sailfish.setups.simple1d.Advection">[docs]</a><span class="k">class</span> <span class="nc">Advection</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Scalar advection, evolution of a smooth wave, using the DG solver.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -107,7 +109,7 @@
         <span class="k">return</span> <span class="mf">1.0</span></div>
 
 
-<div class="viewcode-block" id="Burgers"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Burgers.html#sailfish.setups.simple1d.Burgers">[docs]</a><span class="k">class</span> <span class="nc">Burgers</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="Burgers"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Burgers.html#sailfish.setups.simple1d.Burgers">[docs]</a><span class="k">class</span> <span class="nc">Burgers</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Burgers equation, evolution of a smooth wave using the DG solver.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -137,7 +139,7 @@
         <span class="k">return</span> <span class="mf">1.0</span></div>
 
 
-<div class="viewcode-block" id="Shocktube"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube">[docs]</a><span class="k">class</span> <span class="nc">Shocktube</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="Shocktube"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Shocktube.html#sailfish.setups.simple1d.Shocktube">[docs]</a><span class="k">class</span> <span class="nc">Shocktube</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Discontinuous initial data, with uniform density and pressure to either</span>
 <span class="sd">    side of the discontintuity at x=0.5.</span>
@@ -167,7 +169,7 @@
         <span class="k">return</span> <span class="mf">0.25</span></div>
 
 
-<div class="viewcode-block" id="DensityWave"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave">[docs]</a><span class="k">class</span> <span class="nc">DensityWave</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="DensityWave"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.DensityWave.html#sailfish.setups.simple1d.DensityWave">[docs]</a><span class="k">class</span> <span class="nc">DensityWave</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A sinusoidal variation of the gas density, with possible uniform</span>
 <span class="sd">    translation. The gas pressure is uniform.</span>
@@ -206,7 +208,7 @@
             <span class="k">raise</span> <span class="n">SetupError</span><span class="p">(</span><span class="s2">&quot;amplitude must be less than 1.0&quot;</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="Wind"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind">[docs]</a><span class="k">class</span> <span class="nc">Wind</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="Wind"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind">[docs]</a><span class="k">class</span> <span class="nc">Wind</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A cold, spherically symmetric relativistic wind.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -214,7 +216,7 @@
     <span class="n">velocity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;velocity of the wind (gamma-beta if relativistic)&quot;</span><span class="p">)</span>
 
 <div class="viewcode-block" id="Wind.primitive"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.simple1d.Wind.html#sailfish.setups.simple1d.Wind.primitive">[docs]</a>    <span class="k">def</span> <span class="nf">primitive</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">t</span><span class="p">,</span> <span class="n">r</span><span class="p">,</span> <span class="n">primitive</span><span class="p">):</span>
-        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">r</span> <span class="o">**</span> <span class="mi">2</span>
+        <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">r</span><span class="o">**</span><span class="mi">2</span>
         <span class="n">primitive</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">velocity</span>
         <span class="n">primitive</span><span class="p">[</span><span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="mf">1e-4</span> <span class="o">*</span> <span class="n">primitive</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">**</span> <span class="p">(</span><span class="mi">4</span> <span class="o">/</span> <span class="mi">3</span><span class="p">)</span></div>
 
@@ -245,7 +247,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

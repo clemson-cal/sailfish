@@ -1,0 +1,40 @@
+sailfish.quad\_tree.Node
+========================
+
+.. currentmodule:: sailfish.quad_tree
+
+.. autoclass:: Node
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~Node.__init__
+      ~Node.at
+      ~Node.from_items
+      ~Node.indexes
+      ~Node.items
+      ~Node.nodes
+      ~Node.require
+      ~Node.values
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~Node.children
+      ~Node.depth
+      ~Node.value
+   
+   

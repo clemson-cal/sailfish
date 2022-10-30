@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.setups.circumbinary_disk &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.setups.circumbinary_disk &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +13,9 @@
         <script data-url_root="../../../" id="documentation_options" src="../../../_static/documentation_options.js"></script>
         <script src="../../../_static/jquery.js"></script>
         <script src="../../../_static/underscore.js"></script>
+        <script src="../../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../../_static/doctools.js"></script>
+        <script src="../../../_static/sphinx_highlight.js"></script>
     <script src="../../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../../genindex.html" />
     <link rel="search" title="Search" href="../../../search.html" /> 
@@ -79,10 +81,10 @@
     <span class="n">ViscosityModel</span><span class="p">,</span>
 <span class="p">)</span>
 <span class="kn">from</span> <span class="nn">sailfish.physics.kepler</span> <span class="kn">import</span> <span class="n">OrbitalElements</span>
-<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">SetupError</span><span class="p">,</span> <span class="n">param</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup_base</span> <span class="kn">import</span> <span class="n">SetupBase</span><span class="p">,</span> <span class="n">SetupError</span><span class="p">,</span> <span class="n">param</span>
 
 
-<div class="viewcode-block" id="CircumbinaryDisk"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.html#sailfish.setups.circumbinary_disk.CircumbinaryDisk">[docs]</a><span class="k">class</span> <span class="nc">CircumbinaryDisk</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="CircumbinaryDisk"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.CircumbinaryDisk.html#sailfish.setups.circumbinary_disk.CircumbinaryDisk">[docs]</a><span class="k">class</span> <span class="nc">CircumbinaryDisk</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="sa">r</span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A circumbinary disk setup for binary problems, isothermal or gamma-law.</span>
 
@@ -283,7 +285,7 @@
         <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">point_masses</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="n">time</span><span class="p">))</span></div></div>
 
 
-<div class="viewcode-block" id="KitpCodeComparison"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.KitpCodeComparison.html#sailfish.setups.circumbinary_disk.KitpCodeComparison">[docs]</a><span class="k">class</span> <span class="nc">KitpCodeComparison</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="KitpCodeComparison"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.KitpCodeComparison.html#sailfish.setups.circumbinary_disk.KitpCodeComparison">[docs]</a><span class="k">class</span> <span class="nc">KitpCodeComparison</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="n">mach_number</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">10.0</span><span class="p">,</span> <span class="s2">&quot;nominal orbital Mach number&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;orbital eccentricity&quot;</span><span class="p">)</span>
     <span class="n">mass_ratio</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1.0</span><span class="p">,</span> <span class="s2">&quot;binary mass ratio M2 / M1&quot;</span><span class="p">)</span>
@@ -443,7 +445,7 @@
         <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">point_masses</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="n">time</span><span class="p">),</span> <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="MassTransferBinary"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary">[docs]</a><span class="k">class</span> <span class="nc">MassTransferBinary</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="MassTransferBinary"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary">[docs]</a><span class="k">class</span> <span class="nc">MassTransferBinary</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;orbital eccentricity&quot;</span><span class="p">)</span>
     <span class="n">domain_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">2.0</span><span class="p">,</span> <span class="s2">&quot;half side length of the square computational domain&quot;</span><span class="p">)</span>
     <span class="n">mach_number</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">20.0</span><span class="p">,</span> <span class="s2">&quot;orbital Mach number&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
@@ -455,6 +457,11 @@
     <span class="n">nu</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e-4</span><span class="p">,</span> <span class="s2">&quot;kinematic viscosity parameter&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">buffer_driving_rate</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">1e2</span><span class="p">,</span> <span class="s2">&quot;rate of driving in the buffer&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
     <span class="n">buffer_onset_width</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.25</span><span class="p">,</span> <span class="s2">&quot;buffer ramp distance&quot;</span><span class="p">,</span> <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+    <span class="n">sink_model</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span>
+        <span class="s2">&quot;acceleration_free&quot;</span><span class="p">,</span>
+        <span class="s2">&quot;sink [acceleration_free|force_free|torque_free]&quot;</span><span class="p">,</span>
+        <span class="n">mutable</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="p">)</span>
     <span class="n">which_diagnostics</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="s2">&quot;torques&quot;</span><span class="p">,</span> <span class="s2">&quot;[torques|forces]&quot;</span><span class="p">)</span>
 
 <div class="viewcode-block" id="MassTransferBinary.validate"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.MassTransferBinary.html#sailfish.setups.circumbinary_disk.MassTransferBinary.validate">[docs]</a>    <span class="k">def</span> <span class="nf">validate</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
@@ -497,6 +504,8 @@
                 <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mdot&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="mi">2</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
                 <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;torque&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">gravity</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
                 <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;torque&quot;</span><span class="p">,</span> <span class="n">which_mass</span><span class="o">=</span><span class="s2">&quot;both&quot;</span><span class="p">,</span> <span class="n">accretion</span><span class="o">=</span><span class="kc">True</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;mass&quot;</span><span class="p">),</span>
+                <span class="nb">dict</span><span class="p">(</span><span class="n">quantity</span><span class="o">=</span><span class="s2">&quot;angular_momentum&quot;</span><span class="p">),</span>
             <span class="p">]</span>
         <span class="k">elif</span> <span class="bp">self</span><span class="o">.</span><span class="n">which_diagnostics</span> <span class="o">==</span> <span class="s2">&quot;forces&quot;</span><span class="p">:</span>
             <span class="k">return</span> <span class="p">[</span>
@@ -560,14 +569,14 @@
         <span class="k">return</span> <span class="p">(</span>
             <span class="n">PointMass</span><span class="p">(</span>
                 <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
-                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="o">.</span><span class="n">ACCELERATION_FREE</span><span class="p">,</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
                 <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
                 <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">[</span><span class="mi">0</span><span class="p">],</span>
                 <span class="o">**</span><span class="n">m1</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
             <span class="p">),</span>
             <span class="n">PointMass</span><span class="p">(</span>
                 <span class="n">softening_length</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">softening_length</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
-                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="o">.</span><span class="n">ACCELERATION_FREE</span><span class="p">,</span>
+                <span class="n">sink_model</span><span class="o">=</span><span class="n">SinkModel</span><span class="p">[</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_model</span><span class="o">.</span><span class="n">upper</span><span class="p">()],</span>
                 <span class="n">sink_rate</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_rate</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
                 <span class="n">sink_radius</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">sink_radius</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span>
                 <span class="o">**</span><span class="n">m2</span><span class="o">.</span><span class="n">_asdict</span><span class="p">(),</span>
@@ -578,7 +587,7 @@
         <span class="k">return</span> <span class="nb">dict</span><span class="p">(</span><span class="n">point_masses</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">point_masses</span><span class="p">(</span><span class="n">time</span><span class="p">),</span> <span class="n">diagnostics</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">diagnostics</span><span class="p">)</span></div></div>
 
 
-<div class="viewcode-block" id="EccentricSingleDisk"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.EccentricSingleDisk.html#sailfish.setups.circumbinary_disk.EccentricSingleDisk">[docs]</a><span class="k">class</span> <span class="nc">EccentricSingleDisk</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<div class="viewcode-block" id="EccentricSingleDisk"><a class="viewcode-back" href="../../../_autosummary/sailfish.setups.circumbinary_disk.EccentricSingleDisk.html#sailfish.setups.circumbinary_disk.EccentricSingleDisk">[docs]</a><span class="k">class</span> <span class="nc">EccentricSingleDisk</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="n">eccentricity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;orbital eccentricity&quot;</span><span class="p">)</span>
     <span class="n">domain_radius</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">6.0</span><span class="p">,</span> <span class="s2">&quot;half side length of the square computational domain&quot;</span><span class="p">)</span>
     <span class="n">disk_kick</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.1</span><span class="p">,</span> <span class="s2">&quot;velocity of the kick given to the disk&quot;</span><span class="p">)</span>
@@ -672,7 +681,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

@@ -1,0 +1,268 @@
+<!DOCTYPE html>
+<html class="writer-html5" lang="en" >
+<head>
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>sailfish.quad_tree.Node &mdash; sailfish 0.5.0 documentation</title>
+      <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
+      <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
+  <!--[if lt IE 9]>
+    <script src="../_static/js/html5shiv.min.js"></script>
+  <![endif]-->
+  
+        <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
+        <script src="../_static/jquery.js"></script>
+        <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
+        <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
+    <script src="../_static/js/theme.js"></script>
+    <link rel="index" title="Index" href="../genindex.html" />
+    <link rel="search" title="Search" href="../search.html" />
+    <link rel="next" title="sailfish.quad_tree.NodeList" href="sailfish.quad_tree.NodeList.html" />
+    <link rel="prev" title="sailfish.quad_tree" href="sailfish.quad_tree.html" /> 
+</head>
+
+<body class="wy-body-for-nav"> 
+  <div class="wy-grid-for-nav">
+    <nav data-toggle="wy-nav-shift" class="wy-nav-side">
+      <div class="wy-side-scroll">
+        <div class="wy-side-nav-search" >
+            <a href="../index.html" class="icon icon-home"> sailfish
+          </a>
+<div role="search">
+  <form id="rtd-search-form" class="wy-form" action="../search.html" method="get">
+    <input type="text" name="q" placeholder="Search docs" />
+    <input type="hidden" name="check_keywords" value="yes" />
+    <input type="hidden" name="area" value="default" />
+  </form>
+</div>
+        </div><div class="wy-menu wy-menu-vertical" data-spy="affix" role="navigation" aria-label="Navigation menu">
+              <ul class="current">
+<li class="toctree-l1"><a class="reference internal" href="../setups.html">Problem setups</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../workflow.html">Workflow patterns</a></li>
+<li class="toctree-l1"><a class="reference internal" href="../kernels.html">Kernel libraries</a></li>
+<li class="toctree-l1 current"><a class="reference internal" href="../api.html">API documentation</a><ul class="current">
+<li class="toctree-l2"><a class="reference internal" href="sailfish.driver.html">sailfish.driver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.event.html">sailfish.event</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
+<li class="toctree-l2 current"><a class="reference internal" href="sailfish.quad_tree.html">sailfish.quad_tree</a><ul class="current">
+<li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.quad_tree.Node</a><ul>
+<li class="toctree-l4"><a class="reference internal" href="#sailfish.quad_tree.Node"><code class="docutils literal notranslate"><span class="pre">Node</span></code></a></li>
+</ul>
+</li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.quad_tree.NodeList.html">sailfish.quad_tree.NodeList</a></li>
+</ul>
+</li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup_base.html">sailfish.setup_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver_base.html">sailfish.solver_base</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
+</ul>
+</li>
+</ul>
+
+        </div>
+      </div>
+    </nav>
+
+    <section data-toggle="wy-nav-shift" class="wy-nav-content-wrap"><nav class="wy-nav-top" aria-label="Mobile navigation menu" >
+          <i data-toggle="wy-nav-top" class="fa fa-bars"></i>
+          <a href="../index.html">sailfish</a>
+      </nav>
+
+      <div class="wy-nav-content">
+        <div class="rst-content">
+          <div role="navigation" aria-label="Page navigation">
+  <ul class="wy-breadcrumbs">
+      <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
+          <li><a href="../api.html">API documentation</a> &raquo;</li>
+          <li><a href="sailfish.quad_tree.html">sailfish.quad_tree</a> &raquo;</li>
+      <li>sailfish.quad_tree.Node</li>
+      <li class="wy-breadcrumbs-aside">
+            <a href="../_sources/_autosummary/sailfish.quad_tree.Node.rst.txt" rel="nofollow"> View page source</a>
+      </li>
+  </ul>
+  <hr/>
+</div>
+          <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
+           <div itemprop="articleBody">
+             
+  <section id="sailfish-quad-tree-node">
+<h1>sailfish.quad_tree.Node<a class="headerlink" href="#sailfish-quad-tree-node" title="Permalink to this heading"></a></h1>
+<dl class="py class">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node">
+<em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.quad_tree.</span></span><span class="sig-name descname"><span class="pre">Node</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">items</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node" title="Permalink to this definition"></a></dt>
+<dd><p>Bases: <code class="xref py py-class docutils literal notranslate"><span class="pre">object</span></code></p>
+<p>Represents a node in a self-similar n-tree.</p>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.__init__">
+<span class="sig-name descname"><span class="pre">__init__</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">value</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">children</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">items</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.__init__"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.__init__" title="Permalink to this definition"></a></dt>
+<dd><p>Construct a new node.</p>
+<p>Zero or one of the keyword arguments <cite>value</cite>, <cite>children</cite>, <cite>items</cite> may
+be specified. If zero arguments are given then the node has no
+children and <cite>value</cite> of <cite>None</cite>. If value is given, the node has no
+children and the given value. If <cite>children</cite> (a sequence containing
+exactly 4 Node instances) is given, the node has value <cite>None</cite> and the
+given child nodes. If <cite>items</cite> is given (a well-formed sequence of
+<cite>(index, value)</cite> pairs like that returned from <cite>Node.items</cite>), the node
+is reconstructed from that sequence.</p>
+</dd></dl>
+
+<p class="rubric">Methods</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.__init__" title="sailfish.quad_tree.Node.__init__"><code class="xref py py-obj docutils literal notranslate"><span class="pre">__init__</span></code></a>([value, children, items])</p></td>
+<td><p>Construct a new node.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.at" title="sailfish.quad_tree.Node.at"><code class="xref py py-obj docutils literal notranslate"><span class="pre">at</span></code></a>(index)</p></td>
+<td><p>Return the node at the given index below this one.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.from_items" title="sailfish.quad_tree.Node.from_items"><code class="xref py py-obj docutils literal notranslate"><span class="pre">from_items</span></code></a>(items)</p></td>
+<td><p>Return a node constructed from a well-formed <cite>(index, value)</cite> sequence.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.indexes" title="sailfish.quad_tree.Node.indexes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">indexes</span></code></a>([parent])</p></td>
+<td><p>Return an iterator of index values reflecting this tree's topology.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.items" title="sailfish.quad_tree.Node.items"><code class="xref py py-obj docutils literal notranslate"><span class="pre">items</span></code></a>()</p></td>
+<td><p>Return a zipped sequence of indexes and values.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.nodes" title="sailfish.quad_tree.Node.nodes"><code class="xref py py-obj docutils literal notranslate"><span class="pre">nodes</span></code></a>()</p></td>
+<td><p>Pre-order traversal of the nodes at and below this one.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.require" title="sailfish.quad_tree.Node.require"><code class="xref py py-obj docutils literal notranslate"><span class="pre">require</span></code></a>(index)</p></td>
+<td><p>Create if necessary, and return the node at the given index.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.values" title="sailfish.quad_tree.Node.values"><code class="xref py py-obj docutils literal notranslate"><span class="pre">values</span></code></a>()</p></td>
+<td><p>Pre-order traversal of the values at and below this node.</p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Attributes</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.children" title="sailfish.quad_tree.Node.children"><code class="xref py py-obj docutils literal notranslate"><span class="pre">children</span></code></a></p></td>
+<td><p>Return the children list, or an empty list if there are no children.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.depth" title="sailfish.quad_tree.Node.depth"><code class="xref py py-obj docutils literal notranslate"><span class="pre">depth</span></code></a></p></td>
+<td><p>Return the maximum depth of any node below this one.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="#sailfish.quad_tree.Node.value" title="sailfish.quad_tree.Node.value"><code class="xref py py-obj docutils literal notranslate"><span class="pre">value</span></code></a></p></td>
+<td><p>Return the value of this node.</p></td>
+</tr>
+</tbody>
+</table>
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.at">
+<span class="sig-name descname"><span class="pre">at</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.at"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.at" title="Permalink to this definition"></a></dt>
+<dd><p>Return the node at the given index below this one.</p>
+<p>Raises <cite>IndexError</cite> if the node does not exist.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.children">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">children</span></span><a class="headerlink" href="#sailfish.quad_tree.Node.children" title="Permalink to this definition"></a></dt>
+<dd><p>Return the children list, or an empty list if there are no children.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.depth">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">depth</span></span><a class="headerlink" href="#sailfish.quad_tree.Node.depth" title="Permalink to this definition"></a></dt>
+<dd><p>Return the maximum depth of any node below this one.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.from_items">
+<em class="property"><span class="pre">classmethod</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">from_items</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">items</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.from_items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.from_items" title="Permalink to this definition"></a></dt>
+<dd><p>Return a node constructed from a well-formed <cite>(index, value)</cite> sequence.</p>
+<p>This makes it possible to reconstruct a node from a sequence of its
+items, for example:</p>
+<p><code class="docutils literal notranslate"><span class="pre">node</span> <span class="pre">==</span> <span class="pre">Node.from_items(node.items())</span> <span class="pre">#</span> <span class="pre">True</span></code></p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.indexes">
+<span class="sig-name descname"><span class="pre">indexes</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">parent</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">()</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.indexes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.indexes" title="Permalink to this definition"></a></dt>
+<dd><p>Return an iterator of index values reflecting this tree’s topology.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.items">
+<span class="sig-name descname"><span class="pre">items</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.items"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.items" title="Permalink to this definition"></a></dt>
+<dd><p>Return a zipped sequence of indexes and values.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.nodes">
+<span class="sig-name descname"><span class="pre">nodes</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.nodes"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.nodes" title="Permalink to this definition"></a></dt>
+<dd><p>Pre-order traversal of the nodes at and below this one.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.require">
+<span class="sig-name descname"><span class="pre">require</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">index</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.require"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.require" title="Permalink to this definition"></a></dt>
+<dd><p>Create if necessary, and return the node at the given index.</p>
+<p>This function creates all intermediate nodes that are needed; the
+created nodes will have <cite>value = None</cite>.</p>
+</dd></dl>
+
+<dl class="py property">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.value">
+<em class="property"><span class="pre">property</span><span class="w"> </span></em><span class="sig-name descname"><span class="pre">value</span></span><a class="headerlink" href="#sailfish.quad_tree.Node.value" title="Permalink to this definition"></a></dt>
+<dd><p>Return the value of this node.</p>
+</dd></dl>
+
+<dl class="py method">
+<dt class="sig sig-object py" id="sailfish.quad_tree.Node.values">
+<span class="sig-name descname"><span class="pre">values</span></span><span class="sig-paren">(</span><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/quad_tree.html#Node.values"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.quad_tree.Node.values" title="Permalink to this definition"></a></dt>
+<dd><p>Pre-order traversal of the values at and below this node.</p>
+</dd></dl>
+
+</dd></dl>
+
+</section>
+
+
+           </div>
+          </div>
+          <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
+        <a href="sailfish.quad_tree.html" class="btn btn-neutral float-left" title="sailfish.quad_tree" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.quad_tree.NodeList.html" class="btn btn-neutral float-right" title="sailfish.quad_tree.NodeList" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+    </div>
+
+  <hr/>
+
+  <div role="contentinfo">
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
+  </div>
+
+  Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
+    <a href="https://github.com/readthedocs/sphinx_rtd_theme">theme</a>
+    provided by <a href="https://readthedocs.org">Read the Docs</a>.
+   
+
+</footer>
+        </div>
+      </div>
+    </section>
+  </div>
+  <script>
+      jQuery(function () {
+          SphinxRtdTheme.Navigation.enable(true);
+      });
+  </script> 
+
+</body>
+</html>

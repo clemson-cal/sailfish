@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.setup.param &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.setup_base &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,12 +14,14 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
-    <link rel="next" title="sailfish.setup.SetupError" href="sailfish.setup.SetupError.html" />
-    <link rel="prev" title="sailfish.setup.Setup" href="sailfish.setup.Setup.html" /> 
+    <link rel="next" title="sailfish.setup_base.Parameter" href="sailfish.setup_base.Parameter.html" />
+    <link rel="prev" title="sailfish.physics.kepler.PointMass" href="sailfish.physics.kepler.PointMass.html" /> 
 </head>
 
 <body class="wy-body-for-nav"> 
@@ -46,15 +49,15 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
-<li class="toctree-l2 current"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a><ul class="current">
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.Parameter.html">sailfish.setup.Parameter</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.Setup.html">sailfish.setup.Setup</a></li>
-<li class="toctree-l3 current"><a class="current reference internal" href="#">sailfish.setup.param</a></li>
-<li class="toctree-l3"><a class="reference internal" href="sailfish.setup.SetupError.html">sailfish.setup.SetupError</a></li>
+<li class="toctree-l2 current"><a class="current reference internal" href="#">sailfish.setup_base</a><ul>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup_base.Parameter.html">sailfish.setup_base.Parameter</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup_base.SetupBase.html">sailfish.setup_base.SetupBase</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup_base.param.html">sailfish.setup_base.param</a></li>
+<li class="toctree-l3"><a class="reference internal" href="sailfish.setup_base.SetupError.html">sailfish.setup_base.SetupError</a></li>
 </ul>
 </li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver_base.html">sailfish.solver_base</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.subdivide.html">sailfish.subdivide</a></li>
 </ul>
@@ -76,10 +79,9 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../index.html" class="icon icon-home"></a> &raquo;</li>
           <li><a href="../api.html">API documentation</a> &raquo;</li>
-          <li><a href="sailfish.setup.html">sailfish.setup</a> &raquo;</li>
-      <li>sailfish.setup.param</li>
+      <li>sailfish.setup_base</li>
       <li class="wy-breadcrumbs-aside">
-            <a href="../_sources/_autosummary/sailfish.setup.param.rst.txt" rel="nofollow"> View page source</a>
+            <a href="../_sources/_autosummary/sailfish.setup_base.rst.txt" rel="nofollow"> View page source</a>
       </li>
   </ul>
   <hr/>
@@ -87,28 +89,53 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="sailfish-setup-param">
-<h1>sailfish.setup.param<a class="headerlink" href="#sailfish-setup-param" title="Permalink to this headline"></a></h1>
-<dl class="py attribute">
-<dt class="sig sig-object py" id="sailfish.setup.param">
-<span class="sig-prename descclassname"><span class="pre">sailfish.setup.</span></span><span class="sig-name descname"><span class="pre">param</span></span><a class="headerlink" href="#sailfish.setup.param" title="Permalink to this definition"></a></dt>
-<dd><p>alias of <a class="reference internal" href="sailfish.setup.Parameter.html#sailfish.setup.Parameter" title="sailfish.setup.Parameter"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.setup.Parameter</span></code></a></p>
-</dd></dl>
-
-</div>
+  <section id="module-sailfish.setup_base">
+<span id="sailfish-setup-base"></span><h1>sailfish.setup_base<a class="headerlink" href="#module-sailfish.setup_base" title="Permalink to this heading"></a></h1>
+<p>The <cite>Setup</cite> class dictates physics and solver choices to the driver.</p>
+<p class="rubric">Classes</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setup_base.Parameter.html#sailfish.setup_base.Parameter" title="sailfish.setup_base.Parameter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Parameter</span></code></a>(default, about[, mutable])</p></td>
+<td><p>A model parameter: enables runtime configuring of a setup.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="sailfish.setup_base.SetupBase.html#sailfish.setup_base.SetupBase" title="sailfish.setup_base.SetupBase"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SetupBase</span></code></a>(**kwargs)</p></td>
+<td><p>Abstract base class to describe a simulation model setup.</p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setup_base.param.html#sailfish.setup_base.param" title="sailfish.setup_base.param"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param</span></code></a></p></td>
+<td><p>alias of <a class="reference internal" href="sailfish.setup_base.Parameter.html#sailfish.setup_base.Parameter" title="sailfish.setup_base.Parameter"><code class="xref py py-class docutils literal notranslate"><span class="pre">Parameter</span></code></a></p></td>
+</tr>
+</tbody>
+</table>
+<p class="rubric">Exceptions</p>
+<table class="autosummary longtable docutils align-default">
+<colgroup>
+<col style="width: 10%" />
+<col style="width: 90%" />
+</colgroup>
+<tbody>
+<tr class="row-odd"><td><p><a class="reference internal" href="sailfish.setup_base.SetupError.html#sailfish.setup_base.SetupError" title="sailfish.setup_base.SetupError"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SetupError</span></code></a></p></td>
+<td><p>Something went wrong during setup configuration</p></td>
+</tr>
+</tbody>
+</table>
+</section>
 
 
            </div>
           </div>
           <footer><div class="rst-footer-buttons" role="navigation" aria-label="Footer">
-        <a href="sailfish.setup.Setup.html" class="btn btn-neutral float-left" title="sailfish.setup.Setup" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
-        <a href="sailfish.setup.SetupError.html" class="btn btn-neutral float-right" title="sailfish.setup.SetupError" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
+        <a href="sailfish.physics.kepler.PointMass.html" class="btn btn-neutral float-left" title="sailfish.physics.kepler.PointMass" accesskey="p" rel="prev"><span class="fa fa-arrow-circle-left" aria-hidden="true"></span> Previous</a>
+        <a href="sailfish.setup_base.Parameter.html" class="btn btn-neutral float-right" title="sailfish.setup_base.Parameter" accesskey="n" rel="next">Next <span class="fa fa-arrow-circle-right" aria-hidden="true"></span></a>
     </div>
 
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

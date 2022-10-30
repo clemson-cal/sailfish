@@ -1,7 +1,7 @@
-﻿sailfish.setup
-==============
+﻿sailfish.setup\_base
+====================
 
-.. automodule:: sailfish.setup
+.. automodule:: sailfish.setup_base
 
    
    
@@ -19,7 +19,7 @@
       :toctree:
    
       Parameter
-      Setup
+      SetupBase
       param
    
    

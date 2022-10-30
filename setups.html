@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Problem setups &mdash; sailfish 0.4.0 documentation</title>
+  <title>Problem setups &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +14,9 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -74,8 +77,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="problem-setups">
-<h1>Problem setups<a class="headerlink" href="#problem-setups" title="Permalink to this headline"></a></h1>
+  <section id="problem-setups">
+<h1>Problem setups<a class="headerlink" href="#problem-setups" title="Permalink to this heading"></a></h1>
 <p>Simulations are configured by an object called a <cite>setup</cite>. The setup specifies
 initial conditions, a mesh, boundary conditions, and a solver class, among
 several other optional things. Setups can be specific test problems used for
@@ -84,15 +87,15 @@ with many internal parameters. The degrees of freedom within a setup are
 called <cite>model parameters</cite>, and these have default values which define a
 fiducial model, but they can also be overridden from command line input
 or other sources of configuration.</p>
-<div class="section" id="minimal-example">
-<h2>Minimal example<a class="headerlink" href="#minimal-example" title="Permalink to this headline"></a></h2>
+<section id="minimal-example">
+<h2>Minimal example<a class="headerlink" href="#minimal-example" title="Permalink to this heading"></a></h2>
 <p>Here is a minimal setup, which defines a 1D relativistic hydrodynamics problem
 consisting of a traveling density wave:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">math</span> <span class="kn">import</span> <span class="n">sin</span><span class="p">,</span> <span class="n">pi</span>
-<span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span>
+<span class="kn">from</span> <span class="nn">sailfish.setup_base</span> <span class="kn">import</span> <span class="n">SetupBase</span>
 <span class="kn">from</span> <span class="nn">sailfish.mesh</span> <span class="kn">import</span> <span class="n">PlanarCartesianMesh</span>
 
-<span class="k">class</span> <span class="nc">DensityWave</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">DensityWave</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    A sinusoidal variation of density propagating to the right.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -117,30 +120,30 @@ consisting of a traveling density wave:</p>
 cartesian coordinates, on a domain from 0.0 to 1.0. The boundary condition is
 periodic, and the hydrodynamic primitive data so the density has a sinusoidal
 variation, and the velocity is uniform.</p>
-</div>
-<div class="section" id="required-methods">
-<h2>Required methods<a class="headerlink" href="#required-methods" title="Permalink to this headline"></a></h2>
-<p>Custom setup classes must inherit the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Setup</span></code></a> base class.
-The setup base class provides a lot of functionality in the form of methods
-that have trivial default implementations, but can be overridden if needed.
-The four methods implemented in the example above are required for the setup
-to be instantiated (they are <cite>abstract</cite> methods in the base class).</p>
-<p>The <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.primitive" title="sailfish.setup.Setup.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a> method takes as arguments the
-time, a coordinate position, and a slice of a primitive variable array
-representing a single zone. The result is written to this slice rather than
-returned from the function for efficiency reasons. Generally, the primitive
-method is only used at the start of a new simulation, so the time will
-typically be <cite>t=0.0</cite>. However, in the case of an inflow boundary condition,
-the solver will also call the setup’s primitive method in the guard zones of
-the mesh each time boundary conditions need to be applied. In other words, the
-primitive method always serves as an initial condition, but it can also
-provide a time-dependent Dirichlet boundary condition. The number and meaning
-of primitive variables depends on the system being solved (the system is in
-turn a property of the solver class, which is identified by the
-<a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.solver" title="sailfish.setup.Setup.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a> property).</p>
-<p>The object returned by the <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.mesh" title="sailfish.setup.Setup.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a> method
-describes the physical extent of the simulation domain, as well as how it is
-discretized and what kind of coordinates are used (i.e. cartesian or
+</section>
+<section id="required-methods">
+<h2>Required methods<a class="headerlink" href="#required-methods" title="Permalink to this heading"></a></h2>
+<p>Custom setup classes must inherit the <a class="reference internal" href="_autosummary/sailfish.setup_base.SetupBase.html#sailfish.setup_base.SetupBase" title="sailfish.setup_base.SetupBase"><code class="xref py py-obj docutils literal notranslate"><span class="pre">SetupBase</span></code></a>
+base class. The setup base class provides a lot of functionality in the form
+of methods that have trivial default implementations, but can be overridden if
+needed. The four methods implemented in the example above are required for the
+setup to be instantiated (they are <cite>abstract</cite> methods in the base class).</p>
+<p>The <a class="reference internal" href="_autosummary/sailfish.setup_base.SetupBase.html#sailfish.setup_base.SetupBase.primitive" title="sailfish.setup_base.SetupBase.primitive"><code class="xref py py-obj docutils literal notranslate"><span class="pre">primitive</span></code></a> method takes as
+arguments the time, a coordinate position, and a slice of a primitive variable
+array representing a single zone. The result is written to this slice rather
+than returned from the function for efficiency reasons. Generally, the
+primitive method is only used at the start of a new simulation, so the time
+will typically be <cite>t=0.0</cite>. However, in the case of an inflow boundary
+condition, the solver will also call the setup’s primitive method in the guard
+zones of the mesh each time boundary conditions need to be applied. In other
+words, the primitive method always serves as an initial condition, but it can
+also provide a time-dependent Dirichlet boundary condition. The number and
+meaning of primitive variables depends on the system being solved (the system
+is in turn a property of the solver class, which is identified by the
+<a class="reference internal" href="_autosummary/sailfish.setup_base.SetupBase.html#sailfish.setup_base.SetupBase.solver" title="sailfish.setup_base.SetupBase.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">solver</span></code></a> property).</p>
+<p>The object returned by the <a class="reference internal" href="_autosummary/sailfish.setup_base.SetupBase.html#sailfish.setup_base.SetupBase.mesh" title="sailfish.setup_base.SetupBase.mesh"><code class="xref py py-obj docutils literal notranslate"><span class="pre">mesh</span></code></a>
+method describes the physical extent of the simulation domain, as well as how
+it is discretized and what kind of coordinates are used (i.e. cartesian or
 spherical). The <cite>mesh</cite> method accepts a <cite>resolution</cite> argument, the value of
 which comes from the command line option <code class="code docutils literal notranslate"><span class="pre">--resolution</span> <span class="pre">|</span> <span class="pre">-n</span></code>, or the
 <cite>resolution</cite> member of the <a class="reference internal" href="_autosummary/sailfish.driver.DriverArgs.html#sailfish.driver.DriverArgs" title="sailfish.driver.DriverArgs"><code class="xref py py-obj docutils literal notranslate"><span class="pre">DriverArgs</span></code></a> class. It
@@ -151,13 +154,13 @@ altogether, but don’t do that). For example if your setup uses a
 the <cite>resolution</cite> as the number of zones per decade in radius. If it’s a 2D
 problem in spherical coordinates, it could mean the number of polar zones, or
 in a 3D problem it could be the number of zones on each side of the domain.</p>
-<p>The <a class="reference internal" href="_autosummary/sailfish.setup.Setup.html#sailfish.setup.Setup.boundary_condition" title="sailfish.setup.Setup.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">boundary_condition</span></code></a> method returns
-a string to identify the type of boundary condition to be applied. The mesh
-and boundary condition objects must be compatible with (supported by) the
+<p>The <a class="reference internal" href="_autosummary/sailfish.setup_base.SetupBase.html#sailfish.setup_base.SetupBase.boundary_condition" title="sailfish.setup_base.SetupBase.boundary_condition"><code class="xref py py-obj docutils literal notranslate"><span class="pre">boundary_condition</span></code></a> method
+returns a string to identify the type of boundary condition to be applied. The
+mesh and boundary condition objects must be compatible with (supported by) the
 solver, otherwise the solver will throw an exception when it’s constructed.</p>
-</div>
-<div class="section" id="choosing-a-setup">
-<h2>Choosing a setup<a class="headerlink" href="#choosing-a-setup" title="Permalink to this headline"></a></h2>
+</section>
+<section id="choosing-a-setup">
+<h2>Choosing a setup<a class="headerlink" href="#choosing-a-setup" title="Permalink to this heading"></a></h2>
 <p>The first argument to the sailfish command line tool is the name of a setup
 class, converted to dash-case, i.e. you could run the setup above in a default
 configuration by running <code class="code docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">density-wave</span></code>. The command line tool
@@ -170,35 +173,35 @@ class must be imported before <a class="reference internal" href="_autosummary/s
 new source file to the <a class="reference internal" href="_autosummary/sailfish.setups.html#module-sailfish.setups" title="sailfish.setups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">setups</span></code></a> module, you must import that module in
 the <code class="code docutils literal notranslate"><span class="pre">setups/__init__.py</span></code> file for the setup class(es) in it to be
 discovered.</p>
-</div>
-<div class="section" id="model-parameters">
-<h2>Model parameters<a class="headerlink" href="#model-parameters" title="Permalink to this headline"></a></h2>
+</section>
+<section id="model-parameters">
+<h2>Model parameters<a class="headerlink" href="#model-parameters" title="Permalink to this heading"></a></h2>
 <p>A setup can have internal degrees of freedom to be configured at runtime,
 which are referred to as <cite>model parameters</cite>. To add a model parameter to a
-setup, just define it as a class variable using the <a class="reference internal" href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter" title="sailfish.setup.Parameter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param</span></code></a> constructor:</p>
-<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">sailfish.setup</span> <span class="kn">import</span> <span class="n">Setup</span><span class="p">,</span> <span class="n">param</span>
+setup, just define it as a class variable using the <a class="reference internal" href="_autosummary/sailfish.setup_base.Parameter.html#sailfish.setup_base.Parameter" title="sailfish.setup_base.Parameter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param</span></code></a> constructor:</p>
+<div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">from</span> <span class="nn">sailfish.setup_base</span> <span class="kn">import</span> <span class="n">SetupBase</span><span class="p">,</span> <span class="n">param</span>
 
-<span class="k">class</span> <span class="nc">DensityWave</span><span class="p">(</span><span class="n">Setup</span><span class="p">):</span>
+<span class="k">class</span> <span class="nc">DensityWave</span><span class="p">(</span><span class="n">SetupBase</span><span class="p">):</span>
     <span class="n">wavenumber</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="s2">&quot;integer wavenumber of the sinusoid&quot;</span><span class="p">)</span>
     <span class="n">velocity</span> <span class="o">=</span> <span class="n">param</span><span class="p">(</span><span class="mf">0.0</span><span class="p">,</span> <span class="s2">&quot;speed of the wave&quot;</span><span class="p">)</span>
 
     <span class="c1"># ...</span>
 </pre></div>
 </div>
-<p>The two positional arguments to <a class="reference internal" href="_autosummary/sailfish.setup.Parameter.html#sailfish.setup.Parameter" title="sailfish.setup.Parameter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param</span></code></a> are a default value
-(from which the parameter type is inferred), and a help message. An optional
-keyword argument <code class="code docutils literal notranslate"><span class="pre">mutable=True</span></code> can be supplied to indicate that a
-parameter can be changed in a restarted run from its initial value. For the
-model parameters that only influence the initial condition, it doesn’t make
-sense to make them mutable.</p>
+<p>The two positional arguments to <a class="reference internal" href="_autosummary/sailfish.setup_base.Parameter.html#sailfish.setup_base.Parameter" title="sailfish.setup_base.Parameter"><code class="xref py py-obj docutils literal notranslate"><span class="pre">param</span></code></a> are a
+default value (from which the parameter type is inferred), and a help message.
+An optional keyword argument <code class="code docutils literal notranslate"><span class="pre">mutable=True</span></code> can be supplied to indicate
+that a parameter can be changed in a restarted run from its initial value. For
+the model parameters that only influence the initial condition, it doesn’t
+make sense to make them mutable.</p>
 <p>Model parameters are passed to the setup class from the command line as
 key-value pairs like this:
 <code class="code docutils literal notranslate"><span class="pre">sailfish</span> <span class="pre">density-wave</span> <span class="pre">--model</span> <span class="pre">amplitude=0.5</span> <span class="pre">wavenumber=2</span></code>.</p>
-</div>
-<div class="section" id="optional-methods">
-<h2>Optional methods<a class="headerlink" href="#optional-methods" title="Permalink to this headline"></a></h2>
-</div>
-</div>
+</section>
+<section id="optional-methods">
+<h2>Optional methods<a class="headerlink" href="#optional-methods" title="Permalink to this heading"></a></h2>
+</section>
+</section>
 
 
            </div>
@@ -211,7 +214,7 @@ key-value pairs like this:
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

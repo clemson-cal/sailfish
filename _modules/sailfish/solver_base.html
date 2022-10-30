@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.solver &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.solver_base &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +13,9 @@
         <script data-url_root="../../" id="documentation_options" src="../../_static/documentation_options.js"></script>
         <script src="../../_static/jquery.js"></script>
         <script src="../../_static/underscore.js"></script>
+        <script src="../../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../../_static/doctools.js"></script>
+        <script src="../../_static/sphinx_highlight.js"></script>
     <script src="../../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" /> 
@@ -56,7 +58,7 @@
   <ul class="wy-breadcrumbs">
       <li><a href="../../index.html" class="icon icon-home"></a> &raquo;</li>
           <li><a href="../index.html">Module code</a> &raquo;</li>
-      <li>sailfish.solver</li>
+      <li>sailfish.solver_base</li>
       <li class="wy-breadcrumbs-aside">
       </li>
   </ul>
@@ -65,7 +67,7 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <h1>Source code for sailfish.solver</h1><div class="highlight"><pre>
+  <h1>Source code for sailfish.solver_base</h1><div class="highlight"><pre>
 <span></span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">The `Solver` class maintains physics state and implements a solution scheme.</span>
 <span class="sd">&quot;&quot;&quot;</span>
@@ -73,7 +75,7 @@
 <span class="kn">from</span> <span class="nn">abc</span> <span class="kn">import</span> <span class="n">ABC</span><span class="p">,</span> <span class="n">abstractmethod</span>
 
 
-<div class="viewcode-block" id="SolverBase"><a class="viewcode-back" href="../../_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase">[docs]</a><span class="k">class</span> <span class="nc">SolverBase</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
+<div class="viewcode-block" id="SolverBase"><a class="viewcode-back" href="../../_autosummary/sailfish.solver_base.SolverBase.html#sailfish.solver_base.SolverBase">[docs]</a><span class="k">class</span> <span class="nc">SolverBase</span><span class="p">(</span><span class="n">ABC</span><span class="p">):</span>
     <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Base class for solver implementations.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -168,7 +170,7 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">pass</span>
 
-<div class="viewcode-block" id="SolverBase.maximum_wavespeed"><a class="viewcode-back" href="../../_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.maximum_wavespeed">[docs]</a>    <span class="nd">@abstractmethod</span>
+<div class="viewcode-block" id="SolverBase.maximum_wavespeed"><a class="viewcode-back" href="../../_autosummary/sailfish.solver_base.SolverBase.html#sailfish.solver_base.SolverBase.maximum_wavespeed">[docs]</a>    <span class="nd">@abstractmethod</span>
     <span class="k">def</span> <span class="nf">maximum_wavespeed</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return the largest wavespeed on the grid.</span>
@@ -178,14 +180,14 @@
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
 
-<div class="viewcode-block" id="SolverBase.advance"><a class="viewcode-back" href="../../_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.advance">[docs]</a>    <span class="nd">@abstractmethod</span>
+<div class="viewcode-block" id="SolverBase.advance"><a class="viewcode-back" href="../../_autosummary/sailfish.solver_base.SolverBase.html#sailfish.solver_base.SolverBase.advance">[docs]</a>    <span class="nd">@abstractmethod</span>
     <span class="k">def</span> <span class="nf">advance</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">dt</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Advance the solution state by one iteration.</span>
 <span class="sd">        &quot;&quot;&quot;</span>
         <span class="k">pass</span></div>
 
-<div class="viewcode-block" id="SolverBase.reductions"><a class="viewcode-back" href="../../_autosummary/sailfish.solver.SolverBase.html#sailfish.solver.SolverBase.reductions">[docs]</a>    <span class="k">def</span> <span class="nf">reductions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
+<div class="viewcode-block" id="SolverBase.reductions"><a class="viewcode-back" href="../../_autosummary/sailfish.solver_base.SolverBase.html#sailfish.solver_base.SolverBase.reductions">[docs]</a>    <span class="k">def</span> <span class="nf">reductions</span><span class="p">(</span><span class="bp">self</span><span class="p">):</span>
         <span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">        Return a set of measurements derived from the solution state.</span>
 
@@ -203,7 +205,7 @@
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

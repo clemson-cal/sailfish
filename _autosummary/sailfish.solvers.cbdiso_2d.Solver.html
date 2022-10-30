@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>sailfish.solvers.cbdiso_2d.Solver &mdash; sailfish 0.4.0 documentation</title>
+  <title>sailfish.solvers.cbdiso_2d.Solver &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="../_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="../_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +14,9 @@
         <script data-url_root="../" id="documentation_options" src="../_static/documentation_options.js"></script>
         <script src="../_static/jquery.js"></script>
         <script src="../_static/underscore.js"></script>
+        <script src="../_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="../_static/doctools.js"></script>
+        <script src="../_static/sphinx_highlight.js"></script>
     <script src="../_static/js/theme.js"></script>
     <link rel="index" title="Index" href="../genindex.html" />
     <link rel="search" title="Search" href="../search.html" />
@@ -46,9 +49,9 @@
 <li class="toctree-l2"><a class="reference internal" href="sailfish.kernel.html">sailfish.kernel</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.mesh.html">sailfish.mesh</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.physics.html">sailfish.physics</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.setup.html">sailfish.setup</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.setup_base.html">sailfish.setup_base</a></li>
 <li class="toctree-l2"><a class="reference internal" href="sailfish.setups.html">sailfish.setups</a></li>
-<li class="toctree-l2"><a class="reference internal" href="sailfish.solver.html">sailfish.solver</a></li>
+<li class="toctree-l2"><a class="reference internal" href="sailfish.solver_base.html">sailfish.solver_base</a></li>
 <li class="toctree-l2 current"><a class="reference internal" href="sailfish.solvers.html">sailfish.solvers</a><ul class="current">
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.make_solver.html">sailfish.solvers.make_solver</a></li>
 <li class="toctree-l3"><a class="reference internal" href="sailfish.solvers.register_solver_extension.html">sailfish.solvers.register_solver_extension</a></li>
@@ -99,12 +102,12 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="sailfish-solvers-cbdiso-2d-solver">
-<h1>sailfish.solvers.cbdiso_2d.Solver<a class="headerlink" href="#sailfish-solvers-cbdiso-2d-solver" title="Permalink to this headline"></a></h1>
+  <section id="sailfish-solvers-cbdiso-2d-solver">
+<h1>sailfish.solvers.cbdiso_2d.Solver<a class="headerlink" href="#sailfish-solvers-cbdiso-2d-solver" title="Permalink to this heading"></a></h1>
 <dl class="py class">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Solver">
 <em class="property"><span class="pre">class</span><span class="w"> </span></em><span class="sig-prename descclassname"><span class="pre">sailfish.solvers.cbdiso_2d.</span></span><span class="sig-name descname"><span class="pre">Solver</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">setup</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mesh</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">time</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">solution</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_patches</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">mode</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">'cpu'</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">physics</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">options</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">{}</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="../_modules/sailfish/solvers/cbdiso_2d.html#Solver"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#sailfish.solvers.cbdiso_2d.Solver" title="Permalink to this definition"></a></dt>
-<dd><p>Bases: <a class="reference internal" href="sailfish.solver.SolverBase.html#sailfish.solver.SolverBase" title="sailfish.solver.SolverBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">sailfish.solver.SolverBase</span></code></a></p>
+<dd><p>Bases: <a class="reference internal" href="sailfish.solver_base.SolverBase.html#sailfish.solver_base.SolverBase" title="sailfish.solver_base.SolverBase"><code class="xref py py-class docutils literal notranslate"><span class="pre">SolverBase</span></code></a></p>
 <p>Adapter class to drive the iso_2d C extension module.</p>
 <dl class="py method">
 <dt class="sig sig-object py" id="sailfish.solvers.cbdiso_2d.Solver.__init__">
@@ -112,7 +115,7 @@
 <dd></dd></dl>
 
 <p class="rubric">Methods</p>
-<table class="longtable docutils align-default">
+<table class="autosummary longtable docutils align-default">
 <colgroup>
 <col style="width: 10%" />
 <col style="width: 90%" />
@@ -145,7 +148,7 @@
 </tbody>
 </table>
 <p class="rubric">Attributes</p>
-<table class="longtable docutils align-default">
+<table class="autosummary longtable docutils align-default">
 <colgroup>
 <col style="width: 10%" />
 <col style="width: 90%" />
@@ -202,7 +205,7 @@ parameters of the physical system being solved, such as an equation of
 state or cooling prescription.</p>
 <p>Solver options and physics parameters are kept logically separate
 because their configuration comes from different places: the physics
-parameters come from the <a class="reference internal" href="sailfish.setup.Setup.html#sailfish.setup.Setup" title="sailfish.setup.Setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code></a> class instance
+parameters come from the <code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup.Setup</span></code> class instance
 (which can in turn be set from model parameters), whereas the solver
 options come directly from the driver instance (i.e. command line
 <code class="code docutils literal notranslate"><span class="pre">--solver</span> <span class="pre">key=val</span></code> if sailfish is invoked as an executable).</p>
@@ -261,7 +264,7 @@ object from the setup and mesh instances.</p>
 
 </dd></dl>
 
-</div>
+</section>
 
 
            </div>
@@ -274,7 +277,7 @@ object from the setup and mesh instances.</p>
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

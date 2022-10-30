@@ -1,7 +1,7 @@
-sailfish.setup.Parameter
-========================
+sailfish.setup\_base.Parameter
+==============================
 
-.. currentmodule:: sailfish.setup
+.. currentmodule:: sailfish.setup_base
 
 .. autoclass:: Parameter
    :members:

@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sailfish &mdash; sailfish 0.4.0 documentation</title>
+  <title>Sailfish &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +14,9 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -66,15 +69,15 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="sailfish">
-<h1>Sailfish<a class="headerlink" href="#sailfish" title="Permalink to this headline"></a></h1>
+  <section id="sailfish">
+<h1>Sailfish<a class="headerlink" href="#sailfish" title="Permalink to this heading"></a></h1>
 <div class="toctree-wrapper compound">
 </div>
 <p>Sailfish is a GPU-accelerated astrophysical gasdynamics code.</p>
 <p>The main repository is hosted here: <a class="reference external" href="https://github.com/clemson-cal/sailfish">github.com/clemson-cal</a>.</p>
-</div>
-<div class="section" id="quick-start">
-<h1>Quick-start<a class="headerlink" href="#quick-start" title="Permalink to this headline"></a></h1>
+</section>
+<section id="quick-start">
+<h1>Quick-start<a class="headerlink" href="#quick-start" title="Permalink to this heading"></a></h1>
 <p>Basic use from the command line is like this: <code class="docutils literal notranslate"><span class="pre">bin/sailfish</span> <span class="pre">shocktube</span>
 <span class="pre">--end-time=0.2</span> <span class="pre">--resolution=1000</span></code>. This command will run a built-in setup
 called <cite>shocktube</cite> to a simulation time of 0.2 seconds, on a 1d grid with
@@ -98,10 +101,10 @@ code below:</p>
 problem setup, and then returns the simulation final state. However no
 side-effects are performed by <cite>run</cite> and the terminal output is suppressed (you
 can re-enable it with the keyword argument <code class="docutils literal notranslate"><span class="pre">quiet=False</span></code>).</p>
-</div>
-<div class="section" id="api-documentation">
-<h1>API documentation<a class="headerlink" href="#api-documentation" title="Permalink to this headline"></a></h1>
-<table class="longtable docutils align-default">
+</section>
+<section id="api-documentation">
+<h1>API documentation<a class="headerlink" href="#api-documentation" title="Permalink to this heading"></a></h1>
+<table class="autosummary longtable docutils align-default">
 <colgroup>
 <col style="width: 10%" />
 <col style="width: 90%" />
@@ -122,24 +125,27 @@ can re-enable it with the keyword argument <code class="docutils literal notrans
 <tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.physics.html#module-sailfish.physics" title="sailfish.physics"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.physics</span></code></a></p></td>
 <td><p>Physics support modules, other than hydro solvers.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.setup.html#module-sailfish.setup" title="sailfish.setup"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup</span></code></a></p></td>
-<td><p>The <cite>Setup</cite> class dictates physics and solver choices to the driver.</p></td>
-</tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.setups.html#module-sailfish.setups" title="sailfish.setups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.quad_tree.html#module-sailfish.quad_tree" title="sailfish.quad_tree"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.quad_tree</span></code></a></p></td>
 <td><p></p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.solver.html#module-sailfish.solver" title="sailfish.solver"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solver</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.setup_base.html#module-sailfish.setup_base" title="sailfish.setup_base"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setup_base</span></code></a></p></td>
+<td><p>The <cite>Setup</cite> class dictates physics and solver choices to the driver.</p></td>
+</tr>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.setups.html#module-sailfish.setups" title="sailfish.setups"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.setups</span></code></a></p></td>
+<td><p></p></td>
+</tr>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.solver_base.html#module-sailfish.solver_base" title="sailfish.solver_base"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solver_base</span></code></a></p></td>
 <td><p>The <cite>Solver</cite> class maintains physics state and implements a solution scheme.</p></td>
 </tr>
-<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.solvers.html#module-sailfish.solvers" title="sailfish.solvers"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers</span></code></a></p></td>
+<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.solvers.html#module-sailfish.solvers" title="sailfish.solvers"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.solvers</span></code></a></p></td>
 <td><p>Physics solvers and solution schemes.</p></td>
 </tr>
-<tr class="row-even"><td><p><a class="reference internal" href="_autosummary/sailfish.subdivide.html#module-sailfish.subdivide" title="sailfish.subdivide"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.subdivide</span></code></a></p></td>
+<tr class="row-odd"><td><p><a class="reference internal" href="_autosummary/sailfish.subdivide.html#module-sailfish.subdivide" title="sailfish.subdivide"><code class="xref py py-obj docutils literal notranslate"><span class="pre">sailfish.subdivide</span></code></a></p></td>
 <td><p>Utility functions for domain decomposition.</p></td>
 </tr>
 </tbody>
 </table>
-</div>
+</section>
 
 
            </div>
@@ -151,7 +157,7 @@ can re-enable it with the keyword argument <code class="docutils literal notrans
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a

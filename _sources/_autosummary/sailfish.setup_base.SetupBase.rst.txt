@@ -1,0 +1,51 @@
+sailfish.setup\_base.SetupBase
+==============================
+
+.. currentmodule:: sailfish.setup_base
+
+.. autoclass:: SetupBase
+   :members:
+   :show-inheritance:
+   :inherited-members:
+
+   
+   .. automethod:: __init__
+
+   
+   .. rubric:: Methods
+
+   .. autosummary::
+   
+      ~SetupBase.__init__
+      ~SetupBase.checkpoint_diagnostics
+      ~SetupBase.dash_case_class_name
+      ~SetupBase.default_model_parameters
+      ~SetupBase.describe_class
+      ~SetupBase.find_setup_class
+      ~SetupBase.has_model_parameters
+      ~SetupBase.immutable_parameter_keys
+      ~SetupBase.mesh
+      ~SetupBase.model_parameter_dict
+      ~SetupBase.model_parameters
+      ~SetupBase.primitive
+      ~SetupBase.print_model_parameters
+      ~SetupBase.validate
+   
+   
+
+   
+   
+   .. rubric:: Attributes
+
+   .. autosummary::
+   
+      ~SetupBase.boundary_condition
+      ~SetupBase.default_end_time
+      ~SetupBase.default_resolution
+      ~SetupBase.diagnostics
+      ~SetupBase.physics
+      ~SetupBase.reference_time_scale
+      ~SetupBase.solver
+      ~SetupBase.start_time
+   
+   

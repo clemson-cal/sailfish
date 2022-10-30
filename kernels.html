@@ -1,9 +1,10 @@
 <!DOCTYPE html>
 <html class="writer-html5" lang="en" >
 <head>
-  <meta charset="utf-8" />
+  <meta charset="utf-8" /><meta name="generator" content="Docutils 0.17.1: http://docutils.sourceforge.net/" />
+
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Kernel libraries &mdash; sailfish 0.4.0 documentation</title>
+  <title>Kernel libraries &mdash; sailfish 0.5.0 documentation</title>
       <link rel="stylesheet" href="_static/pygments.css" type="text/css" />
       <link rel="stylesheet" href="_static/css/theme.css" type="text/css" />
   <!--[if lt IE 9]>
@@ -13,7 +14,9 @@
         <script data-url_root="./" id="documentation_options" src="_static/documentation_options.js"></script>
         <script src="_static/jquery.js"></script>
         <script src="_static/underscore.js"></script>
+        <script src="_static/_sphinx_javascript_frameworks_compat.js"></script>
         <script src="_static/doctools.js"></script>
+        <script src="_static/sphinx_highlight.js"></script>
     <script src="_static/js/theme.js"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -81,8 +84,8 @@
           <div role="main" class="document" itemscope="itemscope" itemtype="http://schema.org/Article">
            <div itemprop="articleBody">
              
-  <div class="section" id="kernel-libraries">
-<h1>Kernel libraries<a class="headerlink" href="#kernel-libraries" title="Permalink to this headline"></a></h1>
+  <section id="kernel-libraries">
+<h1>Kernel libraries<a class="headerlink" href="#kernel-libraries" title="Permalink to this heading"></a></h1>
 <p>Sailfish has a module dedicated to generating CPU-GPU agnostic compute
 kernels. A compute kernel is a function that operates on one or more arrays of
 floating point data, and may be parallelized using OpenMP, CUDA, or ROCm.
@@ -92,8 +95,8 @@ in Python code as a string literal, or even generated programmatically. The
 source code is compiled just-in-time (JIT) when the program starts, yielding a
 <a class="reference internal" href="_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library" title="sailfish.kernel.library.Library"><code class="xref py py-class docutils literal notranslate"><span class="pre">Library</span></code></a> object. Kernels are invoked using attribute access on the
 library object.</p>
-<div class="section" id="quick-example">
-<h2>Quick example<a class="headerlink" href="#quick-example" title="Permalink to this headline"></a></h2>
+<section id="quick-example">
+<h2>Quick example<a class="headerlink" href="#quick-example" title="Permalink to this heading"></a></h2>
 <p>Below is a minimal working example of compiling and executing a custom kernel
 from an inline Python string:</p>
 <div class="highlight-python notranslate"><div class="highlight"><pre><span></span><span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
@@ -124,9 +127,9 @@ processing. Several conventions are assumed for the C code, including the
 <code class="xref py py-obj docutils literal notranslate"><span class="pre">PUBLIC</span></code> and <code class="xref py py-obj docutils literal notranslate"><span class="pre">FOR_EACH_2D</span></code> macros, and the end-of-line
 comments on the function signature. These things are explained in more detail
 below.</p>
-</div>
-<div class="section" id="invoking-the-kernel">
-<h2>Invoking the kernel<a class="headerlink" href="#invoking-the-kernel" title="Permalink to this headline"></a></h2>
+</section>
+<section id="invoking-the-kernel">
+<h2>Invoking the kernel<a class="headerlink" href="#invoking-the-kernel" title="Permalink to this heading"></a></h2>
 <p>Let’s start with how to use a kernel that’s already been compiled
 successfully. The library object (<code class="xref py py-obj docutils literal notranslate"><span class="pre">library</span></code> in the example above) has
 one attribute per <code class="xref py py-obj docutils literal notranslate"><span class="pre">PUBLIC</span></code> function defined in the kernel source.
@@ -144,16 +147,16 @@ below shows the object types involved in the kernel invocation:</p>
 <span class="n">library</span><span class="o">.</span><span class="n">my_kernel</span><span class="p">[(</span><span class="mi">10</span><span class="p">,</span> <span class="mi">20</span><span class="p">)](</span><span class="n">data</span><span class="p">)</span> <span class="c1"># None (kernel modifies data array)</span>
 </pre></div>
 </div>
-<div class="section" id="kernel-rank">
-<h3>Kernel rank<a class="headerlink" href="#kernel-rank" title="Permalink to this headline"></a></h3>
+<section id="kernel-rank">
+<h3>Kernel rank<a class="headerlink" href="#kernel-rank" title="Permalink to this heading"></a></h3>
 <p>Kernels of rank 1, 2, and 3 are supported, corresponding to 1D, 2D, or 3D
 array traversals. The arrays supplied as arguments to the kernel can have
 different dimensionality than the rank of the index space to be traversed. For
 example, a triple-nested loop (rank-3 index space) to operate on a 4D array,
 where multiple fields are stored at each <cite>(i,j,k)</cite> index.</p>
-</div>
-<div class="section" id="type-and-bounds-checking">
-<h3>Type and bounds checking<a class="headerlink" href="#type-and-bounds-checking" title="Permalink to this headline"></a></h3>
+</section>
+<section id="type-and-bounds-checking">
+<h3>Type and bounds checking<a class="headerlink" href="#type-and-bounds-checking" title="Permalink to this heading"></a></h3>
 <p>Kernel arguments are type-checked at runtime to match the signature of the
 compute kernel. The kernel source code is also allowed to specify additional
 constraints on the shape of the array arguments, and even the values of
@@ -172,10 +175,10 @@ shape.</p>
 to be kernel arguments. More native data types can be supported as needed, but
 I don’t plan on enabling arbitrary data structures as kernel arguments. Just
 keep your kernel signatures very simple.</p>
-</div>
-</div>
-<div class="section" id="building-a-kernel">
-<h2>Building a kernel<a class="headerlink" href="#building-a-kernel" title="Permalink to this headline"></a></h2>
+</section>
+</section>
+<section id="building-a-kernel">
+<h2>Building a kernel<a class="headerlink" href="#building-a-kernel" title="Permalink to this heading"></a></h2>
 <p>Kernel compilation takes place when the <a class="reference internal" href="_autosummary/sailfish.kernel.library.Library.html#sailfish.kernel.library.Library" title="sailfish.kernel.library.Library"><code class="xref py py-obj docutils literal notranslate"><span class="pre">Library</span></code></a> object is
 instantiated. The constructor is given a string of source code, and a
 compilation mode, which is a string with one of the following values:</p>
@@ -200,11 +203,11 @@ source code itself, combined with any preprocessor directives. For this
 reason, your cache directory will accumulate many stale build products if you
 are modifying the kernel sources frequently. It’s always safe to delete a
 <cite>__pycache__</cite> directory. No caching is done for GPU builds.</p>
-</div>
-<div class="section" id="kernel-source-code">
-<h2>Kernel source code<a class="headerlink" href="#kernel-source-code" title="Permalink to this headline"></a></h2>
-<div class="section" id="source-conventions">
-<h3>Source conventions<a class="headerlink" href="#source-conventions" title="Permalink to this headline"></a></h3>
+</section>
+<section id="kernel-source-code">
+<h2>Kernel source code<a class="headerlink" href="#kernel-source-code" title="Permalink to this heading"></a></h2>
+<section id="source-conventions">
+<h3>Source conventions<a class="headerlink" href="#source-conventions" title="Permalink to this heading"></a></h3>
 <p>The sailfish <cite>kernel</cite> module doesn’t use a general-purpose tool for parsing C
 code, it’s just based on a few regular expressions to crudely extract the
 function names, signatures, and the argument constraints. For this reason, the
@@ -223,9 +226,9 @@ start the scope of the function body to be applied to each array element.
 This macro defines the loop variables <cite>i, j, k</cite> as appropriate for the
 execution strategy.</p></li>
 </ul>
-</div>
-<div class="section" id="argument-constraints">
-<h3>Argument constraints<a class="headerlink" href="#argument-constraints" title="Permalink to this headline"></a></h3>
+</section>
+<section id="argument-constraints">
+<h3>Argument constraints<a class="headerlink" href="#argument-constraints" title="Permalink to this heading"></a></h3>
 <p>Argument contraints are Python expressions, embedded in the C code, and
 associated with a kernel function argument. The Python expression must go on
 the same line as the kernel argument (another reason the parser requires one
@@ -254,9 +257,9 @@ constraints can be relative to other arguments provided.</p>
 on the array arguments is the only way to ensure any level of memory safety.
 Including them is also good because it documents your C code with the array
 shapes expected by the kernel.</p>
-</div>
-</div>
-</div>
+</section>
+</section>
+</section>
 
 
            </div>
@@ -269,7 +272,7 @@ shapes expected by the kernel.</p>
   <hr/>
 
   <div role="contentinfo">
-    <p>&#169; Copyright 2021, Jonathan Zrake.</p>
+    <p>&#169; Copyright 2022, Jonathan Zrake.</p>
   </div>
 
   Built with <a href="https://www.sphinx-doc.org/">Sphinx</a> using a
