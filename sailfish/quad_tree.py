@@ -27,6 +27,18 @@ class NodeList:
 class Node:
     """
     Represents a node in a self-similar n-tree.
+
+    Nodes are allowed to have a value, a list of children, both, or neither.
+    The branching ratio is the number of children, and it is uniform across
+    the tree. Tree nodes are mutable. Nodes do not have a parent pointer, so
+    in principle a node could be the child of multiple parent nodes. Traversal
+    is done pre-order and with memory-efficient (stackful) generator routines.
+    This makes it efficient to do map and zip operations on the values of
+    distinct trees with the same topology. Trees can be reconstructed from
+    their sequence representation.
+
+    Right now, the branching ratio is hard-coded to 4, but this will change
+    soon.
     """
 
     def __init__(self, value=None, children=None, items=None):
@@ -202,27 +214,16 @@ class Node:
             return self[index[0]].require(index[1:])
 
 
-# tree = Node()
-# tree.children = map(Node, range(4))
-
-# tree.children[0] = Node(children=map(Node, "WXYZ"))
-# tree.children[0].children[2] = Node(children=map(Node, "abcd"))
-
-# print("the tree has length", len(tree))
-
-# for i, value in tree.items():
-#     print(i, value)
-
-# print("------------")
-
-# print(tree == Node(items=tree.items()))
-# print(tree[(0, 0)].children)
-# print(tree[(0, 2)].children)
-# tree.at((0, 2, 0))
-
-# node = tree.require((1, 1, 1, 1, 1))
-
-# for i in tree.indexes():
-#     print(i)
-
-# print(tree.depth)
+if __name__ == "__main__":
+    tree = Node()
+    tree.children = map(Node, range(4))
+    assert len(tree) == 5
+    tree.children[0] = Node(children=map(Node, "WXYZ"))
+    assert len(tree) == 9
+    tree.children[0].children[2] = Node(children=map(Node, "abcd"))
+    assert len(tree) == 13
+    node = tree.require((1, 1, 1, 1, 1))
+    assert tree == tree
+    assert len(list(tree.items())) == len(tree)
+    assert Node(items=tree.items()) == tree
+    assert tree.depth == 6
