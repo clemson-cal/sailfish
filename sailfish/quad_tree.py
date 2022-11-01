@@ -3,21 +3,23 @@ class NodeList:
     A restricted container to hold n-tree nodes.
     """
 
-    def __init__(self, children):
+    def __init__(self, ratio, children):
         children = list(children)
-        if len(children) != 4:
-            raise ValueError("need exactly 4 child nodes")
+        if len(children) != ratio:
+            raise ValueError(f"need exactly {ratio} child nodes")
         for node in children:
-            if type(node) != Node:
-                raise ValueError("must be of type Node")
+            if not isinstance(node, Node):
+                raise ValueError("must be of a subtype of Node")
         self._children = children
 
     def __getitem__(self, i):
         return self._children[i]
 
     def __setitem__(self, i, node):
-        if type(node) != Node:
-            raise ValueError("must be of type Node")
+        if not isinstance(node, Node):
+            raise ValueError("must be of a subtype of Node")
+        if node.ratio != len(self._children):
+            raise ValueError("node has the wrong ratio")
         self._children[i] = node
 
     def __iter__(self):
@@ -28,14 +30,13 @@ class Node:
     """
     Represents a node in a self-similar n-tree.
 
-    Nodes are allowed to have a value, a list of children, both, or neither.
-    The branching ratio is the number of children, and it is uniform across
-    the tree. Tree nodes are mutable. Nodes do not have a parent pointer, so
-    in principle a node could be the child of multiple parent nodes. Traversal
-    is done pre-order and with memory-efficient (stackful) generator routines.
-    This makes it efficient to do map and zip operations on the values of
-    distinct trees with the same topology. Trees can be reconstructed from
-    their sequence representation.
+    Nodes are allowed to have a value, a list of children, both, or neither. The
+    branching ratio (number of children), is uniform across the tree. Tree nodes
+    are mutable. Nodes do not have a parent pointer, so in principle a node
+    could be the child of multiple parent nodes. Traversal is done pre-order and
+    with memory-efficient (stackful) generator routines. This makes it efficient
+    to do map and zip operations on the values of distinct trees with the same
+    topology. Trees can be reconstructed from their sequence representation.
 
     Right now, the branching ratio is hard-coded to 4, but this will change
     soon.
@@ -61,9 +62,9 @@ class Node:
             self._children = None
         elif children:
             self._value = None
-            self._children = NodeList(children)
+            self._children = NodeList(self.ratio, children)
         elif items:
-            root = Node.from_items(items)
+            root = self.__class__.from_items(items)
             self._value = root._value
             self._children = root._children
         else:
@@ -73,14 +74,14 @@ class Node:
     @classmethod
     def _from_first_rest(cls, first, rest):
         index, value = first
-        node = Node(value=value)
+        node = cls(value=value)
         try:
             iv = next(rest)
         except StopIteration:
             return node, None
         if len(iv[0]) > len(index):
             children = list()
-            for _ in range(4):
+            for _ in range(cls.ratio):
                 child, iv = cls._from_first_rest(iv, rest)
                 children.append(child)
             node.children = children
@@ -110,7 +111,7 @@ class Node:
         """
         Assign a sequence of children to this node.
         """
-        self._children = NodeList(children)
+        self._children = NodeList(self.ratio, children)
 
     @property
     def value(self):
@@ -207,23 +208,35 @@ class Node:
         created nodes will have `value = None`.
         """
         if self._children is None:
-            self.children = map(lambda _: Node(), range(4))
+            self.children = map(lambda _: self.__class__(), range(self.ratio))
         if len(index) == 1:
             return self[index[0]]
         else:
             return self[index[0]].require(index[1:])
 
 
+class Node2(Node):
+    ratio = classmethod(property(lambda _: 2))
+
+
+class Node4(Node):
+    ratio = classmethod(property(lambda _: 4))
+
+
+class Node8(Node):
+    ratio = classmethod(property(lambda _: 8))
+
+
 if __name__ == "__main__":
-    tree = Node()
-    tree.children = map(Node, range(4))
+    tree = Node4()
+    tree.children = map(Node4, range(4))
     assert len(tree) == 5
-    tree.children[0] = Node(children=map(Node, "WXYZ"))
+    tree.children[0] = Node4(children=map(Node4, "WXYZ"))
     assert len(tree) == 9
-    tree.children[0].children[2] = Node(children=map(Node, "abcd"))
+    tree.children[0].children[2] = Node4(children=map(Node4, "abcd"))
     assert len(tree) == 13
     node = tree.require((1, 1, 1, 1, 1))
     assert tree == tree
     assert len(list(tree.items())) == len(tree)
-    assert Node(items=tree.items()) == tree
+    assert Node4(items=tree.items()) == tree
     assert tree.depth == 6
