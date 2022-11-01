@@ -229,6 +229,102 @@ class Node8(Node):
     ratio = classmethod(property(lambda _: 8))
 
 
+def topological_to_geometric_index(index, dimensionality=1):
+    """
+    Convert a topological index to a geometrical one.
+
+    A topological index is an integer sequence identifying a node in an n-tree.
+    A geometrical index of dimensionality d is a pair: (level, d-tuple) where
+    level is the depth of the node (length of the topological index) and the
+    d-tuple is the logically Cartesian index (i, j, k) in d-dimensional space;
+    i, j, k are each in the range [0, 2^level - 1].
+    """
+
+    res = tuple(
+        sum((i & 1 << e) >> e << n for n, i in enumerate(reversed(index)))
+        for e in reversed(range(dimensionality))
+    )
+    return len(index), res
+
+
+def geometrial_to_topological_index(level, index):
+    pass
+
+
+class MultigridArray:
+    """
+    A multi-level grid object, for block-structured (quad-tree, oct-tree) grids.
+
+    It is organized as a tree where each node has one array (this array is
+    called a patch). The patches have uniform shape. The leading 3 array axes
+    are spatial indexes, and any remaining array axes represent data fields.
+    Data may be point-like (zero-form), edge-like (1-form), face-like (2-form),
+    or cell-like (volume form), and those fields may be intrinsic (e.g. electric
+    field or mass density) or extrinsic (e.g. voltage or mass).
+
+    There may be overlap (guard zones) between the arrays at adjacent nodes, and
+    the overlap may go in different directions.
+
+    Geometry object:
+
+    - mapping from multi-level patch index (level, i, j, k) -> (x, y, z)
+    - might also provide the "metric", i.e. the 1-forms, 2-forms, 3-forms
+
+    Responsibilities:
+
+    - store grid data at multiple levels
+    - map geometry objects onto grid patches
+    - more generally, map between MultigridArray instances with same topology
+    - copying guard zones data between neighboring patches =>
+    - doing prolongation / restriction of data
+    - do flux corrections, or more generally data reconciliation on faces,
+      edges, and points.
+    """
+
+    def __init__(
+        self,
+        blocks_shape: tuple,
+        fields_shape: tuple,
+        topology: Node = None,
+    ):
+        if len(blocks_shape) != 3:
+            raise ValueError("blocks_shape must have length at least 3")
+        self._blocks_shape = tuple(blocks_shape)
+        self._fields_shape = tuple(fields_shape)
+        self.topology = topology
+
+    @property
+    def blocks_shape(self):
+        return self._blocks_shape
+
+    @property
+    def fields_shape(self):
+        return self._fields_shape
+
+    @property
+    def dimensionality(self):
+        return sum(map(lambda n: n > 1, self.blocks_shape))
+
+    @property
+    def topology(self):
+        return self._root_node
+
+    @topology.setter
+    def topology(self, new_topology: Node):
+        if new_topology is not None:
+            if new_topology.ratio != 1 << self.dimensionality:
+                raise ValueError("topology must be a node with ratio = 2^d")
+        self._root_node = new_topology
+
+    def patch_indexes(self):
+        """
+        Return an iterator over the geometrical indexes of patches.
+        """
+        d = self.dimensionality
+        f = lambda i: topological_to_geometric_index(i, d)
+        return map(f, self.topology.indexes())
+
+
 if __name__ == "__main__":
     tree = Node4()
     tree.children = map(Node4, range(4))
@@ -242,3 +338,19 @@ if __name__ == "__main__":
     assert len(list(tree.items())) == len(tree)
     assert Node4(items=tree.items()) == tree
     assert tree.depth == 6
+
+    assert topological_to_geometric_index((0, 0, 0)) == (3, (0,))
+    assert topological_to_geometric_index((0, 0, 1)) == (3, (1,))
+    assert topological_to_geometric_index((0, 1, 0)) == (3, (2,))
+    assert topological_to_geometric_index((0, 1, 1)) == (3, (3,))
+    assert topological_to_geometric_index((1, 0, 0)) == (3, (4,))
+    assert topological_to_geometric_index((1, 0, 1)) == (3, (5,))
+    assert topological_to_geometric_index((1, 1, 0)) == (3, (6,))
+    assert topological_to_geometric_index((1, 1, 1)) == (3, (7,))
+
+    assert topological_to_geometric_index((0, 0, 0), 2) == (3, (0, 0))
+    assert topological_to_geometric_index((0, 0, 1), 2) == (3, (0, 1))
+    assert topological_to_geometric_index((0, 0, 2), 2) == (3, (1, 0))
+    assert topological_to_geometric_index((0, 0, 3), 2) == (3, (1, 1))
+    assert topological_to_geometric_index((0, 3, 3), 2) == (3, (3, 3))
+    assert topological_to_geometric_index((3, 3, 3), 2) == (3, (7, 7))
