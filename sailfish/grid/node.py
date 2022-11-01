@@ -1,3 +1,8 @@
+"""
+Provides a node type for a self-similar n-tree.
+"""
+
+
 class NodeList:
     """
     A restricted container to hold n-tree nodes.
@@ -37,9 +42,6 @@ class Node:
     with memory-efficient (stackful) generator routines. This makes it efficient
     to do map and zip operations on the values of distinct trees with the same
     topology. Trees can be reconstructed from their sequence representation.
-
-    Right now, the branching ratio is hard-coded to 4, but this will change
-    soon.
     """
 
     def __init__(self, value=None, children=None, items=None):
