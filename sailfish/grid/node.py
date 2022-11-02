@@ -59,7 +59,7 @@ class Node:
         """
         if bool(value) + bool(children) + bool(items) > 1:
             raise ValueError("at most one of value, children, items may be specified")
-        elif value:
+        elif value is not None:
             self._value = value
             self._children = None
         elif children:
@@ -229,26 +229,67 @@ class Node8(Node):
     ratio = classmethod(property(lambda _: 8))
 
 
-def topological_to_geometric_index(index, dimensionality=1):
+class Index:
     """
-    Convert a topological index to a geometrical one.
+    A canonical representation of a node index in an n-tree or rank-d grid.
 
     A topological index is an integer sequence identifying a node in an n-tree.
-    A geometrical index of dimensionality d is a pair: (level, d-tuple) where
-    level is the depth of the node (length of the topological index) and the
-    d-tuple is the logically Cartesian index (i, j, k) in d-dimensional space;
-    i, j, k are each in the range [0, 2^level - 1].
+
+    A geometrical index of rank d is a pair: (level, d-tuple) where level is
+    the depth of the node (length of the topological index) and the d-tuple is
+    the logically Cartesian index (i, j, k) in d-dimensional space; i, j, k
+    are each in the range [0, 2^level - 1].
     """
 
-    res = tuple(
-        sum((i & 1 << e) >> e << n for n, i in enumerate(reversed(index)))
-        for e in reversed(range(dimensionality))
-    )
-    return len(index), res
+    @staticmethod
+    def topo_to_bit(t: tuple, rank: int, d: int, l: int):
+        return bool(t & 1 << d)
 
+    @staticmethod
+    def from_topological(t: tuple, rank: int):
+        s = Index()
+        s._data = tuple(tuple(bool(t & 1 << d) for t in t) for d in range(rank))
+        return s
 
-def geometrial_to_topological_index(level, index):
-    pass
+    @staticmethod
+    def from_geometrical(g: tuple, level: int):
+        s = Index()
+        s._data = tuple(tuple(bool(g & 1 << l) for l in range(level)) for g in g)
+        return s
+
+    @staticmethod
+    def top_to_geo(t: tuple, rank: int):
+        return tuple(
+            sum(bool(t & 1 << d) << l for l, t in enumerate(t)) for d in range(rank)
+        )
+
+    @staticmethod
+    def geo_to_top(g: tuple, level: int):
+        return tuple(
+            sum(bool(g & 1 << l) << d for d, g in enumerate(g)) for l in range(level)
+        )
+
+    @property
+    def level(self):
+        return len(self._data[0])
+
+    @property
+    def rank(self):
+        return len(self._data)
+
+    @property
+    def geometrical(self):
+        return tuple(
+            sum(self._data[d][l] << l for l in range(self.level))
+            for d in range(self.rank)
+        )
+
+    @property
+    def topological(self):
+        return tuple(
+            sum(self._data[d][l] << d for d in range(self.rank))
+            for l in range(self.level)
+        )
 
 
 class MultigridArray:
@@ -302,7 +343,7 @@ class MultigridArray:
         return self._fields_shape
 
     @property
-    def dimensionality(self):
+    def rank(self):
         return sum(map(lambda n: n > 1, self.blocks_shape))
 
     @property
@@ -312,7 +353,7 @@ class MultigridArray:
     @topology.setter
     def topology(self, new_topology: Node):
         if new_topology is not None:
-            if new_topology.ratio != 1 << self.dimensionality:
+            if new_topology.ratio != 1 << self.rank:
                 raise ValueError("topology must be a node with ratio = 2^d")
         self._root_node = new_topology
 
@@ -320,9 +361,10 @@ class MultigridArray:
         """
         Return an iterator over the geometrical indexes of patches.
         """
-        d = self.dimensionality
-        f = lambda i: topological_to_geometric_index(i, d)
-        return map(f, self.topology.indexes())
+        return map(
+            lambda i: Index.from_topological(i, self.rank).geometrical,
+            self.topology.indexes(),
+        )
 
 
 if __name__ == "__main__":
@@ -339,18 +381,10 @@ if __name__ == "__main__":
     assert Node4(items=tree.items()) == tree
     assert tree.depth == 6
 
-    assert topological_to_geometric_index((0, 0, 0)) == (3, (0,))
-    assert topological_to_geometric_index((0, 0, 1)) == (3, (1,))
-    assert topological_to_geometric_index((0, 1, 0)) == (3, (2,))
-    assert topological_to_geometric_index((0, 1, 1)) == (3, (3,))
-    assert topological_to_geometric_index((1, 0, 0)) == (3, (4,))
-    assert topological_to_geometric_index((1, 0, 1)) == (3, (5,))
-    assert topological_to_geometric_index((1, 1, 0)) == (3, (6,))
-    assert topological_to_geometric_index((1, 1, 1)) == (3, (7,))
-
-    assert topological_to_geometric_index((0, 0, 0), 2) == (3, (0, 0))
-    assert topological_to_geometric_index((0, 0, 1), 2) == (3, (0, 1))
-    assert topological_to_geometric_index((0, 0, 2), 2) == (3, (1, 0))
-    assert topological_to_geometric_index((0, 0, 3), 2) == (3, (1, 1))
-    assert topological_to_geometric_index((0, 3, 3), 2) == (3, (3, 3))
-    assert topological_to_geometric_index((3, 3, 3), 2) == (3, (7, 7))
+    for index in tree.indexes():
+        index1 = Index.from_topological(index, 2)
+        index2 = Index.from_geometrical(index1.geometrical, index1.level)
+        assert index1.geometrical == index2.geometrical
+        assert index1.topological == index2.topological
+        assert index1.geometrical == Index.top_to_geo(index1.topological, 2)
+        assert index1.topological == Index.geo_to_top(index1.geometrical, index1.level)
