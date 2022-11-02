@@ -156,7 +156,7 @@ class Node:
         if type(index) == int:
             return self.children[index]
         else:
-            return self.at(index)
+            return self[index[0]][index[1:]] if index else self
 
     def __iter__(self):
         """
@@ -194,17 +194,25 @@ class Node:
         """
         return zip(self.indexes(), self.values())
 
-    def at(self, index):
+    def at(self, index_iter):
         """
         Return the node at the given index below this one.
 
+        The effect of this function is the same as `__getitem__`, but the
+        index argument is an iterator rather than a tuple. New tuples are
+        not created by the recursive loopup.
+
         Raises `IndexError` if the node does not exist.
         """
-        return self[index[0]].at(index[1:]) if index else self
+        try:
+            n = next(index_iter)
+        except StopIteration:
+            return self
+        return self[n].at(index_iter)
 
     def require(self, index):
         """
-        Create if necessary, and return the node at the given index.
+        Create if necessary, and return the node, at the given index.
 
         This function creates all intermediate nodes that are needed; the
         created nodes will have `value = None`.
@@ -229,70 +237,54 @@ class Node8(Node):
     ratio = classmethod(property(lambda _: 8))
 
 
-class Index:
+def top_to_geo(rank: int, t: tuple, iter=True):
     """
-    A canonical representation of a node index in an n-tree or rank-d grid.
+    Convert a topological index to geometrical index.
+
+    If the keyword `iter` is `True` then the return is an iterator, otherwise it
+    is a tuple.
 
     A topological index is an integer sequence identifying a node in an n-tree.
 
-    A geometrical index of rank d is a pair: (level, d-tuple) where level is
-    the depth of the node (length of the topological index) and the d-tuple is
-    the logically Cartesian index (i, j, k) in d-dimensional space; i, j, k
-    are each in the range [0, 2^level - 1].
+    A geometrical index of rank d is a pair: (level, d-tuple) where level is the
+    depth of the node (length of the topological index) and the d-tuple is the
+    logically Cartesian index in d-dimensional space; for example in 3d it is
+    (i, j, k) where i, j, k are each in the range [0, 2^level - 1].
+
+    The procedure for converting between representations is summarized in the
+    diagram below. The matrix of bits can be thought of as a canonical
+    representation of the node position in the tree. The rows then form the
+    binary representation of the topological index, and the columns are the
+    binary representation of the geometrical index.
+
+     topological index
+     |
+     v
+
+    |1|   | 0   0   1|
+    |5|   | 1   0   1|
+    |0| = | 0   0   0|
+    |7|   | 1   1   1|
+    |2|   | 0   1   0|
+           ----------
+           10  24  11 -> geometrical index
     """
-
-    @staticmethod
-    def topo_to_bit(t: tuple, rank: int, d: int, l: int):
-        return bool(t & 1 << d)
-
-    @staticmethod
-    def from_topological(t: tuple, rank: int):
-        s = Index()
-        s._data = tuple(tuple(bool(t & 1 << d) for t in t) for d in range(rank))
-        return s
-
-    @staticmethod
-    def from_geometrical(g: tuple, level: int):
-        s = Index()
-        s._data = tuple(tuple(bool(g & 1 << l) for l in range(level)) for g in g)
-        return s
-
-    @staticmethod
-    def top_to_geo(t: tuple, rank: int):
-        return tuple(
-            sum(bool(t & 1 << d) << l for l, t in enumerate(t)) for d in range(rank)
-        )
-
-    @staticmethod
-    def geo_to_top(g: tuple, level: int):
-        return tuple(
-            sum(bool(g & 1 << l) << d for d, g in enumerate(g)) for l in range(level)
-        )
-
-    @property
-    def level(self):
-        return len(self._data[0])
-
-    @property
-    def rank(self):
-        return len(self._data)
-
-    @property
-    def geometrical(self):
-        return tuple(
-            sum(self._data[d][l] << l for l in range(self.level))
-            for d in range(self.rank)
-        )
-
-    @property
-    def topological(self):
-        return tuple(
-            sum(self._data[d][l] << d for d in range(self.rank))
-            for l in range(self.level)
-        )
+    g = (sum(bool(t & 1 << d) << l for l, t in enumerate(t)) for d in range(rank))
+    return len(t), g if iter else tuple(g)
 
 
-class MultigridArray:
+def geo_to_top(level: int, g: tuple, iter=True):
+    """
+    Convert a geometrical index to topological index.
+
+    If the keyword `iter` is `True` then the return is an iterator, otherwise it
+    is a tuple.
+    """
+    t = (sum(bool(g & 1 << l) << d for d, g in enumerate(g)) for l in range(level))
+    return len(g), t if iter else tuple(t)
+
+
+class BlockStructuredGrid:
     """
     A multi-level grid object, for block-structured (quad-tree, oct-tree) grids.
 
@@ -325,7 +317,7 @@ class MultigridArray:
     def __init__(
         self,
         blocks_shape: tuple,
-        fields_shape: tuple,
+        fields_shape: tuple = tuple(),
         topology: Node = None,
     ):
         if len(blocks_shape) != 3:
@@ -361,10 +353,50 @@ class MultigridArray:
         """
         Return an iterator over the geometrical indexes of patches.
         """
-        return map(
-            lambda i: Index.from_topological(i, self.rank).geometrical,
-            self.topology.indexes(),
+        d = self.rank
+        for t in self._root_node.indexes():
+            yield top_to_geo(d, t, iter=False)
+
+    def at(self, level: int, g: tuple):
+        pass
+
+
+class PlanarCartesianGeometry:
+    x0 = -0.5
+    x1 = +0.5
+    y0 = -0.5
+    y1 = +0.5
+    z0 = -0.5
+    z1 = +0.5
+
+    def patch_extent(self, level, index):
+        """
+        Return the box-like region covering the patch at the given level and
+        index.
+        """
+        dx = (self.x1 - self.x0) / (1 << level)
+        dy = (self.y1 - self.y0) / (1 << level)
+        dz = (self.z1 - self.z0) / (1 << level)
+        i, j, k = index
+        return (
+            (dx * i, dx * (i + 1)),
+            (dy * j, dy * (j + 1)),
+            (dz * k, dz * (k + 1)),
         )
+
+    def cell_center_coordinate_array(self, level, index, blocks_shape):
+        from numpy import linspace, meshgrid, stack
+
+        (x0, x1), (y0, y1), (z0, z1) = self.patch_extent(level, index)
+        ni, nj, nk = blocks_shape
+        dx = (x1 - x0) / ni
+        dy = (y1 - y0) / nj
+        dz = (z1 - z0) / nk
+        x = linspace(x0 + 0.5 * dx, x1 - 0.5 * dx, ni)
+        y = linspace(y0 + 0.5 * dy, y1 - 0.5 * dy, nj)
+        z = linspace(z0 + 0.5 * dz, z1 - 0.5 * dz, nk)
+        x, y, z = meshgrid(x, y, z, indexing="ij")
+        return stack([x, y, z], axis=-1)
 
 
 if __name__ == "__main__":
@@ -376,15 +408,25 @@ if __name__ == "__main__":
     tree.children[0].children[2] = Node4(children=map(Node4, "abcd"))
     assert len(tree) == 13
     node = tree.require((1, 1, 1, 1, 1))
+    assert tree[(1, 1, 1, 1, 1)] is node
+    assert tree.at(iter((1, 1, 1, 1, 1))) is node
     assert tree == tree
     assert len(list(tree.items())) == len(tree)
     assert Node4(items=tree.items()) == tree
     assert tree.depth == 6
 
-    for index in tree.indexes():
-        index1 = Index.from_topological(index, 2)
-        index2 = Index.from_geometrical(index1.geometrical, index1.level)
-        assert index1.geometrical == index2.geometrical
-        assert index1.topological == index2.topological
-        assert index1.geometrical == Index.top_to_geo(index1.topological, 2)
-        assert index1.topological == Index.geo_to_top(index1.geometrical, index1.level)
+    # Test the conversion between topological to geometrical indexes
+    t = (1, 5, 0, 7, 2)
+    l, g = top_to_geo(3, t, iter=False)
+    d, s = geo_to_top(l, g, iter=False)
+    assert t == s
+    assert l == len(t)
+    assert d == 3
+
+    grid = BlockStructuredGrid(blocks_shape=(10, 10, 1))
+    grid.topology = tree
+    geom = PlanarCartesianGeometry()
+
+    for node, (level, index) in zip(grid.topology.nodes(), grid.patch_indexes()):
+        xyz = geom.cell_center_coordinate_array(level, index + (0,), grid.blocks_shape)
+        node.value = xyz
