@@ -175,7 +175,9 @@ class Node:
         """
         return 1 + sum(len(c) for c in self.children)
 
-    @property
+    def is_leaf(self):
+        return self._children is not None
+
     def depth(self):
         """
         Return the maximum depth of any node below this one.
@@ -183,7 +185,7 @@ class Node:
         if self._children is None:
             return 1
         else:
-            return max(map(lambda n: 1 + n.depth, self.children))
+            return max(map(lambda n: 1 + n.depth(), self.children))
 
     def indexes(self, parent=tuple()):
         """
@@ -345,7 +347,7 @@ if __name__ == "__main__":
     assert tree == tree
     assert len(list(tree.items())) == len(tree)
     assert Node4(items=tree.items()) == tree
-    assert tree.depth == 6
+    assert tree.depth() == 6
 
     # Test the conversion between topological to geometrical indexes
     t = (1, 5, 0, 7, 2)
@@ -358,11 +360,15 @@ if __name__ == "__main__":
     geom = CartesianMesh(blocks_shape=(10, 10, 10))
 
     coordinate_tree = Node4(
-        items=((i, geom.coordinate_array(i)) for i in tree.indexes())
+        items=(
+            (i, geom.coordinate_array(i) if node.is_leaf() else None)
+            for node, i in zip(tree.nodes(), tree.indexes())
+        )
     )
 
     for array in coordinate_tree:
-        print(array.shape)
+        print(array.shape if array is not None else "not leaf")
+
 
 # class BlockStructuredGrid:
 #     """
