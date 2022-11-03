@@ -1,5 +1,33 @@
 """
 Provides a node type for a self-similar n-tree.
+
+This module also contains draft code to create a class for block-structured
+(quad-tree, oct-tree) grids.
+
+The grid class should be organized as a tree where each node has one array (this
+array is called a patch). The patches have uniform shape. The leading 3 array
+axes are spatial indexes, and any remaining array axes represent data fields.
+Data may be point-like (zero-form), edge-like (1-form), face-like (2-form), or
+cell-like (volume form), and those fields may be intrinsic (e.g. electric field
+or mass density) or extrinsic (e.g. voltage or mass).
+
+There may be overlap (guard zones) between the arrays at adjacent nodes, and
+the overlap may go in different directions.
+
+Geometry object:
+
+- mapping from multi-level patch index (level, i, j, k) -> (x, y, z)
+- might also provide the "metric", i.e. the 1-forms, 2-forms, 3-forms
+
+Responsibilities:
+
+- store grid data at multiple levels
+- map geometry objects onto grid patches
+- more generally, map between MultigridArray instances with same topology
+- copying guard zones data between neighboring patches =>
+- doing prolongation / restriction of data
+- do flux corrections, or more generally data reconciliation on faces,
+  edges, and points.
 """
 
 
@@ -176,7 +204,7 @@ class Node:
         return 1 + sum(len(c) for c in self.children)
 
     def is_leaf(self):
-        return self._children is not None
+        return self._children is None
 
     def depth(self):
         """
@@ -221,15 +249,44 @@ class Node:
         """
         Create if necessary, and return the node, at the given index.
 
+        If `index` is a tuple, then the immediate child node at that index is
+        created if needed and returned. If `index` is a tuple or iterator, then
+        this function recurses to the required position (if the tuple or
+        iterator is empty then this node is returned).
+
         This function creates all intermediate nodes that are needed; the
         created nodes will have `value = None`.
         """
+        if type(index) is tuple:
+            index = iter(index)
+        elif type(index) is int:
+            index = iter((index,))
+
+        try:
+            i = next(index)
+        except StopIteration:
+            return self
+
         if self._children is None:
             self.children = map(lambda _: self.__class__(), range(self.ratio))
-        if len(index) == 1:
-            return self[index[0]]
-        else:
-            return self[index[0]].require(index[1:])
+
+        return self._children[i].require(index)
+
+    def map_leaf_indexes(self, func):
+        return self.__class__(
+            items=(
+                (index, func(index) if node.is_leaf() else None)
+                for node, index in zip(self.nodes(), self.indexes())
+            )
+        )
+
+    def map_values(self, func):
+        return self.__class__(
+            items=(
+                (index, func(node.value) if node.value is not None else None)
+                for node, index in zip(self.nodes(), self.indexes())
+            )
+        )
 
 
 class Node2(Node):
@@ -244,12 +301,12 @@ class Node8(Node):
     ratio = classmethod(property(lambda _: 8))
 
 
-def top_to_geo(rank: int, t: tuple, iter=True):
+def top_to_geo(rank: int, t: tuple, astuple=False, level=False):
     """
     Convert a topological index to geometrical index.
 
-    If the keyword `iter` is `True` then the return is an iterator, otherwise it
-    is a tuple.
+    If the keyword `astuple` is `False` then the return value is an iterator,
+    otherwise it is a tuple.
 
     A topological index is an integer sequence identifying a node in an n-tree.
 
@@ -277,10 +334,12 @@ def top_to_geo(rank: int, t: tuple, iter=True):
            10  24  11 -> geometrical index
     """
     g = (sum((t & 1 << d) >> d << l for l, t in enumerate(t)) for d in range(rank))
-    return len(t), g if iter else tuple(g)
+    if astuple:
+        g = tuple(g)
+    return (len(t), g) if level else g
 
 
-def geo_to_top(level: int, g: tuple, iter=True):
+def geo_to_top(level: int, g: tuple, astuple=False, rank=False):
     """
     Convert a geometrical index to topological index.
 
@@ -288,52 +347,84 @@ def geo_to_top(level: int, g: tuple, iter=True):
     is a tuple.
     """
     t = (sum((g & 1 << l) >> l << d for d, g in enumerate(g)) for l in range(level))
-    return len(g), t if iter else tuple(t)
+    if astuple:
+        t = tuple(t)
+    return (len(g), t) if rank else t
 
 
 class CartesianMesh:
-    x0 = -0.5
-    x1 = +0.5
-    y0 = -0.5
-    y1 = +0.5
-    z0 = -0.5
-    z1 = +0.5
-
-    def __init__(self, blocks_shape: tuple):
+    def __init__(
+        self,
+        blocks_shape: tuple,
+        extent=((-0.5, 0.5), (-0.5, 0.5), (-0.5, 0.5)),
+    ):
         self._blocks_shape = blocks_shape
+        self._extent = extent
 
-    def patch_extent(self, level, index):
+    def patch_extent(self, index, level=None):
         """
-        Return the box-like region covering the patch at the given level and
+        Return the box-like region covering the patch at the given location.
+
+        If `level` is `None`, then `index` is must be a topological index,
+        otherwise if `level` is an integer then `index` must be a geometrical
         index.
         """
-        dx = (self.x1 - self.x0) / (1 << level)
-        dy = (self.y1 - self.y0) / (1 << level)
-        dz = (self.z1 - self.z0) / (1 << level)
+
+        if level is None:
+            level, index = top_to_geo(3, index, level=True)
+
+        (x0, x1), (y0, y1), (z0, z1) = self._extent
+        dx = (x1 - x0) / (1 << level)
+        dy = (y1 - y0) / (1 << level)
+        dz = (z1 - z0) / (1 << level)
         i, j, k = index
+
         return (
-            (dx * i, dx * (i + 1)),
-            (dy * j, dy * (j + 1)),
-            (dz * k, dz * (k + 1)),
+            (x0 + dx * i, x0 + dx * (i + 1)),
+            (y0 + dy * j, y0 + dy * (j + 1)),
+            (z0 + dz * k, z0 + dz * (k + 1)),
         )
 
-    def coordinate_array(self, topological_index):
+    def coordinate_array(self, index, level=None, location="vert"):
+        """
+        Return an array of coordinates at the given location.
+
+        If `level` is `None`, then `index` is must be a topological index,
+        otherwise if `level` is an integer then `index` must be a geometrical
+        index.
+        """
         from numpy import linspace, meshgrid, stack
 
-        level, index = top_to_geo(3, topological_index)
-        (x0, x1), (y0, y1), (z0, z1) = self.patch_extent(level, index)
+        if level is None:
+            level, index = top_to_geo(3, index, level=True)
+
+        (x0, x1), (y0, y1), (z0, z1) = self.patch_extent(index, level)
         ni, nj, nk = self._blocks_shape
         dx = (x1 - x0) / ni
         dy = (y1 - y0) / nj
         dz = (z1 - z0) / nk
-        x = linspace(x0 + 0.5 * dx, x1 - 0.5 * dx, ni)
-        y = linspace(y0 + 0.5 * dy, y1 - 0.5 * dy, nj)
-        z = linspace(z0 + 0.5 * dz, z1 - 0.5 * dz, nk)
+
+        if location == "vert":
+            x = linspace(x0, x1, ni + 1)
+            y = linspace(y0, y1, nj + 1)
+            z = linspace(z0, z1, nk + 1)
+
+        elif location == "cell":
+            x = linspace(x0 + 0.5 * dx, x1 - 0.5 * dx, ni)
+            y = linspace(y0 + 0.5 * dy, y1 - 0.5 * dy, nj)
+            z = linspace(z0 + 0.5 * dz, z1 - 0.5 * dz, nk)
+
         x, y, z = meshgrid(x, y, z, indexing="ij")
         return stack((x, y, z), axis=-1)
 
+    def cell_coordinate_array(self, *args, **kwargs):
+        return self.coordinate_array(location="cell", *args, **kwargs)
 
-if __name__ == "__main__":
+    def vert_coordinate_array(self, *args, **kwargs):
+        return self.coordinate_array(location="vert", *args, **kwargs)
+
+
+def test_node():
     tree = Node4()
     tree.children = map(Node4, range(4))
     assert len(tree) == 5
@@ -351,97 +442,51 @@ if __name__ == "__main__":
 
     # Test the conversion between topological to geometrical indexes
     t = (1, 5, 0, 7, 2)
-    l, g = top_to_geo(3, t, iter=False)
-    d, s = geo_to_top(l, g, iter=False)
+    l, g = top_to_geo(3, t, astuple=True, level=True)
+    d, s = geo_to_top(l, g, astuple=True, rank=True)
     assert t == s
     assert l == len(t)
     assert d == 3
 
-    geom = CartesianMesh(blocks_shape=(10, 10, 10))
 
-    coordinate_tree = Node4(
-        items=(
-            (i, geom.coordinate_array(i) if node.is_leaf() else None)
-            for node, i in zip(tree.nodes(), tree.indexes())
-        )
-    )
+def test_grid():
+    geom = CartesianMesh(blocks_shape=(10, 10, 1))
+    tree = Node4()
 
-    for array in coordinate_tree:
-        print(array.shape if array is not None else "not leaf")
+    level = 1
+    for i in range(1 << level):
+        for j in range(1 << level):
+            tree.require(geo_to_top(level, (i, j))).value = geom.cell_coordinate_array(
+                (i, j, 0),
+                level=level,
+            )
+
+    def initial_data(xyz):
+        from numpy import exp
+
+        x = xyz[..., 0]
+        y = xyz[..., 1]
+        return exp(-50 * (x**2 + y**2))
+
+    cell_coords = tree  # .map_leaf_indexes(geom.cell_coordinate_array)
+    # vert_coords = tree.map_leaf_indexes(geom.vert_coordinate_array)
+    primitive = cell_coords.map_values(initial_data)
+
+    from matplotlib import pyplot as plt
+
+    fig, ax1 = plt.subplots(figsize=(10, 10))
+
+    for xyz, prim in zip(cell_coords, primitive):
+        if xyz is not None:
+            print(xyz[0, 0, 0, 0], "->", xyz[-1, 0, 0, 0])
+            ax1.pcolormesh(
+                xyz[:, :, 0, 0], xyz[:, :, 0, 1], prim[:, :, 0], edgecolors="k"
+            )
+
+    ax1.set_aspect("equal")
+    plt.show()
 
 
-# class BlockStructuredGrid:
-#     """
-#     A multi-level grid object, for block-structured (quad-tree, oct-tree) grids.
-
-#     It is organized as a tree where each node has one array (this array is
-#     called a patch). The patches have uniform shape. The leading 3 array axes
-#     are spatial indexes, and any remaining array axes represent data fields.
-#     Data may be point-like (zero-form), edge-like (1-form), face-like (2-form),
-#     or cell-like (volume form), and those fields may be intrinsic (e.g. electric
-#     field or mass density) or extrinsic (e.g. voltage or mass).
-
-#     There may be overlap (guard zones) between the arrays at adjacent nodes, and
-#     the overlap may go in different directions.
-
-#     Geometry object:
-
-#     - mapping from multi-level patch index (level, i, j, k) -> (x, y, z)
-#     - might also provide the "metric", i.e. the 1-forms, 2-forms, 3-forms
-
-#     Responsibilities:
-
-#     - store grid data at multiple levels
-#     - map geometry objects onto grid patches
-#     - more generally, map between MultigridArray instances with same topology
-#     - copying guard zones data between neighboring patches =>
-#     - doing prolongation / restriction of data
-#     - do flux corrections, or more generally data reconciliation on faces,
-#       edges, and points.
-#     """
-
-#     def __init__(
-#         self,
-#         blocks_shape: tuple,
-#         fields_shape: tuple = tuple(),
-#         topology: Node = None,
-#     ):
-#         if len(blocks_shape) != 3:
-#             raise ValueError("blocks_shape must have length at least 3")
-#         self._blocks_shape = tuple(blocks_shape)
-#         self._fields_shape = tuple(fields_shape)
-#         self.topology = topology
-
-#     @property
-#     def blocks_shape(self):
-#         return self._blocks_shape
-
-#     @property
-#     def fields_shape(self):
-#         return self._fields_shape
-
-#     @property
-#     def rank(self):
-#         return sum(map(lambda n: n > 1, self.blocks_shape))
-
-#     @property
-#     def topology(self):
-#         return self._root_node
-
-#     @topology.setter
-#     def topology(self, new_topology: Node):
-#         if new_topology is not None:
-#             if new_topology.ratio != 1 << self.rank:
-#                 raise ValueError("topology must be a node with ratio = 2^d")
-#         self._root_node = new_topology
-
-#     def patch_indexes(self):
-#         """
-#         Return an iterator over the geometrical indexes of patches.
-#         """
-#         d = self.rank
-#         for t in self._root_node.indexes():
-#             yield top_to_geo(d, t, iter=False)
-
-#     def at(self, level: int, g: tuple):
-#         pass
+if __name__ == "__main__":
+    test_node()
+    test_grid()
