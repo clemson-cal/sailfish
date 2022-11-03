@@ -15,7 +15,7 @@ def file_load(indir, outdir, savefigbool, filename):
     Path('{}/output-figures'.format(current_path_name)).mkdir(parents=True, exist_ok=True)
     max_file_count = 5  # Number of digits in the filename.
 
-    for name in Path(indir).iterdir():
+    for name in sorted(Path(indir).iterdir()):
         file_count += 1
         chkpt = msgpack.load(open(name, 'rb'))
         mesh = chkpt['mesh']
