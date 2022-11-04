@@ -450,17 +450,6 @@ def test_node():
 
 
 def test_grid():
-    geom = CartesianMesh(blocks_shape=(10, 10, 1))
-    tree = Node4()
-
-    level = 1
-    for i in range(1 << level):
-        for j in range(1 << level):
-            tree.require(geo_to_top(level, (i, j))).value = geom.cell_coordinate_array(
-                (i, j, 0),
-                level=level,
-            )
-
     def initial_data(xyz):
         from numpy import exp
 
@@ -468,19 +457,34 @@ def test_grid():
         y = xyz[..., 1]
         return exp(-50 * (x**2 + y**2))
 
-    cell_coords = tree  # .map_leaf_indexes(geom.cell_coordinate_array)
-    # vert_coords = tree.map_leaf_indexes(geom.vert_coordinate_array)
-    primitive = cell_coords.map_values(initial_data)
+    geom = CartesianMesh(blocks_shape=(10, 10, 1))
+    tree = Node4()
+
+    cell_coords = Node4()
+    vert_coords = Node4()
+    primitive = Node4()
+    level = 3
+
+    for i in range(1 << level):
+        for j in range(1 << level):
+            t = tuple(geo_to_top(level, (i, j)))
+            cell_coords.require(t).value = geom.cell_coordinate_array((i, j, 0), level)
+            vert_coords.require(t).value = geom.vert_coordinate_array((i, j, 0), level)
+            primitive.require(t).value = initial_data(cell_coords[t].value)
 
     from matplotlib import pyplot as plt
 
     fig, ax1 = plt.subplots(figsize=(10, 10))
 
-    for xyz, prim in zip(cell_coords, primitive):
-        if xyz is not None:
-            print(xyz[0, 0, 0, 0], "->", xyz[-1, 0, 0, 0])
+    for vert, prim in zip(vert_coords, primitive):
+        if vert is not None and prim is not None:
             ax1.pcolormesh(
-                xyz[:, :, 0, 0], xyz[:, :, 0, 1], prim[:, :, 0], edgecolors="k"
+                vert[:, :, 0, 0],
+                vert[:, :, 0, 1],
+                prim[:, :, 0],
+                edgecolors="k",
+                vmin=0.0,
+                vmax=1.0,
             )
 
     ax1.set_aspect("equal")
