@@ -251,7 +251,7 @@ def gpu_extension(code, name, define_macros=list()):
         return ProxyModule(ValueError(f"GPU compilation {name} failed:\n {e}"))
 
 
-def cpu_extension_function(module, stub, rank):
+def cpu_extension_function(module, stub, rank, prepend_signature):
     """
     Return a function to replace the given stub with a call to a C function.
 
@@ -268,22 +268,19 @@ def cpu_extension_function(module, stub, rank):
     """
 
     c_func = module[stub.__name__]
-    c_func.argtypes = (c_int,) * rank + argtypes(stub)
+    c_func.argtypes = (prepend_signature or (c_int,) * rank) + argtypes(stub)
     c_func.restype = restype(stub)
 
     @wraps(stub)
     def wrapper(*args):
         shape = stub(*args) or tuple()
         cargs = to_ctypes(shape + args, c_func.argtypes)
-
-        if len(shape) != rank:
-            raise ValueError(f"kernel stub must return a tuple of length rank={rank}")
         return c_func(*cargs)
 
     return wrapper
 
 
-def gpu_extension_function(module, stub, rank):
+def gpu_extension_function(module, stub, rank, prepend_signature):
     gpu_func = module.get_function(stub.__name__)
 
     if "return" in stub.__annotations__:
@@ -293,11 +290,9 @@ def gpu_extension_function(module, stub, rank):
 
     @wraps(stub)
     def wrapper(*args):
-        shape = stub(*args) or tuple()
-        cargs = shape + args
-
-        if len(shape) != rank:
-            raise ValueError(f"kernel stub must return a tuple of length rank={rank}")
+        extra = stub(*args)
+        shape = extra[:rank]
+        cargs = extra + args
 
         if rank == 1:
             (ti,) = bs = THREAD_BLOCK_SIZE_1D
@@ -317,9 +312,10 @@ def gpu_extension_function(module, stub, rank):
     return wrapper
 
 
-def extension_function(cpu_module, gpu_module, stub, rank):
-    cpu_func = cpu_extension_function(cpu_module, stub, rank) if cpu_module else None
-    gpu_func = gpu_extension_function(gpu_module, stub, rank) if gpu_module else None
+def extension_function(cpu_module, gpu_module, stub, rank, prepend_signature):
+    p = tuple(PY_CTYPE_DICT[t] for t in prepend_signature)
+    cpu_func = cpu_extension_function(cpu_module, stub, rank, p) if cpu_module else None
+    gpu_func = gpu_extension_function(gpu_module, stub, rank, p) if gpu_module else None
 
     @wraps(stub)
     def wrapper(*args, exec_mode=None):
@@ -333,7 +329,7 @@ def extension_function(cpu_module, gpu_module, stub, rank):
     return wrapper
 
 
-def kernel(code: str = None, rank: int = 0):
+def kernel(code: str = None, rank: int = 0, prepend_signature=tuple()):
     """
     Returns a decorator that replaces a 'stub' function with a 'kernel'.
 
@@ -350,7 +346,7 @@ def kernel(code: str = None, rank: int = 0):
     def decorator(stub):
         cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
         gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
-        return extension_function(cpu_module, gpu_module, stub, rank)
+        return extension_function(cpu_module, gpu_module, stub, rank, prepend_signature)
 
     return decorator
 
@@ -394,7 +390,8 @@ def kernel_class(common_code: str = None):
             for kernel in kernels:
                 stub = getattr(self, kernel)
                 rank = stub.__kernel_rank
-                func = extension_function(cpu_module, gpu_module, stub, rank)
+                sign = stub.__kernel_prepend_signature
+                func = extension_function(cpu_module, gpu_module, stub, rank, sign)
                 setattr(self, kernel, func)
 
         cls.__init__ = __init__
@@ -403,7 +400,7 @@ def kernel_class(common_code: str = None):
     return decorator
 
 
-def kernel_method(rank: int = 0, code: str = None):
+def kernel_method(rank: int = 0, code: str = None, prepend_signature=tuple()):
     """
     A decorator for class methods to be implemented as compiled C code.
     """
@@ -411,6 +408,7 @@ def kernel_method(rank: int = 0, code: str = None):
     def decorator(stub):
         stub.__kernel_rank = rank
         stub.__kernel_code = code
+        stub.__kernel_prepend_signature = prepend_signature
         return stub
 
     return decorator
