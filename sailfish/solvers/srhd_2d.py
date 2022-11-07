@@ -262,7 +262,7 @@ class Solver(SolverBase):
             if n == 0 and bcl == "jet":
                 # introduction of some extra diffusion near the jet inlet is
                 # effective at preventing crashes
-                num_first_order_zones = 4
+                num_first_order_zones = 512
             else:
                 num_first_order_zones = 0
             patch = Patch(
