@@ -80,7 +80,7 @@ if (i >= NI || j >= NJ || k >= NK) return; \
 """
 
 
-def configure_kernel_module(verbose=None, cache=None, default_execution_mode=None):
+def configure_kernel_module(verbose=None, cache=None, default_exec_mode=None):
     """
     Configure the module behavior.
 
@@ -95,10 +95,10 @@ def configure_kernel_module(verbose=None, cache=None, default_execution_mode=Non
         KERNEL_VERBOSE_COMPILE = True
     if cache:
         KERNEL_ENABLE_CACHE = True
-    if default_execution_mode is not None:
-        if default_execution_mode not in ("cpu", "gpu"):
+    if default_exec_mode is not None:
+        if default_exec_mode not in ("cpu", "gpu"):
             raise ValueError("execution mode must be cpu or gpu")
-        KERNEL_DEFAULT_EXEC_MODE = default_execution_mode
+        KERNEL_DEFAULT_EXEC_MODE = default_exec_mode
 
 
 def argtypes(f):
@@ -392,7 +392,7 @@ if __name__ == "__main__":
     if args.exec_mode == "gpu":
         from cupy import array, linspace, zeros_like
 
-    configure_kernel_module(verbose=args.verbose, default_execution_mode=args.exec_mode)
+    configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
 
     # ==============================================================================
     # 1.

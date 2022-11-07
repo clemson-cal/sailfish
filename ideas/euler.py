@@ -312,13 +312,40 @@ def measure_time() -> float:
 
 
 def main():
-    from numpy import array, linspace, zeros, zeros_like, diff
-    from matplotlib import pyplot as plt
+    from argparse import ArgumentParser
 
-    configure_kernel_module(verbose=False)
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        dest="exec_mode",
+        default="cpu",
+        choices=["cpu", "gpu"],
+        help="execution mode",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="verbose output from extension compile stages",
+    )
+    parser.add_argument(
+        "--resolution",
+        "-n",
+        metavar="N",
+        type=int,
+        default=100000,
+        help="grid resolution",
+    )
+    args = parser.parse_args()
+    
+    if args.exec_mode == "cpu":
+        from numpy import array, linspace, zeros, zeros_like, diff
+    if args.exec_mode == "gpu":
+        from cupy import array, linspace, zeros, zeros_like, diff
+
+    configure_kernel_module(verbose=False, default_exec_mode=args.exec_mode)
     solver = Solver(dim=1, gamma_law_index=5.0 / 3.0)
 
-    num_zones = 20000
+    num_zones = args.resolution
     dx = 1.0 / num_zones
     fold = 100
     dt = dx * 1e-1
@@ -326,8 +353,8 @@ def main():
     u = zeros_like(p)
     fhat = zeros((num_zones - 1, solver.ncons))
 
-    p[: num_zones // 2, :] = [1.0] + solver.dim * [0.0] + [1.0]
-    p[num_zones // 2 :, :] = [0.1] + solver.dim * [0.0] + [0.125]
+    p[: num_zones // 2, :] = array([1.0] + solver.dim * [0.0] + [1.0])
+    p[num_zones // 2 :, :] = array([0.1] + solver.dim * [0.0] + [0.125])
     t = 0.0
     n = 0
 
@@ -345,6 +372,9 @@ def main():
 
         kzps = num_zones / fold_time() * 1e-3 * fold
         print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+
+    exit()
+    from matplotlib import pyplot as plt
 
     plt.plot(p[:, 0])
     plt.show()
