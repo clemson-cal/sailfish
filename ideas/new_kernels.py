@@ -325,7 +325,9 @@ def extension_function(cpu_module, gpu_module, stub, rank):
     gpu_func = gpu_extension_function(gpu_module, stub, rank) if gpu_module else None
 
     @wraps(stub)
-    def wrapper(*args, exec_mode=KERNEL_DEFAULT_EXEC_MODE):
+    def wrapper(*args, exec_mode=None):
+        if exec_mode is None:
+            exec_mode = KERNEL_DEFAULT_EXEC_MODE
         if exec_mode == "cpu":
             return cpu_func(*args)
         if exec_mode == "gpu":
