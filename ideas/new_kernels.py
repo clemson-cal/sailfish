@@ -303,19 +303,16 @@ def gpu_extension_function(module, stub, rank):
             (ti,) = bs = THREAD_BLOCK_SIZE_1D
             (ni,) = shape
             nb = ((ni + ti - 1) // ti,)
-            gpu_func(nb, bs, cargs)
-
         if rank == 2:
             ti, tj = bs = THREAD_BLOCK_SIZE_2D
             ni, nj = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj)
-            gpu_func(nb, bs, cargs)
-
         if rank == 3:
             ti, tj, tk = bs = THREAD_BLOCK_SIZE_3D
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
-            gpu_func(nb, bs, cargs)
+
+        gpu_func(nb, bs, cargs)
 
     return wrapper
 
@@ -358,7 +355,7 @@ def kernel(code: str = None, rank: int = 0):
     return decorator
 
 
-def kernel_class(cls):
+def kernel_class(common_code: str = None):
     """
     A decorator for classes that contains kernel stubs.
 
@@ -370,34 +367,40 @@ def kernel_class(cls):
 
     If the wrapped class has a property `define_macros` (list of key-value
     tuples), its value will be passed to the `cpu_extension` function.
+
+    C code is the sum of the contents of either `common_code` or
+    `cls.__doc__`, and the doc strings of all of the class's kernel methods.
     """
 
-    cls_init = cls.__init__
+    def decorator(cls):
+        cls_init = cls.__init__
 
-    def __init__(self, **kwargs):
-        cls_init(self, **kwargs)
+        def __init__(self, **kwargs):
+            cls_init(self, **kwargs)
 
-        code = cls.__doc__
-        kernels = list()
+            code = common_code or cls.__doc__
+            kernels = list()
 
-        for k in dir(cls):
-            f = getattr(self, k)
-            if hasattr(f, "__kernel_code"):
-                code += f.__kernel_code or dedent(f.__doc__)
-                kernels.append(k)
+            for k in dir(cls):
+                f = getattr(self, k)
+                if hasattr(f, "__kernel_code"):
+                    code += f.__kernel_code or dedent(f.__doc__)
+                    kernels.append(k)
 
-        define_macros = getattr(self, "define_macros", list())
-        cpu_module = cpu_extension(code, cls.__name__, define_macros)
-        gpu_module = gpu_extension(code, cls.__name__, define_macros)
+            define_macros = getattr(self, "define_macros", list())
+            cpu_module = cpu_extension(code, cls.__name__, define_macros)
+            gpu_module = gpu_extension(code, cls.__name__, define_macros)
 
-        for kernel in kernels:
-            stub = getattr(self, kernel)
-            rank = stub.__kernel_rank
-            func = extension_function(cpu_module, gpu_module, stub, rank)
-            setattr(self, kernel, func)
+            for kernel in kernels:
+                stub = getattr(self, kernel)
+                rank = stub.__kernel_rank
+                func = extension_function(cpu_module, gpu_module, stub, rank)
+                setattr(self, kernel, func)
 
-    cls.__init__ = __init__
-    return cls
+        cls.__init__ = __init__
+        return cls
+
+    return decorator
 
 
 def kernel_method(rank: int = 0, code: str = None):
@@ -503,7 +506,7 @@ if __name__ == "__main__":
     # included at the top of the resulting source code.
     # ==============================================================================
 
-    @kernel_class
+    @kernel_class()
     class Solver:
         R"""
         static const double gamma_law_index = 5.0 / 3.0;

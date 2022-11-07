@@ -84,226 +84,227 @@ def extrapolate(
     return (y.shape[0],)
 
 
-@kernel_class
-class Solver:
-    R"""
-    #define min2(a, b) ((a) < (b) ? (a) : (b))
-    #define max2(a, b) ((a) > (b) ? (a) : (b))
-    #define min3(a, b, c) min2(a, min2(b, c))
-    #define max3(a, b, c) max2(a, max2(b, c))
+solver_code = R"""
+#define min2(a, b) ((a) < (b) ? (a) : (b))
+#define max2(a, b) ((a) > (b) ? (a) : (b))
+#define min3(a, b, c) min2(a, min2(b, c))
+#define max3(a, b, c) max2(a, max2(b, c))
 
-    #ifndef DIM
-    #define DIM 1
+#ifndef DIM
+#define DIM 1
+#endif
+
+#if DIM == 1
+#define NCONS 3
+#define RHO 0
+#define VXX 1
+#define PRE 2
+#define DEN 0
+#define PXX 1
+#define NRG 2
+#elif DIM == 2
+#define NCONS 4
+#define RHO 0
+#define VXX 1
+#define VYY 2
+#define PRE 3
+#define DEN 0
+#define PXX 1
+#define PYY 2
+#define NRG 3
+#elif DIM == 3
+#define NCONS 5
+#define RHO 0
+#define VXX 1
+#define VYY 2
+#define VZZ 3
+#define PRE 4
+#define DEN 0
+#define PXX 1
+#define PYY 2
+#define PZZ 3
+#define NRG 4
+#endif
+
+#ifndef GAMMA_LAW_INDEX
+#define GAMMA_LAW_INDEX (5.0 / 3.0)
+#endif
+
+static const double gamma_law_index = GAMMA_LAW_INDEX;
+
+PRIVATE void _prim_to_cons(double *p, double *u)
+{
+    #if DIM == 1
+    double rho = p[RHO];
+    double vx  = p[VXX];
+    double pre = p[PRE];
+    double v_squared = vx * vx;
+    u[DEN] = rho;
+    u[PXX] = vx * rho;
+    u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+
+    #elif DIM == 2
+    double rho = p[RHO];
+    double vx  = p[VXX];
+    double vy  = p[VYY];
+    double pre = p[PRE];
+    double v_squared = vx * vx + vy * vy;
+    u[DEN] = rho;
+    u[PXX] = vx * rho;
+    u[PYY] = vy * rho;
+    u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+
+    #elif DIM == 3
+    double rho = p[RHO];
+    double vx  = p[VXX];
+    double vy  = p[VYY];
+    double vz  = p[VZZ];
+    double pre = p[PRE];
+    double v_squared = vx * vx + vy * vy + vz * vz;
+    u[DEN] = rho;
+    u[PXX] = vx * rho;
+    u[PYY] = vy * rho;
+    u[PZZ] = vz * rho;
+    u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
     #endif
+}
+
+PRIVATE void _cons_to_prim(double *u, double *p)
+{
+    #if DIM == 1
+    double rho = u[DEN];
+    double px  = u[PXX];
+    double nrg = u[NRG];
+    double p_squared = px * px;
+    p[RHO] = rho;
+    p[VXX] = px / rho;
+    p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
+
+    #elif DIM == 2
+    double rho = u[DEN];
+    double px  = u[PXX];
+    double py  = u[PYY];
+    double nrg = u[NRG];
+    double p_squared = px * px + py * py;
+    p[RHO] = rho;
+    p[VXX] = px / rho;
+    p[VYY] = py / rho;
+    p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
+
+    #elif DIM == 3
+    double rho = u[DEN];
+    double px  = u[PXX];
+    double py  = u[PYY];
+    double pz  = u[PZZ];
+    double nrg = u[NRG];
+    double p_squared = px * px + py * py + pz * pz;
+    p[RHO] = rho;
+    p[VXX] = px / rho;
+    p[VYY] = py / rho;
+    p[VZZ] = py / rho;
+    p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
+    #endif
+}
+
+PRIVATE void _prim_to_flux(double *p, double *u, double *f, int direction)
+{
+    double pre = p[PRE];
+    double nrg = u[NRG];
+    double vn = p[direction];
 
     #if DIM == 1
-    #define NCONS 3
-    #define RHO 0
-    #define VXX 1
-    #define PRE 2
-    #define DEN 0
-    #define PXX 1
-    #define NRG 2
+    f[DEN] = vn * u[DEN];
+    f[PXX] = vn * u[PXX] + pre * (direction == 1);
+    f[NRG] = vn * (nrg + pre);
+
     #elif DIM == 2
-    #define NCONS 4
-    #define RHO 0
-    #define VXX 1
-    #define VYY 2
-    #define PRE 3
-    #define DEN 0
-    #define PXX 1
-    #define PYY 2
-    #define NRG 3
+    f[DEN] = vn * u[DEN];
+    f[PXX] = vn * u[PXX] + pre * (direction == 1);
+    f[PYY] = vn * u[PYY] + pre * (direction == 2);
+    f[NRG] = vn * (nrg + pre);
+
     #elif DIM == 3
-    #define NCONS 5
-    #define RHO 0
-    #define VXX 1
-    #define VYY 2
-    #define VZZ 3
-    #define PRE 4
-    #define DEN 0
-    #define PXX 1
-    #define PYY 2
-    #define PZZ 3
-    #define NRG 4
+    f[DEN] = vn * u[DEN];
+    f[PXX] = vn * u[PXX] + pre * (direction == 1);
+    f[PYY] = vn * u[PYY] + pre * (direction == 2);
+    f[PZZ] = vn * u[PZZ] + pre * (direction == 3);
+    f[NRG] = vn * (nrg + pre);
     #endif
+}
 
-    #ifndef GAMMA_LAW_INDEX
-    #define GAMMA_LAW_INDEX (5.0 / 3.0)
+PRIVATE double _sound_speed_squared(double *p)
+{
+    return p[PRE] / p[RHO] * gamma_law_index;
+}
+
+PRIVATE double _max_wavespeed(double *p)
+{
+    #if DIM == 1
+    double cs = sqrt(_sound_speed_squared(p));
+    double vx = p[VXX];
+    double ax = max2(fabs(vx - cs), fabs(vx + cs));
+    return ax;
+
+    #elif DIM == 2
+    double cs = sqrt(_sound_speed_squared(p));
+    double vx = p[VXX];
+    double vy = p[VYY];
+    double ax = max2(fabs(vx - cs), fabs(vx + cs));
+    double ay = max2(fabs(vy - cs), fabs(vy + cs));
+    return max2(ax, ay);
+
+    #elif DIM == 3
+    double cs = sqrt(_sound_speed_squared(p));
+    double vx = p[VXX];
+    double vy = p[VYY];
+    double vz = p[VZZ];
+    double ax = max2(fabs(vx - cs), fabs(vx + cs));
+    double ay = max2(fabs(vy - cs), fabs(vy + cs));
+    double az = max2(fabs(vz - cs), fabs(vz + cs));
+    return max3(ax, ay, az);
     #endif
+}
 
-    static const double gamma_law_index = GAMMA_LAW_INDEX;
+PRIVATE void _outer_wavespeeds(
+    double *p,
+    double *wavespeeds,
+    int direction)
+{
+    double cs = sqrt(_sound_speed_squared(p));
+    double vn = p[direction];
+    wavespeeds[0] = vn - cs;
+    wavespeeds[1] = vn + cs;
+}
 
-    PRIVATE void _prim_to_cons(double *p, double *u)
+PRIVATE void _hlle(double *pl, double *pr, double *flux, int direction)
+{
+    double ul[NCONS];
+    double ur[NCONS];
+    double fl[NCONS];
+    double fr[NCONS];
+    double al[2];
+    double ar[2];
+
+    _prim_to_cons(pl, ul);
+    _prim_to_cons(pr, ur);
+    _prim_to_flux(pl, ul, fl, direction);
+    _prim_to_flux(pr, ur, fr, direction);
+    _outer_wavespeeds(pl, al, direction);
+    _outer_wavespeeds(pr, ar, direction);
+
+    double am = min3(0.0, al[0], ar[0]);
+    double ap = max3(0.0, al[1], ar[1]);
+
+    for (int q = 0; q < NCONS; ++q)
     {
-        #if DIM == 1
-        double rho = p[RHO];
-        double vx  = p[VXX];
-        double pre = p[PRE];
-        double v_squared = vx * vx;
-        u[DEN] = rho;
-        u[PXX] = vx * rho;
-        u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
-
-        #elif DIM == 2
-        double rho = p[RHO];
-        double vx  = p[VXX];
-        double vy  = p[VYY];
-        double pre = p[PRE];
-        double v_squared = vx * vx + vy * vy;
-        u[DEN] = rho;
-        u[PXX] = vx * rho;
-        u[PYY] = vy * rho;
-        u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
-
-        #elif DIM == 3
-        double rho = p[RHO];
-        double vx  = p[VXX];
-        double vy  = p[VYY];
-        double vz  = p[VZZ];
-        double pre = p[PRE];
-        double v_squared = vx * vx + vy * vy + vz * vz;
-        u[DEN] = rho;
-        u[PXX] = vx * rho;
-        u[PYY] = vy * rho;
-        u[PZZ] = vz * rho;
-        u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
-        #endif
+        flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
     }
+}
+"""
 
-    PRIVATE void _cons_to_prim(double *u, double *p)
-    {
-        #if DIM == 1
-        double rho = u[DEN];
-        double px  = u[PXX];
-        double nrg = u[NRG];
-        double p_squared = px * px;
-        p[RHO] = rho;
-        p[VXX] = px / rho;
-        p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
 
-        #elif DIM == 2
-        double rho = u[DEN];
-        double px  = u[PXX];
-        double py  = u[PYY];
-        double nrg = u[NRG];
-        double p_squared = px * px + py * py;
-        p[RHO] = rho;
-        p[VXX] = px / rho;
-        p[VYY] = py / rho;
-        p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
-
-        #elif DIM == 3
-        double rho = u[DEN];
-        double px  = u[PXX];
-        double py  = u[PYY];
-        double pz  = u[PZZ];
-        double nrg = u[NRG];
-        double p_squared = px * px + py * py + pz * pz;
-        p[RHO] = rho;
-        p[VXX] = px / rho;
-        p[VYY] = py / rho;
-        p[VZZ] = py / rho;
-        p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
-        #endif
-    }
-
-    PRIVATE void _prim_to_flux(double *p, double *u, double *f, int direction)
-    {
-        double pre = p[PRE];
-        double nrg = u[NRG];
-        double vn = p[direction];
-
-        #if DIM == 1
-        f[DEN] = vn * u[DEN];
-        f[PXX] = vn * u[PXX] + pre * (direction == 1);
-        f[NRG] = vn * (nrg + pre);
-
-        #elif DIM == 2
-        f[DEN] = vn * u[DEN];
-        f[PXX] = vn * u[PXX] + pre * (direction == 1);
-        f[PYY] = vn * u[PYY] + pre * (direction == 2);
-        f[NRG] = vn * (nrg + pre);
-
-        #elif DIM == 3
-        f[DEN] = vn * u[DEN];
-        f[PXX] = vn * u[PXX] + pre * (direction == 1);
-        f[PYY] = vn * u[PYY] + pre * (direction == 2);
-        f[PZZ] = vn * u[PZZ] + pre * (direction == 3);
-        f[NRG] = vn * (nrg + pre);
-        #endif
-    }
-
-    PRIVATE double _sound_speed_squared(double *p)
-    {
-        return p[PRE] / p[RHO] * gamma_law_index;
-    }
-
-    PRIVATE double _max_wavespeed(double *p)
-    {
-        #if DIM == 1
-        double cs = sqrt(_sound_speed_squared(p));
-        double vx = p[VXX];
-        double ax = max2(fabs(vx - cs), fabs(vx + cs));
-        return ax;
-
-        #elif DIM == 2
-        double cs = sqrt(_sound_speed_squared(p));
-        double vx = p[VXX];
-        double vy = p[VYY];
-        double ax = max2(fabs(vx - cs), fabs(vx + cs));
-        double ay = max2(fabs(vy - cs), fabs(vy + cs));
-        return max2(ax, ay);
-
-        #elif DIM == 3
-        double cs = sqrt(_sound_speed_squared(p));
-        double vx = p[VXX];
-        double vy = p[VYY];
-        double vz = p[VZZ];
-        double ax = max2(fabs(vx - cs), fabs(vx + cs));
-        double ay = max2(fabs(vy - cs), fabs(vy + cs));
-        double az = max2(fabs(vz - cs), fabs(vz + cs));
-        return max3(ax, ay, az);
-        #endif
-    }
-
-    PRIVATE void _outer_wavespeeds(
-        double *p,
-        double *wavespeeds,
-        int direction)
-    {
-        double cs = sqrt(_sound_speed_squared(p));
-        double vn = p[direction];
-        wavespeeds[0] = vn - cs;
-        wavespeeds[1] = vn + cs;
-    }
-
-    PRIVATE void _hlle(double *pl, double *pr, double *flux, int direction)
-    {
-        double ul[NCONS];
-        double ur[NCONS];
-        double fl[NCONS];
-        double fr[NCONS];
-        double al[2];
-        double ar[2];
-
-        _prim_to_cons(pl, ul);
-        _prim_to_cons(pr, ur);
-        _prim_to_flux(pl, ul, fl, direction);
-        _prim_to_flux(pr, ur, fr, direction);
-        _outer_wavespeeds(pl, al, direction);
-        _outer_wavespeeds(pr, ar, direction);
-
-        double am = min3(0.0, al[0], ar[0]);
-        double ap = max3(0.0, al[1], ar[1]);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
-        }
-    }
-    """
-
+@kernel_class(solver_code)
+class Solver:
     @kernel_method(rank=1)
     def cons_to_prim(self, u: NDArray[float], p: NDArray[float]):
         R"""
@@ -459,7 +460,6 @@ def main():
                     extrapolate(p, g, pm, pp, solver.ncons)
                     pl = pp[:-1]
                     pr = pm[+1:]
-
                 else:
                     pl = p[:-1]
                     pr = p[+1:]
