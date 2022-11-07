@@ -54,7 +54,7 @@ class Solver:
 
     static const double gamma_law_index = GAMMA_LAW_INDEX;
 
-    static void _prim_to_cons(double *p, double *u)
+    PRIVATE void _prim_to_cons(double *p, double *u)
     {
         #if DIM == 1
         double rho = p[RHO];
@@ -91,7 +91,7 @@ class Solver:
         #endif
     }
 
-    static void _cons_to_prim(double *u, double *p)
+    PRIVATE void _cons_to_prim(double *u, double *p)
     {
         #if DIM == 1
         double rho = u[DEN];
@@ -128,7 +128,7 @@ class Solver:
         #endif
     }
 
-    static void _prim_to_flux(double *p, double *u, double *f, int direction)
+    PRIVATE void _prim_to_flux(double *p, double *u, double *f, int direction)
     {
         double pre = p[PRE];
         double nrg = u[NRG];
@@ -154,12 +154,12 @@ class Solver:
         #endif
     }
 
-    static double _sound_speed_squared(double *p)
+    PRIVATE double _sound_speed_squared(double *p)
     {
         return p[PRE] / p[RHO] * gamma_law_index;
     }
 
-    static double _max_wavespeed(double *p)
+    PRIVATE double _max_wavespeed(double *p)
     {
         #if DIM == 1
         double cs = sqrt(_sound_speed_squared(p));
@@ -187,7 +187,7 @@ class Solver:
         #endif
     }
 
-    static void _outer_wavespeeds(
+    PRIVATE void _outer_wavespeeds(
         double *p,
         double *wavespeeds,
         int direction)
@@ -198,7 +198,7 @@ class Solver:
         wavespeeds[1] = vn + cs;
     }
 
-    static void _hlle(double *pl, double *pr, double *flux, int direction)
+    PRIVATE void _hlle(double *pl, double *pr, double *flux, int direction)
     {
         double ul[NCONS];
         double ur[NCONS];
@@ -227,7 +227,7 @@ class Solver:
     @kernel_method(rank=1)
     def cons_to_prim(self, u: NDArray[float], p: NDArray[float]):
         R"""
-        void cons_to_prim(int ni, double *u, double *p)
+        PUBLIC void cons_to_prim(int ni, double *u, double *p)
         {
             FOR_EACH_1D(ni)
             {
@@ -240,7 +240,7 @@ class Solver:
     @kernel_method(rank=1)
     def prim_to_cons(self, p: NDArray[float], u: NDArray[float]):
         R"""
-        void prim_to_cons(int ni, double *p, double *u)
+        PUBLIC void prim_to_cons(int ni, double *p, double *u)
         {
             FOR_EACH_1D(ni)
             {
@@ -253,7 +253,7 @@ class Solver:
     @kernel_method(rank=1)
     def prim_to_flux(self, p: NDArray[float], f: NDArray[float], direction: int):
         R"""
-        void prim_to_flux(int ni, double *p, double *f, int direction)
+        PUBLIC void prim_to_flux(int ni, double *p, double *f, int direction)
         {
             double u[NCONS];
 
@@ -269,7 +269,7 @@ class Solver:
     @kernel_method(rank=1)
     def max_wavespeed(self, p: NDArray[float], a: NDArray[float]):
         R"""
-        void max_wavespeed(int ni, double *p, double *a)
+        PUBLIC void max_wavespeed(int ni, double *p, double *a)
         {
             FOR_EACH_1D(ni)
             {
@@ -288,7 +288,7 @@ class Solver:
         direction: int,
     ):
         R"""
-        void godunov_flux(int ni, double *pl, double *pr, double *fhat, int direction)
+        PUBLIC void godunov_flux(int ni, double *pl, double *pr, double *fhat, int direction)
         {
             FOR_EACH_1D(ni)
             {

@@ -19,14 +19,16 @@ from os.path import join, dirname
 from textwrap import dedent
 
 
-# Dependencies
+# Numpy imports
 from numpy.typing import NDArray
 from numpy import ndarray
-from cffi import FFI, VerificationError
 
 
 KERNEL_VERBOSE_COMPILE = False
 KERNEL_ENABLE_CACHE = True
+DEFAULT_EXECUTION_MODE = "cpu"
+
+
 PY_CTYPE_DICT = {
     int: c_int,
     float: c_double,
@@ -34,7 +36,10 @@ PY_CTYPE_DICT = {
 }
 
 
-KERNEL_DEFINE_MACROS = R"""
+KERNEL_DEFINE_MACROS_CPU = R"""
+#define PRIVATE static
+#define PUBLIC
+
 #define FOR_EACH_1D(NI) \
 for (int i = 0; i < NI; ++i) \
 
@@ -46,6 +51,32 @@ for (int j = 0; j < NJ; ++j) \
 for (int i = 0; i < NI; ++i) \
 for (int j = 0; j < NJ; ++j) \
 for (int k = 0; k < NK; ++k) \
+"""
+
+
+THREAD_BLOCK_SIZE_1D = (64,)
+THREAD_BLOCK_SIZE_2D = (8, 8)
+THREAD_BLOCK_SIZE_3D = (4, 4, 4)
+
+
+KERNEL_DEFINE_MACROS_GPU = R"""
+#define PRIVATE static __device__
+#define PUBLIC extern "C" __global__
+
+#define FOR_EACH_1D(NI) \
+int i = threadIdx.x + blockIdx.x * blockDim.x; \
+if (i >= NI) return; \
+
+#define FOR_EACH_2D(NI, NJ) \
+int i = threadIdx.x + blockIdx.x * blockDim.x; \
+int j = threadIdx.y + blockIdx.y * blockDim.y; \
+if (i >= NI || j >= NJ) return; \
+
+#define FOR_EACH_3D(NI, NJ, NK) \
+int i = threadIdx.x + blockIdx.x * blockDim.x; \
+int j = threadIdx.y + blockIdx.y * blockDim.y; \
+int k = threadIdx.z + blockIdx.z * blockDim.z; \
+if (i >= NI || j >= NJ || k >= NK) return; \
 """
 
 
@@ -111,9 +142,10 @@ def cpu_extension(code, name, define_macros=list()):
     compiler's stderr should be written to the terminal to aid in identifying
     the compilation error.
     """
+    from cffi import FFI, VerificationError
 
     # Add header macros with for-each loops, etc.
-    code = KERNEL_DEFINE_MACROS + code
+    code = KERNEL_DEFINE_MACROS_CPU + code
     verbose = KERNEL_VERBOSE_COMPILE
 
     # Create a hash for this snippet of code to facilitate caching the
@@ -155,6 +187,20 @@ def cpu_extension(code, name, define_macros=list()):
     raise ValueError(f"compilation of {name} failed")
 
 
+def gpu_extension(code, name, define_macros=list()):
+    try:
+        from cupy import RawModule
+    except ImportError as e:
+        print(e)
+        return
+
+    code = KERNEL_DEFINE_MACROS_GPU + code
+    options = tuple(f"-D {k}={v}" for k, v in define_macros)
+    module = RawModule(code=code, options=options)
+    module.compile()
+    return module
+
+ 
 def cpu_extension_function(module, stub, rank):
     """
     Return a function to replace the given stub with a call to a C function.
@@ -179,9 +225,56 @@ def cpu_extension_function(module, stub, rank):
     def wrapper(*args):
         shape = stub(*args) or tuple()
         cargs = to_ctypes(shape + args, c_func.argtypes)
+
         if len(shape) != rank:
             raise ValueError(f"kernel stub must return a tuple of length rank={rank}")
         return c_func(*cargs)
+
+    return wrapper
+
+
+def gpu_extension_function(module, stub, rank):
+    gpu_func = module.get_function(stub.__name__)
+
+    @wraps(stub)
+    def wrapper(*args):
+        shape = stub(*args) or tuple()
+        cargs = shape + args
+
+        if len(shape) != rank:
+            raise ValueError(f"kernel stub must return a tuple of length rank={rank}")
+
+        if rank == 1:
+            (ti,) = bs = THREAD_BLOCK_SIZE_1D
+            (ni,) = shape
+            nb = ((ni + ti - 1) // ti,)
+            gpu_func(nb, bs, cargs)
+
+        if rank == 2:
+            ti, tj = bs = THREAD_BLOCK_SIZE_2D
+            ni, nj = shape
+            nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj)
+            gpu_func(nb, bs, cargs)
+
+        if rank == 3:
+            ti, tj, tk = bs = THREAD_BLOCK_SIZE_3D
+            ni, nj, nk = shape
+            nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
+            gpu_func(nb, bs, cargs)
+
+    return wrapper
+
+
+def universal_extension_function(cpu_module, gpu_module, stub, rank):
+    cpu_func = cpu_extension_function(cpu_module, stub, rank) if cpu_module else None
+    gpu_func = gpu_extension_function(gpu_module, stub, rank) if gpu_module else None
+
+    @wraps(stub)
+    def wrapper(*args, exec_mode=DEFAULT_EXECUTION_MODE):
+        if exec_mode == "cpu":
+            return cpu_func(*args)
+        if exec_mode == "gpu":
+            return gpu_func(*args)
 
     return wrapper
 
@@ -201,8 +294,9 @@ def kernel(code: str = None, rank: int = 0):
     """
 
     def decorator(stub):
-        module = cpu_extension(code or stub.__doc__, stub.__name__)
-        return cpu_extension_function(module, stub, rank)
+        cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
+        gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
+        return universal_extension_function(cpu_module, gpu_module, stub, rank)
 
     return decorator
 
@@ -236,12 +330,13 @@ def kernel_class(cls):
                 kernels.append(k)
 
         define_macros = getattr(self, "define_macros", list())
-        module = cpu_extension(code, cls.__name__, define_macros)
+        cpu_module = cpu_extension(code, cls.__name__, define_macros)
+        gpu_module = gpu_extension(code, cls.__name__, define_macros)
 
         for kernel in kernels:
             stub = getattr(self, kernel)
             rank = stub.__kernel_rank
-            func = cpu_extension_function(module, stub, rank)
+            func = universal_extension_function(cpu_module, gpu_module, stub, rank)
             setattr(self, kernel, func)
 
     cls.__init__ = __init__
@@ -266,7 +361,8 @@ if __name__ == "__main__":
     # Example usage of kernel functions and classes
     # ==============================================================================
     from numpy import array, linspace, zeros_like
-
+    # from cupy import array, linspace, zeros_like
+    
     # ==============================================================================
     # 1.
     #
@@ -274,21 +370,23 @@ if __name__ == "__main__":
     # provided as an argument to the kernel decorator function.
     # ==============================================================================
 
-    code = R"""
-    double multiply(int a, double b)
-    {
-        return a * b;
-    }
-    """
+    # DISABLED UNTIL NON-NONE RETURN TYPE IS RECOGNIZED AND GPU COMPILE DISABLED
 
-    @kernel(code)
-    def multiply(a: int, b: float) -> float:
-        """
-        Return the product of an integer a and a float b.
-        """
-        pass
+    # code = R"""
+    # PUBLIC double multiply(int a, double b)
+    # {
+    #     return a * b;
+    # }
+    # """
 
-    assert multiply(5, 25.0) == 125.0
+    # @kernel(code)
+    # def multiply(a: int, b: float) -> float:
+    #     """
+    #     Return the product of an integer a and a float b.
+    #     """
+    #     pass
+
+    # assert multiply(5, 25.0) == 125.0
 
     # ==============================================================================
     # 2.
@@ -300,7 +398,7 @@ if __name__ == "__main__":
     @kernel(rank=1)
     def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float]):
         R"""
-        void rank_one_kernel(int ni, double a, double *x, double *y)
+        PUBLIC void rank_one_kernel(int ni, double a, double *x, double *y)
         {
             FOR_EACH_1D(ni)
             {
@@ -315,8 +413,8 @@ if __name__ == "__main__":
     a = linspace(0.0, 1.0, 5000)
     b = zeros_like(a)
     rank_one_kernel(0.25, a, b)
-
     assert (b == 0.25 * a).all()
+
 
     # ==============================================================================
     # 3.
@@ -338,7 +436,7 @@ if __name__ == "__main__":
             //
             // Compute the conversion of conserved variables to primitive ones.
             //
-            void conserved_to_primitive(int ni, double *u, double *p)
+            PUBLIC void conserved_to_primitive(int ni, double *u, double *p)
             {
                 FOR_EACH_1D(ni)
                 {
@@ -369,7 +467,7 @@ if __name__ == "__main__":
             //
             // Compute the conversion of primitive variables to conserved ones.
             //
-            void primitive_to_conserved(int ni, double *p, double *u)
+            PUBLIC void primitive_to_conserved(int ni, double *p, double *u)
             {
                 FOR_EACH_1D(ni)
                 {
