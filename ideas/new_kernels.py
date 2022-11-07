@@ -26,7 +26,7 @@ from numpy import ndarray
 
 KERNEL_VERBOSE_COMPILE = False
 KERNEL_ENABLE_CACHE = True
-DEFAULT_EXECUTION_MODE = "cpu"
+KERNEL_DEFAULT_EXEC_MODE = "cpu"
 
 
 PY_CTYPE_DICT = {
@@ -80,7 +80,7 @@ if (i >= NI || j >= NJ || k >= NK) return; \
 """
 
 
-def configure_kernel_module(verbose=None, cache=None):
+def configure_kernel_module(verbose=None, cache=None, default_execution_mode=None):
     """
     Configure the module behavior.
 
@@ -89,11 +89,16 @@ def configure_kernel_module(verbose=None, cache=None):
     """
     global KERNEL_VERBOSE_COMPILE
     global KERNEL_ENABLE_CACHE
+    global KERNEL_DEFAULT_EXEC_MODE
 
     if verbose:
         KERNEL_VERBOSE_COMPILE = True
     if cache:
         KERNEL_ENABLE_CACHE = True
+    if default_execution_mode is not None:
+        if default_execution_mode not in ("cpu", "gpu"):
+            raise ValueError("execution mode must be cpu or gpu")
+        KERNEL_DEFAULT_EXEC_MODE = default_execution_mode
 
 
 def argtypes(f):
@@ -184,23 +189,27 @@ def cpu_extension(code, name, define_macros=list()):
         # This is hit when the C compiler fails.
         pass
 
-    raise ValueError(f"compilation of {name} failed")
+    raise ValueError(f"CPU compilation of {name} failed")
 
 
 def gpu_extension(code, name, define_macros=list()):
     try:
         from cupy import RawModule
+        from cupy.cuda.compiler import CompileException
+
+        code = KERNEL_DEFINE_MACROS_GPU + code
+        options = tuple(f"-D {k}={v}" for k, v in define_macros)
+        module = RawModule(code=code, options=options)
+        module.compile()
+        return module
+
     except ImportError as e:
-        print(e)
-        return
+        pass
 
-    code = KERNEL_DEFINE_MACROS_GPU + code
-    options = tuple(f"-D {k}={v}" for k, v in define_macros)
-    module = RawModule(code=code, options=options)
-    module.compile()
-    return module
+    except CompileException as e:
+        print(f"GPU compilation {name} failed:\n {e}")
 
- 
+
 def cpu_extension_function(module, stub, rank):
     """
     Return a function to replace the given stub with a call to a C function.
@@ -270,7 +279,7 @@ def universal_extension_function(cpu_module, gpu_module, stub, rank):
     gpu_func = gpu_extension_function(gpu_module, stub, rank) if gpu_module else None
 
     @wraps(stub)
-    def wrapper(*args, exec_mode=DEFAULT_EXECUTION_MODE):
+    def wrapper(*args, exec_mode=KERNEL_DEFAULT_EXEC_MODE):
         if exec_mode == "cpu":
             return cpu_func(*args)
         if exec_mode == "gpu":
@@ -360,9 +369,31 @@ if __name__ == "__main__":
     # ==============================================================================
     # Example usage of kernel functions and classes
     # ==============================================================================
-    from numpy import array, linspace, zeros_like
-    # from cupy import array, linspace, zeros_like
-    
+
+    from argparse import ArgumentParser
+
+    parser = ArgumentParser()
+    parser.add_argument(
+        "--mode",
+        dest="exec_mode",
+        default="cpu",
+        choices=["cpu", "gpu"],
+        help="execution mode",
+    )
+    parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="verbose output from extension compile stages",
+    )
+    args = parser.parse_args()
+
+    if args.exec_mode == "cpu":
+        from numpy import array, linspace, zeros_like
+    if args.exec_mode == "gpu":
+        from cupy import array, linspace, zeros_like
+
+    configure_kernel_module(verbose=args.verbose, default_execution_mode=args.exec_mode)
+
     # ==============================================================================
     # 1.
     #
@@ -414,7 +445,6 @@ if __name__ == "__main__":
     b = zeros_like(a)
     rank_one_kernel(0.25, a, b)
     assert (b == 0.25 * a).all()
-
 
     # ==============================================================================
     # 3.
