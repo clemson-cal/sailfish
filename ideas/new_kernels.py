@@ -1,10 +1,8 @@
 """
-Enables interaction with raw inline C code.
+Enables interaction with raw inline C or CUDA code.
 
 Functions and class members that defer their implementation C code are called
-kernels. These functions act on numpy arrays.
-
-This module will be generalized to support GPU kernels.
+kernels. Kernels act on numpy or cupy arrays.
 
 Author: Jonathan Zrake (2022)
 """
@@ -81,11 +79,13 @@ if (i >= NI || j >= NJ || k >= NK) return; \
 """
 
 
-def configure_kernel_module(verbose=None,
-                            disable_cache=None,
-                            disable_cpu_mode=None,
-                            disable_gpu_mode=None,
-                            default_exec_mode=None):
+def configure_kernel_module(
+    verbose=None,
+    disable_cache=None,
+    disable_cpu_mode=None,
+    disable_gpu_mode=None,
+    default_exec_mode=None,
+):
     """
     Configure the module behavior.
 
@@ -97,7 +97,7 @@ def configure_kernel_module(verbose=None,
     global KERNEL_DISABLE_CPU_MODE
     global KERNEL_DISABLE_GPU_MODE
     global KERNEL_DEFAULT_EXEC_MODE
-    
+
     if verbose:
         KERNEL_VERBOSE_COMPILE = True
     if disable_cache:
@@ -110,7 +110,7 @@ def configure_kernel_module(verbose=None,
         if default_exec_mode not in ("cpu", "gpu"):
             raise ValueError("execution mode must be cpu or gpu")
         KERNEL_DEFAULT_EXEC_MODE = default_exec_mode
-        
+
 
 def argtypes(f):
     """
@@ -142,7 +142,7 @@ def to_ctypes(args, signature):
             yield arg
 
 
-class ErrorProxyFunction:
+class ProxyFunction:
     def __init__(self, error):
         self._error = error
 
@@ -150,15 +150,15 @@ class ErrorProxyFunction:
         raise self._error
 
 
-class ErrorProxyModule:
+class ProxyModule:
     def __init__(self, error):
         self._error = error
 
     def __getitem__(self, key):
-        return ErrorProxyFunction(self._error)
+        return ProxyFunction(self._error)
 
     def get_function(self, key):
-        return ErrorProxyFunction(self._error)
+        return ProxyFunction(self._error)
 
 
 def cpu_extension(code, name, define_macros=list()):
@@ -179,7 +179,7 @@ def cpu_extension(code, name, define_macros=list()):
     """
 
     if KERNEL_DISABLE_CPU_MODE:
-        return ErrorProxyModule(RuntimeError("CPU mode is disabled"))
+        return ProxyModule(RuntimeError("CPU mode is disabled"))
 
     # Add header macros with for-each loops, etc.
     code = KERNEL_DEFINE_MACROS_CPU + code
@@ -211,7 +211,7 @@ def cpu_extension(code, name, define_macros=list()):
     except ImportError as e:
         # It should not be fatal if cffi is not available, since GPU kernels
         # could still possibly be used.
-        return ErrorProxyModule(e)
+        return ProxyModule(e)
 
     try:
         # If the build product is not already cached, then create it now,
@@ -227,12 +227,12 @@ def cpu_extension(code, name, define_macros=list()):
 
     except VerificationError as e:
         # This is hit when the C compiler fails.
-        return ErrorProxyModule(ValueError(f"CPU compilation of {name} failed"))
+        return ProxyModule(ValueError(f"CPU compilation of {name} failed"))
 
 
 def gpu_extension(code, name, define_macros=list()):
     if KERNEL_DISABLE_GPU_MODE:
-        return ErrorProxyModule(RuntimeError("GPU mode is disabled"))
+        return ProxyModule(RuntimeError("GPU mode is disabled"))
 
     try:
         from cupy import RawModule
@@ -245,10 +245,10 @@ def gpu_extension(code, name, define_macros=list()):
         return module
 
     except ImportError as e:
-        return ErrorProxyModule(e)
+        return ProxyModule(e)
 
     except CompileException as e:
-        return ErrorProxyModule(ValueError(f"GPU compilation {name} failed:\n {e}"))
+        return ProxyModule(ValueError(f"GPU compilation {name} failed:\n {e}"))
 
 
 def cpu_extension_function(module, stub, rank):
@@ -287,7 +287,9 @@ def gpu_extension_function(module, stub, rank):
     gpu_func = module.get_function(stub.__name__)
 
     if "return" in stub.__annotations__:
-        return ErrorProxyFunction(ValueError(f"GPU kernel {stub.__name__} may not return a value"))
+        return ProxyFunction(
+            ValueError(f"GPU kernel {stub.__name__} may not return a value")
+        )
 
     @wraps(stub)
     def wrapper(*args):
@@ -318,7 +320,7 @@ def gpu_extension_function(module, stub, rank):
     return wrapper
 
 
-def universal_extension_function(cpu_module, gpu_module, stub, rank):
+def extension_function(cpu_module, gpu_module, stub, rank):
     cpu_func = cpu_extension_function(cpu_module, stub, rank) if cpu_module else None
     gpu_func = gpu_extension_function(gpu_module, stub, rank) if gpu_module else None
 
@@ -349,7 +351,7 @@ def kernel(code: str = None, rank: int = 0):
     def decorator(stub):
         cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
         gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
-        return universal_extension_function(cpu_module, gpu_module, stub, rank)
+        return extension_function(cpu_module, gpu_module, stub, rank)
 
     return decorator
 
@@ -389,7 +391,7 @@ def kernel_class(cls):
         for kernel in kernels:
             stub = getattr(self, kernel)
             rank = stub.__kernel_rank
-            func = universal_extension_function(cpu_module, gpu_module, stub, rank)
+            func = extension_function(cpu_module, gpu_module, stub, rank)
             setattr(self, kernel, func)
 
     cls.__init__ = __init__
