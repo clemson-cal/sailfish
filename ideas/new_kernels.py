@@ -130,7 +130,6 @@ def cpu_extension(code, name):
         module = CDLL(target)
         if verbose:
             print(f"compiled module {target}")
-
         return module
     except VerificationError:
         # This is hit when the C compiler fails.
@@ -285,7 +284,7 @@ def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float]):
     return x.shape
 
 
-a = linspace(0.0, 1.0, 5000000)
+a = linspace(0.0, 1.0, 5000)
 b = zeros_like(a)
 rank_one_kernel(0.25, a, b)
 
