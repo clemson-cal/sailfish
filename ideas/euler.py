@@ -336,7 +336,7 @@ def main():
         help="grid resolution",
     )
     args = parser.parse_args()
-    
+
     if args.exec_mode == "cpu":
         from numpy import array, linspace, zeros, zeros_like, diff
     if args.exec_mode == "gpu":

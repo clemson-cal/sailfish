@@ -131,6 +131,25 @@ def to_ctypes(args, signature):
             yield arg
 
 
+class ErrorProxyFunction:
+    def __init__(self, error):
+        self._error = error
+
+    def __call__(self, *args):
+        raise self._error
+
+
+class ErrorProxyModule:
+    def __init__(self, error):
+        self._error = error
+
+    def __getitem__(self, key):
+        return ErrorProxyFunction(self._error)
+
+    def get_function(self, key):
+        return ErrorProxyFunction(self._error)
+
+
 def cpu_extension(code, name, define_macros=list()):
     """
     Either build or load a CPU extension module with the given code and name.
@@ -147,7 +166,6 @@ def cpu_extension(code, name, define_macros=list()):
     compiler's stderr should be written to the terminal to aid in identifying
     the compilation error.
     """
-    from cffi import FFI, VerificationError
 
     # Add header macros with for-each loops, etc.
     code = KERNEL_DEFINE_MACROS_CPU + code
@@ -161,6 +179,8 @@ def cpu_extension(code, name, define_macros=list()):
     cache_dir = join(dirname(__file__), "__pycache__", sha.hexdigest())
 
     try:
+        from cffi import FFI, VerificationError
+
         if KERNEL_ENABLE_CACHE:
             # Attempt to load a cached build product based on the hash value
             # of the source code.
@@ -174,6 +194,11 @@ def cpu_extension(code, name, define_macros=list()):
     except (FileNotFoundError, StopIteration):
         pass
 
+    except ImportError as e:
+        # It should not be fatal if cffi is not available, since GPU kernels
+        # could still possibly be used.
+        return ErrorProxyModule(e)
+
     try:
         # If the build product is not already cached, then create it now,
         # and save it to the cache directory. Then load it as a shared
@@ -185,11 +210,10 @@ def cpu_extension(code, name, define_macros=list()):
         if verbose:
             print(f"compiled module {target}")
         return module
-    except VerificationError:
-        # This is hit when the C compiler fails.
-        pass
 
-    raise ValueError(f"CPU compilation of {name} failed")
+    except VerificationError as e:
+        # This is hit when the C compiler fails.
+        return ErrorProxyModule(ValueError(f"CPU compilation of {name} failed"))
 
 
 def gpu_extension(code, name, define_macros=list()):
@@ -204,10 +228,10 @@ def gpu_extension(code, name, define_macros=list()):
         return module
 
     except ImportError as e:
-        pass
+        return ErrorProxyModule(e)
 
     except CompileException as e:
-        print(f"GPU compilation {name} failed:\n {e}")
+        return ErrorProxyModule(ValueError(f"GPU compilation {name} failed:\n {e}"))
 
 
 def cpu_extension_function(module, stub, rank):
@@ -244,6 +268,9 @@ def cpu_extension_function(module, stub, rank):
 
 def gpu_extension_function(module, stub, rank):
     gpu_func = module.get_function(stub.__name__)
+
+    if "return" in stub.__annotations__:
+        return ErrorProxyFunction(f"GPU kernel {stub.__name__} may not return a value")
 
     @wraps(stub)
     def wrapper(*args):
@@ -401,23 +428,21 @@ if __name__ == "__main__":
     # provided as an argument to the kernel decorator function.
     # ==============================================================================
 
-    # DISABLED UNTIL NON-NONE RETURN TYPE IS RECOGNIZED AND GPU COMPILE DISABLED
+    code = R"""
+    PUBLIC double multiply(int a, double b)
+    {
+        return a * b;
+    }
+    """
 
-    # code = R"""
-    # PUBLIC double multiply(int a, double b)
-    # {
-    #     return a * b;
-    # }
-    # """
+    @kernel(code)
+    def multiply(a: int, b: float) -> float:
+        """
+        Return the product of an integer a and a float b.
+        """
+        pass
 
-    # @kernel(code)
-    # def multiply(a: int, b: float) -> float:
-    #     """
-    #     Return the product of an integer a and a float b.
-    #     """
-    #     pass
-
-    # assert multiply(5, 25.0) == 125.0
+    assert multiply(5, 25.0) == 125.0
 
     # ==============================================================================
     # 2.
