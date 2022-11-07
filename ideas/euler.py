@@ -1,7 +1,87 @@
 from contextlib import contextmanager
 from time import perf_counter
 from numpy.typing import NDArray
-from new_kernels import kernel_class, kernel_method, configure_kernel_module
+from new_kernels import kernel, kernel_class, kernel_method, configure_kernel_module
+
+
+@kernel(rank=1)
+def plm_gradient(
+    y: NDArray[float],
+    g: NDArray[float],
+    nfields: int,
+    plm_theta: float,
+):
+    R"""
+    #define min2(a, b) ((a) < (b) ? (a) : (b))
+    #define max2(a, b) ((a) > (b) ? (a) : (b))
+    #define min3(a, b, c) min2(a, min2(b, c))
+    #define max3(a, b, c) max2(a, max2(b, c))
+    #define sign(x) copysign(1.0, x)
+    #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
+
+    PRIVATE double plm_gradient_scalar(double yl, double y0, double yr, double plm_theta)
+    {
+        double a = (y0 - yl) * plm_theta;
+        double b = (yr - yl) * 0.5;
+        double c = (yr - y0) * plm_theta;
+        return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
+    }
+
+    PUBLIC void plm_gradient(int ni, double *y, double *g, int nfields, double plm_theta)
+    {
+        FOR_EACH_1D(ni)
+        {
+            int ii = i;
+            int il = i ==      0 ?      0 : i - 1;
+            int ir = i == ni - 1 ? ni - 1 : i + 1;
+
+            double *yl = &y[il * nfields];
+            double *yi = &y[ii * nfields];
+            double *yr = &y[ir * nfields];
+            double *gi = &g[ii * nfields];
+
+            for (int q = 0; q < nfields; ++q)
+            {
+                gi[q] = plm_gradient_scalar(yl[q], yi[q], yr[q], plm_theta);
+            }
+        }
+    }
+    """
+    if y.shape != g.shape:
+        raise ValueError("y and g must have the same shape")
+    if y.shape[1] != nfields:
+        raise ValueError("array must have size nfields on last axis")
+    if not 1.0 <= plm_theta <= 2.0:
+        raise ValueError("theta value must be between 1.0 and 2.0")
+    return (y.shape[0],)
+
+
+@kernel(rank=1)
+def extrapolate(
+    y: NDArray[float],
+    g: NDArray[float],
+    ym: NDArray[float],
+    yp: NDArray[float],
+    nfields: int,
+):
+    R"""
+    PUBLIC void extrapolate(int ni, double *y, double *g, double *ym, double *yp, int nfields)
+    {
+        FOR_EACH_1D(ni)
+        {
+            for (int q = 0; q < nfields; ++q)
+            {
+                ym[i * nfields + q] = y[i * nfields + q] - 0.5 * g[i * nfields + q];
+                yp[i * nfields + q] = y[i * nfields + q] + 0.5 * g[i * nfields + q];
+            }
+        }
+    }
+    """
+    if not all(y.shape == s for s in (g.shape, ym.shape, yp.shape)):
+        raise ValueError("arguments must have the same shape")
+    if y.shape[1] != nfields:
+        raise ValueError("array must have size nfields on last axis")
+    return (y.shape[0],)
 
 
 @kernel_class
@@ -316,16 +396,16 @@ def main():
 
     parser = ArgumentParser()
     parser.add_argument(
+        "--verbose",
+        action="store_true",
+        help="verbose output from extension compile stages",
+    )
+    parser.add_argument(
         "--mode",
         dest="exec_mode",
         default="cpu",
         choices=["cpu", "gpu"],
         help="execution mode",
-    )
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="verbose output from extension compile stages",
     )
     parser.add_argument(
         "--resolution",
@@ -334,6 +414,16 @@ def main():
         type=int,
         default=100000,
         help="grid resolution",
+    )
+    parser.add_argument(
+        "--plm",
+        action="store_true",
+        help="use PLM reconstruction for second-order in space",
+    )
+    parser.add_argument(
+        "--plot",
+        action="store_true",
+        help="show a plot after the run",
     )
     args = parser.parse_args()
 
@@ -350,7 +440,10 @@ def main():
     fold = 100
     dt = dx * 1e-1
     p = zeros((num_zones, solver.ncons))
+    pp = zeros((num_zones, solver.ncons))
+    pm = zeros((num_zones, solver.ncons))
     u = zeros_like(p)
+    g = zeros_like(p)
     fhat = zeros((num_zones - 1, solver.ncons))
 
     p[: num_zones // 2, :] = array([1.0] + solver.dim * [0.0] + [1.0])
@@ -361,8 +454,16 @@ def main():
     while t < 0.1:
         with measure_time() as fold_time:
             for _ in range(fold):
-                pr = p[+1:]
-                pl = p[:-1]
+                if args.plm:
+                    plm_gradient(p, g, solver.ncons, 1.5)
+                    extrapolate(p, g, pm, pp, solver.ncons)
+                    pl = pp[:-1]
+                    pr = pm[+1:]
+
+                else:
+                    pl = p[:-1]
+                    pr = p[+1:]
+
                 solver.godunov_flux(pl, pr, fhat, 1)
                 solver.prim_to_cons(p, u)
                 u[1:-1] -= diff(fhat, axis=0) * (dt / dx)
@@ -373,11 +474,11 @@ def main():
         kzps = num_zones / fold_time() * 1e-3 * fold
         print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
 
-    exit()
-    from matplotlib import pyplot as plt
+    if args.plot:
+        from matplotlib import pyplot as plt
 
-    plt.plot(p[:, 0])
-    plt.show()
+        plt.plot(p[:, 0])
+        plt.show()
 
 
 main()
