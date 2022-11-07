@@ -235,7 +235,7 @@ class Solver:
             }
         }
         """
-        return (u.size // self.ncons(),)
+        return (u.size // self.ncons,)
 
     @kernel_method(rank=1)
     def prim_to_cons(self, p: NDArray[float], u: NDArray[float]):
@@ -248,7 +248,7 @@ class Solver:
             }
         }
         """
-        return (p.size // self.ncons(),)
+        return (p.size // self.ncons,)
 
     @kernel_method(rank=1)
     def prim_to_flux(self, p: NDArray[float], f: NDArray[float], direction: int):
@@ -264,7 +264,7 @@ class Solver:
             }
         }
         """
-        return (p.size // self.ncons(),)
+        return (p.size // self.ncons,)
 
     @kernel_method(rank=1)
     def max_wavespeed(self, p: NDArray[float], a: NDArray[float]):
@@ -277,7 +277,7 @@ class Solver:
             }
         }
         """
-        return (p.size // self.ncons(),)
+        return (p.size // self.ncons,)
 
     @kernel_method(rank=1)
     def godunov_flux(
@@ -296,13 +296,13 @@ class Solver:
             }
         }
         """
-        return (fhat.size // self.ncons(),)
+        return (fhat.size // self.ncons,)
 
-    def ncons(self):
-        return self.define_macros["DIM"] + 2
-
-    def dim(self):
-        return self.define_macros["DIM"]
+    def __init__(self, dim=1, gamma_law_index=5.0 / 3):
+        self.ncons = dim + 2
+        self.dim = dim
+        self.gamma_law_index = gamma_law_index
+        self.define_macros = [("GAMMA_LAW_INDEX", gamma_law_index), ("DIM", dim)]
 
 
 @contextmanager
@@ -316,19 +316,18 @@ def main():
     from matplotlib import pyplot as plt
 
     configure_kernel_module(verbose=False)
-
-    solver = Solver(define_macros=[("GAMMA_LAW_INDEX", "5.0 / 3.0"), ("DIM", 1)])
+    solver = Solver(dim=1, gamma_law_index=5.0 / 3.0)
 
     num_zones = 20000
     dx = 1.0 / num_zones
     fold = 100
     dt = dx * 1e-1
-    p = zeros((num_zones, solver.ncons()))
+    p = zeros((num_zones, solver.ncons))
     u = zeros_like(p)
-    fhat = zeros((num_zones - 1, solver.ncons()))
+    fhat = zeros((num_zones - 1, solver.ncons))
 
-    p[: num_zones // 2, :] = [1.0] + solver.dim() * [0.0] + [1.0]
-    p[num_zones // 2 :, :] = [0.1] + solver.dim() * [0.0] + [0.125]
+    p[: num_zones // 2, :] = [1.0] + solver.dim * [0.0] + [1.0]
+    p[num_zones // 2 :, :] = [0.1] + solver.dim * [0.0] + [0.125]
     t = 0.0
     n = 0
 

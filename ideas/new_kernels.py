@@ -4,8 +4,7 @@ Enables interaction with raw inline C code.
 Functions and class members that defer their implementation C code are called
 kernels. These functions act on numpy arrays.
 
-This code can be easily generalized such that code is also compiled to GPU
-kernels.
+This module will be generalized to support GPU kernels.
 
 Author: Jonathan Zrake (2022)
 """
@@ -96,7 +95,7 @@ def to_ctypes(args, signature):
             yield arg
 
 
-def cpu_extension(code, name, define_macros):
+def cpu_extension(code, name, define_macros=list()):
     """
     Either build or load a CPU extension module with the given code and name.
 
@@ -105,7 +104,8 @@ def cpu_extension(code, name, define_macros):
     resulting build product is cached in the __pycache__ directory, under a
     subdirectory named by the hash (SHA-256) of the code string. If the module
     variable `KERNEL_ENABLE_CACHE` is `True`, then an attempt is made to load
-    a module with the given hash, otherwise one is recompiled.
+    a module with the given hash, otherwise it is compiled even if a cached
+    version was found.
 
     This method can fail with a `ValueError` if the compilation fails. The
     compiler's stderr should be written to the terminal to aid in identifying
@@ -197,7 +197,7 @@ def kernel(code: str = None, rank: int = 0):
     The stub function is a Python function that simply inspects its arguments
     and returns a shape for the kernel invocation. The kernel is a function
     compiled from C code that can be parallelized in some way, and is compiled
-    to either CPU or GPU code, or possibly both,
+    to either CPU or GPU code.
     """
 
     def decorator(stub):
@@ -215,10 +215,17 @@ def kernel_class(cls):
     C code at the time a kernel class is instantiated; the extension module is
     built (or loaded) lazily. This also creates an opportunity for the calling
     Python functions to manipulate the kernel class C code in custom ways
-    for each kernel class instance / physical extension module.
+    for each kernel class instance.
+
+    If the wrapped class has a property `define_macros` (list of key-value
+    tuples), its value will be passed to the `cpu_extension` function.
     """
 
-    def __init__(self, define_macros=None):
+    cls_init = cls.__init__
+
+    def __init__(self, **kwargs):
+        cls_init(self, **kwargs)
+
         code = cls.__doc__
         kernels = list()
 
@@ -228,6 +235,7 @@ def kernel_class(cls):
                 code += f.__kernel_code or dedent(f.__doc__)
                 kernels.append(k)
 
+        define_macros = getattr(self, "define_macros", list())
         module = cpu_extension(code, cls.__name__, define_macros)
 
         for kernel in kernels:
@@ -235,8 +243,6 @@ def kernel_class(cls):
             rank = stub.__kernel_rank
             func = cpu_extension_function(module, stub, rank)
             setattr(self, kernel, func)
-
-        self.define_macros = dict(define_macros or list())
 
     cls.__init__ = __init__
     return cls
@@ -330,37 +336,6 @@ if __name__ == "__main__":
         def conserved_to_primitive(self, u: NDArray[float], p: NDArray[float]):
             R"""
             //
-            // Compute the conversion of primitive variables to conserved ones.
-            //
-            void primitive_to_conserved(int ni, double *p, double *u)
-            {
-                FOR_EACH_1D(ni)
-                {
-                    double rho = p[5 * i + 0];
-                    double vx  = p[5 * i + 1];
-                    double vy  = p[5 * i + 2];
-                    double vz  = p[5 * i + 3];
-                    double pre = p[5 * i + 4];
-                    double v_squared = vx * vx + vy * vy + vz * vz;
-
-                    u[5 * i + 0] = rho;
-                    u[5 * i + 1] = vx * rho;
-                    u[5 * i + 2] = vy * rho;
-                    u[5 * i + 3] = vz * rho;
-                    u[5 * i + 4] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
-                }
-            }
-            """
-            if u.shape[-1] != 5:
-                raise ValueError("u.shape[-1] must be 5")
-            if u.shape != p.shape:
-                raise ValueError("u and p must have the same shape")
-            return (u.size // 5,)
-
-        @kernel_method(rank=1)
-        def primitive_to_conserved(self, p: NDArray[float], u: NDArray[float]):
-            R"""
-            //
             // Compute the conversion of conserved variables to primitive ones.
             //
             void conserved_to_primitive(int ni, double *u, double *p)
@@ -387,6 +362,37 @@ if __name__ == "__main__":
             if p.shape != u.shape:
                 raise ValueError("p and u must have the same shape")
             return (p.size // 5,)
+
+        @kernel_method(rank=1)
+        def primitive_to_conserved(self, p: NDArray[float], u: NDArray[float]):
+            R"""
+            //
+            // Compute the conversion of primitive variables to conserved ones.
+            //
+            void primitive_to_conserved(int ni, double *p, double *u)
+            {
+                FOR_EACH_1D(ni)
+                {
+                    double rho = p[5 * i + 0];
+                    double vx  = p[5 * i + 1];
+                    double vy  = p[5 * i + 2];
+                    double vz  = p[5 * i + 3];
+                    double pre = p[5 * i + 4];
+                    double v_squared = vx * vx + vy * vy + vz * vz;
+
+                    u[5 * i + 0] = rho;
+                    u[5 * i + 1] = vx * rho;
+                    u[5 * i + 2] = vy * rho;
+                    u[5 * i + 3] = vz * rho;
+                    u[5 * i + 4] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+                }
+            }
+            """
+            if u.shape[-1] != 5:
+                raise ValueError("u.shape[-1] must be 5")
+            if u.shape != p.shape:
+                raise ValueError("u and p must have the same shape")
+            return (u.size // 5,)
 
     solver = Solver()
     p = array([[1.0, 0.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 0.0, 1.0]])
