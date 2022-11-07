@@ -227,155 +227,146 @@ def kernel_method(rank: int = 0, code: str = None):
     return decorator
 
 
-# ==============================================================================
-# Example usage of kernel functions and classes
-# ==============================================================================
-from numpy import array, linspace, zeros_like
+if __name__ == "__main__":
+    # ==============================================================================
+    # Example usage of kernel functions and classes
+    # ==============================================================================
+    from numpy import array, linspace, zeros_like
 
+    # ==============================================================================
+    # 1.
+    #
+    # Demonstrates a rank-0 kernel function. The C source for this example is
+    # provided as an argument to the kernel decorator function.
+    # ==============================================================================
 
-# ==============================================================================
-# 1.
-#
-# Demonstrates a rank-0 kernel function. The C source for this example is
-# provided as an argument to the kernel decorator function.
-# ==============================================================================
-
-
-code = R"""
-double multiply(int a, double b)
-{
-    return a * b;
-}
-"""
-
-
-@kernel(code)
-def multiply(a: int, b: float) -> float:
-    """
-    Return the product of an integer a and a float b.
-    """
-    pass
-
-
-assert multiply(5, 25.0) == 125.0
-
-
-# ==============================================================================
-# 2.
-#
-# Demonstrates a rank-1 kernel function. The C source for this example is
-# written in the doc string.
-# ==============================================================================
-
-
-@kernel(rank=1)
-def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float]):
-    R"""
-    void rank_one_kernel(int ni, double a, double *x, double *y)
+    code = R"""
+    double multiply(int a, double b)
     {
-        FOR_EACH_1D(ni)
-        {
-            y[i] = x[i] * a;
-        }
+        return a * b;
     }
     """
-    if x.shape != y.shape:
-        raise ValueError("input and output arrays have different shapes")
-    return x.shape
 
+    @kernel(code)
+    def multiply(a: int, b: float) -> float:
+        """
+        Return the product of an integer a and a float b.
+        """
+        pass
 
-a = linspace(0.0, 1.0, 5000)
-b = zeros_like(a)
-rank_one_kernel(0.25, a, b)
+    assert multiply(5, 25.0) == 125.0
 
-assert (b == 0.25 * a).all()
+    # ==============================================================================
+    # 2.
+    #
+    # Demonstrates a rank-1 kernel function. The C source for this example is
+    # written in the doc string.
+    # ==============================================================================
 
-
-# ==============================================================================
-# 3.
-#
-# Demonstrates a kernel class, containing two kernel methods where the C code
-# is written in the stub doc strings. The kernel methods must be static,
-# meaning they do not take self or cls as the first argument. Code in the
-# class doc string is included at the top of the resulting source code.
-# ==============================================================================
-
-
-@kernel_class
-class Solver:
-    R"""
-    static const double gamma_law_index = 5.0 / 3.0;
-    """
-
-    @kernel_method(rank=1)
-    def conserved_to_primitive(u: NDArray[float], p: NDArray[float]):
+    @kernel(rank=1)
+    def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float]):
         R"""
-        //
-        // Compute the conversion of primitive variables to conserved ones.
-        //
-        void primitive_to_conserved(int ni, double *p, double *u)
+        void rank_one_kernel(int ni, double a, double *x, double *y)
         {
             FOR_EACH_1D(ni)
             {
-                double rho = p[5 * i + 0];
-                double vx  = p[5 * i + 1];
-                double vy  = p[5 * i + 2];
-                double vz  = p[5 * i + 3];
-                double pre = p[5 * i + 4];
-                double v_squared = vx * vx + vy * vy + vz * vz;
-
-                u[5 * i + 0] = rho;
-                u[5 * i + 1] = vx * rho;
-                u[5 * i + 2] = vy * rho;
-                u[5 * i + 3] = vz * rho;
-                u[5 * i + 4] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+                y[i] = x[i] * a;
             }
         }
         """
-        if u.shape[-1] != 5:
-            raise ValueError("u.shape[-1] must be 5")
-        if u.shape != p.shape:
-            raise ValueError("u and p must have the same shape")
-        return (u.size // 5,)
+        if x.shape != y.shape:
+            raise ValueError("input and output arrays have different shapes")
+        return x.shape
 
-    @kernel_method(rank=1)
-    def primitive_to_conserved(p: NDArray[float], u: NDArray[float]):
+    a = linspace(0.0, 1.0, 5000)
+    b = zeros_like(a)
+    rank_one_kernel(0.25, a, b)
+
+    assert (b == 0.25 * a).all()
+
+    # ==============================================================================
+    # 3.
+    #
+    # Demonstrates a kernel class, containing two kernel methods where the C code
+    # is written in the stub doc strings. The kernel methods must be static,
+    # meaning they do not take self or cls as the first argument. Code in the
+    # class doc string is included at the top of the resulting source code.
+    # ==============================================================================
+
+    @kernel_class
+    class Solver:
         R"""
-        //
-        // Compute the conversion of conserved variables to primitive ones.
-        //
-        void conserved_to_primitive(int ni, double *u, double *p)
-        {
-            FOR_EACH_1D(ni)
-            {
-                double rho = u[5 * i + 0];
-                double px  = u[5 * i + 1];
-                double py  = u[5 * i + 2];
-                double pz  = u[5 * i + 3];
-                double nrg = u[5 * i + 4];
-                double p_squared = px * px + py * py + pz * pz;
-
-                p[5 * i + 0] = rho;
-                p[5 * i + 1] = px / rho;
-                p[5 * i + 2] = py / rho;
-                p[5 * i + 3] = py / rho;
-                p[5 * i + 4] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
-            }
-        }
+        static const double gamma_law_index = 5.0 / 3.0;
         """
-        if p.shape[-1] != 5:
-            raise ValueError("p.shape[-1] must be 5")
-        if p.shape != u.shape:
-            raise ValueError("p and u must have the same shape")
-        return (p.size // 5,)
 
+        @kernel_method(rank=1)
+        def conserved_to_primitive(u: NDArray[float], p: NDArray[float]):
+            R"""
+            //
+            // Compute the conversion of primitive variables to conserved ones.
+            //
+            void primitive_to_conserved(int ni, double *p, double *u)
+            {
+                FOR_EACH_1D(ni)
+                {
+                    double rho = p[5 * i + 0];
+                    double vx  = p[5 * i + 1];
+                    double vy  = p[5 * i + 2];
+                    double vz  = p[5 * i + 3];
+                    double pre = p[5 * i + 4];
+                    double v_squared = vx * vx + vy * vy + vz * vz;
 
-solver = Solver()
-p = array([[1.0, 0.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 0.0, 1.0]])
-u = zeros_like(p)
-q = zeros_like(p)
+                    u[5 * i + 0] = rho;
+                    u[5 * i + 1] = vx * rho;
+                    u[5 * i + 2] = vy * rho;
+                    u[5 * i + 3] = vz * rho;
+                    u[5 * i + 4] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+                }
+            }
+            """
+            if u.shape[-1] != 5:
+                raise ValueError("u.shape[-1] must be 5")
+            if u.shape != p.shape:
+                raise ValueError("u and p must have the same shape")
+            return (u.size // 5,)
 
-solver.primitive_to_conserved(p, u)
-solver.conserved_to_primitive(u, q)
+        @kernel_method(rank=1)
+        def primitive_to_conserved(p: NDArray[float], u: NDArray[float]):
+            R"""
+            //
+            // Compute the conversion of conserved variables to primitive ones.
+            //
+            void conserved_to_primitive(int ni, double *u, double *p)
+            {
+                FOR_EACH_1D(ni)
+                {
+                    double rho = u[5 * i + 0];
+                    double px  = u[5 * i + 1];
+                    double py  = u[5 * i + 2];
+                    double pz  = u[5 * i + 3];
+                    double nrg = u[5 * i + 4];
+                    double p_squared = px * px + py * py + pz * pz;
 
-assert (p == q).all()
+                    p[5 * i + 0] = rho;
+                    p[5 * i + 1] = px / rho;
+                    p[5 * i + 2] = py / rho;
+                    p[5 * i + 3] = py / rho;
+                    p[5 * i + 4] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
+                }
+            }
+            """
+            if p.shape[-1] != 5:
+                raise ValueError("p.shape[-1] must be 5")
+            if p.shape != u.shape:
+                raise ValueError("p and u must have the same shape")
+            return (p.size // 5,)
+
+    solver = Solver()
+    p = array([[1.0, 0.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 0.0, 1.0]])
+    u = zeros_like(p)
+    q = zeros_like(p)
+
+    solver.primitive_to_conserved(p, u)
+    solver.conserved_to_primitive(u, q)
+
+    assert (p == q).all()

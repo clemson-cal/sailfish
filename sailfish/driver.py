@@ -306,7 +306,6 @@ def simulate(driver):
     This function is a generator: it yields its state at a sequence of
     pause points, defined by the `events` dictionary.
     """
-    from time import perf_counter
     from sailfish import __version__ as version
     from sailfish.kernel.system import configure_build, log_system_info, measure_time
     from sailfish.event import Recurrence
