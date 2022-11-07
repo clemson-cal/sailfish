@@ -25,9 +25,10 @@ from numpy import ndarray
 
 
 KERNEL_VERBOSE_COMPILE = False
-KERNEL_ENABLE_CACHE = True
+KERNEL_DISABLE_CACHE = True
+KERNEL_DISABLE_CPU_MODE = False
+KERNEL_DISABLE_GPU_MODE = False
 KERNEL_DEFAULT_EXEC_MODE = "cpu"
-
 
 PY_CTYPE_DICT = {
     int: c_int,
@@ -80,7 +81,11 @@ if (i >= NI || j >= NJ || k >= NK) return; \
 """
 
 
-def configure_kernel_module(verbose=None, cache=None, default_exec_mode=None):
+def configure_kernel_module(verbose=None,
+                            disable_cache=None,
+                            disable_cpu_mode=None,
+                            disable_gpu_mode=None,
+                            default_exec_mode=None):
     """
     Configure the module behavior.
 
@@ -88,18 +93,24 @@ def configure_kernel_module(verbose=None, cache=None, default_exec_mode=None):
     from conspicuous / obvious locations of the user application.
     """
     global KERNEL_VERBOSE_COMPILE
-    global KERNEL_ENABLE_CACHE
+    global KERNEL_DISABLE_CACHE
+    global KERNEL_DISABLE_CPU_MODE
+    global KERNEL_DISABLE_GPU_MODE
     global KERNEL_DEFAULT_EXEC_MODE
-
+    
     if verbose:
         KERNEL_VERBOSE_COMPILE = True
-    if cache:
-        KERNEL_ENABLE_CACHE = True
+    if disable_cache:
+        KERNEL_DISABLE_CACHE = True
+    if disable_cpu_mode:
+        KERNEL_DISABLE_CPU_MODE = True
+    if disable_gpu_mode:
+        KERNEL_DISABLE_GPU_MODE = True
     if default_exec_mode is not None:
         if default_exec_mode not in ("cpu", "gpu"):
             raise ValueError("execution mode must be cpu or gpu")
         KERNEL_DEFAULT_EXEC_MODE = default_exec_mode
-
+        
 
 def argtypes(f):
     """
@@ -158,7 +169,7 @@ def cpu_extension(code, name, define_macros=list()):
     pre-pending the contents of the `KERNEL_DEFINE_MACROS` module string. The
     resulting build product is cached in the __pycache__ directory, under a
     subdirectory named by the hash (SHA-256) of the code string. If the module
-    variable `KERNEL_ENABLE_CACHE` is `True`, then an attempt is made to load
+    variable `KERNEL_DISABLE_CACHE` is `False`, then an attempt is made to load
     a module with the given hash, otherwise it is compiled even if a cached
     version was found.
 
@@ -166,6 +177,9 @@ def cpu_extension(code, name, define_macros=list()):
     compiler's stderr should be written to the terminal to aid in identifying
     the compilation error.
     """
+
+    if KERNEL_DISABLE_CPU_MODE:
+        return ErrorProxyModule(RuntimeError("CPU mode is disabled"))
 
     # Add header macros with for-each loops, etc.
     code = KERNEL_DEFINE_MACROS_CPU + code
@@ -181,7 +195,7 @@ def cpu_extension(code, name, define_macros=list()):
     try:
         from cffi import FFI, VerificationError
 
-        if KERNEL_ENABLE_CACHE:
+        if not KERNEL_DISABLE_CACHE:
             # Attempt to load a cached build product based on the hash value
             # of the source code.
             target = join(
@@ -217,6 +231,9 @@ def cpu_extension(code, name, define_macros=list()):
 
 
 def gpu_extension(code, name, define_macros=list()):
+    if KERNEL_DISABLE_GPU_MODE:
+        return ErrorProxyModule(RuntimeError("GPU mode is disabled"))
+
     try:
         from cupy import RawModule
         from cupy.cuda.compiler import CompileException
@@ -270,7 +287,7 @@ def gpu_extension_function(module, stub, rank):
     gpu_func = module.get_function(stub.__name__)
 
     if "return" in stub.__annotations__:
-        return ErrorProxyFunction(f"GPU kernel {stub.__name__} may not return a value")
+        return ErrorProxyFunction(ValueError(f"GPU kernel {stub.__name__} may not return a value"))
 
     @wraps(stub)
     def wrapper(*args):
@@ -425,7 +442,9 @@ if __name__ == "__main__":
     # 1.
     #
     # Demonstrates a rank-0 kernel function. The C source for this example is
-    # provided as an argument to the kernel decorator function.
+    # provided as an argument to the kernel decorator function. Note that native
+    # functions that return a value cannot be GPU kernels, but they can be CPU
+    # kernels.
     # ==============================================================================
 
     code = R"""
@@ -442,7 +461,8 @@ if __name__ == "__main__":
         """
         pass
 
-    assert multiply(5, 25.0) == 125.0
+    if args.exec_mode != "gpu":
+        assert multiply(5, 25.0) == 125.0
 
     # ==============================================================================
     # 2.
