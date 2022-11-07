@@ -193,24 +193,35 @@ def kernel(code: str = None, rank: int = 0):
 def kernel_class(cls):
     """
     A decorator for classes that contains kernel stubs.
+
+    The class instance is given a custom __init__ which compiles the attached
+    C code at the time a kernel class is instantiated; the extension module is
+    built (or loaded) lazily. This also creates an opportunity for the calling
+    Python functions to manipulate the kernel class C code in custom ways
+    for each kernel class instance / physical extension module.
     """
-    code = cls.__doc__
-    kernels = list()
 
-    for k in dir(cls):
-        f = getattr(cls, k)
-        if hasattr(f, "__kernel_code"):
-            code += f.__kernel_code or dedent(f.__doc__)
-            kernels.append(k)
+    def __init__(self, define_macros=None):
+        code = cls.__doc__
+        kernels = list()
 
-    module = cpu_extension(code, cls.__name__)
+        for k in dir(cls):
+            f = getattr(self, k)
+            if hasattr(f, "__kernel_code"):
+                code += f.__kernel_code or dedent(f.__doc__)
+                kernels.append(k)
 
-    for kernel in kernels:
-        stub = getattr(cls, kernel)
-        rank = stub.__kernel_rank
-        func = cpu_extension_function(module, stub, rank)
-        setattr(cls, kernel, staticmethod(func))
+        module = cpu_extension(code, cls.__name__, define_macros)
 
+        for kernel in kernels:
+            stub = getattr(self, kernel)
+            rank = stub.__kernel_rank
+            func = cpu_extension_function(module, stub, rank)
+            setattr(self, kernel, func)
+
+        self.define_macros = dict(define_macros or list())
+
+    cls.__init__ = __init__
     return cls
 
 
@@ -287,10 +298,9 @@ if __name__ == "__main__":
     # ==============================================================================
     # 3.
     #
-    # Demonstrates a kernel class, containing two kernel methods where the C code
-    # is written in the stub doc strings. The kernel methods must be static,
-    # meaning they do not take self or cls as the first argument. Code in the
-    # class doc string is included at the top of the resulting source code.
+    # Demonstrates a kernel class, containing two kernel methods where the C
+    # code is written in the stub doc strings. Code in the class doc string is
+    # included at the top of the resulting source code.
     # ==============================================================================
 
     @kernel_class
@@ -300,7 +310,7 @@ if __name__ == "__main__":
         """
 
         @kernel_method(rank=1)
-        def conserved_to_primitive(u: NDArray[float], p: NDArray[float]):
+        def conserved_to_primitive(self, u: NDArray[float], p: NDArray[float]):
             R"""
             //
             // Compute the conversion of primitive variables to conserved ones.
@@ -331,7 +341,7 @@ if __name__ == "__main__":
             return (u.size // 5,)
 
         @kernel_method(rank=1)
-        def primitive_to_conserved(p: NDArray[float], u: NDArray[float]):
+        def primitive_to_conserved(self, p: NDArray[float], u: NDArray[float]):
             R"""
             //
             // Compute the conversion of conserved variables to primitive ones.
