@@ -1,7 +1,7 @@
 from contextlib import contextmanager
 from time import perf_counter
 from numpy.typing import NDArray
-from new_kernels import kernel_class, kernel_method
+from new_kernels import kernel_class, kernel_method, configure_kernel_module
 
 
 @kernel_class
@@ -12,56 +12,179 @@ class Solver:
     #define min3(a, b, c) min2(a, min2(b, c))
     #define max3(a, b, c) max2(a, max2(b, c))
 
-    static const double gamma_law_index = 5.0 / 3.0;
+    #ifndef DIM
+    #define DIM 1
+    #endif
+
+    #if DIM == 1
+    #define NCONS 3
+    #define RHO 0
+    #define VXX 1
+    #define PRE 2
+    #define DEN 0
+    #define PXX 1
+    #define NRG 2
+    #elif DIM == 2
+    #define NCONS 4
+    #define RHO 0
+    #define VXX 1
+    #define VYY 2
+    #define PRE 3
+    #define DEN 0
+    #define PXX 1
+    #define PYY 2
+    #define NRG 3
+    #elif DIM == 3
+    #define NCONS 5
+    #define RHO 0
+    #define VXX 1
+    #define VYY 2
+    #define VZZ 3
+    #define PRE 4
+    #define DEN 0
+    #define PXX 1
+    #define PYY 2
+    #define PZZ 3
+    #define NRG 4
+    #endif
+
+    #ifndef GAMMA_LAW_INDEX
+    #define GAMMA_LAW_INDEX (5.0 / 3.0)
+    #endif
+
+    static const double gamma_law_index = GAMMA_LAW_INDEX;
 
     static void _prim_to_cons(double *p, double *u)
     {
-        double rho = p[0];
-        double vx  = p[1];
-        double vy  = p[2];
-        double vz  = p[3];
-        double pre = p[4];
-        double v_squared = vx * vx + vy * vy + vz * vz;
+        #if DIM == 1
+        double rho = p[RHO];
+        double vx  = p[VXX];
+        double pre = p[PRE];
+        double v_squared = vx * vx;
+        u[DEN] = rho;
+        u[PXX] = vx * rho;
+        u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
 
-        u[0] = rho;
-        u[1] = vx * rho;
-        u[2] = vy * rho;
-        u[3] = vz * rho;
-        u[4] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+        #elif DIM == 2
+        double rho = p[RHO];
+        double vx  = p[VXX];
+        double vy  = p[VYY];
+        double pre = p[PRE];
+        double v_squared = vx * vx + vy * vy;
+        u[DEN] = rho;
+        u[PXX] = vx * rho;
+        u[PYY] = vy * rho;
+        u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+
+        #elif DIM == 3
+        double rho = p[RHO];
+        double vx  = p[VXX];
+        double vy  = p[VYY];
+        double vz  = p[VZZ];
+        double pre = p[PRE];
+        double v_squared = vx * vx + vy * vy + vz * vz;
+        u[DEN] = rho;
+        u[PXX] = vx * rho;
+        u[PYY] = vy * rho;
+        u[PZZ] = vz * rho;
+        u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
+        #endif
     }
 
     static void _cons_to_prim(double *u, double *p)
     {
-        double rho = u[0];
-        double px  = u[1];
-        double py  = u[2];
-        double pz  = u[3];
-        double nrg = u[4];
-        double p_squared = px * px + py * py + pz * pz;
+        #if DIM == 1
+        double rho = u[DEN];
+        double px  = u[PXX];
+        double nrg = u[NRG];
+        double p_squared = px * px;
+        p[RHO] = rho;
+        p[VXX] = px / rho;
+        p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
 
-        p[0] = rho;
-        p[1] = px / rho;
-        p[2] = py / rho;
-        p[3] = py / rho;
-        p[4] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
+        #elif DIM == 2
+        double rho = u[DEN];
+        double px  = u[PXX];
+        double py  = u[PYY];
+        double nrg = u[NRG];
+        double p_squared = px * px + py * py;
+        p[RHO] = rho;
+        p[VXX] = px / rho;
+        p[VYY] = py / rho;
+        p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
+
+        #elif DIM == 3
+        double rho = u[DEN];
+        double px  = u[PXX];
+        double py  = u[PYY];
+        double pz  = u[PZZ];
+        double nrg = u[NRG];
+        double p_squared = px * px + py * py + pz * pz;
+        p[RHO] = rho;
+        p[VXX] = px / rho;
+        p[VYY] = py / rho;
+        p[VZZ] = py / rho;
+        p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
+        #endif
     }
 
     static void _prim_to_flux(double *p, double *u, double *f, int direction)
     {
-        double pre = p[4];
-        double nrg = u[4];
+        double pre = p[PRE];
+        double nrg = u[NRG];
         double vn = p[direction];
 
-        f[0] = vn * u[0];
-        f[1] = vn * u[1] + pre * (direction == 1);
-        f[2] = vn * u[2] + pre * (direction == 2);
-        f[3] = vn * u[3] + pre * (direction == 3);
-        f[4] = vn * (nrg + pre);
+        #if DIM == 1
+        f[DEN] = vn * u[DEN];
+        f[PXX] = vn * u[PXX] + pre * (direction == 1);
+        f[NRG] = vn * (nrg + pre);
+
+        #elif DIM == 2
+        f[DEN] = vn * u[DEN];
+        f[PXX] = vn * u[PXX] + pre * (direction == 1);
+        f[PYY] = vn * u[PYY] + pre * (direction == 2);
+        f[NRG] = vn * (nrg + pre);
+
+        #elif DIM == 3
+        f[DEN] = vn * u[DEN];
+        f[PXX] = vn * u[PXX] + pre * (direction == 1);
+        f[PYY] = vn * u[PYY] + pre * (direction == 2);
+        f[PZZ] = vn * u[PZZ] + pre * (direction == 3);
+        f[NRG] = vn * (nrg + pre);
+        #endif
     }
 
     static double _sound_speed_squared(double *p)
     {
-        return p[4] / p[0] * gamma_law_index;
+        return p[PRE] / p[RHO] * gamma_law_index;
+    }
+
+    static double _max_wavespeed(double *p)
+    {
+        #if DIM == 1
+        double cs = sqrt(_sound_speed_squared(p));
+        double vx = p[VXX];
+        double ax = max2(fabs(vx - cs), fabs(vx + cs));
+        return ax;
+
+        #elif DIM == 2
+        double cs = sqrt(_sound_speed_squared(p));
+        double vx = p[VXX];
+        double vy = p[VYY];
+        double ax = max2(fabs(vx - cs), fabs(vx + cs));
+        double ay = max2(fabs(vy - cs), fabs(vy + cs));
+        return max2(ax, ay);
+
+        #elif DIM == 3
+        double cs = sqrt(_sound_speed_squared(p));
+        double vx = p[VXX];
+        double vy = p[VYY];
+        double vz = p[VZZ];
+        double ax = max2(fabs(vx - cs), fabs(vx + cs));
+        double ay = max2(fabs(vy - cs), fabs(vy + cs));
+        double az = max2(fabs(vz - cs), fabs(vz + cs));
+        return max3(ax, ay, az);
+        #endif
     }
 
     static void _outer_wavespeeds(
@@ -75,24 +198,12 @@ class Solver:
         wavespeeds[1] = vn + cs;
     }
 
-    static double _max_wavespeed(double *p)
-    {
-        double cs = sqrt(_sound_speed_squared(p));
-        double vx = p[1];
-        double vy = p[2];
-        double vz = p[3];
-        double ax = max2(fabs(vx - cs), fabs(vx + cs));
-        double ay = max2(fabs(vy - cs), fabs(vy + cs));
-        double az = max2(fabs(vz - cs), fabs(vz + cs));
-        return max3(ax, ay, az);
-    }
-
     static void _hlle(double *pl, double *pr, double *flux, int direction)
     {
-        double ul[5];
-        double ur[5];
-        double fl[5];
-        double fr[5];
+        double ul[NCONS];
+        double ur[NCONS];
+        double fl[NCONS];
+        double fr[NCONS];
         double al[2];
         double ar[2];
 
@@ -106,7 +217,7 @@ class Solver:
         double am = min3(0.0, al[0], ar[0]);
         double ap = max3(0.0, al[1], ar[1]);
 
-        for (int q = 0; q < 5; ++q)
+        for (int q = 0; q < NCONS; ++q)
         {
             flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
         }
@@ -114,62 +225,63 @@ class Solver:
     """
 
     @kernel_method(rank=1)
-    def cons_to_prim(u: NDArray[float], p: NDArray[float]):
+    def cons_to_prim(self, u: NDArray[float], p: NDArray[float]):
         R"""
         void cons_to_prim(int ni, double *u, double *p)
         {
             FOR_EACH_1D(ni)
             {
-                _cons_to_prim(&u[5 * i], &p[5 * i]);
+                _cons_to_prim(&u[NCONS * i], &p[NCONS * i]);
             }
         }
         """
-        return (u.size // 5,)
+        return (u.size // self.ncons(),)
 
     @kernel_method(rank=1)
-    def prim_to_cons(p: NDArray[float], u: NDArray[float]):
+    def prim_to_cons(self, p: NDArray[float], u: NDArray[float]):
         R"""
         void prim_to_cons(int ni, double *p, double *u)
         {
             FOR_EACH_1D(ni)
             {
-                _prim_to_cons(&p[5 * i], &u[5 * i]);
+                _prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
             }
         }
         """
-        return (p.size // 5,)
+        return (p.size // self.ncons(),)
 
     @kernel_method(rank=1)
-    def prim_to_flux(p: NDArray[float], f: NDArray[float], direction: int):
+    def prim_to_flux(self, p: NDArray[float], f: NDArray[float], direction: int):
         R"""
         void prim_to_flux(int ni, double *p, double *f, int direction)
         {
-            double u[5];
+            double u[NCONS];
 
             FOR_EACH_1D(ni)
             {
-                _prim_to_cons(&p[i * 5], u);
-                _prim_to_flux(&p[i * 5], u, &f[i * 5], direction);
+                _prim_to_cons(&p[i * NCONS], u);
+                _prim_to_flux(&p[i * NCONS], u, &f[i * NCONS], direction);
             }
         }
         """
-        return (p.size // 5,)
+        return (p.size // self.ncons(),)
 
     @kernel_method(rank=1)
-    def max_wavespeed(p: NDArray[float], a: NDArray[float]):
+    def max_wavespeed(self, p: NDArray[float], a: NDArray[float]):
         R"""
         void max_wavespeed(int ni, double *p, double *a)
         {
             FOR_EACH_1D(ni)
             {
-                a[i] = _max_wavespeed(&p[i * 5]);
+                a[i] = _max_wavespeed(&p[i * NCONS]);
             }
         }
         """
-        return (p.size // 5,)
+        return (p.size // self.ncons(),)
 
     @kernel_method(rank=1)
     def godunov_flux(
+        self,
         pl: NDArray[float],
         pr: NDArray[float],
         fhat: NDArray[float],
@@ -180,11 +292,17 @@ class Solver:
         {
             FOR_EACH_1D(ni)
             {
-                _hlle(&pl[5 * i], &pr[5 * i], &fhat[5 * i], direction);
+                _hlle(&pl[NCONS * i], &pr[NCONS * i], &fhat[NCONS * i], direction);
             }
         }
         """
-        return (fhat.size // 5,)
+        return (fhat.size // self.ncons(),)
+
+    def ncons(self):
+        return self.define_macros["DIM"] + 2
+
+    def dim(self):
+        return self.define_macros["DIM"]
 
 
 @contextmanager
@@ -197,18 +315,20 @@ def main():
     from numpy import array, linspace, zeros, zeros_like, diff
     from matplotlib import pyplot as plt
 
-    solver = Solver()
+    configure_kernel_module(verbose=False)
 
-    num_zones = 10000
+    solver = Solver(define_macros=[("GAMMA_LAW_INDEX", "5.0 / 3.0"), ("DIM", 1)])
+
+    num_zones = 20000
     dx = 1.0 / num_zones
     fold = 100
     dt = dx * 1e-1
-    p = zeros((num_zones, 5))
+    p = zeros((num_zones, solver.ncons()))
     u = zeros_like(p)
-    fhat = zeros((num_zones - 1, 5))
+    fhat = zeros((num_zones - 1, solver.ncons()))
 
-    p[: num_zones // 2, :] = [1.0, 0.0, 0.0, 0.0, 1.0]
-    p[num_zones // 2 :, :] = [0.1, 0.0, 0.0, 0.0, 0.125]
+    p[: num_zones // 2, :] = [1.0] + solver.dim() * [0.0] + [1.0]
+    p[num_zones // 2 :, :] = [0.1] + solver.dim() * [0.0] + [0.125]
     t = 0.0
     n = 0
 

@@ -50,6 +50,22 @@ for (int k = 0; k < NK; ++k) \
 """
 
 
+def configure_kernel_module(verbose=None, cache=None):
+    """
+    Configure the module behavior.
+
+    Calls to this function affect shared module state, so should be called
+    from conspicuous / obvious locations of the user application.
+    """
+    global KERNEL_VERBOSE_COMPILE
+    global KERNEL_ENABLE_CACHE
+
+    if verbose:
+        KERNEL_VERBOSE_COMPILE = True
+    if cache:
+        KERNEL_ENABLE_CACHE = True
+
+
 def argtypes(f):
     """
     Return a tuple of ctypes objects derived from a function's type hints.
@@ -80,7 +96,7 @@ def to_ctypes(args, signature):
             yield arg
 
 
-def cpu_extension(code, name):
+def cpu_extension(code, name, define_macros):
     """
     Either build or load a CPU extension module with the given code and name.
 
@@ -104,6 +120,7 @@ def cpu_extension(code, name):
     # build product.
     sha = sha256()
     sha.update(code.encode("utf-8"))
+    sha.update(str(define_macros).encode("utf-8"))
     cache_dir = join(dirname(__file__), "__pycache__", sha.hexdigest())
 
     try:
@@ -125,7 +142,7 @@ def cpu_extension(code, name):
         # and save it to the cache directory. Then load it as a shared
         # library (CDLL).
         ffi = FFI()
-        ffi.set_source(name, code)
+        ffi.set_source(name, code, define_macros=define_macros)
         target = ffi.compile(tmpdir=cache_dir or ".", verbose=verbose)
         module = CDLL(target)
         if verbose:
