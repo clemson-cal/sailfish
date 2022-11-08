@@ -23,7 +23,7 @@ from numpy import ndarray
 
 
 KERNEL_VERBOSE_COMPILE = False
-KERNEL_DISABLE_CACHE = True
+KERNEL_DISABLE_CACHE = False
 KERNEL_DISABLE_CPU_MODE = False
 KERNEL_DISABLE_GPU_MODE = False
 KERNEL_DEFAULT_EXEC_MODE = "cpu"
@@ -251,7 +251,7 @@ def gpu_extension(code, name, define_macros=list()):
         return ProxyModule(ValueError(f"GPU compilation {name} failed:\n {e}"))
 
 
-def cpu_extension_function(module, stub, rank, prepend_signature):
+def cpu_extension_function(module, stub, rank, pre_argtypes):
     """
     Return a function to replace the given stub with a call to a C function.
 
@@ -268,7 +268,7 @@ def cpu_extension_function(module, stub, rank, prepend_signature):
     """
 
     c_func = module[stub.__name__]
-    c_func.argtypes = (prepend_signature or (c_int,) * rank) + argtypes(stub)
+    c_func.argtypes = (pre_argtypes or (c_int,) * rank) + argtypes(stub)
     c_func.restype = restype(stub)
 
     @wraps(stub)
@@ -280,7 +280,7 @@ def cpu_extension_function(module, stub, rank, prepend_signature):
     return wrapper
 
 
-def gpu_extension_function(module, stub, rank, prepend_signature):
+def gpu_extension_function(module, stub, rank, pre_argtypes):
     gpu_func = module.get_function(stub.__name__)
 
     if "return" in stub.__annotations__:
@@ -312,8 +312,8 @@ def gpu_extension_function(module, stub, rank, prepend_signature):
     return wrapper
 
 
-def extension_function(cpu_module, gpu_module, stub, rank, prepend_signature):
-    p = tuple(PY_CTYPE_DICT[t] for t in prepend_signature)
+def extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes):
+    p = tuple(PY_CTYPE_DICT[t] for t in pre_argtypes)
     cpu_func = cpu_extension_function(cpu_module, stub, rank, p) if cpu_module else None
     gpu_func = gpu_extension_function(gpu_module, stub, rank, p) if gpu_module else None
 
@@ -329,7 +329,7 @@ def extension_function(cpu_module, gpu_module, stub, rank, prepend_signature):
     return wrapper
 
 
-def kernel(code: str = None, rank: int = 0, prepend_signature=tuple()):
+def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
     """
     Returns a decorator that replaces a 'stub' function with a 'kernel'.
 
@@ -346,7 +346,7 @@ def kernel(code: str = None, rank: int = 0, prepend_signature=tuple()):
     def decorator(stub):
         cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
         gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
-        return extension_function(cpu_module, gpu_module, stub, rank, prepend_signature)
+        return extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes)
 
     return decorator
 
@@ -390,7 +390,7 @@ def kernel_class(common_code: str = None):
             for kernel in kernels:
                 stub = getattr(self, kernel)
                 rank = stub.__kernel_rank
-                sign = stub.__kernel_prepend_signature
+                sign = stub.__kernel_pre_argtypes
                 func = extension_function(cpu_module, gpu_module, stub, rank, sign)
                 setattr(self, kernel, func)
 
@@ -400,7 +400,7 @@ def kernel_class(common_code: str = None):
     return decorator
 
 
-def kernel_method(rank: int = 0, code: str = None, prepend_signature=tuple()):
+def kernel_method(rank: int = 0, code: str = None, pre_argtypes=tuple()):
     """
     A decorator for class methods to be implemented as compiled C code.
     """
@@ -408,7 +408,7 @@ def kernel_method(rank: int = 0, code: str = None, prepend_signature=tuple()):
     def decorator(stub):
         stub.__kernel_rank = rank
         stub.__kernel_code = code
-        stub.__kernel_prepend_signature = prepend_signature
+        stub.__kernel_pre_argtypes = pre_argtypes
         return stub
 
     return decorator
