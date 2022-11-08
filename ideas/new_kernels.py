@@ -39,44 +39,52 @@ KERNEL_DEFINE_MACROS_CPU = R"""
 #define PRIVATE static
 #define PUBLIC
 
-#define FOR_EACH_1D(NI) \
-for (int i = 0; i < NI; ++i) \
+#define FOR_RANGE_1D(I0, I1) \
+for (int i = I0; i < I1; ++i) \
 
-#define FOR_EACH_2D(NI, NJ) \
-for (int i = 0; i < NI; ++i) \
-for (int j = 0; j < NJ; ++j) \
+#define FOR_RANGE_2D(I0, I1, J0, J1) \
+for (int i = I0; i < I1; ++i) \
+for (int j = J0; j < J1; ++j) \
 
-#define FOR_EACH_3D(NI, NJ, NK) \
-for (int i = 0; i < NI; ++i) \
-for (int j = 0; j < NJ; ++j) \
-for (int k = 0; k < NK; ++k) \
+#define FOR_RANGE_3D(I0, I1, J0, J1, K0, K1) \
+for (int i = I0; i < I1; ++i) \
+for (int j = J0; j < J1; ++j) \
+for (int k = K0; k < K1; ++k) \
+
+#define FOR_EACH_1D(NI) FOR_RANGE_1D(0, NI)
+#define FOR_EACH_2D(NI, NJ) FOR_RANGE_2D(0, NI, 0, NJ)
+#define FOR_EACH_3D(NI, NJ, NK) FOR_RANGE_3D(0, NI, 0, NJ, 0, NK)
 """
-
-
-THREAD_BLOCK_SIZE_1D = (64,)
-THREAD_BLOCK_SIZE_2D = (8, 8)
-THREAD_BLOCK_SIZE_3D = (4, 4, 4)
 
 
 KERNEL_DEFINE_MACROS_GPU = R"""
 #define PRIVATE static __device__
 #define PUBLIC extern "C" __global__
 
-#define FOR_EACH_1D(NI) \
+#define FOR_RANGE_1D(I0, I1) \
 int i = threadIdx.x + blockIdx.x * blockDim.x; \
-if (i >= NI) return; \
+if (i < I0 || i >= I1) return; \
 
-#define FOR_EACH_2D(NI, NJ) \
+#define FOR_RANGE_2D(I0, I1, J0, J1) \
 int i = threadIdx.x + blockIdx.x * blockDim.x; \
 int j = threadIdx.y + blockIdx.y * blockDim.y; \
-if (i >= NI || j >= NJ) return; \
+if (i < I0 || i >= I1 || j < J0 || j >= J1) return; \
 
-#define FOR_EACH_3D(NI, NJ, NK) \
+#define FOR_RANGE_3D(I0, I1, J0, J1, K0, K1) \
 int i = threadIdx.x + blockIdx.x * blockDim.x; \
 int j = threadIdx.y + blockIdx.y * blockDim.y; \
 int k = threadIdx.z + blockIdx.z * blockDim.z; \
-if (i >= NI || j >= NJ || k >= NK) return; \
+if (i < I0 || i >= I1 || j < J0 || j >= J1 || K < K0 || K >= K1) return; \
+
+#define FOR_EACH_1D(NI) FOR_RANGE_1D(0, NI)
+#define FOR_EACH_2D(NI, NJ) FOR_RANGE_2D(0, NI, 0, NJ)
+#define FOR_EACH_3D(NI, NJ, NK) FOR_RANGE_3D(0, NI, 0, NJ, 0, NK)
 """
+
+
+THREAD_BLOCK_SIZE_1D = (64,)
+THREAD_BLOCK_SIZE_2D = (8, 8)
+THREAD_BLOCK_SIZE_3D = (4, 4, 4)
 
 
 def configure_kernel_module(
@@ -227,7 +235,7 @@ def cpu_extension(code, name, define_macros=list()):
 
     except VerificationError as e:
         # This is hit when the C compiler fails.
-        return ProxyModule(ValueError(f"CPU compilation of {name} failed"))
+        return ProxyModule(RuntimeError(f"CPU compilation of {name} failed"))
 
 
 def gpu_extension(code, name, define_macros=list()):
@@ -248,7 +256,8 @@ def gpu_extension(code, name, define_macros=list()):
         return ProxyModule(e)
 
     except CompileException as e:
-        return ProxyModule(ValueError(f"GPU compilation {name} failed:\n {e}"))
+        # This is hit when the nvrtc compiler fails.
+        return ProxyModule(RuntimeError(f"GPU compilation {name} failed:\n {e}"))
 
 
 def cpu_extension_function(module, stub, rank, pre_argtypes):

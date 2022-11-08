@@ -13,7 +13,7 @@ from time import perf_counter
 from numpy.typing import NDArray
 from new_kernels import kernel, kernel_class, kernel_method
 
-solver_code = R"""
+code = R"""
 #define min2(a, b) ((a) < (b) ? (a) : (b))
 #define max2(a, b) ((a) > (b) ? (a) : (b))
 #define min3(a, b, c) min2(a, min2(b, c))
@@ -112,8 +112,8 @@ PRIVATE void _hlle(double *pl, double *pr, double *flux, int direction)
 """
 
 
-@kernel_class(solver_code)
-class Solver:
+@kernel_class(code)
+class Hydro:
     @kernel_method(rank=1)
     def cons_to_prim(self, u: NDArray[float], p: NDArray[float]):
         R"""
@@ -234,7 +234,7 @@ def main():
 
     configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
 
-    solver = Solver()
+    hydro = Hydro()
     num_zones = args.resolution
     dx = 1.0 / num_zones
     fold = 100
@@ -256,12 +256,12 @@ def main():
             for _ in range(fold):
                 pl = p[:-1]
                 pr = p[+1:]
-                solver.godunov_flux(pl, pr, fhat, 1)
-                solver.prim_to_cons(p, u)
+                hydro.godunov_flux(pl, pr, fhat, 1)
+                hydro.prim_to_cons(p, u)
                 u[1:-1] -= diff(fhat, axis=0) * (dt / dx)
                 t += dt
                 n += 1
-                solver.cons_to_prim(u, p)
+                hydro.cons_to_prim(u, p)
 
         kzps = num_zones / fold_time() * 1e-3 * fold
         print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
