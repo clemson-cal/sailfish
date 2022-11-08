@@ -124,9 +124,25 @@ PRIVATE void _cons_to_prim(double *u, double *p)
     p[RHO] = rho;
     p[VXX] = px / rho;
     p[VYY] = py / rho;
-    p[VZZ] = py / rho;
+    p[VZZ] = pz / rho;
     p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
     #endif
+}
+
+PRIVATE int _cons_to_prim_check(double *u, double *p)
+{
+    _cons_to_prim(u, p);
+
+    if (u[DEN] < 0.0) {
+        return 1;
+    }
+    if (u[NRG] < 0.0) {
+        return 2;
+    }
+    if (p[PRE] < 0.0) {
+        return 3;
+    }
+    return 0;
 }
 
 PRIVATE void _prim_to_flux(double *p, double *u, double *f, int direction)
@@ -226,6 +242,18 @@ PRIVATE void _riemann_hlle(double *pl, double *pr, double *flux, int direction)
 """
 
 
+def _check_same_shape_and_c_contiguous(*args, num_axes=None):
+    if any(not a.flags["C_CONTIGUOUS"] for a in args):
+        raise ValueError("arrays must be c-contiguous")
+    if not all(args[0].shape[:num_axes] == a.shape[:num_axes] for a in args[1:]):
+        raise ValueError("arrays must have the same shape")
+
+
+def _check_num_fields(x, n):
+    if x.shape[-1] != n:
+        raise ValueError("array has wrong number of fields")
+
+
 @kernel_class(code)
 class EulerEquations:
     """
@@ -241,10 +269,20 @@ class EulerEquations:
     2      density, vx, vy, pressure       mass, px, py, energy
     3      density, vx, vy, vz, pressure   mass, px, py, pz, energy
 
-    This class contains an HLLE Riemann solver. An HLLC solver can be easily added.
+    The kernel functions treat their input data as contiguous, so the
+    dimensionality of the input/output arrays does not matter. However any
+    guard zones in the arrays are not skipped. Pay attention to this if for
+    example you are computing the maximum wavespeed on the grid -- guard zones
+    could have garbage wavespeeds so a max-reduction operation must exclude
+    exclude any guard zones (it should do this anyway).
+
+    This class contains an HLLE Riemann solver. An HLLC solver can be easily
+    added.
     """
 
     def __init__(self, dim=1, gamma_law_index=5.0 / 3.0):
+        if dim not in (1, 2, 3):
+            raise ValueError("dim must be 1, 2, or 3")
         self.ncons = dim + 2
         self.dim = dim
         self.gamma_law_index = gamma_law_index
@@ -261,6 +299,28 @@ class EulerEquations:
             }
         }
         """
+        _check_same_shape_and_c_contiguous(u, p)
+        _check_num_fields(u, self.ncons)
+        return u.shape[:-1]
+
+    @kernel_method(rank=1)
+    def cons_to_prim_check(
+        self,
+        u: NDArray[float],
+        p: NDArray[float],
+        mask: NDArray[int],
+    ):
+        R"""
+        PUBLIC void cons_to_prim_check(int ni, double *u, double *p, int *mask)
+        {
+            FOR_EACH_1D(ni)
+            {
+                mask[i] = _cons_to_prim_check(&u[NCONS * i], &p[NCONS * i]);
+            }
+        }
+        """
+        _check_same_shape_and_c_contiguous(u, p, mask)
+        _check_num_fields(u, self.ncons)
         return u.shape[:-1]
 
     @kernel_method(rank=1)
@@ -274,6 +334,8 @@ class EulerEquations:
             }
         }
         """
+        _check_same_shape_and_c_contiguous(p, u)
+        _check_num_fields(p, self.ncons)
         return p.shape[:-1]
 
     @kernel_method(rank=1)
@@ -290,6 +352,8 @@ class EulerEquations:
             }
         }
         """
+        _check_same_shape_and_c_contiguous(p, f)
+        _check_num_fields(p, self.ncons)
         return p.shape[:-1]
 
     @kernel_method(rank=1)
@@ -303,6 +367,8 @@ class EulerEquations:
             }
         }
         """
+        _check_same_shape_and_c_contiguous(p, a, num_axes=len(a.shape))
+        _check_num_fields(p, self.ncons)
         return p.shape[:-1]
 
     @kernel_method(rank=1)
@@ -322,4 +388,28 @@ class EulerEquations:
             }
         }
         """
+        _check_same_shape_and_c_contiguous(pl, pr, fhat)
+        _check_num_fields(fhat, self.ncons)
         return fhat.shape[:-1]
+
+
+if __name__ == "__main__":
+    from numpy import array, zeros_like, allclose
+
+    p = array([[1.0, 0.1, 0.2, 100.0]])
+    u = zeros_like(p)
+    q = zeros_like(p)
+    hydro = EulerEquations(dim=2)
+    hydro.prim_to_cons(p, u)
+    hydro.cons_to_prim(u, q)
+
+    assert allclose(p - q, 0.0)
+
+    p = array([[1.0, 0.1, 0.2, 0.3, 100.0]])
+    u = zeros_like(p)
+    q = zeros_like(p)
+    hydro = EulerEquations(dim=3)
+    hydro.prim_to_cons(p, u)
+    hydro.cons_to_prim(u, q)
+
+    assert allclose(p - q, 0.0)

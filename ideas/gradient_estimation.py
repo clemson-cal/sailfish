@@ -150,6 +150,8 @@ def plm_gradient_1d(
 ):
     """
     Estimate PLM gradients of data on an evenly spaced 1d rectilinear grid.
+
+    The first and last zone on each axis are not modified.
     """
     if len(y.shape) != 2:
         raise ValueError("array must have rank 1 and one axis of fields")
@@ -169,6 +171,8 @@ def plm_gradient_2d(
 ):
     """
     Estimate PLM gradients of data on an evenly spaced 2d rectilinear grid.
+
+    The first and last zone on each axis are not modified.
     """
     if len(y.shape) != 3:
         raise ValueError("array must have rank 2 and one axis of fields")
@@ -189,6 +193,8 @@ def plm_gradient_3d(
 ):
     """
     Estimate PLM gradients of data on an evenly spaced 3d rectilinear grid.
+
+    The first and last zone on each axis are not modified.
     """
     if len(y.shape) != 4:
         raise ValueError("array must have rank 3 and one axis of fields")
@@ -238,4 +244,4 @@ def extrapolate(
     """
     if not all(y.shape == s for s in (g.shape, ym.shape, yp.shape)):
         raise ValueError("arguments must have the same shape")
-    return y.shape
+    return (y.size // y.shape[-1], y.shape[-1])

@@ -1,9 +1,6 @@
 from contextlib import contextmanager
 from time import perf_counter
 from numpy.typing import NDArray
-from new_kernels import kernel, configure_kernel_module
-from hydro_euler import EulerEquations
-from gradient_estimation import plm_gradient_1d, extrapolate
 
 
 @contextmanager
@@ -14,6 +11,7 @@ def measure_time() -> float:
 
 def main():
     from argparse import ArgumentParser
+    from new_kernels import configure_kernel_module
 
     parser = ArgumentParser()
     parser.add_argument(
@@ -47,13 +45,16 @@ def main():
         help="show a plot after the run",
     )
     args = parser.parse_args()
+    configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
 
     if args.exec_mode == "cpu":
         from numpy import array, linspace, zeros, zeros_like, diff
     if args.exec_mode == "gpu":
         from cupy import array, linspace, zeros, zeros_like, diff
 
-    configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
+    from hydro_euler import EulerEquations
+    from gradient_estimation import plm_gradient_1d, extrapolate
+
     hydro = EulerEquations(dim=1, gamma_law_index=5.0 / 3.0)
 
     num_zones = args.resolution

@@ -32,6 +32,7 @@ PY_CTYPE_DICT = {
     int: c_int,
     float: c_double,
     NDArray[float]: POINTER(c_double),
+    NDArray[int]: POINTER(c_int),
 }
 
 
