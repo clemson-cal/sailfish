@@ -301,7 +301,7 @@ class EulerEquations:
         """
         _check_same_shape_and_c_contiguous(u, p)
         _check_num_fields(u, self.ncons)
-        return u.shape[:-1]
+        return (u.size // self.ncons,)
 
     @kernel_method(rank=1)
     def cons_to_prim_check(
@@ -321,7 +321,7 @@ class EulerEquations:
         """
         _check_same_shape_and_c_contiguous(u, p, mask)
         _check_num_fields(u, self.ncons)
-        return u.shape[:-1]
+        return (u.size // self.ncons,)
 
     @kernel_method(rank=1)
     def prim_to_cons(self, p: NDArray[float], u: NDArray[float]):
@@ -336,7 +336,7 @@ class EulerEquations:
         """
         _check_same_shape_and_c_contiguous(p, u)
         _check_num_fields(p, self.ncons)
-        return p.shape[:-1]
+        return (p.size // self.ncons,)
 
     @kernel_method(rank=1)
     def prim_to_flux(self, p: NDArray[float], f: NDArray[float], direction: int):
@@ -354,7 +354,7 @@ class EulerEquations:
         """
         _check_same_shape_and_c_contiguous(p, f)
         _check_num_fields(p, self.ncons)
-        return p.shape[:-1]
+        return (p.size // self.ncons,)
 
     @kernel_method(rank=1)
     def max_wavespeed(self, p: NDArray[float], a: NDArray[float]):
@@ -369,7 +369,7 @@ class EulerEquations:
         """
         _check_same_shape_and_c_contiguous(p, a, num_axes=len(a.shape))
         _check_num_fields(p, self.ncons)
-        return p.shape[:-1]
+        return (p.size // self.ncons,)
 
     @kernel_method(rank=1)
     def riemann_hlle(
@@ -390,7 +390,7 @@ class EulerEquations:
         """
         _check_same_shape_and_c_contiguous(pl, pr, fhat)
         _check_num_fields(fhat, self.ncons)
-        return fhat.shape[:-1]
+        return (fhat.size // self.ncons,)
 
 
 if __name__ == "__main__":
@@ -402,7 +402,6 @@ if __name__ == "__main__":
     hydro = EulerEquations(dim=2)
     hydro.prim_to_cons(p, u)
     hydro.cons_to_prim(u, q)
-
     assert allclose(p - q, 0.0)
 
     p = array([[1.0, 0.1, 0.2, 0.3, 100.0]])
@@ -411,5 +410,4 @@ if __name__ == "__main__":
     hydro = EulerEquations(dim=3)
     hydro.prim_to_cons(p, u)
     hydro.cons_to_prim(u, q)
-
     assert allclose(p - q, 0.0)

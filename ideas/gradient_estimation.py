@@ -176,8 +176,6 @@ def plm_gradient_2d(
     """
     if len(y.shape) != 3:
         raise ValueError("array must have rank 2 and one axis of fields")
-    if y.shape != g.shape:
-        raise ValueError("y and g must have the same shape")
     if not 1.0 <= plm_theta <= 2.0:
         raise ValueError("theta value must be between 1.0 and 2.0")
     return y.shape
@@ -198,8 +196,6 @@ def plm_gradient_3d(
     """
     if len(y.shape) != 4:
         raise ValueError("array must have rank 3 and one axis of fields")
-    if y.shape != g.shape:
-        raise ValueError("y and g must have the same shape")
     if not 1.0 <= plm_theta <= 2.0:
         raise ValueError("theta value must be between 1.0 and 2.0")
     return y.shape
