@@ -72,11 +72,7 @@ def main():
             meshgrid,
             logical_not,
         )
-
     if args.dim == 1:
-        from hydro_euler import EulerEquations
-        from gradient_estimation import plm_gradient_1d, extrapolate
-
         hydro = EulerEquations(dim=1, gamma_law_index=5.0 / 3.0)
         num_zones = args.resolution or 100000
         dx = 1.0 / num_zones
@@ -123,9 +119,6 @@ def main():
             plt.show()
 
     elif args.dim == 2:
-        from hydro_euler import EulerEquations
-        from gradient_estimation import plm_gradient_2d, extrapolate
-
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
         num_zones = args.resolution or 100
         dx = 1.0 / num_zones

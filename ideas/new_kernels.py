@@ -353,10 +353,25 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
     to either CPU or GPU code.
     """
 
-    def decorator(stub):
-        cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
-        gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
-        return extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes)
+    class decorator:
+        """
+        Defers compilation of the kernel function until it's first called.
+        """
+
+        def __init__(self, stub):
+            self._stub = stub
+            self._first = True
+
+        def __call__(self, *args):
+            stub = self._stub
+            if self._first:
+                cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
+                gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
+                self._func = extension_function(
+                    cpu_module, gpu_module, stub, rank, pre_argtypes
+                )
+                self._first = False
+            return self._func(*args)
 
     return decorator
 
