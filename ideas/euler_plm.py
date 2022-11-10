@@ -9,6 +9,78 @@ def measure_time() -> float:
     yield lambda: perf_counter() - start
 
 
+def update_prim_1d(
+    p,
+    hydro,
+    dt,
+    dx,
+    plm=False,
+    u=None,
+    g=None,
+    pp=None,
+    pm=None,
+    fhat=None,
+):
+    """
+    One-dimensional update function.
+
+    Optional scratch arrays may be provided.
+    """
+    from numpy import empty, empty_like, diff
+
+    ni, nfields = p.shape
+    u = empty_like(p) if u is None else u
+    g = empty_like(p) if g is None else g
+    pp = empty_like(p) if pp is None else pp
+    pm = empty_like(p) if pm is None else pm
+    fhat = empty((ni - 1, nfields)) if fhat is None else fhat
+
+    if plm:
+        plm_gradient_1d(p, g, 1.5)
+        extrapolate(p, g, pm, pp)
+        pl = pp[:-1]
+        pr = pm[+1:]
+    else:
+        pl = p[:-1]
+        pr = p[+1:]
+
+    hydro.riemann_hlle(pl, pr, fhat, 1)
+    hydro.prim_to_cons(p, u)
+    u[1:-1] -= diff(fhat, axis=0) * (dt / dx)
+    hydro.cons_to_prim(u, p)
+
+
+def update_prim_2d(p, hydro, dt, dx):
+    from numpy import zeros, zeros_like, diff
+    from gradient_estimation import plm_gradient_2d, extrapolate
+
+    ni, nj, nfields = p.shape
+    u = zeros_like(p)
+    gx = zeros_like(p)
+    gy = zeros_like(p)
+    pp = zeros_like(p)
+    pm = zeros_like(p)
+    fhat = zeros((ni - 1, nj, nfields))
+    ghat = zeros((ni, nj - 1, nfields))
+
+    plm_gradient_2d(p, gx, gy, 1.5)
+
+    extrapolate(p, gx, pm, pp)
+    pl = pp[:-1, :].copy()
+    pr = pm[+1:, :].copy()
+    hydro.riemann_hlle(pl, pr, fhat, 1)
+
+    extrapolate(p, gy, pm, pp)
+    pl = pp[:, :-1].copy()
+    pr = pm[:, +1:].copy()
+    hydro.riemann_hlle(pl, pr, ghat, 2)
+
+    hydro.prim_to_cons(p, u)
+    u[1:-1, :] -= diff(fhat, axis=0) * (dt / dx)
+    u[:, 1:-1] -= diff(ghat, axis=1) * (dt / dx)
+    hydro.cons_to_prim(u, p)
+
+
 def main():
     from argparse import ArgumentParser
     from new_kernels import configure_kernel_module
@@ -37,6 +109,11 @@ def main():
         help="grid resolution",
     )
     parser.add_argument(
+        "--patches-per-dim",
+        type=int,
+        default=1,
+    )
+    parser.add_argument(
         "--plm",
         action="store_true",
         help="use PLM reconstruction for second-order in space",
@@ -60,6 +137,8 @@ def main():
             linspace,
             zeros,
             zeros_like,
+            empty_like,
+            empty,
             diff,
             meshgrid,
             logical_not,
@@ -70,6 +149,8 @@ def main():
             linspace,
             zeros,
             zeros_like,
+            empty_like,
+            empty,
             diff,
             meshgrid,
             logical_not,
@@ -81,35 +162,35 @@ def main():
         fold = 100
         dt = dx * 1e-1
         p = zeros((num_zones, hydro.ncons))
-        u = zeros_like(p)
-        g = zeros_like(p)
-        pp = zeros_like(p)
-        pm = zeros_like(p)
-        fhat = zeros((num_zones - 1, hydro.ncons))
 
         p[: num_zones // 2, :] = array([1.0] + hydro.dim * [0.0] + [1.0])
         p[num_zones // 2 :, :] = array([0.1] + hydro.dim * [0.0] + [0.125])
         t = 0.0
         n = 0
 
+        u = empty_like(p)
+        g = empty_like(p)
+        pp = empty_like(p)
+        pm = empty_like(p)
+        fhat = empty((num_zones - 1, hydro.ncons))
+
         while t < 0.1:
             with measure_time() as fold_time:
                 for _ in range(fold):
-                    if args.plm:
-                        plm_gradient_1d(p, g, 1.5)
-                        extrapolate(p, g, pm, pp)
-                        pl = pp[:-1]
-                        pr = pm[+1:]
-                    else:
-                        pl = p[:-1]
-                        pr = p[+1:]
-
-                    hydro.riemann_hlle(pl, pr, fhat, 1)
-                    hydro.prim_to_cons(p, u)
-                    u[1:-1] -= diff(fhat, axis=0) * (dt / dx)
+                    update_prim_1d(
+                        p,
+                        hydro,
+                        dt,
+                        dx,
+                        plm=args.plm,
+                        u=u,
+                        g=g,
+                        pp=pp,
+                        pm=pm,
+                        fhat=fhat,
+                    )
                     t += dt
                     n += 1
-                    hydro.cons_to_prim(u, p)
 
             kzps = num_zones / fold_time() * 1e-3 * fold
             print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
@@ -120,20 +201,13 @@ def main():
             plt.plot(p[:, 0])
             plt.show()
 
-    elif args.dim == 2:
+    elif args.dim == 2 and args.patches_per_dim == 1:
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
         num_zones = args.resolution or 100
         dx = 1.0 / num_zones
         fold = 10
         dt = dx * 1e-1
         p = zeros((num_zones, num_zones, hydro.ncons))
-        u = zeros_like(p)
-        gx = zeros_like(p)
-        gy = zeros_like(p)
-        pp = zeros_like(p)
-        pm = zeros_like(p)
-        fhat = zeros((num_zones - 1, num_zones, hydro.ncons))
-        ghat = zeros((num_zones, num_zones - 1, hydro.ncons))
 
         xv = linspace(-0.5, 0.5, num_zones + 1)
         yv = linspace(-0.5, 0.5, num_zones + 1)
@@ -154,23 +228,7 @@ def main():
         while t < 0.1:
             with measure_time() as fold_time:
                 for _ in range(fold):
-                    plm_gradient_2d(p, gx, gy, 1.5)
-
-                    extrapolate(p, gx, pm, pp)
-                    pl = pp[:-1, :].copy()
-                    pr = pm[+1:, :].copy()
-                    hydro.riemann_hlle(pl, pr, fhat, 1)
-
-                    extrapolate(p, gy, pm, pp)
-                    pl = pp[:, :-1].copy()
-                    pr = pm[:, +1:].copy()
-                    hydro.riemann_hlle(pl, pr, ghat, 2)
-
-                    hydro.prim_to_cons(p, u)
-                    u[1:-1, :] -= diff(fhat, axis=0) * (dt / dx)
-                    u[:, 1:-1] -= diff(ghat, axis=1) * (dt / dx)
-                    hydro.cons_to_prim(u, p)
-
+                    update_prim_2d(p, hydro, dt, dx)
                     t += dt
                     n += 1
 
@@ -184,7 +242,7 @@ def main():
             plt.colorbar()
             plt.show()
 
-    elif args.dim == 0:
+    elif args.dim == 2:
         from grid import (
             initial_patches,
             cell_center_coordinates,
@@ -192,15 +250,18 @@ def main():
             copy_guard_zones,
         )
 
-        num_zones = 10
-        dx = 1.0 / num_zones
-        fold = 1
+        num_patches = args.patches_per_dim
+        num_zones = (args.resolution or 100) // num_patches
+        dx = 1.0 / (num_patches * num_zones)
+        fold = 10
         dt = dx * 1e-1
 
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
-        patches = set(initial_patches(4, 4))
+        patches = set(initial_patches(num_patches, num_patches))
         coordinate = {
-            ij: cell_center_coordinates(*ij, 4, 4, num_zones, num_zones)
+            ij: cell_center_coordinates(
+                *ij, num_patches, num_patches, num_zones, num_zones
+            )
             for ij in patches
         }
 
@@ -220,37 +281,12 @@ def main():
         t = 0.0
         n = 0
 
-        while t < 0.05:
+        while t < 0.1:
             with measure_time() as fold_time:
                 copy_guard_zones(primitives)
                 for _ in range(fold):
-                    for i, j in patches:
-                        p = primitives[(i, j)]
-                        u = zeros_like(p)
-                        gx = zeros_like(p)
-                        gy = zeros_like(p)
-                        pp = zeros_like(p)
-                        pm = zeros_like(p)
-                        fhat = zeros((num_zones + 4 - 1, num_zones + 4, hydro.ncons))
-                        ghat = zeros((num_zones + 4, num_zones + 4 - 1, hydro.ncons))
-
-                        plm_gradient_2d(p, gx, gy, 1.5)
-
-                        extrapolate(p, gx, pm, pp)
-                        pl = pp[:-1, :].copy()
-                        pr = pm[+1:, :].copy()
-                        hydro.riemann_hlle(pl, pr, fhat, 1)
-
-                        extrapolate(p, gy, pm, pp)
-                        pl = pp[:, :-1].copy()
-                        pr = pm[:, +1:].copy()
-                        hydro.riemann_hlle(pl, pr, ghat, 2)
-
-                        hydro.prim_to_cons(p, u)
-                        u[1:-1, :] -= diff(fhat, axis=0) * (dt / dx)
-                        u[:, 1:-1] -= diff(ghat, axis=1) * (dt / dx)
-                        hydro.cons_to_prim(u, p)
-
+                    for p in primitives.values():
+                        update_prim_2d(p, hydro, dt, dx)
                     t += dt
                     n += 1
 
@@ -260,12 +296,20 @@ def main():
         if args.plot:
             from matplotlib import pyplot as plt
 
+            vmax = max(p[2:-2, 2:-2, 0].max() for p in primitives.values())
+
             for i, j in patches:
-                z = primitives[(i, j)][:, :, 0]
+                z = primitives[(i, j)][..., 0]
                 x, y = coordinate[(i, j)]
 
-                plt.pcolormesh(x, y, z, vmin=0, vmax=1)
-
+                plt.pcolormesh(
+                    x[2:-2, 2:-2],
+                    y[2:-2, 2:-2],
+                    z[2:-2, 2:-2],
+                    vmin=0.0,
+                    vmax=vmax,
+                )
+            plt.colorbar()
             plt.axis("equal")
             plt.show()
 
