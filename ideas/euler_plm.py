@@ -1,56 +1,47 @@
-from contextlib import contextmanager
 from time import perf_counter
 from numpy.typing import NDArray
 
 
-@contextmanager
-def measure_time() -> float:
-    start = perf_counter()
-    yield lambda: perf_counter() - start
+def perf_time_sequence():
+    last = perf_counter()
+    yield
+    while True:
+        now = perf_counter()
+        yield now - last
+        last = now
 
 
-def update_prim_1d(
-    p,
-    hydro,
-    dt,
-    dx,
-    plm=False,
-    u=None,
-    g=None,
-    pp=None,
-    pm=None,
-    fhat=None,
-):
+def update_prim_1d(p, hydro, dx, plm=False):
     """
     One-dimensional update function.
-
-    Optional scratch arrays may be provided.
     """
-    from numpy import empty, empty_like, diff
+    from numpy import zeros, zeros_like, diff
 
     ni, nfields = p.shape
-    u = empty_like(p) if u is None else u
-    g = empty_like(p) if g is None else g
-    pp = empty_like(p) if pp is None else pp
-    pm = empty_like(p) if pm is None else pm
-    fhat = empty((ni - 1, nfields)) if fhat is None else fhat
+    u = zeros_like(p)
+    g = zeros_like(p)
+    pp = zeros_like(p)
+    pm = zeros_like(p)
+    fhat = zeros((ni - 1, nfields))
 
-    if plm:
-        plm_gradient_1d(p, g, 1.5)
-        extrapolate(p, g, pm, pp)
-        pl = pp[:-1]
-        pr = pm[+1:]
-    else:
-        pl = p[:-1]
-        pr = p[+1:]
+    while True:
+        dt = yield True
+        if plm:
+            plm_gradient_1d(p, g, 1.5)
+            extrapolate(p, g, pm, pp)
+            pl = pp[:-1]
+            pr = pm[+1:]
+        else:
+            pl = p[:-1]
+            pr = p[+1:]
 
-    hydro.riemann_hlle(pl, pr, fhat, 1)
-    hydro.prim_to_cons(p, u)
-    u[1:-1] -= diff(fhat, axis=0) * (dt / dx)
-    hydro.cons_to_prim(u, p)
+        hydro.riemann_hlle(pl, pr, fhat, 1)
+        hydro.prim_to_cons(p, u)
+        u[1:-1] -= diff(fhat, axis=0) * (dt / dx)
+        hydro.cons_to_prim(u, p)
 
 
-def update_prim_2d(p, hydro, dt, dx):
+def update_prim_2d(p, hydro, dx):
     from numpy import zeros, zeros_like, diff
     from gradient_estimation import plm_gradient_2d, extrapolate
 
@@ -63,22 +54,38 @@ def update_prim_2d(p, hydro, dt, dx):
     fhat = zeros((ni - 1, nj, nfields))
     ghat = zeros((ni, nj - 1, nfields))
 
-    plm_gradient_2d(p, gx, gy, 1.5)
+    while True:
+        dt = yield True
+        plm_gradient_2d(p, gx, gy, 1.5)
 
-    extrapolate(p, gx, pm, pp)
-    pl = pp[:-1, :].copy()
-    pr = pm[+1:, :].copy()
-    hydro.riemann_hlle(pl, pr, fhat, 1)
+        extrapolate(p, gx, pm, pp)
+        pl = pp[:-1, :].copy()
+        pr = pm[+1:, :].copy()
+        hydro.riemann_hlle(pl, pr, fhat, 1)
 
-    extrapolate(p, gy, pm, pp)
-    pl = pp[:, :-1].copy()
-    pr = pm[:, +1:].copy()
-    hydro.riemann_hlle(pl, pr, ghat, 2)
+        extrapolate(p, gy, pm, pp)
+        pl = pp[:, :-1].copy()
+        pr = pm[:, +1:].copy()
+        hydro.riemann_hlle(pl, pr, ghat, 2)
 
-    hydro.prim_to_cons(p, u)
-    u[1:-1, :] -= diff(fhat, axis=0) * (dt / dx)
-    u[:, 1:-1] -= diff(ghat, axis=1) * (dt / dx)
-    hydro.cons_to_prim(u, p)
+        hydro.prim_to_cons(p, u)
+        u[1:-1, :] -= diff(fhat, axis=0) * (dt / dx)
+        u[:, 1:-1] -= diff(ghat, axis=1) * (dt / dx)
+        hydro.cons_to_prim(u, p)
+
+
+def cylindrical_shocktube(x, y):
+    from numpy import zeros, logical_not
+
+    disk = (x**2 + y**2) ** 0.5 < 0.1
+    fisk = logical_not(disk)
+    p = zeros(x.shape + (4,))
+
+    p[disk, 0] = 1.000
+    p[fisk, 0] = 0.100
+    p[disk, 3] = 1.000
+    p[fisk, 3] = 0.125
+    return p
 
 
 def main():
@@ -155,45 +162,37 @@ def main():
             meshgrid,
             logical_not,
         )
+
+    # -------------------------------------------------------------------------
+    # A 1d evolution scheme that uses a single patch, and a
+    # generator-coroutine to cache cache scratch arrays.
+    # -------------------------------------------------------------------------
     if args.dim == 1:
         hydro = EulerEquations(dim=1, gamma_law_index=5.0 / 3.0)
         num_zones = args.resolution or 100000
         dx = 1.0 / num_zones
-        fold = 100
+        fold = 50
         dt = dx * 1e-1
         p = zeros((num_zones, hydro.ncons))
 
-        p[: num_zones // 2, :] = array([1.0] + hydro.dim * [0.0] + [1.0])
-        p[num_zones // 2 :, :] = array([0.1] + hydro.dim * [0.0] + [0.125])
+        p[: num_zones // 2, :] = array([1.0, 0.0, 1.0])
+        p[num_zones // 2 :, :] = array([0.1, 0.0, 0.125])
         t = 0.0
         n = 0
+        g = update_prim_1d(p, hydro, dx)
+        g.send(None)
 
-        u = empty_like(p)
-        g = empty_like(p)
-        pp = empty_like(p)
-        pm = empty_like(p)
-        fhat = empty((num_zones - 1, hydro.ncons))
+        perf_timer = perf_time_sequence()
+        perf_timer.send(None)
 
         while t < 0.1:
-            with measure_time() as fold_time:
-                for _ in range(fold):
-                    update_prim_1d(
-                        p,
-                        hydro,
-                        dt,
-                        dx,
-                        plm=args.plm,
-                        u=u,
-                        g=g,
-                        pp=pp,
-                        pm=pm,
-                        fhat=fhat,
-                    )
-                    t += dt
-                    n += 1
+            g.send(dt)
+            t += dt
+            n += 1
 
-            kzps = num_zones / fold_time() * 1e-3 * fold
-            print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+            if n % fold == 0:
+                kzps = num_zones / next(perf_timer) * 1e-3 * fold
+                print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
 
         if args.plot:
             from matplotlib import pyplot as plt
@@ -201,39 +200,37 @@ def main():
             plt.plot(p[:, 0])
             plt.show()
 
+    # -------------------------------------------------------------------------
+    # A 2d evolution scheme that uses a single patch.
+    # -------------------------------------------------------------------------
     elif args.dim == 2 and args.patches_per_dim == 1:
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
         num_zones = args.resolution or 100
         dx = 1.0 / num_zones
         fold = 10
         dt = dx * 1e-1
-        p = zeros((num_zones, num_zones, hydro.ncons))
 
         xv = linspace(-0.5, 0.5, num_zones + 1)
         yv = linspace(-0.5, 0.5, num_zones + 1)
         xc = 0.5 * (xv[1:] + xv[:-1])
-        yc = 0.5 * (xv[1:] + xv[:-1])
-        X, Y = meshgrid(xc, yc)
-
-        disk = (X**2 + Y**2) ** 0.5 < 0.1
-        fisk = logical_not(disk)
-        p[disk, 0] = 1.000
-        p[fisk, 0] = 0.100
-        p[disk, 3] = 1.000
-        p[fisk, 3] = 0.125
-
+        yc = 0.5 * (yv[1:] + yv[:-1])
+        x, y = meshgrid(xc, yc)
+        p = cylindrical_shocktube(x, y)
         t = 0.0
         n = 0
+        perf_timer = perf_time_sequence()
+        perf_timer.send(None)
+        update = update_prim_2d(p, hydro, dx)
+        update.send(None)
 
         while t < 0.1:
-            with measure_time() as fold_time:
-                for _ in range(fold):
-                    update_prim_2d(p, hydro, dt, dx)
-                    t += dt
-                    n += 1
+            update.send(dt)
+            t += dt
+            n += 1
 
-            kzps = num_zones * num_zones / fold_time() * 1e-3 * fold
-            print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+            if n % fold == 0:
+                kzps = num_zones**2 / next(perf_timer) * 1e-3 * fold
+                print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
 
         if args.plot:
             from matplotlib import pyplot as plt
@@ -242,6 +239,9 @@ def main():
             plt.colorbar()
             plt.show()
 
+    # -------------------------------------------------------------------------
+    # A 2d evolution scheme that uses a grid of patches.
+    # -------------------------------------------------------------------------
     elif args.dim == 2:
         from grid import (
             initial_patches,
@@ -264,34 +264,29 @@ def main():
             )
             for ij in patches
         }
-
-        primitives = dict()
-
-        for i, j in patches:
-            x, y = coordinate[(i, j)]
-            disk = (x**2 + y**2) ** 0.5 < 0.1
-            fisk = logical_not(disk)
-            p = zeros(x.shape + (hydro.ncons,))
-            p[disk, 0] = 1.000
-            p[fisk, 0] = 0.100
-            p[disk, 3] = 1.000
-            p[fisk, 3] = 0.125
-            primitives[(i, j)] = p
+        primitives = {
+            i: cylindrical_shocktube(x, y) for i, (x, y) in coordinate.items()
+        }
+        updates = [update_prim_2d(p, hydro, dx) for p in primitives.values()]
+        for update in updates:
+            update.send(None)
 
         t = 0.0
         n = 0
+        perf_timer = perf_time_sequence()
+        perf_timer.send(None)
 
         while t < 0.1:
-            with measure_time() as fold_time:
-                copy_guard_zones(primitives)
-                for _ in range(fold):
-                    for p in primitives.values():
-                        update_prim_2d(p, hydro, dt, dx)
-                    t += dt
-                    n += 1
+            copy_guard_zones(primitives)
+            for g in updates:
+                g.send(dt)
 
-            kzps = num_zones * num_zones * len(patches) / fold_time() * 1e-3 * fold
-            print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+            t += dt
+            n += 1
+
+            if n % fold == 0:
+                kzps = num_zones**2 * len(patches) / next(perf_timer) * 1e-3 * fold
+                print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
 
         if args.plot:
             from matplotlib import pyplot as plt
