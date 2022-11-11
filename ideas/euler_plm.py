@@ -10,7 +10,7 @@ def perf_time_sequence():
         last = now
 
 
-def update_prim_1d(p, hydro, dx, plm=False):
+def update_prim_1d(p, hydro, dx, plm=False, mode='cpu'):
     """
     One-dimensional update function.
     """
@@ -23,6 +23,14 @@ def update_prim_1d(p, hydro, dx, plm=False):
     pp = zeros_like(p)
     pm = zeros_like(p)
     fhat = zeros((ni - 1, nfields))
+
+    if mode == 'gpu':
+        import cupy
+        u = cupy.array(u)
+        g = cupy.array(g)
+        pp = cupy.array(g)
+        pm = cupy.array(g)
+        fhat = cupy.array(fhat)
 
     while True:
         dt = yield True
@@ -217,31 +225,6 @@ def main():
     args = parser.parse_args()
     configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
 
-    if args.exec_mode == "cpu":
-        from numpy import (
-            array,
-            linspace,
-            zeros,
-            zeros_like,
-            empty_like,
-            empty,
-            diff,
-            meshgrid,
-            logical_not,
-        )
-    if args.exec_mode == "gpu":
-        from cupy import (
-            array,
-            linspace,
-            zeros,
-            zeros_like,
-            empty_like,
-            empty,
-            diff,
-            meshgrid,
-            logical_not,
-        )
-
     # -------------------------------------------------------------------------
     # A 1d evolution scheme that uses a single patch, and a
     # generator-coroutine to cache cache scratch arrays.
@@ -258,7 +241,12 @@ def main():
         p = linear_shocktube(x)
         t = 0.0
         n = 0
-        g = update_prim_1d(p, hydro, dx, plm=args.plm)
+
+        if args.exec_mode == 'gpu':
+            import cupy
+            p = cupy.array(p)
+
+        g = update_prim_1d(p, hydro, dx, plm=args.plm, mode=args.exec_mode)
         g.send(None)
 
         perf_timer = perf_time_sequence()
@@ -272,6 +260,13 @@ def main():
             if n % args.fold == 0:
                 kzps = nz / next(perf_timer) * args.fold * 1e-3
                 print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+
+        if args.exec_mode == 'gpu':
+            import cupy
+            p = p.get()
+
+        from numpy import save
+        save("prim.npy", p)
 
         if args.plot:
             from matplotlib import pyplot as plt
