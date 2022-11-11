@@ -1,5 +1,4 @@
 from time import perf_counter
-from numpy.typing import NDArray
 
 
 def perf_time_sequence():
@@ -16,6 +15,7 @@ def update_prim_1d(p, hydro, dx, plm=False):
     One-dimensional update function.
     """
     from numpy import zeros, zeros_like, diff
+    from gradient_estimation import plm_gradient_1d, extrapolate
 
     ni, nfields = p.shape
     u = zeros_like(p)
@@ -74,17 +74,90 @@ def update_prim_2d(p, hydro, dx):
         hydro.cons_to_prim(u, p)
 
 
-def cylindrical_shocktube(x, y):
+def cell_centers_1d(ni):
+    from numpy import linspace
+
+    xv = linspace(0.0, 1.0, ni)
+    xc = 0.5 * (xv[1:] + xv[:-1])
+    return xc
+
+
+def cell_centers_2d(i, j, ni_patches, nj_patches, ni, nj):
+    from numpy import linspace, meshgrid
+
+    dx = 1.0 / ni_patches
+    dy = 1.0 / nj_patches
+    ddx = dx / ni
+    ddy = dy / nj
+    x0 = -0.5 + (i + 0) * dx
+    x1 = -0.5 + (i + 1) * dx
+    y0 = -0.5 + (j + 0) * dy
+    y1 = -0.5 + (j + 1) * dy
+    xv = linspace(x0 - 2 * ddx, x1 + 2 * ddy, ni + 5)
+    yv = linspace(y0 - 2 * ddx, y1 + 2 * ddy, nj + 5)
+    xc = 0.5 * (xv[1:] + xv[:-1])
+    yc = 0.5 * (yv[1:] + yv[:-1])
+    return meshgrid(xc, yc, indexing="ij")
+
+
+def initial_patches(ni_patches, nj_patches):
+    for i in range(ni_patches):
+        for j in range(nj_patches):
+            yield i, j
+
+
+def copy_guard_zones(grid):
+    for i, j in grid:
+        cc = grid.get((i, j))
+        lc = grid.get((i - 1, j), None)
+        rc = grid.get((i + 1, j), None)
+        cl = grid.get((i, j - 1), None)
+        cr = grid.get((i, j + 1), None)
+
+        if lc is not None:
+            cc[:+2, 2:-2] = lc[-4:-2, 2:-2]
+        if rc is not None:
+            cc[-2:, 2:-2] = rc[+2:+4, 2:-2]
+        if cl is not None:
+            cc[2:-2, :+2] = cl[2:-2, -4:-2]
+        if cr is not None:
+            cc[2:-2, -2:] = cr[2:-2, +2:+4]
+
+
+def cylindrical_shocktube(x, y, radius: float = 0.1, pressure: float = 1.0):
+    """
+    A cylindrical shocktube setup
+
+    ----------
+    radius ........ radius of the high-pressure region
+    pressure ...... gas pressure inside the cylinder
+    """
+
     from numpy import zeros, logical_not
 
-    disk = (x**2 + y**2) ** 0.5 < 0.1
+    disk = (x**2 + y**2) ** 0.5 < radius
     fisk = logical_not(disk)
-    p = zeros(x.shape + (4,))
+    p = zeros(disk.shape + (4,))
 
     p[disk, 0] = 1.000
     p[fisk, 0] = 0.100
-    p[disk, 3] = 1.000
+    p[disk, 3] = pressure
     p[fisk, 3] = 0.125
+    return p
+
+
+def linear_shocktube(x):
+    """
+    A linear shocktube setup
+    """
+
+    from numpy import array, zeros, logical_not
+
+    l = x < 0.5
+    r = logical_not(l)
+    p = zeros(x.shape + (3,))
+    p[l, :] = array([1.0, 0.0, 1.000])
+    p[r, :] = array([0.1, 0.0, 0.125])
     return p
 
 
@@ -92,7 +165,6 @@ def main():
     from argparse import ArgumentParser
     from new_kernels import configure_kernel_module
     from hydro_euler import EulerEquations
-    from gradient_estimation import plm_gradient_1d, plm_gradient_2d, extrapolate
 
     parser = ArgumentParser()
     parser.add_argument(
@@ -114,6 +186,13 @@ def main():
         type=int,
         default=None,
         help="grid resolution",
+    )
+    parser.add_argument(
+        "--fold",
+        "-f",
+        type=int,
+        default=50,
+        help="number of iterations between messages",
     )
     parser.add_argument(
         "--patches-per-dim",
@@ -168,18 +247,18 @@ def main():
     # generator-coroutine to cache cache scratch arrays.
     # -------------------------------------------------------------------------
     if args.dim == 1:
-        hydro = EulerEquations(dim=1, gamma_law_index=5.0 / 3.0)
-        num_zones = args.resolution or 100000
-        dx = 1.0 / num_zones
-        fold = 50
-        dt = dx * 1e-1
-        p = zeros((num_zones, hydro.ncons))
+        if args.patches_per_dim != 1:
+            raise ValueError("only 1 patch is supported in 1d")
 
-        p[: num_zones // 2, :] = array([1.0, 0.0, 1.0])
-        p[num_zones // 2 :, :] = array([0.1, 0.0, 0.125])
+        hydro = EulerEquations(dim=1, gamma_law_index=5.0 / 3.0)
+        nz = args.resolution or 100000
+        dx = 1.0 / nz
+        dt = dx * 1e-1
+        x = cell_centers_1d(nz)
+        p = linear_shocktube(x)
         t = 0.0
         n = 0
-        g = update_prim_1d(p, hydro, dx)
+        g = update_prim_1d(p, hydro, dx, plm=args.plm)
         g.send(None)
 
         perf_timer = perf_time_sequence()
@@ -190,8 +269,8 @@ def main():
             t += dt
             n += 1
 
-            if n % fold == 0:
-                kzps = num_zones / next(perf_timer) * 1e-3 * fold
+            if n % args.fold == 0:
+                kzps = nz / next(perf_timer) * args.fold * 1e-3
                 print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
 
         if args.plot:
@@ -201,107 +280,54 @@ def main():
             plt.show()
 
     # -------------------------------------------------------------------------
-    # A 2d evolution scheme that uses a single patch.
-    # -------------------------------------------------------------------------
-    elif args.dim == 2 and args.patches_per_dim == 1:
-        hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
-        num_zones = args.resolution or 100
-        dx = 1.0 / num_zones
-        fold = 10
-        dt = dx * 1e-1
-
-        xv = linspace(-0.5, 0.5, num_zones + 1)
-        yv = linspace(-0.5, 0.5, num_zones + 1)
-        xc = 0.5 * (xv[1:] + xv[:-1])
-        yc = 0.5 * (yv[1:] + yv[:-1])
-        x, y = meshgrid(xc, yc)
-        p = cylindrical_shocktube(x, y)
-        t = 0.0
-        n = 0
-        perf_timer = perf_time_sequence()
-        perf_timer.send(None)
-        update = update_prim_2d(p, hydro, dx)
-        update.send(None)
-
-        while t < 0.1:
-            update.send(dt)
-            t += dt
-            n += 1
-
-            if n % fold == 0:
-                kzps = num_zones**2 / next(perf_timer) * 1e-3 * fold
-                print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
-
-        if args.plot:
-            from matplotlib import pyplot as plt
-
-            plt.imshow(p[:, :, 0])
-            plt.colorbar()
-            plt.show()
-
-    # -------------------------------------------------------------------------
-    # A 2d evolution scheme that uses a grid of patches.
+    # A 2d evolution scheme that uses a grid of uniformly refined patches.
     # -------------------------------------------------------------------------
     elif args.dim == 2:
-        from grid import (
-            initial_patches,
-            cell_center_coordinates,
-            initial_data,
-            copy_guard_zones,
-        )
-
-        num_patches = args.patches_per_dim
-        num_zones = (args.resolution or 100) // num_patches
-        dx = 1.0 / (num_patches * num_zones)
-        fold = 10
+        np = args.patches_per_dim
+        nz = (args.resolution or 100) // np
+        dx = 1.0 / (np * nz)
         dt = dx * 1e-1
+        t = 0.0
+        n = 0
 
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
-        patches = set(initial_patches(num_patches, num_patches))
-        coordinate = {
-            ij: cell_center_coordinates(
-                *ij, num_patches, num_patches, num_zones, num_zones
-            )
-            for ij in patches
-        }
-        primitives = {
-            i: cylindrical_shocktube(x, y) for i, (x, y) in coordinate.items()
-        }
-        updates = [update_prim_2d(p, hydro, dx) for p in primitives.values()]
+        patches = set(initial_patches(np, np))
+        cell_arrays = {ij: cell_centers_2d(*ij, np, np, nz, nz) for ij in patches}
+        prim_arrays = {ij: cylindrical_shocktube(*xy) for ij, xy in cell_arrays.items()}
+        updates = [update_prim_2d(p, hydro, dx) for p in prim_arrays.values()]
+
         for update in updates:
             update.send(None)
 
-        t = 0.0
-        n = 0
         perf_timer = perf_time_sequence()
         perf_timer.send(None)
 
         while t < 0.1:
-            copy_guard_zones(primitives)
+            copy_guard_zones(prim_arrays)
             for g in updates:
                 g.send(dt)
-
             t += dt
             n += 1
 
-            if n % fold == 0:
-                kzps = num_zones**2 * len(patches) / next(perf_timer) * 1e-3 * fold
+            if n % args.fold == 0:
+                kzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-3
                 print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
 
         if args.plot:
             from matplotlib import pyplot as plt
 
-            vmax = max(p[2:-2, 2:-2, 0].max() for p in primitives.values())
+            vmin = max(p[2:-2, 2:-2, 0].min() for p in prim_arrays.values())
+            vmax = max(p[2:-2, 2:-2, 0].max() for p in prim_arrays.values())
 
             for i, j in patches:
-                z = primitives[(i, j)][..., 0]
-                x, y = coordinate[(i, j)]
+                z = prim_arrays[(i, j)][..., 0]
+                x, y = cell_arrays[(i, j)]
 
                 plt.pcolormesh(
                     x[2:-2, 2:-2],
                     y[2:-2, 2:-2],
                     z[2:-2, 2:-2],
-                    vmin=0.0,
+                    vmin=vmin,
                     vmax=vmax,
                 )
             plt.colorbar()
@@ -309,4 +335,5 @@ def main():
             plt.show()
 
 
-main()
+if __name__ == "__main__":
+    main()
