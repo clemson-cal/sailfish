@@ -152,6 +152,17 @@ def to_ctypes(args, signature):
 
 
 class ProxyFunction:
+    """
+    Represents a kernel function that failed to be created for some reason.
+
+    Instances of this class are used when the failure should be silently
+    forgiven unless calling code tries to invoke the function that could not
+    be compiled. The main use case is where either cffi or cupy is not
+    installed, so compilation of the respective CPU or GPU extension was not
+    possible. This should not trigger an error unless code tries to invoke the
+    kernel in the mode that was unavailable.
+    """
+
     def __init__(self, error):
         self._error = error
 
@@ -160,6 +171,10 @@ class ProxyFunction:
 
 
 class ProxyModule:
+    """
+    A CPU or GPU extension module that could not be created for some reason.
+    """
+
     def __init__(self, error):
         self._error = error
 
@@ -341,7 +356,7 @@ def extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes):
 
 def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
     """
-    Returns a decorator that replaces a 'stub' function with a 'kernel'.
+    Return a decorator that replaces a 'stub' function with a 'kernel'.
 
     The C code to be compiled is given either in the `code` variable, or is
     otherwise taken from the stub's doc string (which must then consist
