@@ -51,7 +51,6 @@ def update_prim_2d(p, hydro, dx, mode="cpu", stream=None):
         from numpy import zeros, zeros_like, diff
     from gradient_estimation import plm_gradient_2d, extrapolate
 
-
     with stream:
         ni, nj, nfields = p.shape
         u = zeros_like(p)
@@ -398,20 +397,29 @@ def main():
         if args.exec_mode == "gpu":
             import cupy
 
-            for ij in prim_arrays:
-                stream = cupy.cuda.Stream(non_blocking=True)
-                with stream:
-                    prim_arrays[ij] = cupy.array(prim_arrays[ij])
+            array_cls = cupy.array
+            stream_cls = cupy.cuda.Stream
+        else:
+            import contextlib
+            import numpy
 
-                update = update_prim_2d(prim_arrays[ij], hydro, dx, mode=args.exec_mode, stream=stream)
-                update.send(None)
+            array_cls = numpy.array
+            stream_cls = contextlib.nullcontext
 
-                streams.append(stream)
-                updates.append(update)
+        for ij in prim_arrays:
+            stream = stream_cls()
+            with stream:
+                prim_arrays[ij] = array_cls(prim_arrays[ij])
+            update = update_prim_2d(
+                prim_arrays[ij], hydro, dx, mode=args.exec_mode, stream=stream
+            )
+            update.send(None)
+            streams.append(stream)
+            updates.append(update)
 
         perf_timer = perf_time_sequence()
         perf_timer.send(None)
-        
+
         while t < 0.1:
             copy_guard_zones(prim_arrays)
             for stream, update in zip(streams, updates):
