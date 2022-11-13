@@ -14,7 +14,10 @@ def update_prim_1d(p, hydro, dx, plm=False, mode="cpu"):
     """
     One-dimensional update function.
     """
-    from numpy import zeros, zeros_like, diff
+    if mode == "gpu":
+        from cupy import zeros, zeros_like, diff
+    else:
+        from numpy import zeros, zeros_like, diff
     from gradient_estimation import plm_gradient_1d, extrapolate
 
     ni, nfields = p.shape
@@ -23,15 +26,6 @@ def update_prim_1d(p, hydro, dx, plm=False, mode="cpu"):
     pp = zeros_like(p)
     pm = zeros_like(p)
     fhat = zeros((ni - 1, nfields))
-
-    if mode == "gpu":
-        import cupy
-
-        u = cupy.array(u)
-        g = cupy.array(g)
-        pp = cupy.array(g)
-        pm = cupy.array(g)
-        fhat = cupy.array(fhat)
 
     while True:
         dt = yield
@@ -50,41 +44,56 @@ def update_prim_1d(p, hydro, dx, plm=False, mode="cpu"):
         hydro.cons_to_prim(u, p)
 
 
-def update_prim_2d(p, hydro, dx):
-    from numpy import zeros, zeros_like, diff
+def update_prim_2d(p, hydro, dx, mode="cpu", stream=None):
+    if mode == "gpu":
+        from cupy import zeros, zeros_like, diff
+    else:
+        from numpy import zeros, zeros_like, diff
     from gradient_estimation import plm_gradient_2d, extrapolate
 
-    ni, nj, nfields = p.shape
-    u = zeros_like(p)
-    gx = zeros_like(p)
-    gy = zeros_like(p)
-    pp = zeros_like(p)
-    pm = zeros_like(p)
-    fhat = zeros((ni - 1, nj, nfields))
-    ghat = zeros((ni, nj - 1, nfields))
+
+    with stream:
+        ni, nj, nfields = p.shape
+        u = zeros_like(p)
+        gx = zeros_like(p)
+        gy = zeros_like(p)
+        pp = zeros_like(p)
+        pm = zeros_like(p)
+        pli = zeros_like(p[:-1, :])
+        pri = zeros_like(p[+1:, :])
+        plj = zeros_like(p[:, :-1:])
+        prj = zeros_like(p[:, +1:])
+        fhat = zeros((ni - 1, nj, nfields))
+        ghat = zeros((ni, nj - 1, nfields))
 
     while True:
         dt = yield
-        plm_gradient_2d(p, gx, gy, 1.5)
 
-        extrapolate(p, gx, pm, pp)
-        pl = pp[:-1, :].copy()
-        pr = pm[+1:, :].copy()
-        hydro.riemann_hlle(pl, pr, fhat, 1)
+        with stream:
+            plm_gradient_2d(p, gx, gy, 1.5)
 
-        extrapolate(p, gy, pm, pp)
-        pl = pp[:, :-1].copy()
-        pr = pm[:, +1:].copy()
-        hydro.riemann_hlle(pl, pr, ghat, 2)
+            extrapolate(p, gx, pm, pp)
+            pli[...] = pp[:-1, :]
+            pri[...] = pm[+1:, :]
+            hydro.riemann_hlle(pli, pri, fhat, 1)
 
-        hydro.prim_to_cons(p, u)
-        u[1:-1, :] -= diff(fhat, axis=0) * (dt / dx)
-        u[:, 1:-1] -= diff(ghat, axis=1) * (dt / dx)
-        hydro.cons_to_prim(u, p)
+            extrapolate(p, gy, pm, pp)
+            plj[...] = pp[:, :-1]
+            prj[...] = pm[:, +1:]
+            hydro.riemann_hlle(plj, prj, ghat, 2)
+
+            hydro.prim_to_cons(p, u)
+            u[1:-1, :] -= diff(fhat, axis=0) * (dt / dx)
+            u[:, 1:-1] -= diff(ghat, axis=1) * (dt / dx)
+            hydro.cons_to_prim(u, p)
 
 
-def update_prim_2d_func(p, hydro, dx, dt):
-    from numpy import zeros, zeros_like, diff
+def update_prim_2d_func(p, hydro, dx, dt, mode="cpu"):
+    if mode == "gpu":
+        from cupy import zeros, zeros_like, diff
+    else:
+        from numpy import zeros, zeros_like, diff
+
     from gradient_estimation import plm_gradient_2d, extrapolate
 
     ni, nj, nfields = p.shape
@@ -382,39 +391,38 @@ def main():
         patches = set(initial_patches(np, np))
         cell_arrays = {ij: cell_centers_2d(*ij, np, np, nz, nz) for ij in patches}
         prim_arrays = {ij: cylindrical_shocktube(*xy) for ij, xy in cell_arrays.items()}
-        updates = list(
-            update_prim_2d_cls(p, hydro, dx, dt) for p in prim_arrays.values()
-        )
 
-        # updates = [update_prim_2d(p, hydro, dx) for p in prim_arrays.values()]
-        # for update in updates:
-        #     update.send(None)
+        streams = list()
+        updates = list()
+
+        if args.exec_mode == "gpu":
+            import cupy
+
+            for ij in prim_arrays:
+                stream = cupy.cuda.Stream(non_blocking=True)
+                with stream:
+                    prim_arrays[ij] = cupy.array(prim_arrays[ij])
+
+                update = update_prim_2d(prim_arrays[ij], hydro, dx, mode=args.exec_mode, stream=stream)
+                update.send(None)
+
+                streams.append(stream)
+                updates.append(update)
 
         perf_timer = perf_time_sequence()
         perf_timer.send(None)
+        
+        while t < 0.1:
+            copy_guard_zones(prim_arrays)
+            for stream, update in zip(streams, updates):
+                update.send(dt)
 
-        from concurrent.futures import ThreadPoolExecutor
+            t += dt
+            n += 1
 
-        with ThreadPoolExecutor(max_workers=12) as executor:
-            while t < 0.1:
-                copy_guard_zones(prim_arrays)
-
-                fs = list()
-                for update, prim in zip(updates, prim_arrays.values()):
-                    # update(prim)
-                    fs.append(executor.submit(update, prim))
-
-                list(f.result() for f in fs)
-
-                # for g in updates:
-                #     g.send(dt)
-
-                t += dt
-                n += 1
-
-                if n % args.fold == 0:
-                    kzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-3
-                    print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+            if n % args.fold == 0:
+                kzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-3
+                print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
 
         if args.plot:
             from matplotlib import pyplot as plt
