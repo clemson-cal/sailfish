@@ -1,10 +1,16 @@
 from time import perf_counter
 
 
-def perf_time_sequence():
+def perf_time_sequence(mode):
+
     last = perf_counter()
     yield
     while True:
+        if mode == "gpu":
+            from cupy.cuda.runtime import deviceSynchronize
+
+            deviceSynchronize()
+
         now = perf_counter()
         yield now - last
         last = now
@@ -245,7 +251,7 @@ def main():
             to_host = lambda a: a
 
         p = xp.array(p)
-        perf_timer = perf_time_sequence()
+        perf_timer = perf_time_sequence(mode=args.exec_mode)
         perf_timer.send(None)
 
         while t < 0.1:
@@ -303,7 +309,7 @@ def main():
             prim_arrays[ij] = xp.array(prim_arrays[ij])
             streams.append(stream)
 
-        perf_timer = perf_time_sequence()
+        perf_timer = perf_time_sequence(mode=args.exec_mode)
         perf_timer.send(None)
 
         while t < 0.1:
