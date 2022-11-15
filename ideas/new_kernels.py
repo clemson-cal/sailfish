@@ -419,7 +419,7 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
             self._stub = stub
             self._first = True
 
-        def __call__(self, *args, exec_mode="cpu", stream=None):
+        def __call__(self, *args, exec_mode=None, stream=None):
             stub = self._stub
             if self._first:
                 cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
