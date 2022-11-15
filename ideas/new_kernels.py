@@ -378,7 +378,7 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
             self._stub = stub
             self._first = True
 
-        def __call__(self, *args):
+        def __call__(self, *args, exec_mode="cpu"):
             stub = self._stub
             if self._first:
                 cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
@@ -387,7 +387,7 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
                     cpu_module, gpu_module, stub, rank, pre_argtypes
                 )
                 self._first = False
-            return self._func(*args)
+            return self._func(*args, exec_mode=exec_mode)
 
     return decorator
 
