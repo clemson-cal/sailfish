@@ -1,8 +1,9 @@
 """
-Enables interaction with raw inline C or CUDA code.
+Enables interaction with embedded C or CUDA code.
 
 Functions and class members that defer their implementation C code are called
-kernels. Kernels act on numpy or cupy arrays.
+kernels. Kernels are meant to crunch numbers. They act on numpy or cupy
+arrays.
 
 Author: Jonathan Zrake (2022)
 """
@@ -151,7 +152,7 @@ def to_ctypes(args, signature):
             yield arg
 
 
-class ProxyFunction:
+class MissingFunction:
     """
     Represents a kernel function that failed to be created for some reason.
 
@@ -170,7 +171,7 @@ class ProxyFunction:
         raise self._error
 
 
-class ProxyModule:
+class MissingModule:
     """
     A CPU or GPU extension module that could not be created for some reason.
     """
@@ -179,10 +180,10 @@ class ProxyModule:
         self._error = error
 
     def __getitem__(self, key):
-        return ProxyFunction(self._error)
+        return MissingFunction(self._error)
 
     def get_function(self, key):
-        return ProxyFunction(self._error)
+        return MissingFunction(self._error)
 
 
 def cpu_extension(code, name, define_macros=list()):
@@ -203,7 +204,7 @@ def cpu_extension(code, name, define_macros=list()):
     """
 
     if KERNEL_DISABLE_CPU_MODE:
-        return ProxyModule(RuntimeError("CPU mode is disabled"))
+        return MissingModule(RuntimeError("CPU mode is disabled"))
 
     # Add header macros with for-each loops, etc.
     code = KERNEL_DEFINE_MACROS_CPU + code
@@ -235,7 +236,7 @@ def cpu_extension(code, name, define_macros=list()):
     except ImportError as e:
         # It should not be fatal if cffi is not available, since GPU kernels
         # could still possibly be used.
-        return ProxyModule(e)
+        return MissingModule(e)
 
     try:
         # If the build product is not already cached, then create it now,
@@ -251,12 +252,12 @@ def cpu_extension(code, name, define_macros=list()):
 
     except VerificationError as e:
         # This is hit when the C compiler fails.
-        return ProxyModule(RuntimeError(f"CPU compilation of {name} failed"))
+        return MissingModule(RuntimeError(f"CPU compilation of {name} failed"))
 
 
 def gpu_extension(code, name, define_macros=list()):
     if KERNEL_DISABLE_GPU_MODE:
-        return ProxyModule(RuntimeError("GPU mode is disabled"))
+        return MissingModule(RuntimeError("GPU mode is disabled"))
 
     try:
         from cupy import RawModule
@@ -269,11 +270,11 @@ def gpu_extension(code, name, define_macros=list()):
         return module
 
     except ImportError as e:
-        return ProxyModule(e)
+        return MissingModule(e)
 
     except CompileException as e:
         # This is hit when the nvrtc compiler fails.
-        return ProxyModule(RuntimeError(f"GPU compilation {name} failed:\n {e}"))
+        return MissingModule(RuntimeError(f"GPU compilation {name} failed:\n {e}"))
 
 
 def cpu_extension_function(module, stub, rank, pre_argtypes):
@@ -309,7 +310,7 @@ def gpu_extension_function(module, stub, rank, pre_argtypes):
     gpu_func = module.get_function(stub.__name__)
 
     if "return" in stub.__annotations__:
-        return ProxyFunction(
+        return MissingFunction(
             ValueError(f"GPU kernel {stub.__name__} may not return a value")
         )
 
