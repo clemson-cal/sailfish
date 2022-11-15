@@ -1,21 +1,3 @@
-from time import perf_counter
-
-
-def perf_time_sequence(mode):
-
-    last = perf_counter()
-    yield
-    while True:
-        if mode == "gpu":
-            from cupy.cuda.runtime import deviceSynchronize
-
-            deviceSynchronize()
-
-        now = perf_counter()
-        yield now - last
-        last = now
-
-
 def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
     """
     One-dimensional update function.
@@ -170,7 +152,7 @@ def linear_shocktube(x):
 
 def main():
     from argparse import ArgumentParser
-    from new_kernels import configure_kernel_module
+    from new_kernels import configure_kernel_module, perf_time_sequence
     from hydro_euler import EulerEquations
 
     parser = ArgumentParser()
@@ -252,7 +234,6 @@ def main():
 
         p = xp.array(p)
         perf_timer = perf_time_sequence(mode=args.exec_mode)
-        perf_timer.send(None)
 
         while t < 0.1:
             update_prim_1d(p, hydro, dt, dx, xp, plm=args.plm)
@@ -310,7 +291,6 @@ def main():
             streams.append(stream)
 
         perf_timer = perf_time_sequence(mode=args.exec_mode)
-        perf_timer.send(None)
 
         while t < 0.1:
             copy_guard_zones(prim_arrays)

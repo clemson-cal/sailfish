@@ -16,6 +16,7 @@ from hashlib import sha256
 from os import listdir
 from os.path import join, dirname
 from textwrap import dedent
+from time import perf_counter
 
 
 # Numpy imports
@@ -87,6 +88,37 @@ if (i < I0 || i >= I1 || j < J0 || j >= J1 || K < K0 || K >= K1) return; \
 THREAD_BLOCK_SIZE_1D = (64,)
 THREAD_BLOCK_SIZE_2D = (8, 8)
 THREAD_BLOCK_SIZE_3D = (4, 4, 4)
+
+
+def perf_time_sequence(mode):
+    """
+    Generate a sequence of time differences between subsequent yield's.
+
+    This is a useful utility function for crude profiling of iteration-based
+    programs. It yields the number of seconds that have elapsed since the
+    previous yield.
+
+    WARNING: it does a device-wide synchronization each time it is called! So,
+    do not call `next` on it in-line with dispatching work to multiple devices
+    or streams.
+    """
+
+    def impl(mode):
+        last = perf_counter()
+        yield
+        while True:
+            if mode == "gpu":
+                from cupy.cuda.runtime import deviceSynchronize
+
+                deviceSynchronize()
+
+            now = perf_counter()
+            yield now - last
+            last = now
+
+    g = impl(mode)
+    g.send(None)
+    return g
 
 
 def configure_kernel_module(
@@ -367,6 +399,15 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
     and returns a shape for the kernel invocation. The kernel is a function
     compiled from C code that can be parallelized in some way, and is compiled
     to either CPU or GPU code.
+
+    The wrapper function returned is a proxy to the respective CPU and GPU
+    compiled extension functions. The execution mode is controlled by passing
+    an extra keyword argument `exec_mode='cpu'|'gpu'` to the wrapper function.
+    It defaults to the module-wide variable `KERNEL_DEFAULT_EXEC_MODE` which
+    is in turn be set with `configure_kernel_module(default_exec_mode='gpu')`.
+
+    In GPU execution mode, an additional keyword argument `stream` is
+    provided. The default value is `None` which means to use the default stream.
     """
 
     class decorator:
