@@ -5,6 +5,7 @@ This program is also useful in determining how big an array needs to be to
 "saturate" (i.e. max out the occupancy of) the GPU. When 
 """
 
+
 from cupy import zeros
 from cupy.cuda import Stream
 from numpy.typing import NDArray
@@ -37,17 +38,17 @@ def compute(count: int, x: NDArray[float]):
 
 if __name__ == "__main__":
     iterations_per_element = 10000
-    array_size = (200, 200)
-    num_arrays = 10
+    array_size = (100, 100)
+    num_arrays = 50
     num_samples = 20
 
     arrays = list(zeros(array_size) for _ in range(num_arrays))
     streams = list(Stream() for _ in range(num_arrays))
 
     for _, time_taken in zip(range(num_samples), perf_time_sequence(mode="gpu")):
-
         for stream, array in zip(streams, arrays):
-            compute(iterations_per_element, array, exec_mode="gpu", stream=stream)
+            with stream:
+                compute(iterations_per_element, array, exec_mode="gpu")
 
         work = iterations_per_element * array_size[0] * array_size[1] * num_arrays
         print(f"time={work/time_taken/1e9:.2f} Gzps")

@@ -347,7 +347,7 @@ def gpu_extension_function(module, stub, rank, pre_argtypes):
         )
 
     @wraps(stub)
-    def wrapper(*args, stream=None):
+    def wrapper(*args):
         extra = stub(*args)
         shape = extra[:rank]
         cargs = extra + args
@@ -365,7 +365,7 @@ def gpu_extension_function(module, stub, rank, pre_argtypes):
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
 
-        gpu_func(nb, bs, cargs, stream=stream)
+        gpu_func(nb, bs, cargs)
 
     return wrapper
 
@@ -376,13 +376,13 @@ def extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes):
     gpu_func = gpu_extension_function(gpu_module, stub, rank, p) if gpu_module else None
 
     @wraps(stub)
-    def wrapper(*args, exec_mode=None, stream=None):
+    def wrapper(*args, exec_mode=None):
         if exec_mode is None:
             exec_mode = KERNEL_DEFAULT_EXEC_MODE
         if exec_mode == "cpu":
             return cpu_func(*args)
         if exec_mode == "gpu":
-            return gpu_func(*args, stream=stream)
+            return gpu_func(*args)
 
     return wrapper
 
@@ -405,9 +405,6 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
     an extra keyword argument `exec_mode='cpu'|'gpu'` to the wrapper function.
     It defaults to the module-wide variable `KERNEL_DEFAULT_EXEC_MODE` which
     is in turn be set with `configure_kernel_module(default_exec_mode='gpu')`.
-
-    In GPU execution mode, an additional keyword argument `stream` is
-    provided. The default value is `None` which means to use the default stream.
     """
 
     class decorator:
@@ -419,7 +416,7 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
             self._stub = stub
             self._first = True
 
-        def __call__(self, *args, exec_mode=None, stream=None):
+        def __call__(self, *args, exec_mode=None):
             stub = self._stub
             if self._first:
                 cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
@@ -428,7 +425,7 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
                     cpu_module, gpu_module, stub, rank, pre_argtypes
                 )
                 self._first = False
-            return self._func(*args, exec_mode=exec_mode, stream=stream)
+            return self._func(*args, exec_mode=exec_mode)
 
     return decorator
 
