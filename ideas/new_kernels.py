@@ -315,7 +315,7 @@ def gpu_extension_function(module, stub, rank, pre_argtypes):
         )
 
     @wraps(stub)
-    def wrapper(*args):
+    def wrapper(*args, stream=None):
         extra = stub(*args)
         shape = extra[:rank]
         cargs = extra + args
@@ -333,7 +333,7 @@ def gpu_extension_function(module, stub, rank, pre_argtypes):
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
 
-        gpu_func(nb, bs, cargs)
+        gpu_func(nb, bs, cargs, stream=stream)
 
     return wrapper
 
@@ -344,13 +344,13 @@ def extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes):
     gpu_func = gpu_extension_function(gpu_module, stub, rank, p) if gpu_module else None
 
     @wraps(stub)
-    def wrapper(*args, exec_mode=None):
+    def wrapper(*args, exec_mode=None, stream=None):
         if exec_mode is None:
             exec_mode = KERNEL_DEFAULT_EXEC_MODE
         if exec_mode == "cpu":
             return cpu_func(*args)
         if exec_mode == "gpu":
-            return gpu_func(*args)
+            return gpu_func(*args, stream=stream)
 
     return wrapper
 
@@ -378,7 +378,7 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
             self._stub = stub
             self._first = True
 
-        def __call__(self, *args, exec_mode="cpu"):
+        def __call__(self, *args, exec_mode="cpu", stream=None):
             stub = self._stub
             if self._first:
                 cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
@@ -387,7 +387,7 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
                     cpu_module, gpu_module, stub, rank, pre_argtypes
                 )
                 self._first = False
-            return self._func(*args, exec_mode=exec_mode)
+            return self._func(*args, exec_mode=exec_mode, stream=stream)
 
     return decorator
 
