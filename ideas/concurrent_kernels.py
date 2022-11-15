@@ -5,7 +5,6 @@ This program is also useful in determining how big an array needs to be to
 "saturate" (i.e. max out the occupancy of) the GPU. When 
 """
 
-from time import perf_counter
 from cupy import zeros
 from cupy.cuda import Stream
 from numpy.typing import NDArray

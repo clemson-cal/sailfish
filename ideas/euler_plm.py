@@ -10,6 +10,7 @@ def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
     pp = xp.empty_like(p)
     pm = xp.empty_like(p)
     fhat = xp.empty((ni - 1, nfields))
+    g[...] = 0.0
 
     if plm:
         plm_gradient_1d(p, g, 1.5)
@@ -26,7 +27,7 @@ def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
     hydro.cons_to_prim(u, p)
 
 
-def update_prim_2d(p, hydro, dt, dx, xp):
+def update_prim_2d(p, hydro, dt, dx, xp, stream):
     from gradient_estimation import plm_gradient_2d, extrapolate
 
     ni, nj, nfields = p.shape
@@ -45,22 +46,22 @@ def update_prim_2d(p, hydro, dt, dx, xp):
     gx[...] = 0.0
     gy[...] = 0.0
 
-    plm_gradient_2d(p, gx, gy, 1.5)
+    plm_gradient_2d(p, gx, gy, 1.5, stream=stream)
 
-    extrapolate(p, gx, pm, pp)
+    extrapolate(p, gx, pm, pp, stream=stream)
     pli[...] = pp[:-1, :]
     pri[...] = pm[+1:, :]
-    hydro.riemann_hlle(pli, pri, fhat, 1)
+    hydro.riemann_hlle(pli, pri, fhat, 1, stream=stream)
 
-    extrapolate(p, gy, pm, pp)
+    extrapolate(p, gy, pm, pp, stream=stream)
     plj[...] = pp[:, :-1]
     prj[...] = pm[:, +1:]
-    hydro.riemann_hlle(plj, prj, ghat, 2)
+    hydro.riemann_hlle(plj, prj, ghat, 2, stream=stream)
 
-    hydro.prim_to_cons(p, u)
+    hydro.prim_to_cons(p, u, stream=stream)
     u[1:-1, :] -= xp.diff(fhat, axis=0) * (dt / dx)
     u[:, 1:-1] -= xp.diff(ghat, axis=1) * (dt / dx)
-    hydro.cons_to_prim(u, p)
+    hydro.cons_to_prim(u, p, stream=stream)
 
 
 def cell_centers_1d(ni):
@@ -296,7 +297,7 @@ def main():
             copy_guard_zones(prim_arrays)
             for stream, prim in zip(streams, prim_arrays.values()):
                 with stream:
-                    update_prim_2d(prim, hydro, dt, dx, xp)
+                    update_prim_2d(prim, hydro, dt, dx, xp, stream)
 
             t += dt
             n += 1
