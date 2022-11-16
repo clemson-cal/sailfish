@@ -21,7 +21,10 @@ class SchemaError(Exception):
 
 class Schema:
     """
-    Default values, type-hints and about messages extracted from a function
+    Meta-data for a user-configurable application component
+
+    The schema stores default values, type-hints and about messages for a set
+    of configuration items.
 
     Default values and type hints are extracted from the function signature.
     About messages are extracte from the doc string, see examples below for
@@ -50,8 +53,11 @@ class Schema:
                     break
 
                 key, about = (x.strip() for x in line.split(":"))
-                type_hint = parameters[key].annotation
-                default = parameters[key].default
+                try:
+                    type_hint = parameters[key].annotation
+                    default = parameters[key].default
+                except KeyError:
+                    raise SchemaError(f"{name}.{key} missing from function signature")
 
                 if default is _empty:
                     raise SchemaError(f"missing default value for {name}.{key}")
@@ -71,9 +77,15 @@ class Schema:
 
     @property
     def component_name(self):
+        """
+        The name of the configurable component this schema represents
+        """
         return self.func.__name__
 
     def validate(self, **kwargs):
+        """
+        Raise an exception if any keyword args incompatible with the schema
+        """
         parameters = signature(self.func).parameters
         for key, val in kwargs.items():
             type_hint = parameters[key].annotation
@@ -83,6 +95,9 @@ class Schema:
                 )
 
     def print_schema(self, file=stdout):
+        """
+        Pretty-print a table of configuration items to the given file
+        """
         key_col = max(max(len(name) for name in self.data) + 3, 22)
         def_col = max(len(str(d)) for (_, d, _) in self.data.values()) + 1
 
@@ -94,7 +109,12 @@ class Schema:
 
 def configurable(func):
     """
-    Attaches a `Schema` instance to a function that provides a schema
+    Attaches a `Schema` instance to a function that provides a schema.
+
+    The scheme instance enables pretty-printing of the component
+    configuration, and validation of a dictionary-like objects against the
+    schema. This decorator also registers the function as an app configuration
+    component in a module variable.
     """
     schema = Schema(func)
     func.schema = schema
@@ -103,44 +123,51 @@ def configurable(func):
     return func
 
 
-@configurable
-def planar_shocktube(x, which: str = "sod1", centerline: float = 0.5):
+if __name__ == "__main__":
     """
-    A planar shocktube model for 1d adiabatic Euler equations
-
-    Configuration
-    -------------
-
-    which:       Type of shocktube setup [sod1, sod2]
-    centerline:  Position of the discontinuity
+    Examples of how to create configurable application components from
+    functions.
     """
-    pass
 
+    @configurable
+    def planar_shocktube(
+        x,
+        which: str = "sod1",
+        centerline: float = 0.5,
+    ):
+        """
+        A planar shocktube model for 1d adiabatic Euler equations
 
-@configurable
-def cylindrical_shocktube(
-    x,
-    y,
-    radius: float = 0.1,
-    pressure_inside: float = 1.0,
-    gamma_law_index: float = 1.66,
-):
-    """
-    A cylindrical shocktube initial condition
+        Configuration
+        -------------
 
-    Configuration
-    -------------
+        which:       Type of shocktube setup [sod1, sod2]
+        centerline:  Position of the discontinuity
+        """
+        pass
 
-    radius:           Radius of the high-pressure region
-    pressure_inside:  Pressure of the high-pressure region
-    gamma_law_index:  The gamma-law index of the gas
-    """
-    pass
+    @configurable
+    def cylindrical_shocktube(
+        x,
+        y,
+        radius: float = 0.1,
+        pressure_inside: float = 1.0,
+        gamma_law_index: float = 1.66,
+    ):
+        """
+        A cylindrical shocktube initial condition
 
+        Configuration
+        -------------
 
-planar_shocktube.schema.validate(which="sod1")
+        radius:           Radius of the high-pressure region
+        pressure_inside:  Pressure of the high-pressure region
+        gamma_law_index:  The gamma-law index of the gas
+        """
+        pass
 
+    planar_shocktube.schema.validate(which="sod1")
+    cylindrical_shocktube.schema.validate(radius=3.0)
 
-def print_configurations():
     for schema in SCHEMAS:
         schema.print_schema()
