@@ -94,17 +94,33 @@ class Schema:
                     f"parameter {key} must be {type_hint.__name__} (got {type(val).__name__})"
                 )
 
-    def print_schema(self, file=stdout):
+    def print_schema(self, log, color=True):
         """
-        Pretty-print a table of configuration items to the given file
+        Print a formatted table of configuration items to a function
+
+        If `color` is `True` then the output is formatted in color, so the given
+        `log` function should interpret the color directives appropriately.
+        Otherwise, or if `log` is builtin `print`, the color formatting is
+        omitted.
         """
         key_col = max(max(len(name) for name in self.data) + 3, 22)
         def_col = max(len(str(d)) for (_, d, _) in self.data.values()) + 1
 
-        print(f"\n\n{self.component_name}\n", file=stdout)
+        if color and log is not print:
+            log(f"\n\n<cyan>{self.component_name}</cyan>\n")
+        else:
+            log(f"\n\n{self.component_name}\n")
 
         for key, (_, default, about) in self.data.items():
-            print(f"{key :.<{key_col}} {default :<{def_col}} {about}", file=stdout)
+            if color and log is not print:
+                msg = (
+                    f"<blue>{key :.<{key_col}}</blue> "
+                    f"<yellow>{default :<{def_col}}</yellow> "
+                    f"<green>{about}</green>"
+                )
+            else:
+                msg = f"{key :.<{key_col}} {default :<{def_col}} {about}"
+            log(msg)
 
 
 def configurable(func):
@@ -123,7 +139,7 @@ def configurable(func):
     return func
 
 
-if __name__ == "__main__":
+def main():
     """
     Examples of how to create configurable application components from
     functions.
@@ -169,5 +185,16 @@ if __name__ == "__main__":
     planar_shocktube.schema.validate(which="sod1")
     cylindrical_shocktube.schema.validate(radius=3.0)
 
+    from loguru import logger
+
+    logger.remove()
+    logger.add(level="INFO", sink=stdout, format="{message}")
+
     for schema in SCHEMAS:
-        schema.print_schema()
+        schema.print_schema(logger.opt(ansi=True).info)
+
+    logger.success("Good!")
+
+
+if __name__ == "__main__":
+    main()
