@@ -196,15 +196,12 @@ def measure_time() -> float:
 
 
 def main():
+    from sys import stdout
     from argparse import ArgumentParser
+    from loguru import logger
     from new_kernels import configure_kernel_module
 
     parser = ArgumentParser()
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="verbose output from extension compile stages",
-    )
     parser.add_argument(
         "--mode",
         dest="exec_mode",
@@ -225,14 +222,23 @@ def main():
         action="store_true",
         help="show a plot after the run",
     )
+    parser.add_argument(
+        "--log-level",
+        default="info",
+        choices=["trace", "debug", "info", "success", "warning", "error", "critical"],
+        help="log messages at and above this severity level",
+    )
+    args = parser.parse_args()
+    logger.remove()
+    logger.add(stdout, level=args.log_level.upper())
+    configure_kernel_module(default_exec_mode=args.exec_mode)
+
     args = parser.parse_args()
 
     if args.exec_mode == "cpu":
         from numpy import array, linspace, zeros, zeros_like, diff
     if args.exec_mode == "gpu":
         from cupy import array, linspace, zeros, zeros_like, diff
-
-    configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
 
     hydro = Hydro()
     num_zones = args.resolution

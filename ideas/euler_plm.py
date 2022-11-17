@@ -152,16 +152,13 @@ def linear_shocktube(x):
 
 
 def main():
+    from sys import stdout
     from argparse import ArgumentParser
+    from loguru import logger
     from new_kernels import configure_kernel_module, perf_time_sequence
     from hydro_euler import EulerEquations
 
     parser = ArgumentParser()
-    parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="verbose output from extension compile stages",
-    )
     parser.add_argument(
         "--mode",
         dest="exec_mode",
@@ -204,8 +201,36 @@ def main():
         action="store_true",
         help="show a plot after the run",
     )
+
+    parser.add_argument(
+        "--log-level",
+        default="info",
+        choices=["trace", "debug", "info", "success", "warning", "error", "critical"],
+        help="log messages at and above this severity level",
+    )
     args = parser.parse_args()
-    configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
+
+    log_format = (
+        "<green>{time:MM-DD-YY HH:mm:ss.SS}</green> | "
+        "<level>{level: <8}</level> | "
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+    )
+    loop_str = "<blue><b>{iter:04d}</b></blue> <black>time</black>:{time:.4f} <black>Mzps</black>:{Mzps:.3f}"
+    loop_msg = logger.opt(ansi=True).info
+
+    logger.remove()
+    logger.add(
+        stdout,
+        level=args.log_level.upper(),
+        format=log_format,
+        filter=lambda r: r["level"].name != "INFO",
+    )
+    logger.add(
+        stdout,
+        format="{message}",
+        filter=lambda r: r["level"].name == "INFO",
+    )
+    configure_kernel_module(default_exec_mode=args.exec_mode)
 
     # -------------------------------------------------------------------------
     # A 1d evolution scheme that uses a single patch, and a
@@ -242,8 +267,8 @@ def main():
             n += 1
 
             if n % args.fold == 0:
-                kzps = nz / next(perf_timer) * args.fold * 1e-3
-                print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+                Mzps = nz / next(perf_timer) * args.fold * 1e-6
+                loop_msg(loop_str.format(iter=n, time=t, Mzps=Mzps))
 
         p = to_host(p)
         from numpy import save
@@ -303,8 +328,8 @@ def main():
             n += 1
 
             if n % args.fold == 0:
-                kzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-3
-                print(f"[{n:04d}]: t={t:.4f} Mzps={kzps * 1e-3:.3f}")
+                Mzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-6
+                loop_msg(loop_str.format(iter=n, time=t, Mzps=Mzps))
 
         if args.plot:
             from matplotlib import pyplot as plt

@@ -19,12 +19,13 @@ from textwrap import dedent
 from time import perf_counter
 
 
-# Numpy imports
+# Numpy and logging imports
 from numpy.typing import NDArray
 from numpy import ndarray
+from loguru import logger
 
 
-KERNEL_VERBOSE_COMPILE = False
+KERNEL_VERBOSE_COMPILE = False  # passed to CFFI
 KERNEL_DISABLE_CACHE = False
 KERNEL_DISABLE_CPU_MODE = False
 KERNEL_DISABLE_GPU_MODE = False
@@ -153,6 +154,12 @@ def configure_kernel_module(
             raise ValueError("execution mode must be cpu or gpu")
         KERNEL_DEFAULT_EXEC_MODE = default_exec_mode
 
+    logger.trace(f"KERNEL_VERBOSE_COMPILE={KERNEL_VERBOSE_COMPILE}")
+    logger.trace(f"KERNEL_DISABLE_CACHE={KERNEL_DISABLE_CACHE}")
+    logger.trace(f"KERNEL_DISABLE_CPU_MODE={KERNEL_DISABLE_CPU_MODE}")
+    logger.trace(f"KERNEL_DISABLE_GPU_MODE={KERNEL_DISABLE_GPU_MODE}")
+    logger.trace(f"KERNEL_DEFAULT_EXEC_MODE={KERNEL_DEFAULT_EXEC_MODE}")
+
 
 def argtypes(f):
     """
@@ -234,7 +241,6 @@ def cpu_extension(code, name, define_macros=list()):
     compiler's stderr should be written to the terminal to aid in identifying
     the compilation error.
     """
-
     if KERNEL_DISABLE_CPU_MODE:
         return MissingModule(RuntimeError("CPU mode is disabled"))
 
@@ -252,22 +258,26 @@ def cpu_extension(code, name, define_macros=list()):
     try:
         from cffi import FFI, VerificationError
 
-        if not KERNEL_DISABLE_CACHE:
+        if KERNEL_DISABLE_CACHE:
+            logger.debug(f"cache disabled")
+        else:
             # Attempt to load a cached build product based on the hash value
             # of the source code.
             target = join(
                 cache_dir, next(f for f in listdir(cache_dir) if f.endswith(".so"))
             )
             module = CDLL(target)
-            if verbose:
-                print(f"loaded cached module: {target}")
+            logger.success(f"load cached module: {name}")
+            logger.trace(f"cached library filenamme: {target}")
             return module
+
     except (FileNotFoundError, StopIteration):
-        pass
+        logger.debug(f"no cache found for module {name}")
 
     except ImportError as e:
         # It should not be fatal if cffi is not available, since GPU kernels
         # could still possibly be used.
+        logger.debug(f"{e}; skip CPU extension")
         return MissingModule(e)
 
     try:
@@ -278,17 +288,17 @@ def cpu_extension(code, name, define_macros=list()):
         ffi.set_source(name, code, define_macros=define_macros)
         target = ffi.compile(tmpdir=cache_dir or ".", verbose=verbose)
         module = CDLL(target)
-        if verbose:
-            print(f"compiled module {target}")
+        logger.success(f"compile CPU module {name}")
         return module
 
     except VerificationError as e:
-        # This is hit when the C compiler fails.
+        logger.debug(f"cupy module not found, skipping GPU extension")
         return MissingModule(RuntimeError(f"CPU compilation of {name} failed"))
 
 
 def gpu_extension(code, name, define_macros=list()):
     if KERNEL_DISABLE_GPU_MODE:
+        logger.debug(f"KERNEL_DISABLE_GPU_MODE=True; skip GPU extension")
         return MissingModule(RuntimeError("GPU mode is disabled"))
 
     try:
@@ -299,14 +309,16 @@ def gpu_extension(code, name, define_macros=list()):
         options = tuple(f"-D {k}={v}" for k, v in define_macros)
         module = RawModule(code=code, options=options)
         module.compile()
+        logger.success(f"compile GPU module {name}")
         return module
 
     except ImportError as e:
+        logger.debug(f"{e}; skip GPU extension")
         return MissingModule(e)
 
     except CompileException as e:
-        # This is hit when the nvrtc compiler fails.
-        return MissingModule(RuntimeError(f"GPU compilation {name} failed:\n {e}"))
+        logger.warning(f"{e}; skip GPU extension")
+        return MissingModule(RuntimeError(f"{e}; skip GPU extension"))
 
 
 def cpu_extension_function(module, stub, rank, pre_argtypes):
@@ -499,6 +511,7 @@ if __name__ == "__main__":
     # ==============================================================================
 
     from argparse import ArgumentParser
+    from sys import stdout
 
     parser = ArgumentParser()
     parser.add_argument(
@@ -509,18 +522,20 @@ if __name__ == "__main__":
         help="execution mode",
     )
     parser.add_argument(
-        "--verbose",
-        action="store_true",
-        help="verbose output from extension compile stages",
+        "--log-level",
+        default="info",
+        choices=["trace", "debug", "info", "success", "warning", "error", "critical"],
+        help="log messages at and above this severity level",
     )
     args = parser.parse_args()
+    logger.remove()
+    logger.add(stdout, level=args.log_level.upper())
+    configure_kernel_module(default_exec_mode=args.exec_mode)
 
     if args.exec_mode == "cpu":
         from numpy import array, linspace, zeros_like
     if args.exec_mode == "gpu":
         from cupy import array, linspace, zeros_like
-
-    configure_kernel_module(verbose=args.verbose, default_exec_mode=args.exec_mode)
 
     # ==============================================================================
     # 1.

@@ -107,7 +107,7 @@ class Schema:
         def_col = max(len(str(d)) for (_, d, _) in self.data.values()) + 1
 
         if color and log is not print:
-            log(f"\n\n<cyan>{self.component_name}</cyan>\n")
+            log(f"\n\n<cyan><u>{self.component_name}</u></cyan>\n")
         else:
             log(f"\n\n{self.component_name}\n")
 
@@ -186,14 +186,15 @@ def main():
     cylindrical_shocktube.schema.validate(radius=3.0)
 
     from loguru import logger
+    import sys
 
     logger.remove()
-    logger.add(level="INFO", sink=stdout, format="{message}")
+    logger.add(stdout, filter=lambda r: r["level"].name == "INFO", format="{message}")
+    logger.add(stdout, filter=lambda r: r["level"].name != "INFO")
+    logger = logger.opt(ansi=True)
 
     for schema in SCHEMAS:
-        schema.print_schema(logger.opt(ansi=True).info)
-
-    logger.success("Good!")
+        schema.print_schema(logger.info)
 
 
 if __name__ == "__main__":
