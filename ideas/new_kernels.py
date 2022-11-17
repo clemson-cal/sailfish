@@ -292,8 +292,8 @@ def cpu_extension(code, name, define_macros=list()):
         return module
 
     except VerificationError as e:
-        logger.debug(f"cupy module not found, skipping GPU extension")
-        return MissingModule(RuntimeError(f"CPU compilation of {name} failed"))
+        logger.debug(f"{e}; skip CPU extension")
+        return MissingModule(RuntimeError(f"invoke failed CPU extension"))
 
 
 def gpu_extension(code, name, define_macros=list()):
@@ -318,7 +318,7 @@ def gpu_extension(code, name, define_macros=list()):
 
     except CompileException as e:
         logger.warning(f"{e}; skip GPU extension")
-        return MissingModule(RuntimeError(f"{e}; skip GPU extension"))
+        return MissingModule(RuntimeError(f"invoke failed GPU extension"))
 
 
 def cpu_extension_function(module, stub, rank, pre_argtypes):

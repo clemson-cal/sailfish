@@ -1,3 +1,10 @@
+from sys import stdout
+from argparse import ArgumentParser
+from loguru import logger
+from new_kernels import configure_kernel_module, perf_time_sequence
+from hydro_euler import EulerEquations
+
+
 def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
     """
     One-dimensional update function.
@@ -151,13 +158,8 @@ def linear_shocktube(x):
     return p
 
 
+@logger.catch
 def main():
-    from sys import stdout
-    from argparse import ArgumentParser
-    from loguru import logger
-    from new_kernels import configure_kernel_module, perf_time_sequence
-    from hydro_euler import EulerEquations
-
     parser = ArgumentParser()
     parser.add_argument(
         "--mode",
@@ -354,4 +356,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
+        logger.success("ctrl-c interrupt")
