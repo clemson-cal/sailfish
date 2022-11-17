@@ -304,12 +304,25 @@ def main():
                 with stream:
                     update_prim_2d(prim, hydro, dt, dx, xp)
 
+            # Should it be necessary to synchronize the streams before copying guard
+            # zones? Results look right even with no sync, but that might not be
+            # guaranteed.
+            #
+            # for stream in streams:
+            #     stream.synchronize()
+
             t += dt
             n += 1
 
             if n % args.fold == 0:
                 Mzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-6
                 term(iteration_msg(iter=n, time=t, Mzps=Mzps))
+
+        from pickle import dump
+
+        host_prim = {ij: to_host(p) for ij, p in prim_arrays.items()}
+        with open("chkpt.pk", "wb") as outf:
+            dump((host_prim, cell_arrays), outf)
 
         if args.plot:
             from matplotlib import pyplot as plt

@@ -37,10 +37,10 @@ def compute(count: int, x: NDArray[float]):
 
 
 if __name__ == "__main__":
-    iterations_per_element = 10000
+    iterations_per_element = 1000
     array_size = (100, 100)
-    num_arrays = 50
-    num_samples = 20
+    num_arrays = 100
+    num_samples = 50
 
     arrays = list(zeros(array_size) for _ in range(num_arrays))
     streams = list(Stream() for _ in range(num_arrays))

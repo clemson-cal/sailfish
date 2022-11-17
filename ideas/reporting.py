@@ -40,7 +40,7 @@ def configure_logger(logger, log_level="success"):
 
 
 def iteration_msg(iter, time, Mzps):
-    msg = "<blue><b>{iter:04d}</b></blue> <black>time</black>:{time:.4f} <black>Mzps</black>:{Mzps:.3f}"
+    msg = "<blue><b>{iter:04d}</b></blue> <green>time</green>:{time:.4f} <green>Mzps</green>:{Mzps:.3f}"
     return msg.format(
         iter=iter,
         time=time,
