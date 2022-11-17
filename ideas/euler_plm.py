@@ -1,6 +1,7 @@
 from sys import stdout
 from argparse import ArgumentParser
 from loguru import logger
+from reporting import configure_logger, terminal, add_logging_arguments, iteration_msg
 from new_kernels import configure_kernel_module, perf_time_sequence
 from hydro_euler import EulerEquations
 
@@ -203,35 +204,12 @@ def main():
         action="store_true",
         help="show a plot after the run",
     )
-
-    parser.add_argument(
-        "--log-level",
-        default="info",
-        choices=["trace", "debug", "info", "success", "warning", "error", "critical"],
-        help="log messages at and above this severity level",
-    )
+    add_logging_arguments(parser)
     args = parser.parse_args()
 
-    log_format = (
-        "<green>{time:MM-DD-YY HH:mm:ss.SS}</green> | "
-        "<level>{level: <8}</level> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
-    )
-    loop_str = "<blue><b>{iter:04d}</b></blue> <black>time</black>:{time:.4f} <black>Mzps</black>:{Mzps:.3f}"
-    loop_msg = logger.opt(ansi=True).info
+    configure_logger(logger, log_level=args.log_level)
+    term = terminal(logger)
 
-    logger.remove()
-    logger.add(
-        stdout,
-        level=args.log_level.upper(),
-        format=log_format,
-        filter=lambda r: r["level"].name != "INFO",
-    )
-    logger.add(
-        stdout,
-        format="{message}",
-        filter=lambda r: r["level"].name == "INFO",
-    )
     configure_kernel_module(default_exec_mode=args.exec_mode)
 
     # -------------------------------------------------------------------------
@@ -270,7 +248,7 @@ def main():
 
             if n % args.fold == 0:
                 Mzps = nz / next(perf_timer) * args.fold * 1e-6
-                loop_msg(loop_str.format(iter=n, time=t, Mzps=Mzps))
+                term(iteration_msg(iter=n, time=t, Mzps=Mzps))
 
         p = to_host(p)
         from numpy import save
@@ -331,7 +309,7 @@ def main():
 
             if n % args.fold == 0:
                 Mzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-6
-                loop_msg(loop_str.format(iter=n, time=t, Mzps=Mzps))
+                term(iteration_msg(iter=n, time=t, Mzps=Mzps))
 
         if args.plot:
             from matplotlib import pyplot as plt

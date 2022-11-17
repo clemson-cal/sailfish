@@ -242,7 +242,8 @@ def cpu_extension(code, name, define_macros=list()):
     the compilation error.
     """
     if KERNEL_DISABLE_CPU_MODE:
-        return MissingModule(RuntimeError("CPU mode is disabled"))
+        logger.debug(f"KERNEL_DISABLE_CPU_MODE=True; skip CPU extension")
+        return MissingModule(RuntimeError("invoke skipped CPU extension"))
 
     # Add header macros with for-each loops, etc.
     code = KERNEL_DEFINE_MACROS_CPU + code
@@ -299,7 +300,7 @@ def cpu_extension(code, name, define_macros=list()):
 def gpu_extension(code, name, define_macros=list()):
     if KERNEL_DISABLE_GPU_MODE:
         logger.debug(f"KERNEL_DISABLE_GPU_MODE=True; skip GPU extension")
-        return MissingModule(RuntimeError("GPU mode is disabled"))
+        return MissingModule(RuntimeError("invoke skipped GPU extension"))
 
     try:
         from cupy import RawModule

@@ -144,6 +144,12 @@ def main():
     Examples of how to create configurable application components from
     functions.
     """
+    from loguru import logger
+
+    term = lambda msg: logger.opt(ansi=True).log("TERM", msg)
+    logger.level("TERM", 0)
+    logger.remove()
+    logger.add(stdout, level="TERM", format="{message}")
 
     @configurable
     def planar_shocktube(
@@ -185,16 +191,8 @@ def main():
     planar_shocktube.schema.validate(which="sod1")
     cylindrical_shocktube.schema.validate(radius=3.0)
 
-    from loguru import logger
-    import sys
-
-    logger.remove()
-    logger.add(stdout, filter=lambda r: r["level"].name == "INFO", format="{message}")
-    logger.add(stdout, filter=lambda r: r["level"].name != "INFO")
-    logger = logger.opt(ansi=True)
-
     for schema in SCHEMAS:
-        schema.print_schema(logger.info)
+        schema.print_schema(term)
 
 
 if __name__ == "__main__":
