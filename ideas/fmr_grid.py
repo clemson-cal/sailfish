@@ -1,6 +1,8 @@
 from numpy import linspace, meshgrid, exp, zeros
 from matplotlib import pyplot as plt
 
+DEBUG_MODE = False
+
 
 def cell_centers_2d(level, ij, ni, nj):
     i, j = ij
@@ -20,8 +22,8 @@ def cell_centers_2d(level, ij, ni, nj):
 
 
 def downsample(a):
-    ni, nj = a.shape
-    res = zeros((ni // 2, nj // 2))
+    ni, nj = a.shape[:2]
+    res = zeros((ni // 2, nj // 2) + a.shape[2:])
     res += a[0::2, 0::2]
     res += a[1::2, 0::2]
     res += a[0::2, 1::2]
@@ -31,8 +33,8 @@ def downsample(a):
 
 
 def upsample(a):
-    ni, nj = a.shape
-    res = zeros((ni * 2, nj * 2))
+    ni, nj = a.shape[:2]
+    res = zeros((ni * 2, nj * 2) + a.shape[2:])
     res[0::2, 0::2] = a
     res[1::2, 0::2] = a
     res[0::2, 1::2] = a
@@ -52,7 +54,8 @@ def fill_guard_rc(index, grid):
         cc[-ng:, ng:-ng] = rc[ng : 2 * ng, ng:-ng]
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         rc = grid[(level - 1, (i // 2 + 1, j // 2))]
@@ -62,7 +65,8 @@ def fill_guard_rc(index, grid):
             cc[-ng:, ng:-ng] = upsample(rc[ng : ng + 1, ng + nj // 2 : -ng])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         rc0 = grid[(level + 1, (2 * (i + 1), 2 * j + 0))]
@@ -71,7 +75,8 @@ def fill_guard_rc(index, grid):
         cc[-ng:, ng + nj // 2 : -ng] = downsample(rc1[ng : 3 * ng, ng:-ng])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
 
 def fill_guard_lc(index, grid):
@@ -83,10 +88,11 @@ def fill_guard_lc(index, grid):
 
     try:
         lc = grid[(level, (i - 1, j))]
-        cc[ng:, ng:-ng] = lc[-2 * ng : -ng, ng:-ng]
+        cc[:ng, ng:-ng] = lc[-2 * ng : -ng, ng:-ng]
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         lc = grid[(level - 1, (i // 2 - 1, j // 2))]
@@ -96,7 +102,8 @@ def fill_guard_lc(index, grid):
             cc[:ng, ng:-ng] = upsample(lc[ni : ni + 1, ng + nj // 2 : -ng])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         lc0 = grid[(level + 1, (2 * (i - 1), 2 * j + 0))]
@@ -105,7 +112,8 @@ def fill_guard_lc(index, grid):
         cc[:ng, ng + nj // 2 : -ng] = downsample(lc1[-3 * ng : -ng, ng:-ng])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
 
 def fill_guard_cr(index, grid):
@@ -120,7 +128,8 @@ def fill_guard_cr(index, grid):
         cc[ng:-ng, -ng:] = cr[ng:-ng, ng : 2 * ng]
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         cr = grid[(level - 1, (i // 2, j // 2 + 1))]
@@ -130,7 +139,8 @@ def fill_guard_cr(index, grid):
             cc[ng:-ng, -ng:] = upsample(cr[ng + ni // 2 : -ng, ng : ng + 1])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         cr0 = grid[(level + 1, (2 * i + 0, 2 * (j + 1)))]
@@ -139,7 +149,8 @@ def fill_guard_cr(index, grid):
         cc[ng + ni // 2 : -ng, -ng:] = downsample(cr1[ng:-ng, ng : 3 * ng])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
 
 def fill_guard_cl(index, grid):
@@ -151,10 +162,11 @@ def fill_guard_cl(index, grid):
 
     try:
         cl = grid[(level, (i, j - 1))]
-        cc[ng:-ng, ng:] = cl[ng:-ng, -2 * ng : -ng]
+        cc[ng:-ng, :ng] = cl[ng:-ng, -2 * ng : -ng]
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         cl = grid[(level - 1, (i // 2, j // 2 - 1))]
@@ -164,7 +176,8 @@ def fill_guard_cl(index, grid):
             cc[ng:-ng, :ng] = upsample(cl[ng + ni // 2 : -ng, ni : ni + 1])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
     try:
         cl0 = grid[(level + 1, (2 * i + 0, 2 * (j - 1)))]
@@ -173,47 +186,48 @@ def fill_guard_cl(index, grid):
         cc[ng + nj // 2 : -ng, :ng] = downsample(cl1[ng:-ng, -3 * ng : -ng])
         return
     except KeyError as e:
-        print(f"no neighbor {e} for block {index}")
+        if DEBUG_MODE:
+            print(f"no neighbor {e} for block {index}")
 
 
-nz = 16
-grid = dict()
+if __name__ == "__main__":
+    DEBUG_MODE = True
 
+    nz = 16
+    grid = dict()
 
-grid[(1, (0, 1))] = cell_centers_2d(1, (0, 1), nz, nz)
-grid[(2, (2, 3))] = cell_centers_2d(2, (2, 3), nz, nz)
-grid[(2, (0, 1))] = cell_centers_2d(2, (0, 1), nz, nz)
-z_arrays = {key: (exp(-(x**2 + y**2) / 0.05)) for key, (x, y) in grid.items()}
+    grid[(1, (0, 1))] = cell_centers_2d(1, (0, 1), nz, nz)
+    grid[(2, (2, 3))] = cell_centers_2d(2, (2, 3), nz, nz)
+    grid[(2, (0, 1))] = cell_centers_2d(2, (0, 1), nz, nz)
+    z_arrays = {key: (exp(-(x**2 + y**2) / 0.05)) for key, (x, y) in grid.items()}
 
-for z in z_arrays.values():
-    z[:+2, :] = 0.0
-    z[-2:, :] = 0.0
-    z[:, :+2] = 0.0
-    z[:, -2:] = 0.0
+    for z in z_arrays.values():
+        z[:+2, :] = 0.0
+        z[-2:, :] = 0.0
+        z[:, :+2] = 0.0
+        z[:, -2:] = 0.0
 
+    fill_guard_lc((2, (2, 3)), z_arrays)
+    fill_guard_cr((2, (0, 1)), z_arrays)
 
-fill_guard_lc((2, (2, 3)), z_arrays)
-fill_guard_cr((2, (0, 1)), z_arrays)
+    vmin = max(z[2:-2, 2:-2].min() for z in z_arrays.values())
+    vmax = max(z[2:-2, 2:-2].max() for z in z_arrays.values())
 
+    for ind in grid:
 
-vmin = max(z[2:-2, 2:-2].min() for z in z_arrays.values())
-vmax = max(z[2:-2, 2:-2].max() for z in z_arrays.values())
+        z = z_arrays[ind]
+        x, y = grid[ind]
 
-for ind in grid:
+        plt.pcolormesh(
+            x,  # [2:-2, 2:-2],
+            y,  # [2:-2, 2:-2],
+            z,  # [2:-2, 2:-2],
+            vmin=vmin,
+            vmax=vmax,
+        )
 
-    z = z_arrays[ind]
-    x, y = grid[ind]
-
-    plt.pcolormesh(
-        x,  # [2:-2, 2:-2],
-        y,  # [2:-2, 2:-2],
-        z,  # [2:-2, 2:-2],
-        vmin=vmin,
-        vmax=vmax,
-    )
-
-plt.colorbar()
-plt.axis("equal")
-plt.xlim(-0.5, 0.5)
-plt.ylim(-0.5, 0.5)
-plt.show()
+    plt.colorbar()
+    plt.axis("equal")
+    plt.xlim(-0.5, 0.5)
+    plt.ylim(-0.5, 0.5)
+    plt.show()

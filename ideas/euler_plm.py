@@ -34,9 +34,12 @@ def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
     hydro.cons_to_prim(u, p)
 
 
-def update_prim_2d(p, hydro, dt, dx, xp):
-
+def update_prim_2d(p, hydro, dt: float, spacing: tuple, xp):
+    """
+    Two-dimensional update function.
+    """
     ni, nj, nfields = p.shape
+    dx, dy = spacing
     u = xp.empty_like(p)
     gx = xp.empty_like(p)
     gy = xp.empty_like(p)
@@ -66,7 +69,7 @@ def update_prim_2d(p, hydro, dt, dx, xp):
 
     hydro.prim_to_cons(p, u)
     u[1:-1, :] -= xp.diff(fhat, axis=0) * (dt / dx)
-    u[:, 1:-1] -= xp.diff(ghat, axis=1) * (dt / dx)
+    u[:, 1:-1] -= xp.diff(ghat, axis=1) * (dt / dy)
     hydro.cons_to_prim(u, p)
 
 
@@ -78,17 +81,32 @@ def cell_centers_1d(ni):
     return xc
 
 
-def cell_centers_2d(i, j, ni_patches, nj_patches, ni, nj):
-    from numpy import linspace, meshgrid
+def patch_spacing(index, nz, np):
+    level, (i, j) = index
+    dx = 1.0 / np / nz / (1 << level)
+    dy = 1.0 / np / nz / (1 << level)
+    return dx, dy
 
-    dx = 1.0 / ni_patches
-    dy = 1.0 / nj_patches
-    ddx = dx / ni
-    ddy = dy / nj
+
+def patch_extent(index, nz, np):
+    level, (i, j) = index
+    dx = 1.0 / np / (1 << level)
+    dy = 1.0 / np / (1 << level)
     x0 = -0.5 + (i + 0) * dx
     x1 = -0.5 + (i + 1) * dx
     y0 = -0.5 + (j + 0) * dy
     y1 = -0.5 + (j + 1) * dy
+    return (x0, x1), (y0, y1)
+
+
+def cell_centers_2d(index, nz, np):
+    from numpy import linspace, meshgrid
+
+    (x0, x1), (y0, y1) = patch_extent(index, nz, np)
+    ni = nz
+    nj = nz
+    ddx = (x1 - x0) / ni
+    ddy = (y1 - y0) / nj
     xv = linspace(x0 - 2 * ddx, x1 + 2 * ddy, ni + 5)
     yv = linspace(y0 - 2 * ddx, y1 + 2 * ddy, nj + 5)
     xc = 0.5 * (xv[1:] + xv[:-1])
@@ -103,12 +121,12 @@ def initial_patches(ni_patches, nj_patches):
 
 
 def copy_guard_zones(grid):
-    for i, j in grid:
-        cc = grid.get((i, j))
-        lc = grid.get((i - 1, j), None)
-        rc = grid.get((i + 1, j), None)
-        cl = grid.get((i, j - 1), None)
-        cr = grid.get((i, j + 1), None)
+    for level, (i, j) in grid:
+        cc = grid.get((level, (i, j)))
+        lc = grid.get((level, (i - 1, j)), None)
+        rc = grid.get((level, (i + 1, j)), None)
+        cl = grid.get((level, (i, j - 1)), None)
+        cr = grid.get((level, (i, j + 1)), None)
 
         if lc is not None:
             cc[:+2, 2:-2] = lc[-4:-2, 2:-2]
@@ -118,6 +136,16 @@ def copy_guard_zones(grid):
             cc[2:-2, :+2] = cl[2:-2, -4:-2]
         if cr is not None:
             cc[2:-2, -2:] = cr[2:-2, +2:+4]
+
+
+def copy_guard_zones_fmr(grid):
+    import fmr_grid
+
+    for index in grid:
+        fmr_grid.fill_guard_cl(index, grid)
+        fmr_grid.fill_guard_cr(index, grid)
+        fmr_grid.fill_guard_lc(index, grid)
+        fmr_grid.fill_guard_rc(index, grid)
 
 
 def cylindrical_shocktube(x, y, radius: float = 0.1, pressure: float = 1.0):
@@ -215,7 +243,6 @@ def main():
     # generator-coroutine to cache cache scratch arrays.
     # -------------------------------------------------------------------------
     if args.dim == 1:
-
         plm_gradient_1d.compile()
         extrapolate.compile()
 
@@ -269,20 +296,27 @@ def main():
     # A 2d evolution scheme that uses a grid of uniformly refined patches.
     # -------------------------------------------------------------------------
     elif args.dim == 2:
-        np = args.patches_per_dim
-        nz = (args.resolution or 100) // np
-        dx = 1.0 / (np * nz)
-        dt = dx * 1e-1
-        t = 0.0
-        n = 0
-
         plm_gradient_2d.compile()
         extrapolate.compile()
 
+        # np = args.patches_per_dim
+        # nz = (args.resolution or 100) // np
+        np = 2  # number of patches at the root level
+        nz = args.resolution  # zones per patch (per dim)
+        t = 0.0
+        n = 0
+
+        patches = set()
+        patches.add((0, (0, 0)))
+        patches.add((0, (1, 0)))
+        patches.add((0, (0, 1)))
+        # patches.add((0, (1, 1)))
+        patches.add((1, (2, 2)))
+
+        cell_arrays = {k: cell_centers_2d(k, nz, np) for k in patches}
+        prim_arrays = {k: cylindrical_shocktube(*xy) for k, xy in cell_arrays.items()}
+        patch_spacings = {k: patch_spacing(k, nz, np) for k in patches}
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
-        patches = set(initial_patches(np, np))
-        cell_arrays = {ij: cell_centers_2d(*ij, np, np, nz, nz) for ij in patches}
-        prim_arrays = {ij: cylindrical_shocktube(*xy) for ij, xy in cell_arrays.items()}
 
         if args.exec_mode == "gpu":
             import cupy as xp
@@ -298,20 +332,26 @@ def main():
 
         streams = list()
 
-        for ij in prim_arrays:
+        for k in prim_arrays:
             stream = stream_cls()
-            prim_arrays[ij] = xp.array(prim_arrays[ij])
+            prim_arrays[k] = xp.array(prim_arrays[k])
             streams.append(stream)
 
-        perf_timer = perf_time_sequence(mode=args.exec_mode)
+        smallest_spacing = min(min(dx, dy) for dx, dy in patch_spacings.values())
+        dt = smallest_spacing * 0.1
 
         logger.info("start simulation")
+        perf_timer = perf_time_sequence(mode=args.exec_mode)
 
-        while t < 0.1:
-            copy_guard_zones(prim_arrays)
-            for stream, prim in zip(streams, prim_arrays.values()):
+        while t < 0.05:
+            copy_guard_zones_fmr(prim_arrays)
+            for stream, spacing, prim in zip(
+                streams,
+                patch_spacings.values(),
+                prim_arrays.values(),
+            ):
                 with stream:
-                    update_prim_2d(prim, hydro, dt, dx, xp)
+                    update_prim_2d(prim, hydro, dt, spacing, xp)
 
             # Should it be necessary to synchronize the streams before copying guard
             # zones? Results look right even with no sync, but that might not be
@@ -329,7 +369,7 @@ def main():
 
         from pickle import dump
 
-        host_prim = {ij: to_host(p) for ij, p in prim_arrays.items()}
+        host_prim = {index: to_host(p) for index, p in prim_arrays.items()}
         with open("chkpt.pk", "wb") as outf:
             dump((host_prim, cell_arrays), outf)
 
@@ -339,9 +379,9 @@ def main():
             vmin = max(p[2:-2, 2:-2, 0].min() for p in prim_arrays.values())
             vmax = max(p[2:-2, 2:-2, 0].max() for p in prim_arrays.values())
 
-            for i, j in patches:
-                z = prim_arrays[(i, j)][..., 0]
-                x, y = cell_arrays[(i, j)]
+            for k in patches:
+                z = prim_arrays[k][..., 0]
+                x, y = cell_arrays[k]
 
                 plt.pcolormesh(
                     x[2:-2, 2:-2],
@@ -350,6 +390,12 @@ def main():
                     vmin=vmin,
                     vmax=vmax,
                 )
+                # (x0, x1), (y0, y1) = patch_extent(k, nz, np)
+                # plt.plot([x0, x1], [y0, y0], c="w", lw=0.5)
+                # plt.plot([x0, x1], [y1, y1], c="w", lw=0.5)
+                # plt.plot([x0, x0], [y0, y1], c="w", lw=0.5)
+                # plt.plot([x1, x1], [y0, y1], c="w", lw=0.5)
+
             plt.colorbar()
             plt.axis("equal")
             plt.show()
