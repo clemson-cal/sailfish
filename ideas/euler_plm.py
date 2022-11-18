@@ -4,14 +4,13 @@ from loguru import logger
 from reporting import configure_logger, terminal, add_logging_arguments, iteration_msg
 from new_kernels import configure_kernel_module, perf_time_sequence
 from hydro_euler import EulerEquations
+from gradient_estimation import plm_gradient_1d, plm_gradient_2d, extrapolate
 
 
 def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
     """
     One-dimensional update function.
     """
-    from gradient_estimation import plm_gradient_1d, extrapolate
-
     ni, nfields = p.shape
     u = xp.empty_like(p)
     g = xp.empty_like(p)
@@ -36,7 +35,6 @@ def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
 
 
 def update_prim_2d(p, hydro, dt, dx, xp):
-    from gradient_estimation import plm_gradient_2d, extrapolate
 
     ni, nj, nfields = p.shape
     u = xp.empty_like(p)
@@ -217,6 +215,10 @@ def main():
     # generator-coroutine to cache cache scratch arrays.
     # -------------------------------------------------------------------------
     if args.dim == 1:
+
+        plm_gradient_1d.compile()
+        extrapolate.compile()
+
         if args.patches_per_dim != 1:
             raise ValueError("only 1 patch is supported in 1d")
 
@@ -241,14 +243,16 @@ def main():
         p = xp.array(p)
         perf_timer = perf_time_sequence(mode=args.exec_mode)
 
+        logger.info("start simulation")
+
         while t < 0.1:
             update_prim_1d(p, hydro, dt, dx, xp, plm=args.plm)
             t += dt
             n += 1
 
             if n % args.fold == 0:
-                Mzps = nz / next(perf_timer) * args.fold * 1e-6
-                term(iteration_msg(iter=n, time=t, Mzps=Mzps))
+                zps = nz / next(perf_timer) * args.fold
+                term(iteration_msg(iter=n, time=t, zps=zps))
 
         p = to_host(p)
         from numpy import save
@@ -271,6 +275,9 @@ def main():
         dt = dx * 1e-1
         t = 0.0
         n = 0
+
+        plm_gradient_2d.compile()
+        extrapolate.compile()
 
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
         patches = set(initial_patches(np, np))
@@ -298,6 +305,8 @@ def main():
 
         perf_timer = perf_time_sequence(mode=args.exec_mode)
 
+        logger.info("start simulation")
+
         while t < 0.1:
             copy_guard_zones(prim_arrays)
             for stream, prim in zip(streams, prim_arrays.values()):
@@ -315,8 +324,8 @@ def main():
             n += 1
 
             if n % args.fold == 0:
-                Mzps = nz**2 * len(patches) / next(perf_timer) * args.fold * 1e-6
-                term(iteration_msg(iter=n, time=t, Mzps=Mzps))
+                zps = nz**2 * len(patches) / next(perf_timer) * args.fold
+                term(iteration_msg(iter=n, time=t, zps=zps))
 
         from pickle import dump
 

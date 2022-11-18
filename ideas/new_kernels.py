@@ -269,7 +269,7 @@ def cpu_extension(code, name, define_macros=list()):
             )
             module = CDLL(target)
             logger.success(f"load cached module {name}")
-            logger.trace(f"cached library filenamme {target}")
+            logger.trace(f"cached library filename {target}")
             return module
 
     except (FileNotFoundError, StopIteration):
@@ -427,18 +427,22 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
 
         def __init__(self, stub):
             self._stub = stub
-            self._first = True
+            self._compiled = False
 
         def __call__(self, *args, exec_mode=None):
-            stub = self._stub
-            if self._first:
-                cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
-                gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
-                self._func = extension_function(
-                    cpu_module, gpu_module, stub, rank, pre_argtypes
-                )
-                self._first = False
+            self.compile()
             return self._func(*args, exec_mode=exec_mode)
+
+        def compile(self):
+            if self._compiled:
+                return
+            stub = self._stub
+            cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
+            gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
+            self._func = extension_function(
+                cpu_module, gpu_module, stub, rank, pre_argtypes
+            )
+            self._compiled = True
 
     return decorator
 

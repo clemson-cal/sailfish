@@ -18,11 +18,11 @@ def configure_logger(logger, log_level="success"):
     the `terminal` function below.
     """
     log_format = (
-        "<green>{time:MM-DD-YY HH:mm:ss.SS}</green> | "
-        "<level>{level: <8}</level> | "
-        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - <level>{message}</level>"
+        "<blue><b>{elapsed}</b></blue>:"
+        "<level>{level: <8}</level>"
+        "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
+        "<level>{message}</level>"
     )
-
     logger.remove()
     logger.level("TERM", 0)
     logger.add(
@@ -39,16 +39,28 @@ def configure_logger(logger, log_level="success"):
     )
 
 
-def iteration_msg(iter, time, Mzps):
-    msg = "<blue><b>{iter:04d}</b></blue> <green>time</green>:{time:.4f} <green>Mzps</green>:{Mzps:.3f}"
-    return msg.format(
-        iter=iter,
-        time=time,
-        Mzps=Mzps,
+def iteration_msg(iter: int, time: float, zps: float):
+    """
+    Return a string formatted for a reasonable iteration message.
+
+    Parameters
+    ----------
+
+    iter: Iteration number
+    time: Simulation time
+    zps:  Zone-updates per second
+    """
+    return (
+        f"<blue><b>{iter:04d}</b></blue> "
+        f"<red>time</red>:{time:.4f} "
+        f"<red>Mzps</red>:{zps/1e6:.3f}"
     )
 
 
 def terminal(logger, ansi=True):
+    """
+    Return a function which logs at the TERM level.
+    """
     return lambda msg: logger.opt(ansi=ansi).log("TERM", msg)
 
 
