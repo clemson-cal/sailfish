@@ -73,6 +73,41 @@ def update_prim_2d(p, hydro, dt: float, spacing: tuple, xp):
     hydro.cons_to_prim(u, p)
 
 
+def godunov_fluxes_2d(p, fhat, ghat, hydro, spacing: tuple, xp):
+    gx = xp.empty_like(p)
+    gy = xp.empty_like(p)
+    pp = xp.empty_like(p)
+    pm = xp.empty_like(p)
+    pli = xp.empty_like(p[:-1, :])
+    pri = xp.empty_like(p[+1:, :])
+    plj = xp.empty_like(p[:, :-1:])
+    prj = xp.empty_like(p[:, +1:])
+    gx[...] = 0.0
+    gy[...] = 0.0
+
+    plm_gradient_2d(p, gx, gy, 1.5)
+
+    extrapolate(p, gx, pm, pp)
+    pli[...] = pp[:-1, :]
+    pri[...] = pm[+1:, :]
+    hydro.riemann_hlle(pli, pri, fhat, 1)
+
+    extrapolate(p, gy, pm, pp)
+    plj[...] = pp[:, :-1]
+    prj[...] = pm[:, +1:]
+    hydro.riemann_hlle(plj, prj, ghat, 2)
+
+
+def add_godunov_fluxes(p, fhat, ghat, hydro, spacing: tuple, xp):
+    dx, dy = spacing
+    u = xp.empty_like(p)
+
+    hydro.prim_to_cons(p, u)
+    u[1:-1, :] -= xp.diff(fhat, axis=0) * (dt / dx)
+    u[:, 1:-1] -= xp.diff(ghat, axis=1) * (dt / dy)
+    hydro.cons_to_prim(u, p)
+
+
 def cell_centers_1d(ni):
     from numpy import linspace
 
@@ -313,10 +348,20 @@ def main():
         # patches.add((0, (1, 1)))
         patches.add((1, (2, 2)))
 
-        cell_arrays = {k: cell_centers_2d(k, nz, np) for k in patches}
-        prim_arrays = {k: cylindrical_shocktube(*xy) for k, xy in cell_arrays.items()}
+        from numpy import zeros
+
         patch_spacings = {k: patch_spacing(k, nz, np) for k in patches}
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
+
+        ng = 2
+        cell_arrays = {k: cell_centers_2d(k, nz, np) for k in patches}
+        prim_arrays = {k: cylindrical_shocktube(*xy) for k, xy in cell_arrays.items()}
+        fhat_arrays = {
+            k: zeros((nz + 2 * ng - 1, nz + 2 * ng, hydro.ncons)) for k in patches
+        }
+        ghat_arrays = {
+            k: zeros((nz + 2 * ng, nz + 2 * ng - 1, hydro.ncons)) for k in patches
+        }
 
         if args.exec_mode == "gpu":
             import cupy as xp
