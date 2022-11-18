@@ -125,12 +125,20 @@ class Schema:
 
 def configurable(func):
     """
-    Attaches a `Schema` instance to a function that provides a schema.
+    Attaches a schema to a function that provides sufficient meta-data.
 
-    The scheme instance enables pretty-printing of the component
-    configuration, and validation of a dictionary-like objects against the
-    schema. This decorator also registers the function as an app configuration
-    component in a module variable.
+    Meta-data is supplied through the names, type-hints, and default values of
+    the function arguments, and also a special "Configuration" section inside
+    the function doc string. The configuration section contains about messages
+    for the function arguments that are published as a configuration.
+    Functions that are decorated with `configurable` are registered in a
+    module variable, enabling the top-level application to inspect of a
+    collection of configurable components across all of the application
+    sub-modules.
+
+    The `Schema` instance, which will be attached to the decorated function,
+    enables pretty-printing of the component configuration, and validation of
+    dictionary-like configuration objects.
     """
     schema = Schema(func)
     func.schema = schema
