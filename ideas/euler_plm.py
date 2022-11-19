@@ -51,7 +51,6 @@ def update_prim_2d(p, hydro, dt: float, spacing: tuple, xp):
     prj = xp.empty_like(p[:, +1:])
     fhat = xp.empty((ni - 1, nj, nfields))
     ghat = xp.empty((ni, nj - 1, nfields))
-
     gx[...] = 0.0
     gy[...] = 0.0
 
@@ -98,10 +97,9 @@ def godunov_fluxes_2d(p, fhat, ghat, hydro, spacing: tuple, xp):
     hydro.riemann_hlle(plj, prj, ghat, 2)
 
 
-def add_godunov_fluxes(p, fhat, ghat, hydro, spacing: tuple, xp):
+def transmit_flux(p, fhat, ghat, hydro, dt: float, spacing: tuple, xp):
     dx, dy = spacing
     u = xp.empty_like(p)
-
     hydro.prim_to_cons(p, u)
     u[1:-1, :] -= xp.diff(fhat, axis=0) * (dt / dx)
     u[:, 1:-1] -= xp.diff(ghat, axis=1) * (dt / dy)
@@ -183,6 +181,17 @@ def copy_guard_zones_fmr(grid):
         fmr_grid.fill_guard_rc(index, grid)
 
 
+def correct_flux(fhat, ghat):
+    import fmr_grid
+
+    for index in fhat:
+        fmr_grid.correct_flux_cl(index, ghat)
+        fmr_grid.correct_flux_cr(index, ghat)
+    for index in ghat:
+        fmr_grid.correct_flux_lc(index, fhat)
+        fmr_grid.correct_flux_rc(index, fhat)
+
+
 def cylindrical_shocktube(x, y, radius: float = 0.1, pressure: float = 1.0):
     """
     A cylindrical shocktube setup
@@ -259,6 +268,11 @@ def main():
         "--dim",
         type=int,
         default=1,
+    )
+    parser.add_argument(
+        "--flux-correction",
+        action="store_true",
+        help="include the flux correction step for FMR",
     )
     parser.add_argument(
         "--plot",
@@ -345,8 +359,10 @@ def main():
         patches.add((0, (0, 0)))
         patches.add((0, (1, 0)))
         patches.add((0, (0, 1)))
-        # patches.add((0, (1, 1)))
         patches.add((1, (2, 2)))
+        patches.add((1, (2, 3)))
+        patches.add((1, (3, 2)))
+        patches.add((1, (3, 3)))
 
         from numpy import zeros
 
@@ -375,12 +391,12 @@ def main():
             stream_cls = contextlib.nullcontext
             to_host = lambda a: a
 
-        streams = list()
+        streams = dict()
 
         for k in prim_arrays:
             stream = stream_cls()
             prim_arrays[k] = xp.array(prim_arrays[k])
-            streams.append(stream)
+            streams[k] = stream
 
         smallest_spacing = min(min(dx, dy) for dx, dy in patch_spacings.values())
         dt = smallest_spacing * 0.1
@@ -388,22 +404,36 @@ def main():
         logger.info("start simulation")
         perf_timer = perf_time_sequence(mode=args.exec_mode)
 
-        while t < 0.05:
+        while t < 0.1:
             copy_guard_zones_fmr(prim_arrays)
-            for stream, spacing, prim in zip(
-                streams,
-                patch_spacings.values(),
-                prim_arrays.values(),
-            ):
-                with stream:
-                    update_prim_2d(prim, hydro, dt, spacing, xp)
 
-            # Should it be necessary to synchronize the streams before copying guard
-            # zones? Results look right even with no sync, but that might not be
-            # guaranteed.
-            #
-            # for stream in streams:
-            #     stream.synchronize()
+            if args.flux_correction:
+                for k in patches:
+                    stream = streams[k]
+                    spacing = patch_spacings[k]
+                    prim = prim_arrays[k]
+                    fhat = fhat_arrays[k]
+                    ghat = ghat_arrays[k]
+                    with stream:
+                        godunov_fluxes_2d(prim, fhat, ghat, hydro, spacing, xp)
+
+                correct_flux(fhat_arrays, ghat_arrays)
+
+                for k in patches:
+                    stream = streams[k]
+                    spacing = patch_spacings[k]
+                    prim = prim_arrays[k]
+                    fhat = fhat_arrays[k]
+                    ghat = ghat_arrays[k]
+                    with stream:
+                        transmit_flux(prim, fhat, ghat, hydro, dt, spacing, xp)
+            else:
+                for k in patches:
+                    stream = streams[k]
+                    spacing = patch_spacings[k]
+                    prim = prim_arrays[k]
+                    with stream:
+                        update_prim_2d(prim, hydro, dt, spacing, xp)
 
             t += dt
             n += 1
