@@ -383,7 +383,13 @@ def gpu_extension_function(module, stub, rank, pre_argtypes):
     return wrapper
 
 
-def extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes):
+def extension_function(
+    cpu_module,
+    gpu_module,
+    stub,
+    rank,
+    pre_argtypes,
+):
     p = tuple(PY_CTYPE_DICT[t] for t in pre_argtypes)
     cpu_func = cpu_extension_function(cpu_module, stub, rank, p) if cpu_module else None
     gpu_func = gpu_extension_function(gpu_module, stub, rank, p) if gpu_module else None
@@ -400,7 +406,48 @@ def extension_function(cpu_module, gpu_module, stub, rank, pre_argtypes):
     return wrapper
 
 
-def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
+def collate_source_code(device_funcs):
+    """
+    Return a string of source code built from a list of device funcs.
+
+    Since device functions can name others as dependencies, this function
+    is effectively a tree traversal, where unique functions are collected
+    and then arranged in reverse-dependency order.
+    """
+
+    def recurse(funcs, collected):
+        for func in funcs:
+            if not func in collected:
+                recurse(func.__device_funcs, collected)
+                collected.add(func)
+
+    collected = set()
+    recurse(device_funcs, collected)
+    return str().join(func.__code for func in reversed(list(collected)))
+
+
+def device(code: str = None, device_funcs=list()):
+    """
+    Return a decorator that replaces a stub function with a 'device' function.
+
+    Device functions cannot be called from Python not invoked as kernels. They
+    are essentially a container for a string of source code, and a function
+    name, that can be declared programmatically as a dependency of other
+    device functions and kernels.
+    """
+
+    def decorator(stub):
+        c = code or dedent(stub.__doc__)
+        if c.count("PRIVATE") != 1:
+            raise ValueError("must include exactly one function marked 'PRIVATE'")
+        stub.__device_funcs = device_funcs
+        stub.__code = c
+        return stub
+
+    return decorator
+
+
+def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple(), device_funcs=list()):
     """
     Return a decorator that replaces a 'stub' function with a 'kernel'.
 
@@ -437,10 +484,15 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple()):
             if self._compiled:
                 return
             stub = self._stub
-            cpu_module = cpu_extension(code or stub.__doc__, stub.__name__)
-            gpu_module = gpu_extension(code or stub.__doc__, stub.__name__)
+            c = collate_source_code(device_funcs) + (code or dedent(stub.__doc__))
+            cpu_module = cpu_extension(c, stub.__name__)
+            gpu_module = gpu_extension(c, stub.__name__)
             self._func = extension_function(
-                cpu_module, gpu_module, stub, rank, pre_argtypes
+                cpu_module,
+                gpu_module,
+                stub,
+                rank,
+                pre_argtypes,
             )
             self._compiled = True
 
@@ -470,7 +522,7 @@ def kernel_class(common_code: str = None):
         def __init__(self, **kwargs):
             cls_init(self, **kwargs)
 
-            code = common_code or cls.__doc__
+            code = common_code or dedent(cls.__doc__)
             kernels = list()
 
             for k in dir(cls):
@@ -510,7 +562,9 @@ def kernel_method(rank: int = 0, code: str = None, pre_argtypes=tuple()):
     return decorator
 
 
-if __name__ == "__main__":
+@logger.catch
+def main():
+
     # ==============================================================================
     # Example usage of kernel functions and classes
     # ==============================================================================
@@ -680,3 +734,62 @@ if __name__ == "__main__":
     solver.conserved_to_primitive(u, q)
 
     assert (p == q).all()
+
+    # ==============================================================================
+    # 4.
+    #
+    # Demonstrates how functions marked with the devive decorator are used for
+    # programatic code generation.
+    # ==============================================================================
+
+    @device()
+    def device_func0(a: int):
+        R"""
+        PRIVATE int device_func0(int a)
+        {
+            return a;
+        }
+        """
+        pass
+
+    @device(device_funcs=[device_func0])
+    def device_func1(a: int):
+        R"""
+        PRIVATE int device_func1(int a)
+        {
+            return device_func0(a);
+        }
+        """
+        pass
+
+    @device(device_funcs=[device_func0])
+    def device_func2(a: int):
+        R"""
+        PRIVATE int device_func2(int a)
+        {
+            return device_func0(a);
+        }
+        """
+        pass
+
+    collated = R"""
+    PRIVATE int device_func0(int a)
+    {
+        return a;
+    }
+
+    PRIVATE int device_func1(int a)
+    {
+        return device_func0(a);
+    }
+
+    PRIVATE int device_func2(int a)
+    {
+        return device_func0(a);
+    }
+    """
+    assert collate_source_code([device_func1, device_func2]) == dedent(collated)
+
+
+if __name__ == "__main__":
+    main()
