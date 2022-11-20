@@ -1,10 +1,12 @@
 from sys import stdout
 from argparse import ArgumentParser
 from loguru import logger
+from numpy import linspace, meshgrid, zeros, logical_not
 from reporting import configure_logger, terminal, add_logging_arguments, iteration_msg
 from new_kernels import configure_kernel_module, perf_time_sequence
 from hydro_euler import EulerEquations
 from gradient_estimation import plm_gradient_1d, plm_gradient_2d, extrapolate
+import fmr_grid
 
 
 def update_prim_1d(p, hydro, dt, dx, xp, plm=False):
@@ -133,7 +135,6 @@ def patch_extent(index, nz, np):
 
 
 def cell_centers_2d(index, nz, np):
-    from numpy import linspace, meshgrid
 
     (x0, x1), (y0, y1) = patch_extent(index, nz, np)
     ni = nz
@@ -147,7 +148,7 @@ def cell_centers_2d(index, nz, np):
     return meshgrid(xc, yc, indexing="ij")
 
 
-def initial_patches(ni_patches, nj_patches):
+def grid_of_patches(ni_patches, nj_patches):
     for i in range(ni_patches):
         for j in range(nj_patches):
             yield i, j
@@ -172,8 +173,6 @@ def copy_guard_zones(grid):
 
 
 def copy_guard_zones_fmr(grid):
-    import fmr_grid
-
     for index in grid:
         fmr_grid.fill_guard_cl(index, grid)
         fmr_grid.fill_guard_cr(index, grid)
@@ -181,9 +180,7 @@ def copy_guard_zones_fmr(grid):
         fmr_grid.fill_guard_rc(index, grid)
 
 
-def correct_flux(fhat, ghat):
-    import fmr_grid
-
+def correct_flux_fmr(fhat, ghat):
     for index in fhat:
         fmr_grid.correct_flux_cl(index, ghat)
         fmr_grid.correct_flux_cr(index, ghat)
@@ -200,9 +197,6 @@ def cylindrical_shocktube(x, y, radius: float = 0.1, pressure: float = 1.0):
     radius ........ radius of the high-pressure region
     pressure ...... gas pressure inside the cylinder
     """
-
-    from numpy import zeros, logical_not
-
     disk = (x**2 + y**2) ** 0.5 < radius
     fisk = logical_not(disk)
     p = zeros(disk.shape + (4,))
@@ -364,8 +358,6 @@ def main():
         patches.add((1, (3, 2)))
         patches.add((1, (3, 3)))
 
-        from numpy import zeros
-
         patch_spacings = {k: patch_spacing(k, nz, np) for k in patches}
         hydro = EulerEquations(dim=2, gamma_law_index=5.0 / 3.0)
 
@@ -417,7 +409,7 @@ def main():
                     with stream:
                         godunov_fluxes_2d(prim, fhat, ghat, hydro, spacing, xp)
 
-                correct_flux(fhat_arrays, ghat_arrays)
+                correct_flux_fmr(fhat_arrays, ghat_arrays)
 
                 for k in patches:
                     stream = streams[k]
