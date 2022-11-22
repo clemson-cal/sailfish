@@ -418,11 +418,19 @@ def collate_source_code(device_funcs):
     def recurse(funcs, collected):
         for func in funcs:
             if not func in collected:
-                recurse(func.__device_funcs, collected)
+                try:
+                    recurse(func.__device_funcs, collected)
+                except AttributeError:
+                    pass
                 collected.add(func)
 
     collected = set()
     recurse(device_funcs, collected)
+
+    for item in collected:
+        if not hasattr(item, "__device_funcs") or not hasattr(item, "__code"):
+            raise ValueError(f"expect function marked with @device, got {item}")
+
     return str().join(func.__code for func in reversed(list(collected)))
 
 
