@@ -434,7 +434,7 @@ def collate_source_code(device_funcs):
     return str().join(func.__code for func in reversed(list(collected)))
 
 
-def device(code: str = None, device_funcs=list()):
+def device(code: str = None, device_funcs=list(), static=list()):
     """
     Return a decorator that replaces a stub function with a 'device' function.
 
@@ -442,6 +442,11 @@ def device(code: str = None, device_funcs=list()):
     are essentially a container for a string of source code, and a function
     name, that can be declared programmatically as a dependency of other
     device functions and kernels.
+
+    [TODO] The `static` argument is a list of strings to be prepended to the
+    function code, probably containing macros. The same static string(s) may
+    be attached to groups of device functions and will only be prepended once
+    (by uniqueness).
     """
 
     def decorator(stub):
@@ -449,6 +454,7 @@ def device(code: str = None, device_funcs=list()):
         if c.count("PRIVATE") != 1:
             raise ValueError("must include exactly one function marked 'PRIVATE'")
         stub.__device_funcs = device_funcs
+        stub.__static = static
         stub.__code = c
         return stub
 
@@ -480,21 +486,28 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple(), device_funcs=l
         Defers compilation of the kernel function until it's first called.
         """
 
-        def __init__(self, stub):
+        def __init__(self, stub, define_macros=list()):
             self._stub = stub
             self._compiled = False
+            self._define_macros = define_macros
 
         def __call__(self, *args, exec_mode=None):
             self.compile()
             return self._func(*args, exec_mode=exec_mode)
+
+        def with_defines(self, **kwargs):
+            return self.__class__(
+                self._stub, list((k.upper(), v) for k, v in kwargs.items())
+            )
 
         def compile(self):
             if self._compiled:
                 return
             stub = self._stub
             c = collate_source_code(device_funcs) + (code or dedent(stub.__doc__))
-            cpu_module = cpu_extension(c, stub.__name__)
-            gpu_module = gpu_extension(c, stub.__name__)
+            define_macros = self._define_macros
+            cpu_module = cpu_extension(c, stub.__name__, define_macros)
+            gpu_module = gpu_extension(c, stub.__name__, define_macros)
             self._func = extension_function(
                 cpu_module,
                 gpu_module,
