@@ -551,6 +551,7 @@ def kernel_class(cls):
         kernel_code = str()
         device_funcs = set()
         kernel_data_dict = dict()
+        static = getattr(self, "static", str())
         define_macros = getattr(self, "define_macros", list())
 
         if type(define_macros) is dict:
@@ -564,7 +565,7 @@ def kernel_class(cls):
                 define_macros += kernel_data.define_macros()
                 kernel_data_dict[k] = kernel_data
 
-        code = collate_source_code(device_funcs) + kernel_code
+        code = static + collate_source_code(device_funcs) + kernel_code
         name = cls.__name__
         cpu_module = cpu_extension(code, name, define_macros)
         gpu_module = gpu_extension(code, name, define_macros)

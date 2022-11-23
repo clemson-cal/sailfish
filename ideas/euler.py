@@ -11,9 +11,9 @@ Author: Jonathan Zrake
 from contextlib import contextmanager
 from time import perf_counter
 from numpy.typing import NDArray
-from new_kernels import kernel, kernel_class, kernel_method
+from new_kernels import kernel, kernel_class
 
-code = R"""
+static = R"""
 #define min2(a, b) ((a) < (b) ? (a) : (b))
 #define max2(a, b) ((a) > (b) ? (a) : (b))
 #define min3(a, b, c) min2(a, min2(b, c))
@@ -29,7 +29,7 @@ code = R"""
 
 static const double gamma_law_index = 5.0 / 3.0;
 
-PRIVATE void _prim_to_cons(double *p, double *u)
+DEVICE void _prim_to_cons(double *p, double *u)
 {
     double rho = p[RHO];
     double vx  = p[VXX];
@@ -40,7 +40,7 @@ PRIVATE void _prim_to_cons(double *p, double *u)
     u[NRG] = 0.5 * rho * v_squared + pre / (gamma_law_index - 1.0);
 }
 
-PRIVATE void _cons_to_prim(double *u, double *p)
+DEVICE void _cons_to_prim(double *u, double *p)
 {
     double rho = u[DEN];
     double px  = u[PXX];
@@ -51,7 +51,7 @@ PRIVATE void _cons_to_prim(double *u, double *p)
     p[PRE] = (nrg - 0.5 * p_squared / rho) * (gamma_law_index - 1.0);
 }
 
-PRIVATE void _prim_to_flux(double *p, double *u, double *f, int direction)
+DEVICE void _prim_to_flux(double *p, double *u, double *f, int direction)
 {
     double pre = p[PRE];
     double nrg = u[NRG];
@@ -61,12 +61,12 @@ PRIVATE void _prim_to_flux(double *p, double *u, double *f, int direction)
     f[NRG] = vn * (nrg + pre);
 }
 
-PRIVATE double _sound_speed_squared(double *p)
+DEVICE double _sound_speed_squared(double *p)
 {
     return p[PRE] / p[RHO] * gamma_law_index;
 }
 
-PRIVATE double _max_wavespeed(double *p)
+DEVICE double _max_wavespeed(double *p)
 {
     double cs = sqrt(_sound_speed_squared(p));
     double vx = p[VXX];
@@ -74,7 +74,7 @@ PRIVATE double _max_wavespeed(double *p)
     return ax;
 }
 
-PRIVATE void _outer_wavespeeds(
+DEVICE void _outer_wavespeeds(
     double *p,
     double *wavespeeds,
     int direction)
@@ -85,7 +85,7 @@ PRIVATE void _outer_wavespeeds(
     wavespeeds[1] = vn + cs;
 }
 
-PRIVATE void _hlle(double *pl, double *pr, double *flux, int direction)
+DEVICE void _hlle(double *pl, double *pr, double *flux, int direction)
 {
     double ul[NCONS];
     double ur[NCONS];
@@ -112,12 +112,15 @@ PRIVATE void _hlle(double *pl, double *pr, double *flux, int direction)
 """
 
 
-@kernel_class(code)
+@kernel_class
 class Hydro:
-    @kernel_method(rank=1)
-    def cons_to_prim(self, u: NDArray[float], p: NDArray[float]):
+
+    static = static
+
+    @kernel()
+    def cons_to_prim(self, u: NDArray[float], p: NDArray[float], ni: int = None):
         R"""
-        PUBLIC void cons_to_prim(int ni, double *u, double *p)
+        KERNEL void cons_to_prim(double *u, double *p, int ni)
         {
             FOR_EACH_1D(ni)
             {
@@ -125,12 +128,12 @@ class Hydro:
             }
         }
         """
-        return u.shape[:1]
+        return u.shape[0], (u, p, u.shape[0])
 
-    @kernel_method(rank=1)
-    def prim_to_cons(self, p: NDArray[float], u: NDArray[float]):
+    @kernel()
+    def prim_to_cons(self, p: NDArray[float], u: NDArray[float], ni: int = None):
         R"""
-        PUBLIC void prim_to_cons(int ni, double *p, double *u)
+        KERNEL void prim_to_cons(double *p, double *u, int ni)
         {
             FOR_EACH_1D(ni)
             {
@@ -138,12 +141,14 @@ class Hydro:
             }
         }
         """
-        return p.shape[:1]
+        return p.shape[0], (p, u, p.shape[0])
 
-    @kernel_method(rank=1)
-    def prim_to_flux(self, p: NDArray[float], f: NDArray[float], direction: int):
+    @kernel()
+    def prim_to_flux(
+        self, p: NDArray[float], f: NDArray[float], direction: int, ni: int = None
+    ):
         R"""
-        PUBLIC void prim_to_flux(int ni, double *p, double *f, int direction)
+        KERNEL void prim_to_flux(double *p, double *f, int direction, int ni)
         {
             double u[NCONS];
 
@@ -154,12 +159,12 @@ class Hydro:
             }
         }
         """
-        return p.shape[:1]
+        return p.shape[0], (p, f, direction, p.shape[0])
 
-    @kernel_method(rank=1)
-    def max_wavespeed(self, p: NDArray[float], a: NDArray[float]):
+    @kernel()
+    def max_wavespeed(self, p: NDArray[float], a: NDArray[float], ni: int = None):
         R"""
-        PUBLIC void max_wavespeed(int ni, double *p, double *a)
+        KERNEL void max_wavespeed(double *p, double *a, int ni)
         {
             FOR_EACH_1D(ni)
             {
@@ -167,18 +172,19 @@ class Hydro:
             }
         }
         """
-        return p.shape[:1]
+        return p.shape[0], (p, a, p.shape[0])
 
-    @kernel_method(rank=1)
+    @kernel()
     def godunov_flux(
         self,
         pl: NDArray[float],
         pr: NDArray[float],
         fhat: NDArray[float],
         direction: int,
+        ni: int = None,
     ):
         R"""
-        PUBLIC void godunov_flux(int ni, double *pl, double *pr, double *fhat, int direction)
+        KERNEL void godunov_flux(double *pl, double *pr, double *fhat, int direction, int ni)
         {
             FOR_EACH_1D(ni)
             {
@@ -186,7 +192,7 @@ class Hydro:
             }
         }
         """
-        return fhat.shape[:1]
+        return fhat.shape[0], (pl, pr, fhat, direction, fhat.shape[0])
 
 
 @contextmanager
