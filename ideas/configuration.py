@@ -94,7 +94,7 @@ class Schema:
                     f"parameter {key} must be {type_hint.__name__} (got {type(val).__name__})"
                 )
 
-    def print_schema(self, log, color=True):
+    def print_schema(self, log, color=True, newline=False, config=dict()):
         """
         Print a formatted table of configuration items to a function
 
@@ -107,20 +107,52 @@ class Schema:
         def_col = max(len(str(d)) for (_, d, _) in self.data.values()) + 1
 
         if color and log is not print:
-            log(f"\n\n<cyan><u>{self.component_name}</u></cyan>\n")
+            log(f"\n<cyan><u>{self.component_name}</u></cyan>\n")
         else:
-            log(f"\n\n{self.component_name}\n")
+            log(f"\n{self.component_name}\n")
 
-        for key, (_, default, about) in self.data.items():
+        for key, (_, value, about) in self.data.items():
+            try:
+                value = config[key]
+            except KeyError:
+                pass
+
             if color and log is not print:
                 msg = (
                     f"<blue>{key :.<{key_col}}</blue> "
-                    f"<yellow>{default :<{def_col}}</yellow> "
+                    f"<yellow>{str(value) :<{def_col}}</yellow> "
                     f"<green>{about}</green>"
                 )
             else:
-                msg = f"{key :.<{key_col}} {default :<{def_col}} {about}"
+                msg = f"{key :.<{key_col}} {str(value) :<{def_col}} {about}"
             log(msg)
+
+        if newline:
+            log("\n")
+
+    def argument_parser(self, parser=None):
+        if parser is None:
+            from argparse import ArgumentParser
+
+            parser = ArgumentParser()
+
+        for key, (type_hint, default, about) in self.data.items():
+            if type_hint is bool and default is False:
+                parser.add_argument(
+                    "--" + key.replace("_", "-"),
+                    action="store_true",
+                    help=about,
+                )
+            else:
+                parser.add_argument(
+                    "--" + key.replace("_", "-"),
+                    type=type_hint,
+                    default=default,
+                    help=about,
+                    metavar="",
+                )
+
+        return parser
 
 
 def configurable(func):
@@ -145,6 +177,11 @@ def configurable(func):
     SCHEMAS.append(schema)
 
     return func
+
+
+def all_schemas():
+    for schema in SCHEMAS:
+        yield schema
 
 
 def main():

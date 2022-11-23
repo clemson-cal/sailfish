@@ -2,7 +2,8 @@ from loguru import logger
 from numpy import linspace, meshgrid, zeros, logical_not
 from numpy.typing import NDArray
 from new_kernels import kernel, perf_time_sequence, configure_kernel_module
-from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
+from lib_euler import prim_to_cons, cons_to_prim, riemann
+from configuration import configurable, all_schemas
 
 
 @kernel(device_funcs=[cons_to_prim], define_macros=dict(DIM=1))
@@ -64,6 +65,7 @@ def conservative_update(
             double *uc = &u[3 * i];
             double *fm = &f[3 * i];
             double *fp = &f[3 * (i + 1)];
+
             for (int q = 0; q < 3; ++q)
             {
                 uc[q] -= (fp[q] - fm[q]) * dt / dx;
@@ -74,9 +76,7 @@ def conservative_update(
     return u.size // 3, (u, f, dt, dx, u.size // 3)
 
 
-@kernel(
-    device_funcs=[prim_to_cons, cons_to_prim, riemann_hlle], define_macros=dict(DIM=1)
-)
+@kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann], define_macros=dict(DIM=1))
 def update_prim_rk1_pcm(p: NDArray[float], dt: float, dx: float, ni: int = None):
     R"""
     //
@@ -97,8 +97,8 @@ def update_prim_rk1_pcm(p: NDArray[float], dt: float, dx: float, ni: int = None)
             double *pr = &p[NCONS * (i + 1)];
 
             prim_to_cons(pc, uc);
-            riemann_hlle(pl, pc, fhat_m, 1);
-            riemann_hlle(pc, pr, fhat_p, 1);
+            riemann(pl, pc, fhat_m, 1);
+            riemann(pc, pr, fhat_p, 1);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -111,7 +111,7 @@ def update_prim_rk1_pcm(p: NDArray[float], dt: float, dx: float, ni: int = None)
     return p.shape[0], (p, dt, dx, p.shape[0])
 
 
-@kernel(device_funcs=[riemann_hlle], define_macros=dict(DIM=1))
+@kernel(device_funcs=[riemann], define_macros=dict(DIM=1))
 def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = None):
     R"""
     //
@@ -126,7 +126,7 @@ def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = N
             double *pc = &p[NCONS * i];
             double *pr = &p[NCONS * (i + 1)];
             double *fp = &f[NCONS * (i + 1)];
-            riemann_hlle(pc, pr, fp, 1);
+            riemann(pc, pr, fp, 1);
         }
     }
     """
@@ -197,78 +197,31 @@ def numpy_or_cupy(mode):
 
 
 @logger.catch
-def main():
-    from argparse import ArgumentParser
-    from reporting import (
-        configure_logger,
-        terminal,
-        add_logging_arguments,
-        iteration_msg,
-    )
+@configurable
+def driver(
+    exec_mode: str = "cpu",
+    resolution: int = 10000,
+    strategy: str = "flux_per_zone",
+    fold: int = 100,
+    plot: bool = False,
+):
+    """
+    Configuration
+    -------------
 
-    parser = ArgumentParser()
-    parser.add_argument(
-        "--mode",
-        dest="exec_mode",
-        default="cpu",
-        choices=["cpu", "gpu"],
-        help="execution mode",
-    )
-    parser.add_argument(
-        "--resolution",
-        "-n",
-        metavar="N",
-        type=int,
-        default=None,
-        help="grid resolution",
-    )
-    parser.add_argument(
-        "--fold",
-        "-f",
-        type=int,
-        default=50,
-        help="number of iterations between messages",
-    )
-    parser.add_argument(
-        "--patches-per-dim",
-        type=int,
-        default=1,
-    )
-    parser.add_argument(
-        "--plm",
-        action="store_true",
-        help="use PLM reconstruction for second-order in space",
-    )
-    parser.add_argument(
-        "--dim",
-        type=int,
-        default=1,
-    )
-    parser.add_argument(
-        "--flux-correction",
-        action="store_true",
-        help="include the flux correction step for FMR",
-    )
-    parser.add_argument(
-        "--plot",
-        action="store_true",
-        help="show a plot after the run",
-    )
-    parser.add_argument(
-        "--strategy",
-        choices=["flux_per_zone", "flux_per_face"],
-        default="flux_per_face",
-    )
-    add_logging_arguments(parser)
-    args = parser.parse_args()
+    exec_mode:     execution mode [cpu|gpu]
+    resolution:    number of grid zones
+    strategy:      solver strategy [flux_per_zone|flux_per_face]
+    fold:          number of iterations between iteration message
+    plot:          whether to show a plot of the solution
+    """
+    from reporting import terminal, iteration_msg
 
-    configure_logger(logger, log_level=args.log_level)
+    configure_kernel_module(default_exec_mode=exec_mode)
     term = terminal(logger)
+    xp, to_host = numpy_or_cupy(exec_mode)
 
-    configure_kernel_module(default_exec_mode=args.exec_mode)
-    xp, to_host = numpy_or_cupy(args.exec_mode)
-
-    nz = args.resolution or 100000
+    nz = resolution or 100000
     dx = 1.0 / nz
     dt = dx * 1e-1
     x = cell_centers_1d(nz)
@@ -277,22 +230,22 @@ def main():
     n = 0
 
     p = xp.array(p)
-    perf_timer = perf_time_sequence(mode=args.exec_mode)
+    perf_timer = perf_time_sequence(mode=exec_mode)
 
     logger.info("start simulation")
 
     while t < 0.1:
-        update_prim(p, dt, dx, args.strategy, xp)
+        update_prim(p, dt, dx, strategy, xp)
         t += dt
         n += 1
 
-        if n % args.fold == 0:
-            zps = nz / next(perf_timer) * args.fold
+        if n % fold == 0:
+            zps = nz / next(perf_timer) * fold
             term(iteration_msg(iter=n, time=t, zps=zps))
 
     p = to_host(p)
 
-    if args.plot:
+    if plot:
         from matplotlib import pyplot as plt
 
         plt.plot(p[:, 0])
@@ -300,4 +253,21 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    from argparse import ArgumentParser
+    from reporting import add_logging_arguments, terminal, configure_logger
+
+    parser = ArgumentParser()
+    add_logging_arguments(parser)
+
+    driver_group = parser.add_argument_group("driver")
+    driver.schema.argument_parser(driver_group)
+    args = parser.parse_args()
+
+    config = {
+        g.title: {a.dest: getattr(args, a.dest, None) for a in g._group_actions}
+        for g in parser._action_groups
+    }
+    configure_logger(logger, log_level=args.log_level)
+
+    driver.schema.print_schema(terminal(logger), config=vars(args), newline=True)
+    driver(**config["driver"])
