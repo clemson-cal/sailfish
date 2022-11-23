@@ -322,7 +322,7 @@ def gpu_extension(code, name, define_macros=list()):
         return MissingModule(RuntimeError(f"invoke failed GPU extension"))
 
 
-def cpu_extension_function(module, stub, rank, pre_argtypes):
+def cpu_extension_function(module, stub, rank, pre_argtypes, method=False):
     """
     Return a function to replace the given stub with a call to a C function.
 
@@ -345,13 +345,13 @@ def cpu_extension_function(module, stub, rank, pre_argtypes):
     @wraps(stub)
     def wrapper(*args):
         shape = stub(*args) or tuple()
-        cargs = to_ctypes(shape + args, c_func.argtypes)
+        cargs = to_ctypes(shape + (args[1:] if method else args), c_func.argtypes)
         return c_func(*cargs)
 
     return wrapper
 
 
-def gpu_extension_function(module, stub, rank, pre_argtypes):
+def gpu_extension_function(module, stub, rank, pre_argtypes, method=False):
     gpu_func = module.get_function(stub.__name__)
 
     if "return" in stub.__annotations__:
@@ -363,7 +363,7 @@ def gpu_extension_function(module, stub, rank, pre_argtypes):
     def wrapper(*args):
         extra = stub(*args)
         shape = extra[:rank]
-        cargs = extra + args
+        cargs = extra + (args[1:] if method else args)
 
         if rank == 1:
             (ti,) = bs = THREAD_BLOCK_SIZE_1D
@@ -389,10 +389,11 @@ def extension_function(
     stub,
     rank,
     pre_argtypes,
+    method=False,
 ):
     p = tuple(PY_CTYPE_DICT[t] for t in pre_argtypes)
-    cpu_func = cpu_extension_function(cpu_module, stub, rank, p) if cpu_module else None
-    gpu_func = gpu_extension_function(gpu_module, stub, rank, p) if gpu_module else None
+    cpu_func = cpu_extension_function(cpu_module, stub, rank, p, method) if cpu_module else None
+    gpu_func = gpu_extension_function(gpu_module, stub, rank, p, method) if gpu_module else None
 
     @wraps(stub)
     def wrapper(*args, exec_mode=None):
@@ -406,7 +407,7 @@ def extension_function(
     return wrapper
 
 
-def collate_source_code(device_funcs):
+def collate_source_code(device_funcs: list):
     """
     Return a string of source code built from a list of device funcs.
 
@@ -422,19 +423,21 @@ def collate_source_code(device_funcs):
                     recurse(func.__device_funcs, collected)
                 except AttributeError:
                     pass
-                collected.add(func)
+                collected.append(func)
 
-    collected = set()
+    collected = list()
     recurse(device_funcs, collected)
 
     for item in collected:
-        if not hasattr(item, "__device_funcs") or not hasattr(item, "__code"):
+        if not hasattr(item, "__device_func_marker"):
             raise ValueError(f"expect function marked with @device, got {item}")
 
-    return str().join(func.__code for func in reversed(list(collected)))
+    a = str().join(set(func.__static for func in collected))
+    b = str().join(func.__code for func in collected)
+    return a + b
 
 
-def device(code: str = None, device_funcs=list(), static=list()):
+def device(code: str = None, device_funcs=list(), static=str()):
     """
     Return a decorator that replaces a stub function with a 'device' function.
 
@@ -443,10 +446,10 @@ def device(code: str = None, device_funcs=list(), static=list()):
     name, that can be declared programmatically as a dependency of other
     device functions and kernels.
 
-    [TODO] The `static` argument is a list of strings to be prepended to the
-    function code, probably containing macros. The same static string(s) may
-    be attached to groups of device functions and will only be prepended once
-    (by uniqueness).
+    The `static` argument is a string to be prepended to the function code,
+    probably containing macros that might also apply to other related device
+    functions. Duplicate static strings will be removed at the time of kernel
+    code generation.
     """
 
     def decorator(stub):
@@ -456,12 +459,19 @@ def device(code: str = None, device_funcs=list(), static=list()):
         stub.__device_funcs = device_funcs
         stub.__static = static
         stub.__code = c
+        stub.__device_func_marker = None
         return stub
 
     return decorator
 
 
-def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple(), device_funcs=list()):
+def kernel(
+    code: str = None,
+    rank: int = 0,
+    pre_argtypes=tuple(),
+    device_funcs=list(),
+    define_macros=list(),
+):
     """
     Return a decorator that replaces a 'stub' function with a 'kernel'.
 
@@ -481,106 +491,102 @@ def kernel(code: str = None, rank: int = 0, pre_argtypes=tuple(), device_funcs=l
     is in turn be set with `configure_kernel_module(default_exec_mode='gpu')`.
     """
 
-    class decorator:
-        """
-        Defers compilation of the kernel function until it's first called.
-        """
+    def decorator(stub):
+        class kernel_data_cls:
+            def __init__(self):
+                self._compiled = False
 
-        def __init__(self, stub, define_macros=list()):
-            self._stub = stub
-            self._compiled = False
-            self._define_macros = define_macros
+            def kernel_code(self):
+                return code or dedent(stub.__doc__)
 
-        def __call__(self, *args, exec_mode=None):
-            self.compile()
-            return self._func(*args, exec_mode=exec_mode)
+            def device_funcs(self):
+                return device_funcs
 
-        def with_defines(self, **kwargs):
-            return self.__class__(
-                self._stub, list((k.upper(), v) for k, v in kwargs.items())
-            )
+            def define_macros(self):
+                return define_macros
 
-        def compile(self):
-            if self._compiled:
-                return
-            stub = self._stub
-            c = collate_source_code(device_funcs) + (code or dedent(stub.__doc__))
-            define_macros = self._define_macros
-            cpu_module = cpu_extension(c, stub.__name__, define_macros)
-            gpu_module = gpu_extension(c, stub.__name__, define_macros)
-            self._func = extension_function(
-                cpu_module,
-                gpu_module,
-                stub,
-                rank,
-                pre_argtypes,
-            )
-            self._compiled = True
+            def code(self):
+                a = collate_source_code(device_funcs)
+                b = self.kernel_code()
+                return a + b
+
+            def require_compiled(self):
+                if not self._compiled:
+                    code = self.code()
+                    name = stub.__name__
+                    cpu_module = cpu_extension(code, name, define_macros)
+                    gpu_module = gpu_extension(code, name, define_macros)
+                    self.inject_modules(cpu_module, gpu_module)
+
+            def inject_modules(self, cpu_module, gpu_module, method=False):
+                self._func = extension_function(
+                    cpu_module,
+                    gpu_module,
+                    stub,
+                    rank,
+                    pre_argtypes,
+                    method,
+                )
+                self._compiled = True
+                self._method = method
+
+        k = kernel_data_cls()
+
+        @wraps(stub)
+        def wrapper(*args, exec_mode=None):
+            k.require_compiled()
+            return k._func(*args, exec_mode=exec_mode)
+
+        wrapper.__kernel_data = k
+
+        return wrapper
 
     return decorator
 
 
-def kernel_class(common_code: str = None):
+
+def kernel_class(cls):
     """
     A decorator for classes that contains kernel stubs.
 
-    The class instance is given a custom __init__ which compiles the attached
-    C code at the time a kernel class is instantiated; the extension module is
-    built (or loaded) lazily. This also creates an opportunity for the calling
-    Python functions to manipulate the kernel class C code in custom ways
-    for each kernel class instance.
+    The class instance is given a custom __init__ which collects source code
+    from any member functions defined as kernels. Compilation takes place when
+    the kernel class is instantiated.
 
     If the wrapped class has a property `define_macros` (list of key-value
-    tuples), its value will be passed to the `cpu_extension` function.
-
-    C code is the sum of the contents of either `common_code` or
-    `cls.__doc__`, and the doc strings of all of the class's kernel methods.
+    tuples), its value will be added to (and supersede) any define macros
+    associated with the individual kernels. The kernel class is thus a
+    convenient way to group bits of code that are parameterized around a set
+    of common compile-time macros.
     """
+    cls_init = cls.__init__
 
-    def decorator(cls):
-        cls_init = cls.__init__
+    def __init__(self, **kwargs):
+        cls_init(self, **kwargs)
 
-        def __init__(self, **kwargs):
-            cls_init(self, **kwargs)
+        kernel_code = str()
+        device_funcs = set()
+        define_macros = getattr(self, "define_macros", list())
+        kernel_data_dict = dict()
 
-            code = common_code or dedent(cls.__doc__)
-            kernels = list()
+        for k in dir(self):
+            if hasattr(getattr(self, k), "__kernel_data"):
+                kernel_data = getattr(self, k).__kernel_data
+                kernel_code += kernel_data.kernel_code()
+                device_funcs |= set(kernel_data.device_funcs())
+                define_macros += kernel_data.define_macros()
+                kernel_data_dict[k] = kernel_data
 
-            for k in dir(cls):
-                f = getattr(self, k)
-                if hasattr(f, "__kernel_code"):
-                    code += f.__kernel_code or dedent(f.__doc__)
-                    kernels.append(k)
+        code = collate_source_code(device_funcs) + kernel_code
+        name = cls.__name__
+        cpu_module = cpu_extension(code, name, define_macros)
+        gpu_module = gpu_extension(code, name, define_macros)
 
-            define_macros = getattr(self, "define_macros", list())
-            cpu_module = cpu_extension(code, cls.__name__, define_macros)
-            gpu_module = gpu_extension(code, cls.__name__, define_macros)
+        for key, kernel_data in kernel_data_dict.items():
+            kernel_data.inject_modules(cpu_module, gpu_module, method=True)
 
-            for kernel in kernels:
-                stub = getattr(self, kernel)
-                rank = stub.__kernel_rank
-                sign = stub.__kernel_pre_argtypes
-                func = extension_function(cpu_module, gpu_module, stub, rank, sign)
-                setattr(self, kernel, func)
-
-        cls.__init__ = __init__
-        return cls
-
-    return decorator
-
-
-def kernel_method(rank: int = 0, code: str = None, pre_argtypes=tuple()):
-    """
-    A decorator for class methods to be implemented as compiled C code.
-    """
-
-    def decorator(stub):
-        stub.__kernel_rank = rank
-        stub.__kernel_code = code
-        stub.__kernel_pre_argtypes = pre_argtypes
-        return stub
-
-    return decorator
+    cls.__init__ = __init__
+    return cls
 
 
 @logger.catch
@@ -678,13 +684,23 @@ def main():
     # included at the top of the resulting source code.
     # ==============================================================================
 
-    @kernel_class()
-    class Solver:
+    @device()
+    def dot3(a, b, c):
         R"""
-        static const double gamma_law_index = 5.0 / 3.0;
+        PRIVATE double dot3(double a, double b, double c)
+        {
+            return a * a + b * b + c * c;
+        }
         """
+        pass
 
-        @kernel_method(rank=1)
+    @kernel_class
+    class Solver:
+        @property
+        def define_macros(self):
+            return [("gamma_law_index", 5.0 / 3.0)]
+
+        @kernel(rank=1, device_funcs=[dot3])
         def conserved_to_primitive(self, u: NDArray[float], p: NDArray[float]):
             R"""
             //
@@ -699,7 +715,7 @@ def main():
                     double py  = u[5 * i + 2];
                     double pz  = u[5 * i + 3];
                     double nrg = u[5 * i + 4];
-                    double p_squared = px * px + py * py + pz * pz;
+                    double p_squared = dot3(px, py, pz);
 
                     p[5 * i + 0] = rho;
                     p[5 * i + 1] = px / rho;
@@ -715,7 +731,7 @@ def main():
                 raise ValueError("p and u must have the same shape")
             return (p.size // 5,)
 
-        @kernel_method(rank=1)
+        @kernel(rank=1, device_funcs=[dot3])
         def primitive_to_conserved(self, p: NDArray[float], u: NDArray[float]):
             R"""
             //
@@ -730,7 +746,7 @@ def main():
                     double vy  = p[5 * i + 2];
                     double vz  = p[5 * i + 3];
                     double pre = p[5 * i + 4];
-                    double v_squared = vx * vx + vy * vy + vz * vz;
+                    double v_squared = dot3(vx, vy, vz);
 
                     u[5 * i + 0] = rho;
                     u[5 * i + 1] = vx * rho;
@@ -746,15 +762,18 @@ def main():
                 raise ValueError("u and p must have the same shape")
             return (u.size // 5,)
 
+        def thing(self):
+            pass
+
     solver = Solver()
     p = array([[1.0, 0.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 0.0, 1.0]])
     u = zeros_like(p)
     q = zeros_like(p)
-
     solver.primitive_to_conserved(p, u)
-    solver.conserved_to_primitive(u, q)
+    # exit()
+    # solver.conserved_to_primitive(u, q)
 
-    assert (p == q).all()
+    # assert (p == q).all()
 
     # ==============================================================================
     # 4.
