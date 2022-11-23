@@ -322,7 +322,7 @@ def gpu_extension(code, name, define_macros=list()):
         return MissingModule(RuntimeError(f"invoke failed GPU extension"))
 
 
-def cpu_extension_function(module, stub, rank, pre_argtypes, method=False):
+def cpu_extension_function(module, stub):
     """
     Return a function to replace the given stub with a call to a C function.
 
@@ -339,19 +339,19 @@ def cpu_extension_function(module, stub, rank, pre_argtypes, method=False):
     """
 
     c_func = module[stub.__name__]
-    c_func.argtypes = (pre_argtypes or (c_int,) * rank) + argtypes(stub)
+    c_func.argtypes = argtypes(stub)
     c_func.restype = restype(stub)
 
     @wraps(stub)
     def wrapper(*args):
-        shape = stub(*args) or tuple()
-        cargs = to_ctypes(shape + (args[1:] if method else args), c_func.argtypes)
+        shape, pyargs = stub(*args) or tuple()
+        cargs = to_ctypes(pyargs, c_func.argtypes)
         return c_func(*cargs)
 
     return wrapper
 
 
-def gpu_extension_function(module, stub, rank, pre_argtypes, method=False):
+def gpu_extension_function(module, stub):
     gpu_func = module.get_function(stub.__name__)
 
     if "return" in stub.__annotations__:
@@ -361,9 +361,7 @@ def gpu_extension_function(module, stub, rank, pre_argtypes, method=False):
 
     @wraps(stub)
     def wrapper(*args):
-        extra = stub(*args)
-        shape = extra[:rank]
-        cargs = extra + (args[1:] if method else args)
+        shape, pyargs = stub(*args) or tuple()
 
         if rank == 1:
             (ti,) = bs = THREAD_BLOCK_SIZE_1D
@@ -378,22 +376,14 @@ def gpu_extension_function(module, stub, rank, pre_argtypes, method=False):
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
 
-        gpu_func(nb, bs, cargs)
+        gpu_func(nb, bs, pyargs)
 
     return wrapper
 
 
-def extension_function(
-    cpu_module,
-    gpu_module,
-    stub,
-    rank,
-    pre_argtypes,
-    method=False,
-):
-    p = tuple(PY_CTYPE_DICT[t] for t in pre_argtypes)
-    cpu_func = cpu_extension_function(cpu_module, stub, rank, p, method) if cpu_module else None
-    gpu_func = gpu_extension_function(gpu_module, stub, rank, p, method) if gpu_module else None
+def extension_function(cpu_module, gpu_module, stub):
+    cpu_func = cpu_extension_function(cpu_module, stub) if cpu_module else None
+    gpu_func = gpu_extension_function(gpu_module, stub) if gpu_module else None
 
     @wraps(stub)
     def wrapper(*args, exec_mode=None):
@@ -465,13 +455,7 @@ def device(code: str = None, device_funcs=list(), static=str()):
     return decorator
 
 
-def kernel(
-    code: str = None,
-    rank: int = 0,
-    pre_argtypes=tuple(),
-    device_funcs=list(),
-    define_macros=list(),
-):
+def kernel(code: str = None, device_funcs=list(), define_macros=list()):
     """
     Return a decorator that replaces a 'stub' function with a 'kernel'.
 
@@ -519,14 +503,7 @@ def kernel(
                     self.inject_modules(cpu_module, gpu_module)
 
             def inject_modules(self, cpu_module, gpu_module, method=False):
-                self._func = extension_function(
-                    cpu_module,
-                    gpu_module,
-                    stub,
-                    rank,
-                    pre_argtypes,
-                    method,
-                )
+                self._func = extension_function(cpu_module, gpu_module, stub)
                 self._compiled = True
                 self._method = method
 
@@ -542,7 +519,6 @@ def kernel(
         return wrapper
 
     return decorator
-
 
 
 def kernel_class(cls):
@@ -644,7 +620,7 @@ def main():
         """
         Return the product of an integer a and a float b.
         """
-        pass
+        return None, (a, b)
 
     if args.exec_mode != "gpu":
         assert multiply(5, 25.0) == 125.0
@@ -656,10 +632,10 @@ def main():
     # written in the doc string.
     # ==============================================================================
 
-    @kernel(rank=1)
-    def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float]):
+    @kernel()
+    def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float], ni: int = None):
         R"""
-        PUBLIC void rank_one_kernel(int ni, double a, double *x, double *y)
+        PUBLIC void rank_one_kernel(double a, double *x, double *y, int ni)
         {
             FOR_EACH_1D(ni)
             {
@@ -669,7 +645,7 @@ def main():
         """
         if x.shape != y.shape:
             raise ValueError("input and output arrays have different shapes")
-        return x.shape
+        return x.shape, (a, x, y, x.shape[0])
 
     a = linspace(0.0, 1.0, 5000)
     b = zeros_like(a)
@@ -700,13 +676,18 @@ def main():
         def define_macros(self):
             return [("gamma_law_index", 5.0 / 3.0)]
 
-        @kernel(rank=1, device_funcs=[dot3])
-        def conserved_to_primitive(self, u: NDArray[float], p: NDArray[float]):
+        @kernel(device_funcs=[dot3])
+        def conserved_to_primitive(
+            self,
+            u: NDArray[float],
+            p: NDArray[float],
+            ni: int = None,
+        ):
             R"""
             //
             // Compute the conversion of conserved variables to primitive ones.
             //
-            PUBLIC void conserved_to_primitive(int ni, double *u, double *p)
+            PUBLIC void conserved_to_primitive(double *u, double *p, int ni)
             {
                 FOR_EACH_1D(ni)
                 {
@@ -729,15 +710,20 @@ def main():
                 raise ValueError("p.shape[-1] must be 5")
             if p.shape != u.shape:
                 raise ValueError("p and u must have the same shape")
-            return (p.size // 5,)
+            return (p.size // 5,), (u, p, p.size // 5)
 
-        @kernel(rank=1, device_funcs=[dot3])
-        def primitive_to_conserved(self, p: NDArray[float], u: NDArray[float]):
+        @kernel(device_funcs=[dot3])
+        def primitive_to_conserved(
+            self,
+            p: NDArray[float],
+            u: NDArray[float],
+            ni: int = None,
+        ):
             R"""
             //
             // Compute the conversion of primitive variables to conserved ones.
             //
-            PUBLIC void primitive_to_conserved(int ni, double *p, double *u)
+            PUBLIC void primitive_to_conserved(double *p, double *u, int ni)
             {
                 FOR_EACH_1D(ni)
                 {
@@ -760,20 +746,16 @@ def main():
                 raise ValueError("u.shape[-1] must be 5")
             if u.shape != p.shape:
                 raise ValueError("u and p must have the same shape")
-            return (u.size // 5,)
-
-        def thing(self):
-            pass
+            return (u.size // 5,), (p, u, u.size // 5)
 
     solver = Solver()
     p = array([[1.0, 0.0, 0.0, 0.0, 1.0], [1.0, 0.0, 0.0, 0.0, 1.0]])
     u = zeros_like(p)
     q = zeros_like(p)
     solver.primitive_to_conserved(p, u)
-    # exit()
-    # solver.conserved_to_primitive(u, q)
+    solver.conserved_to_primitive(u, q)
 
-    # assert (p == q).all()
+    assert (p == q).all()
 
     # ==============================================================================
     # 4.
