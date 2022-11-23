@@ -332,10 +332,6 @@ def cpu_extension_function(module, stub):
     type hints, so the stub must provide type hints for all of its arguments,
     and all of the type hints must map to ctypes objects through the module
     variable `PY_CTYPE_DICT`.
-
-    The first `rank` arguments to the compiled C function must be integers
-    representing the shape of the kernel index space. Subsequent arguments
-    reflect the stub signature.
     """
 
     c_func = module[stub.__name__]
@@ -461,18 +457,19 @@ def kernel(code: str = None, device_funcs=list(), define_macros=list()):
 
     The C code to be compiled is given either in the `code` variable, or is
     otherwise taken from the stub's doc string (which must then consist
-    exclusively of valid C code).
+    exclusively of valid C code). The stub function is a Python function that
+    simply inspects its arguments and returns:
 
-    The stub function is a Python function that simply inspects its arguments
-    and returns a shape for the kernel invocation. The kernel is a function
-    compiled from C code that can be parallelized in some way, and is compiled
-    to either CPU or GPU code.
+    1. A shape for the kernel launch (total threads per dim), and
+    2. The arguments to be passed to the native function
 
-    The wrapper function returned is a proxy to the respective CPU and GPU
-    compiled extension functions. The execution mode is controlled by passing
-    an extra keyword argument `exec_mode='cpu'|'gpu'` to the wrapper function.
-    It defaults to the module-wide variable `KERNEL_DEFAULT_EXEC_MODE` which
-    is in turn be set with `configure_kernel_module(default_exec_mode='gpu')`.
+    The kernel is a function compiled from C code that can be parallelized in
+    some way, and is compiled to either CPU or GPU code. The wrapper function
+    returned is a proxy to the respective CPU and GPU compiled extension
+    functions. The execution mode is controlled by passing an extra keyword
+    argument `exec_mode='cpu'|'gpu'` to the wrapper function. It defaults to
+    the module-wide variable `KERNEL_DEFAULT_EXEC_MODE` which is in turn be
+    set with `configure_kernel_module(default_exec_mode='gpu')`.
     """
 
     def decorator(stub):
@@ -530,10 +527,10 @@ def kernel_class(cls):
     the kernel class is instantiated.
 
     If the wrapped class has a property `define_macros` (list of key-value
-    tuples), its value will be added to (and supersede) any define macros
-    associated with the individual kernels. The kernel class is thus a
-    convenient way to group bits of code that are parameterized around a set
-    of common compile-time macros.
+    tuples or a dict), its value will be added to (and supersede) any define
+    macros associated with the individual kernels. The kernel class is thus a
+    convenient way to group bits of code that are parameterized around a
+    common set of compile-time macros.
     """
     cls_init = cls.__init__
 
@@ -542,8 +539,11 @@ def kernel_class(cls):
 
         kernel_code = str()
         device_funcs = set()
-        define_macros = getattr(self, "define_macros", list())
         kernel_data_dict = dict()
+        define_macros = getattr(self, "define_macros", list())
+
+        if type(define_macros) is dict:
+            define_macros = list(define_macros.items())
 
         for k in dir(self):
             if hasattr(getattr(self, k), "__kernel_data"):
@@ -674,7 +674,7 @@ def main():
     class Solver:
         @property
         def define_macros(self):
-            return [("gamma_law_index", 5.0 / 3.0)]
+            return dict(gamma_law_index=5.0 / 3.0)
 
         @kernel(device_funcs=[dot3])
         def conserved_to_primitive(
