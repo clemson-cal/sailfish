@@ -276,8 +276,8 @@ class EulerEquations:
     could have garbage wavespeeds so a max-reduction operation must exclude
     exclude any guard zones (it should do this anyway).
 
-    This class contains an HLLE Riemann solver. An HLLC solver can be easily
-    added.
+    This class contains an HLLE Riemann solver. An HLLC or exact solver could
+    be easily added.
     """
 
     def __init__(self, dim=1, gamma_law_index=5.0 / 3.0):

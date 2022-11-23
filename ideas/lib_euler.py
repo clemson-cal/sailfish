@@ -266,7 +266,14 @@ def outer_wavespeeds(
     """
 
 
-@device(static=static, device_funcs=[prim_to_cons, outer_wavespeeds])
+@device(
+    static=static,
+    device_funcs=[
+        prim_to_cons,
+        prim_and_cons_to_flux,
+        outer_wavespeeds,
+    ],
+)
 def riemann_hlle(
     pl: NDArray[float],
     pr: NDArray[float],
