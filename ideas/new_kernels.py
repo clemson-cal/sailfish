@@ -40,8 +40,8 @@ PY_CTYPE_DICT = {
 
 
 KERNEL_DEFINE_MACROS_CPU = R"""
-#define PRIVATE static
-#define PUBLIC
+#define DEVICE static
+#define KERNEL
 
 #define FOR_RANGE_1D(I0, I1) \
 for (int i = I0; i < I1; ++i) \
@@ -62,8 +62,8 @@ for (int k = K0; k < K1; ++k) \
 
 
 KERNEL_DEFINE_MACROS_GPU = R"""
-#define PRIVATE static __device__
-#define PUBLIC extern "C" __global__
+#define DEVICE static __device__
+#define KERNEL extern "C" __global__
 
 #define FOR_RANGE_1D(I0, I1) \
 int i = threadIdx.x + blockIdx.x * blockDim.x; \
@@ -340,7 +340,7 @@ def cpu_extension_function(module, stub):
 
     @wraps(stub)
     def wrapper(*args):
-        shape, pyargs = stub(*args) or tuple()
+        shape, pyargs = stub(*args)
         cargs = to_ctypes(pyargs, c_func.argtypes)
         return c_func(*cargs)
 
@@ -357,17 +357,20 @@ def gpu_extension_function(module, stub):
 
     @wraps(stub)
     def wrapper(*args):
-        shape, pyargs = stub(*args) or tuple()
+        shape, pyargs = stub(*args)
 
-        if rank == 1:
+        if type(shape) is int:
+            shape = (shape,)
+
+        if len(shape) == 1:
             (ti,) = bs = THREAD_BLOCK_SIZE_1D
             (ni,) = shape
             nb = ((ni + ti - 1) // ti,)
-        if rank == 2:
+        if len(shape) == 2:
             ti, tj = bs = THREAD_BLOCK_SIZE_2D
             ni, nj = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj)
-        if rank == 3:
+        if len(shape) == 3:
             ti, tj, tk = bs = THREAD_BLOCK_SIZE_3D
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
@@ -440,13 +443,18 @@ def device(code: str = None, device_funcs=list(), static=str()):
 
     def decorator(stub):
         c = code or dedent(stub.__doc__)
-        if c.count("PRIVATE") != 1:
-            raise ValueError("must include exactly one function marked 'PRIVATE'")
+        if c.count("DEVICE") != 1:
+            raise ValueError("must include exactly one function marked 'DEVICE'")
         stub.__device_funcs = device_funcs
         stub.__static = static
         stub.__code = c
         stub.__device_func_marker = None
-        return stub
+
+        @wraps(stub)
+        def wrapper(*args, **kwargs):
+            raise NotImplementedError("cannot call a device function")
+
+        return wrapper
 
     return decorator
 
@@ -471,6 +479,9 @@ def kernel(code: str = None, device_funcs=list(), define_macros=list()):
     the module-wide variable `KERNEL_DEFAULT_EXEC_MODE` which is in turn be
     set with `configure_kernel_module(default_exec_mode='gpu')`.
     """
+
+    if type(define_macros) is dict:
+        define_macros = list(define_macros.items())
 
     def decorator(stub):
         class kernel_data_cls:
@@ -609,7 +620,7 @@ def main():
     # ==============================================================================
 
     code = R"""
-    PUBLIC double multiply(int a, double b)
+    KERNEL double multiply(int a, double b)
     {
         return a * b;
     }
@@ -635,7 +646,7 @@ def main():
     @kernel()
     def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float], ni: int = None):
         R"""
-        PUBLIC void rank_one_kernel(double a, double *x, double *y, int ni)
+        KERNEL void rank_one_kernel(double a, double *x, double *y, int ni)
         {
             FOR_EACH_1D(ni)
             {
@@ -663,7 +674,7 @@ def main():
     @device()
     def dot3(a, b, c):
         R"""
-        PRIVATE double dot3(double a, double b, double c)
+        DEVICE double dot3(double a, double b, double c)
         {
             return a * a + b * b + c * c;
         }
@@ -687,7 +698,7 @@ def main():
             //
             // Compute the conversion of conserved variables to primitive ones.
             //
-            PUBLIC void conserved_to_primitive(double *u, double *p, int ni)
+            KERNEL void conserved_to_primitive(double *u, double *p, int ni)
             {
                 FOR_EACH_1D(ni)
                 {
@@ -723,7 +734,7 @@ def main():
             //
             // Compute the conversion of primitive variables to conserved ones.
             //
-            PUBLIC void primitive_to_conserved(double *p, double *u, int ni)
+            KERNEL void primitive_to_conserved(double *p, double *u, int ni)
             {
                 FOR_EACH_1D(ni)
                 {
@@ -767,7 +778,7 @@ def main():
     @device()
     def device_func0(a: int):
         R"""
-        PRIVATE int device_func0(int a)
+        DEVICE int device_func0(int a)
         {
             return a;
         }
@@ -777,7 +788,7 @@ def main():
     @device(device_funcs=[device_func0])
     def device_func1(a: int):
         R"""
-        PRIVATE int device_func1(int a)
+        DEVICE int device_func1(int a)
         {
             return device_func0(a);
         }
@@ -787,7 +798,7 @@ def main():
     @device(device_funcs=[device_func0])
     def device_func2(a: int):
         R"""
-        PRIVATE int device_func2(int a)
+        DEVICE int device_func2(int a)
         {
             return device_func0(a);
         }
@@ -795,17 +806,17 @@ def main():
         pass
 
     collated = R"""
-    PRIVATE int device_func0(int a)
+    DEVICE int device_func0(int a)
     {
         return a;
     }
 
-    PRIVATE int device_func1(int a)
+    DEVICE int device_func1(int a)
     {
         return device_func0(a);
     }
 
-    PRIVATE int device_func2(int a)
+    DEVICE int device_func2(int a)
     {
         return device_func0(a);
     }
