@@ -144,6 +144,8 @@ class Schema:
                 parser.add_argument(
                     "--" + key.replace("_", "-"),
                     action="store_true",
+                    default=None,
+                    dest=f"{dest_prefix}.{key}" if dest_prefix else key,
                     help=about,
                 )
             else:
