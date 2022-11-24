@@ -1,3 +1,5 @@
+from collections.abc import MutableMapping
+from collections import ChainMap
 from loguru import logger
 from numpy import linspace, meshgrid, zeros, logical_not
 from numpy.typing import NDArray
@@ -196,7 +198,6 @@ def numpy_or_cupy(mode):
         return numpy, lambda a: a
 
 
-@logger.catch
 @configurable
 def driver(
     exec_mode: str = "cpu",
@@ -252,22 +253,127 @@ def driver(
         plt.show()
 
 
-if __name__ == "__main__":
+def flatten_dict(
+    d: MutableMapping,
+    parent_key: str = "",
+    sep: str = ".",
+) -> MutableMapping:
+    """
+    Create a flattened dictionary e from d, with e['a.b.c'] = d['a']['b']['c']
+    """
+    items = list()
+    for k, v in d.items():
+        new_key = parent_key + sep + k if parent_key else k
+        if isinstance(v, MutableMapping):
+            items.extend(flatten_dict(v, new_key, sep=sep).items())
+        else:
+            items.append((new_key, v))
+    return dict(items)
+
+
+def load_config(config):
+    """
+    Attemmpt to load configuration data from a file: either JSON or YAML.
+    """
+    if config.endswith(".json"):
+        from json import load
+
+        with open(config, "r") as infile:
+            return load(infile)
+
+    elif config.endswith(".yaml"):
+        from yaml import load, CLoader
+
+        with open(config, "r") as infile:
+            return load(infile, Loader=CLoader)
+
+    else:
+        raise ValueError(f"unknown configuration file {config}")
+
+
+def short_help(args):
+    args.parser.print_usage()
+
+
+def run(args):
+    config = ChainMap(
+        *(flatten_dict(load_config(config)) for config in reversed(args.configs))
+    )
+    driver_args = {k[k.index(".") + 1 :]: v for k, v in config.items()}
+    driver.schema.print_schema(
+        args.term,
+        config=driver_args,
+        newline=True,
+    )
+    driver(**driver_args)
+
+
+def show_config(args):
+    if args.defaults:
+        for schema in all_schemas():
+            schema.print_schema(args.term)
+
+    else:
+        app_config = {s.component_name: s.defaults_dict() for s in all_schemas()}
+
+        if args.format == "json":
+            from json import dumps
+
+            print(dumps(app_config, indent=4))
+
+        if args.format == "yaml":
+            try:
+                from yaml import dump, CDumper
+
+                print(dump(app_config, Dumper=CDumper))
+
+            except ImportError as e:
+                print(e)
+
+
+@logger.catch
+def main():
     from argparse import ArgumentParser
     from reporting import add_logging_arguments, terminal, configure_logger
 
     parser = ArgumentParser()
-    add_logging_arguments(parser)
+    parser.set_defaults(func=short_help)
+    parser.set_defaults(term=terminal(logger))
+    parser.set_defaults(parser=parser)
+    parser.set_defaults(log_level="info")
+    subparsers = parser.add_subparsers()
 
-    driver_group = parser.add_argument_group("driver")
-    driver.schema.argument_parser(driver_group)
+    show_config_parser = subparsers.add_parser(
+        "show-config",
+        help="show global configuration data",
+    )
+    show_config_parser.set_defaults(func=show_config)
+    group = show_config_parser.add_mutually_exclusive_group()
+    group.add_argument(
+        "--format",
+        type=str,
+        default="json",
+        choices=["json", "yaml"],
+        help="output format for the configuration data",
+    )
+    group.add_argument(
+        "--defaults",
+        action="store_true",
+        help="print defaults and help messages for configurable components",
+    )
+    run_parser = subparsers.add_parser(
+        "run",
+        help="run a simulation",
+    )
+    run_parser.set_defaults(func=run)
+    run_parser.add_argument("configs", nargs="*")
+    add_logging_arguments(run_parser)
+
     args = parser.parse_args()
-
-    config = {
-        g.title: {a.dest: getattr(args, a.dest, None) for a in g._group_actions}
-        for g in parser._action_groups
-    }
     configure_logger(logger, log_level=args.log_level)
 
-    driver.schema.print_schema(terminal(logger), config=vars(args), newline=True)
-    driver(**config["driver"])
+    args.func(args)
+
+
+if __name__ == "__main__":
+    main()

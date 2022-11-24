@@ -130,6 +130,9 @@ class Schema:
         if newline:
             log("\n")
 
+    def defaults_dict(self):
+        return {key: value for key, (_, value, _) in self.data.items()}
+
     def argument_parser(self, parser=None):
         if parser is None:
             from argparse import ArgumentParser

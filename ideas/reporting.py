@@ -16,6 +16,9 @@ def configure_logger(logger, log_level="success"):
 
     Messages to the terminal should be emitted through the function returned by
     the `terminal` function below.
+
+    WARNING: This function should only be called once (calling again will
+    cause the logger.level function to fail).
     """
     log_format = (
         "<blue><b>{elapsed}</b></blue>:"
