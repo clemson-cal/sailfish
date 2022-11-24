@@ -133,7 +133,7 @@ class Schema:
     def defaults_dict(self):
         return {key: value for key, (_, value, _) in self.data.items()}
 
-    def argument_parser(self, parser=None):
+    def argument_parser(self, parser=None, dest_prefix=None):
         if parser is None:
             from argparse import ArgumentParser
 
@@ -150,7 +150,8 @@ class Schema:
                 parser.add_argument(
                     "--" + key.replace("_", "-"),
                     type=type_hint,
-                    default=default,
+                    default=None,
+                    dest=f"{dest_prefix}.{key}" if dest_prefix else key,
                     help=about,
                     metavar="",
                 )

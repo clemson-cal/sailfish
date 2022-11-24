@@ -297,9 +297,12 @@ def short_help(args):
 
 def run(args):
     config = ChainMap(
-        *(flatten_dict(load_config(config)) for config in reversed(args.configs))
+        {k: v for k, v in vars(args).items() if v is not None and "." in k}
     )
-    driver_args = {k[k.index(".") + 1 :]: v for k, v in config.items()}
+    config.maps.extend(flatten_dict(load_config(c)) for c in reversed(args.configs))
+    driver_args = {
+        k[k.index(".") + 1 :]: v for k, v in config.items() if k.startswith("driver")
+    }
     driver.schema.print_schema(
         args.term,
         config=driver_args,
@@ -366,7 +369,12 @@ def main():
         help="run a simulation",
     )
     run_parser.set_defaults(func=run)
-    run_parser.add_argument("configs", nargs="*")
+    run_parser.add_argument(
+        "configs",
+        nargs="*",
+        help="sequence of presets, configuration files, or checkpoints",
+    )
+    driver.schema.argument_parser(run_parser, dest_prefix="driver")
     add_logging_arguments(run_parser)
 
     args = parser.parse_args()
