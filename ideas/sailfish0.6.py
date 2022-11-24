@@ -200,6 +200,7 @@ def numpy_or_cupy(mode):
 
 @configurable
 def driver(
+    app_cfg,
     exec_mode: str = "cpu",
     resolution: int = 10000,
     strategy: str = "flux_per_zone",
@@ -271,9 +272,16 @@ def flatten_dict(
     return dict(items)
 
 
+def dict_section(d: MutableMapping, section: str):
+    """
+    From a map with keys like section.b.c, return a dict with keys like b.c.
+    """
+    return {k[k.index(".") + 1 :]: v for k, v in d.items() if k.startswith(section)}
+
+
 def load_config(config):
     """
-    Attemmpt to load configuration data from a file: either JSON or YAML.
+    Attempt to load configuration data from a file: either JSON or YAML.
     """
     if config.endswith(".json"):
         from json import load
@@ -296,19 +304,18 @@ def short_help(args):
 
 
 def run(args):
-    config = ChainMap(
+    app_cfg = ChainMap(
         {k: v for k, v in vars(args).items() if v is not None and "." in k}
     )
-    config.maps.extend(flatten_dict(load_config(c)) for c in reversed(args.configs))
-    driver_args = {
-        k[k.index(".") + 1 :]: v for k, v in config.items() if k.startswith("driver")
-    }
+    app_cfg.maps.extend(flatten_dict(load_config(c)) for c in reversed(args.configs))
+    driver_args = dict_section(app_cfg, "driver")
+    driver.schema.validate(**driver_args)
     driver.schema.print_schema(
         args.term,
         config=driver_args,
         newline=True,
     )
-    driver(**driver_args)
+    driver(app_cfg, **driver_args)
 
 
 def show_config(args):
@@ -317,18 +324,18 @@ def show_config(args):
             schema.print_schema(args.term)
 
     else:
-        app_config = {s.component_name: s.defaults_dict() for s in all_schemas()}
+        app_cfg = {s.component_name: s.defaults_dict() for s in all_schemas()}
 
         if args.format == "json":
             from json import dumps
 
-            print(dumps(app_config, indent=4))
+            print(dumps(app_cfg, indent=4))
 
         if args.format == "yaml":
             try:
                 from yaml import dump, CDumper
 
-                print(dump(app_config, Dumper=CDumper))
+                print(dump(app_cfg, Dumper=CDumper))
 
             except ImportError as e:
                 print(e)
