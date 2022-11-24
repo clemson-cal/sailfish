@@ -3,9 +3,40 @@ from collections import ChainMap
 from loguru import logger
 from numpy import linspace, meshgrid, zeros, logical_not
 from numpy.typing import NDArray
-from new_kernels import kernel, perf_time_sequence, configure_kernel_module
+from new_kernels import kernel, perf_time_sequence, configure_kernel_module, device
 from lib_euler import prim_to_cons, cons_to_prim, riemann
 from configuration import configurable, all_schemas
+
+
+@device()
+def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
+    R"""
+    DEVICE double plm_minmod(
+        double yl,
+        double yc,
+        double yr,
+        double plm_theta)
+    {
+        #define min2(a, b) ((a) < (b) ? (a) : (b))
+        #define max2(a, b) ((a) > (b) ? (a) : (b))
+        #define min3(a, b, c) min2(a, min2(b, c))
+        #define max3(a, b, c) max2(a, max2(b, c))
+        #define sign(x) copysign(1.0, x)
+        #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
+
+        double a = (yc - yl) * plm_theta;
+        double b = (yr - yl) * 0.5;
+        double c = (yr - yc) * plm_theta;
+        return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
+
+        #undef min2
+        #undef max2
+        #undef min3
+        #undef max3
+        #undef sign
+        #undef minabs
+    }
+    """
 
 
 @kernel(device_funcs=[cons_to_prim], define_macros=dict(DIM=1))
@@ -55,6 +86,9 @@ def conservative_update(
     // Conservative difference an array of fluxes to update an array of conserved
     // densities.
     //
+    // Does not modify the first-2 or final-2 zones in the conserved variable
+    // array.
+    //
     KERNEL void conservative_update(
         double *u,
         double *f,
@@ -62,7 +96,7 @@ def conservative_update(
         double dx,
         int ni)
     {
-        FOR_RANGE_1D(1, ni - 1)
+        FOR_RANGE_1D(2, ni - 2)
         {
             double *uc = &u[3 * i];
             double *fm = &f[3 * i];
@@ -135,11 +169,51 @@ def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = N
     return p.shape[0], (p, f, p.shape[0])
 
 
+@kernel(device_funcs=[riemann, plm_minmod], define_macros=dict(DIM=1))
+def compute_godunov_fluxes_plm(
+    p: NDArray[float],
+    f: NDArray[float],
+    plm_theta: float,
+    ni: int = None,
+):
+    R"""
+    //
+    // Compute an array of Godunov fluxes using HLLE Riemann solver and PLM
+    // reconstruction.
+    //
+    // The first-2 and final-2 elements of the flux array are not modified.
+    //
+    KERNEL void compute_godunov_fluxes_plm(double *p, double *f, double plm_theta, int ni)
+    {
+        double pm[NCONS];
+        double pp[NCONS];
+
+        FOR_RANGE_1D(1, ni - 2)
+        {
+            double *pl = &p[NCONS * (i - 1)];
+            double *pc = &p[NCONS * (i + 0)];
+            double *pr = &p[NCONS * (i + 1)];
+            double *ps = &p[NCONS * (i + 2)];
+            double *fh = &f[NCONS * (i + 1)];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+            }
+            riemann(pm, pp, fh, 1);
+        }
+    }
+    """
+    return p.shape[0], (p, f, plm_theta, p.shape[0])
+
+
 def update_prim(
     p,
     dt,
     dx,
     strategy="flux_per_zone",
+    reconstruction="pcm",
     xp=None,
 ):
     """
@@ -151,13 +225,25 @@ def update_prim(
         u = xp.empty_like(p)
 
         prim_to_cons_array(p, u)
-        compute_godunov_fluxes_pcm(p, f)
+
+        if reconstruction == "pcm":
+            compute_godunov_fluxes_pcm(p, f)
+        elif reconstruction == "plm":
+            compute_godunov_fluxes_plm(p, f, 1.5)
+        else:
+            raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
+
         conservative_update(u, f, dt, dx)
         cons_to_prim_array(u, p)
         return
 
     if strategy == "flux_per_zone":
-        update_prim_rk1_pcm(p, dt, dx)
+        if reconstruction == "pcm":
+            update_prim_rk1_pcm(p, dt, dx)
+        elif reconstruction == "plm":
+            raise NotImplementedError(f"{reconstruction}")
+        else:
+            raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
         return
 
     raise ValueError(f"unknown strategy {strategy}")
@@ -204,6 +290,7 @@ def driver(
     exec_mode: str = "cpu",
     resolution: int = 10000,
     strategy: str = "flux_per_zone",
+    reconstruction: str = "pcm",
     fold: int = 100,
     plot: bool = False,
 ):
@@ -211,11 +298,12 @@ def driver(
     Configuration
     -------------
 
-    exec_mode:     execution mode [cpu|gpu]
-    resolution:    number of grid zones
-    strategy:      solver strategy [flux_per_zone|flux_per_face]
-    fold:          number of iterations between iteration message
-    plot:          whether to show a plot of the solution
+    exec_mode:      execution mode [cpu|gpu]
+    resolution:     number of grid zones
+    strategy:       solver strategy [flux_per_zone|flux_per_face]
+    reconstruction: first or second-order reconstruction [pcm|plm]
+    fold:           number of iterations between iteration message
+    plot:           whether to show a plot of the solution
     """
     from reporting import terminal, iteration_msg
 
@@ -237,7 +325,7 @@ def driver(
     logger.info("start simulation")
 
     while t < 0.1:
-        update_prim(p, dt, dx, strategy, xp)
+        update_prim(p, dt, dx, strategy, reconstruction, xp)
         t += dt
         n += 1
 
