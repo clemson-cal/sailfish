@@ -11,30 +11,21 @@ from configuration import configurable, all_schemas
 @device()
 def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
     R"""
+    #define min2(a, b) ((a) < (b) ? (a) : (b))
+    #define min3(a, b, c) min2(a, min2(b, c))
+    #define sign(x) copysign(1.0, x)
+    #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
+
     DEVICE double plm_minmod(
         double yl,
         double yc,
         double yr,
         double plm_theta)
     {
-        #define min2(a, b) ((a) < (b) ? (a) : (b))
-        #define max2(a, b) ((a) > (b) ? (a) : (b))
-        #define min3(a, b, c) min2(a, min2(b, c))
-        #define max3(a, b, c) max2(a, max2(b, c))
-        #define sign(x) copysign(1.0, x)
-        #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
-
         double a = (yc - yl) * plm_theta;
         double b = (yr - yl) * 0.5;
         double c = (yr - yc) * plm_theta;
         return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
-
-        #undef min2
-        #undef max2
-        #undef min3
-        #undef max3
-        #undef sign
-        #undef minabs
     }
     """
 
@@ -47,7 +38,7 @@ def cons_to_prim_array(u: NDArray[float], p: NDArray[float], ni: int = None):
     //
     KERNEL void cons_to_prim_array(double *u, double *p, int ni)
     {
-        FOR_EACH_1D(ni)
+        FOR_RANGE_1D(1, ni - 1)
         {
             cons_to_prim(&u[NCONS * i], &p[NCONS * i]);
         }
@@ -64,7 +55,7 @@ def prim_to_cons_array(p: NDArray[float], u: NDArray[float], ni: int = None):
     //
     KERNEL void prim_to_cons_array(double *p, double *u, int ni)
     {
-        FOR_EACH_1D(ni)
+        FOR_RANGE_1D(1, ni - 1)
         {
             prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
         }
@@ -98,8 +89,8 @@ def conservative_update(
     {
         FOR_RANGE_1D(2, ni - 2)
         {
-            double *uc = &u[3 * i];
-            double *fm = &f[3 * i];
+            double *uc = &u[3 * (i + 0)];
+            double *fm = &f[3 * (i + 0)];
             double *fp = &f[3 * (i + 1)];
 
             for (int q = 0; q < 3; ++q)
@@ -113,38 +104,106 @@ def conservative_update(
 
 
 @kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann], define_macros=dict(DIM=1))
-def update_prim_rk1_pcm(p: NDArray[float], dt: float, dx: float, ni: int = None):
+def update_prim_rk1_pcm(
+    prd: NDArray[float],
+    pwr: NDArray[float],
+    dt: float,
+    dx: float,
+    ni: int = None,
+):
     R"""
     //
     // A single-step first-order update using flux-per-zone.
     //
-    // The first and final elements of the primitive array are not modified.
+    // The first-2 and final-2 elements of the primitive array are not modified.
     //
-    KERNEL void update_prim_rk1_pcm(double *p, double dt, double dx, int ni)
+    KERNEL void update_prim_rk1_pcm(double *prd, double *pwr, double dt, double dx, int ni)
     {
-        double uc[NCONS];
-        double fhat_m[NCONS];
-        double fhat_p[NCONS];
-
-        FOR_RANGE_1D(1, ni - 1)
+        FOR_RANGE_1D(2, ni - 2)
         {
-            double *pc = &p[NCONS * i];
-            double *pl = &p[NCONS * (i - 1)];
-            double *pr = &p[NCONS * (i + 1)];
+            double uc[NCONS];
+            double fm[NCONS];
+            double fp[NCONS];
+
+            double *pl = &prd[NCONS * (i - 1)];
+            double *pc = &prd[NCONS * (i + 0)];
+            double *pr = &prd[NCONS * (i + 1)];
 
             prim_to_cons(pc, uc);
-            riemann(pl, pc, fhat_m, 1);
-            riemann(pc, pr, fhat_p, 1);
+            riemann(pl, pc, fm, 1);
+            riemann(pc, pr, fp, 1);
 
             for (int q = 0; q < NCONS; ++q)
             {
-                uc[q] -= (fhat_p[q] - fhat_m[q]) * dt / dx;
+                uc[q] -= (fp[q] - fm[q]) * dt / dx;
             }
-            cons_to_prim(uc, pc);
+            cons_to_prim(uc, &pwr[NCONS * i]);
         }
     }
     """
-    return p.shape[0], (p, dt, dx, p.shape[0])
+    return prd.shape[0], (prd, pwr, dt, dx, prd.shape[0])
+
+
+@kernel(
+    device_funcs=[prim_to_cons, cons_to_prim, riemann, plm_minmod],
+    define_macros=dict(DIM=1),
+)
+def update_prim_rk1_plm(
+    prd: NDArray[float],
+    pwr: NDArray[float],
+    dt: float,
+    dx: float,
+    plm_theta: float,
+    ni: int = None,
+):
+    R"""
+    //
+    // A second-order-in-space update using flux-per-zone and PLM.
+    //
+    // The first-2 and final-2 elements of the primitive array are not modified.
+    //
+    KERNEL void update_prim_rk1_plm(double *prd, double *pwr, double dt, double dx, double plm_theta, int ni)
+    {
+        FOR_RANGE_1D(2, ni - 2)
+        {
+            double uc[NCONS];
+            double plp[NCONS];
+            double pcm[NCONS];
+            double pcp[NCONS];
+            double prm[NCONS];
+            double fm[NCONS];
+            double fp[NCONS];
+
+            double *pk = &prd[NCONS * (i - 2)];
+            double *pl = &prd[NCONS * (i - 1)];
+            double *pc = &prd[NCONS * (i + 0)];
+            double *pr = &prd[NCONS * (i + 1)];
+            double *ps = &prd[NCONS * (i + 2)];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
+                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+
+                plp[q] = pl[q] + 0.5 * gl;
+                pcm[q] = pc[q] - 0.5 * gc;
+                pcp[q] = pc[q] + 0.5 * gc;
+                prm[q] = pr[q] - 0.5 * gr;
+            }
+            riemann(plp, pcm, fm, 1);
+            riemann(pcp, prm, fp, 1);
+            prim_to_cons(pc, uc);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uc[q] -= (fp[q] - fm[q]) * dt / dx;
+            }
+            cons_to_prim(uc, &pwr[NCONS * i]);
+        }
+    }
+    """
+    return prd.shape[0], (prd, pwr, dt, dx, plm_theta, prd.shape[0])
 
 
 @kernel(device_funcs=[riemann], define_macros=dict(DIM=1))
@@ -159,9 +218,10 @@ def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = N
     {
         FOR_RANGE_1D(0, ni - 1)
         {
-            double *pc = &p[NCONS * i];
+            double *pc = &p[NCONS * (i + 0)];
             double *pr = &p[NCONS * (i + 1)];
             double *fp = &f[NCONS * (i + 1)];
+
             riemann(pc, pr, fp, 1);
         }
     }
@@ -181,15 +241,15 @@ def compute_godunov_fluxes_plm(
     // Compute an array of Godunov fluxes using HLLE Riemann solver and PLM
     // reconstruction.
     //
-    // The first-2 and final-2 elements of the flux array are not modified.
+    // The first-1 and final-2 elements of the flux array are not modified.
     //
     KERNEL void compute_godunov_fluxes_plm(double *p, double *f, double plm_theta, int ni)
     {
-        double pm[NCONS];
-        double pp[NCONS];
-
         FOR_RANGE_1D(1, ni - 2)
         {
+            double pm[NCONS];
+            double pp[NCONS];
+
             double *pl = &p[NCONS * (i - 1)];
             double *pc = &p[NCONS * (i + 0)];
             double *pr = &p[NCONS * (i + 1)];
@@ -208,12 +268,31 @@ def compute_godunov_fluxes_plm(
     return p.shape[0], (p, f, plm_theta, p.shape[0])
 
 
+def update_prim_rk1(prd, pwr, dt, dx, reconstruction, plm_theta):
+    if reconstruction == "pcm":
+        update_prim_rk1_pcm(prd, pwr, dt, dx)
+    elif reconstruction == "plm":
+        update_prim_rk1_plm(prd, pwr, dt, dx, plm_theta)
+    else:
+        raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
+
+
+def compute_godunov_fluxes(p, f, reconstruction, plm_theta):
+    if reconstruction == "pcm":
+        compute_godunov_fluxes_pcm(p, f)
+    elif reconstruction == "plm":
+        compute_godunov_fluxes_plm(p, f, plm_theta)
+    else:
+        raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
+
+
 def update_prim(
     p,
     dt,
     dx,
     strategy="flux_per_zone",
     reconstruction="pcm",
+    plm_theta=2.0,
     xp=None,
 ):
     """
@@ -224,29 +303,30 @@ def update_prim(
         f = xp.empty_like(p)
         u = xp.empty_like(p)
 
+        compute_godunov_fluxes(p, f, reconstruction, plm_theta)
         prim_to_cons_array(p, u)
-
-        if reconstruction == "pcm":
-            compute_godunov_fluxes_pcm(p, f)
-        elif reconstruction == "plm":
-            compute_godunov_fluxes_plm(p, f, 1.5)
-        else:
-            raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
-
         conservative_update(u, f, dt, dx)
         cons_to_prim_array(u, p)
-        return
 
-    if strategy == "flux_per_zone":
-        if reconstruction == "pcm":
-            update_prim_rk1_pcm(p, dt, dx)
-        elif reconstruction == "plm":
-            raise NotImplementedError(f"{reconstruction}")
-        else:
-            raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
-        return
+    elif strategy == "flux_per_zone":
+        prd = p
+        pwr = p.copy()
+        update_prim_rk1(prd, pwr, dt, dx, reconstruction, plm_theta)
+        p[...] = pwr[...]
 
-    raise ValueError(f"unknown strategy {strategy}")
+    else:
+        raise ValueError(f"unknown strategy {strategy}")
+
+
+class Solver:
+    def __init__(self):
+        pass
+
+    def initial_state(self):
+        pass
+
+    def advance(self, state):
+        pass
 
 
 def cell_centers_1d(ni):
@@ -286,11 +366,13 @@ def numpy_or_cupy(mode):
 
 @configurable
 def driver(
-    app_cfg,
+    app_config,
     exec_mode: str = "cpu",
     resolution: int = 10000,
+    tfinal: float = 0.1,
     strategy: str = "flux_per_zone",
     reconstruction: str = "pcm",
+    plm_theta: float = 1.5,
     fold: int = 100,
     plot: bool = False,
 ):
@@ -300,18 +382,21 @@ def driver(
 
     exec_mode:      execution mode [cpu|gpu]
     resolution:     number of grid zones
+    tfinal:         time to end the simulation
     strategy:       solver strategy [flux_per_zone|flux_per_face]
     reconstruction: first or second-order reconstruction [pcm|plm]
+    plm_theta:      PLM parameter [1.0, 2.0]
     fold:           number of iterations between iteration message
     plot:           whether to show a plot of the solution
     """
+    from functools import partial
     from reporting import terminal, iteration_msg
 
     configure_kernel_module(default_exec_mode=exec_mode)
     term = terminal(logger)
     xp, to_host = numpy_or_cupy(exec_mode)
 
-    nz = resolution or 100000
+    nz = resolution
     dx = 1.0 / nz
     dt = dx * 1e-1
     x = cell_centers_1d(nz)
@@ -321,11 +406,18 @@ def driver(
 
     p = xp.array(p)
     perf_timer = perf_time_sequence(mode=exec_mode)
+    advance = partial(
+        update_prim,
+        dx=dx,
+        strategy=strategy,
+        reconstruction=reconstruction,
+        xp=xp,
+    )
 
     logger.info("start simulation")
 
-    while t < 0.1:
-        update_prim(p, dt, dx, strategy, reconstruction, xp)
+    while t < tfinal:
+        advance(p, dt)
         t += dt
         n += 1
 
@@ -338,7 +430,7 @@ def driver(
     if plot:
         from matplotlib import pyplot as plt
 
-        plt.plot(p[:, 0])
+        plt.plot(p[:, 0], "-o", mfc="none", label=strategy)
         plt.show()
 
 
@@ -392,18 +484,19 @@ def short_help(args):
 
 
 def run(args):
-    app_cfg = ChainMap(
+    app_config = ChainMap(
         {k: v for k, v in vars(args).items() if v is not None and "." in k}
     )
-    app_cfg.maps.extend(flatten_dict(load_config(c)) for c in reversed(args.configs))
-    driver_args = dict_section(app_cfg, "driver")
+    app_config.maps.extend(flatten_dict(load_config(c)) for c in reversed(args.configs))
+    driver_args = dict_section(app_config, "driver")
     driver.schema.validate(**driver_args)
     driver.schema.print_schema(
         args.term,
         config=driver_args,
         newline=True,
     )
-    driver(app_cfg, **driver_args)
+
+    driver(app_config, **driver_args)
 
 
 def show_config(args):
@@ -479,4 +572,8 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
+        logger.success("ctrl-c interrupt")
