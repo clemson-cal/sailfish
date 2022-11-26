@@ -293,11 +293,12 @@ def update_prim(
     strategy="flux_per_zone",
     reconstruction="pcm",
     plm_theta=2.0,
-    xp=None,
+    exec_mode="cpu",
 ):
     """
     Drives a first-order update of a primitive array
     """
+    xp = numpy_or_cupy(exec_mode)
 
     if strategy == "flux_per_face":
         f = xp.empty_like(p)
@@ -316,17 +317,6 @@ def update_prim(
 
     else:
         raise ValueError(f"unknown strategy {strategy}")
-
-
-class Solver:
-    def __init__(self):
-        pass
-
-    def initial_state(self):
-        pass
-
-    def advance(self, state):
-        pass
 
 
 def cell_centers_1d(ni):
@@ -356,12 +346,66 @@ def numpy_or_cupy(mode):
     if mode == "gpu":
         import cupy
 
-        return cupy, lambda a: a.get()
+        return cupy  # , lambda a: a.get()
 
     if mode == "cpu":
         import numpy
 
-        return numpy, lambda a: a
+        return numpy  # , lambda a: a
+
+
+class State:
+    def __init__(self, n, t, p):
+        self._n = n
+        self._t = t
+        self._p = p
+
+    @property
+    def iteration(self):
+        return self._n
+
+    @property
+    def time(self):
+        return self._t
+
+    @property
+    def primitive(self):
+        try:
+            return self._p.get()
+        except AttributeError:
+            return self._p
+
+    @property
+    def total_zones(self):
+        return self._p.shape[0]
+
+
+def simulation(exec_mode, resolution, strategy, reconstruction):
+    from functools import partial
+
+    xp = numpy_or_cupy(exec_mode)
+    nz = resolution
+    dx = 1.0 / nz
+    dt = dx * 1e-1
+    x = cell_centers_1d(nz)
+    p = linear_shocktube(x)
+    t = 0.0
+    n = 0
+    p = xp.array(p)
+    iteration = 0
+
+    advance = partial(
+        update_prim,
+        dx=dx,
+        strategy=strategy,
+        reconstruction=reconstruction,
+        exec_mode=exec_mode,
+    )
+    while True:
+        advance(p, dt)
+        t += dt
+        n += 1
+        yield State(n, t, p)
 
 
 @configurable
@@ -389,48 +433,33 @@ def driver(
     fold:           number of iterations between iteration message
     plot:           whether to show a plot of the solution
     """
-    from functools import partial
     from reporting import terminal, iteration_msg
 
     configure_kernel_module(default_exec_mode=exec_mode)
     term = terminal(logger)
-    xp, to_host = numpy_or_cupy(exec_mode)
-
-    nz = resolution
-    dx = 1.0 / nz
-    dt = dx * 1e-1
-    x = cell_centers_1d(nz)
-    p = linear_shocktube(x)
-    t = 0.0
-    n = 0
-
-    p = xp.array(p)
-    perf_timer = perf_time_sequence(mode=exec_mode)
-    advance = partial(
-        update_prim,
-        dx=dx,
-        strategy=strategy,
-        reconstruction=reconstruction,
-        xp=xp,
-    )
 
     logger.info("start simulation")
+    perf_timer = perf_time_sequence(mode=exec_mode)
 
-    while t < tfinal:
-        advance(p, dt)
-        t += dt
-        n += 1
+    for state in simulation(exec_mode, resolution, strategy, reconstruction):
+        if state.iteration % fold == 0:
+            zps = state.total_zones / next(perf_timer) * fold
+            term(iteration_msg(state.iteration, state.time, zps=zps))
 
-        if n % fold == 0:
-            zps = nz / next(perf_timer) * fold
-            term(iteration_msg(iter=n, time=t, zps=zps))
+        # if tasks.checkpoint.is_due(state.time):
+        #     write_checkpoint(state, timeseries, tasks)
 
-    p = to_host(p)
+        # if tasks.timeseries.is_due(state.time):
+        #     for name, info in diagnostics.items():
+        #         timeseries[name].append(state.diagnostic(info))
+
+        if state.time >= tfinal:
+            break
 
     if plot:
         from matplotlib import pyplot as plt
 
-        plt.plot(p[:, 0], "-o", mfc="none", label=strategy)
+        plt.plot(state.primitive[:, 0], "-o", mfc="none", label=strategy)
         plt.show()
 
 
