@@ -104,7 +104,7 @@ def conservative_update(
 
 
 @kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann], define_macros=dict(DIM=1))
-def update_prim_rk1_pcm(
+def update_prim_fwd_pcm(
     prd: NDArray[float],
     pwr: NDArray[float],
     dt: float,
@@ -117,7 +117,7 @@ def update_prim_rk1_pcm(
     //
     // The first-2 and final-2 elements of the primitive array are not modified.
     //
-    KERNEL void update_prim_rk1_pcm(double *prd, double *pwr, double dt, double dx, int ni)
+    KERNEL void update_prim_fwd_pcm(double *prd, double *pwr, double dt, double dx, int ni)
     {
         FOR_RANGE_1D(2, ni - 2)
         {
@@ -144,11 +144,58 @@ def update_prim_rk1_pcm(
     return prd.shape[0], (prd, pwr, dt, dx, prd.shape[0])
 
 
+@kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann], define_macros=dict(DIM=1))
+def update_prim_rkn_pcm(
+    prd: NDArray[float],  # read-from primitive
+    pwr: NDArray[float],  # write-to-primitive
+    urk: NDArray[float],  # u at time-level n
+    dt: float,  # time step dt
+    dx: float,  # grid spacing dx
+    rk: float,  # RK parameter
+    ni: int = None,  # number of grid zones (includes guard)
+):
+    R"""
+    //
+    // A single-step first-order update using flux-per-zone.
+    //
+    // The first-2 and final-2 elements of the primitive array are not modified.
+    //
+    KERNEL void update_prim_rkn_pcm(double *prd, double *pwr, double *urk, double dt, double dx, double rk, int ni)
+    {
+        FOR_RANGE_1D(2, ni - 2)
+        {
+            double uc[NCONS];
+            double fm[NCONS];
+            double fp[NCONS];
+
+            double *pl = &prd[NCONS * (i - 1)];
+            double *pc = &prd[NCONS * (i + 0)];
+            double *pr = &prd[NCONS * (i + 1)];
+
+            prim_to_cons(pc, uc);
+            riemann(pl, pc, fm, 1);
+            riemann(pc, pr, fp, 1);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                // uc[q] = (uc[q] - (fp[q] - fm[q]) * dt / dx) * (1.0 - rk) + urk[NCONS * i + q] * rk;
+
+                uc[q] -= (fp[q] - fm[q]) * dt / dx;
+                uc[q] *= (1.0 - rk);
+                uc[q] += rk * urk[NCONS * i + q];
+            }
+            cons_to_prim(uc, &pwr[NCONS * i]);
+        }
+    }
+    """
+    return prd.shape[0], (prd, pwr, urk, dt, dx, rk, prd.shape[0])
+
+
 @kernel(
     device_funcs=[prim_to_cons, cons_to_prim, riemann, plm_minmod],
     define_macros=dict(DIM=1),
 )
-def update_prim_rk1_plm(
+def update_prim_fwd_plm(
     prd: NDArray[float],
     pwr: NDArray[float],
     dt: float,
@@ -162,7 +209,7 @@ def update_prim_rk1_plm(
     //
     // The first-2 and final-2 elements of the primitive array are not modified.
     //
-    KERNEL void update_prim_rk1_plm(double *prd, double *pwr, double dt, double dx, double plm_theta, int ni)
+    KERNEL void update_prim_fwd_plm(double *prd, double *pwr, double dt, double dx, double plm_theta, int ni)
     {
         FOR_RANGE_1D(2, ni - 2)
         {
@@ -268,11 +315,11 @@ def compute_godunov_fluxes_plm(
     return p.shape[0], (p, f, plm_theta, p.shape[0])
 
 
-def update_prim_rk1(prd, pwr, dt, dx, reconstruction, plm_theta):
+def update_prim_fwd(prd, pwr, dt, dx, reconstruction, plm_theta):
     if reconstruction == "pcm":
-        update_prim_rk1_pcm(prd, pwr, dt, dx)
+        update_prim_fwd_pcm(prd, pwr, dt, dx)
     elif reconstruction == "plm":
-        update_prim_rk1_plm(prd, pwr, dt, dx, plm_theta)
+        update_prim_fwd_plm(prd, pwr, dt, dx, plm_theta)
     else:
         raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
 
@@ -293,6 +340,7 @@ def update_prim(
     strategy="flux_per_zone",
     reconstruction="pcm",
     plm_theta=2.0,
+    time_integration="fwd",
     exec_mode="cpu",
 ):
     """
@@ -308,12 +356,35 @@ def update_prim(
         prim_to_cons_array(p, u)
         conservative_update(u, f, dt, dx)
         cons_to_prim_array(u, p)
+        return p
+
+    elif strategy == "flux_per_zone" and time_integration == "fwd":
+        prd = p
+        pwr = p.copy()
+        update_prim_fwd(prd, pwr, dt, dx, reconstruction, plm_theta)
+        return pwr
 
     elif strategy == "flux_per_zone":
         prd = p
         pwr = p.copy()
-        update_prim_rk1(prd, pwr, dt, dx, reconstruction, plm_theta)
-        p[...] = pwr[...]
+        urk = xp.zeros_like(prd)
+        prim_to_cons_array(prd, urk)
+
+        if time_integration == "rk1":
+            rks = [0.0]
+        elif time_integration == "rk2":
+            rks = [0.0, 0.5]
+        elif time_integration == "rk3":
+            rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
+        else:
+            raise ValueError(
+                f"time_integration must be [fwd|r1k|rk2|rk3], got {time_integration}"
+            )
+
+        for rk in rks:
+            update_prim_rkn_pcm(prd, pwr, urk, dt, dx, rk)
+            prd, pwr = pwr, prd
+        return pwr
 
     else:
         raise ValueError(f"unknown strategy {strategy}")
@@ -342,16 +413,16 @@ def linear_shocktube(x):
     return p
 
 
-def numpy_or_cupy(mode):
-    if mode == "gpu":
+def numpy_or_cupy(exec_mode):
+    if exec_mode == "gpu":
         import cupy
 
-        return cupy  # , lambda a: a.get()
+        return cupy
 
-    if mode == "cpu":
+    if exec_mode == "cpu":
         import numpy
 
-        return numpy  # , lambda a: a
+        return numpy
 
 
 class State:
@@ -380,7 +451,7 @@ class State:
         return self._p.shape[0]
 
 
-def simulation(exec_mode, resolution, strategy, reconstruction):
+def simulation(exec_mode, resolution, strategy, reconstruction, time_integration):
     from functools import partial
 
     xp = numpy_or_cupy(exec_mode)
@@ -399,10 +470,13 @@ def simulation(exec_mode, resolution, strategy, reconstruction):
         dx=dx,
         strategy=strategy,
         reconstruction=reconstruction,
+        time_integration=time_integration,
         exec_mode=exec_mode,
     )
+    yield State(n, t, p)
+
     while True:
-        advance(p, dt)
+        p = advance(p, dt)
         t += dt
         n += 1
         yield State(n, t, p)
@@ -417,6 +491,7 @@ def driver(
     strategy: str = "flux_per_zone",
     reconstruction: str = "pcm",
     plm_theta: float = 1.5,
+    time_integration: str = "fwd",
     fold: int = 100,
     plot: bool = False,
 ):
@@ -424,14 +499,15 @@ def driver(
     Configuration
     -------------
 
-    exec_mode:      execution mode [cpu|gpu]
-    resolution:     number of grid zones
-    tfinal:         time to end the simulation
-    strategy:       solver strategy [flux_per_zone|flux_per_face]
-    reconstruction: first or second-order reconstruction [pcm|plm]
-    plm_theta:      PLM parameter [1.0, 2.0]
-    fold:           number of iterations between iteration message
-    plot:           whether to show a plot of the solution
+    exec_mode:        execution mode [cpu|gpu]
+    resolution:       number of grid zones
+    tfinal:           time to end the simulation
+    strategy:         solver strategy [flux_per_zone|flux_per_face]
+    reconstruction:   first or second-order reconstruction [pcm|plm]
+    plm_theta:        PLM parameter [1.0, 2.0]
+    time_integration: Runge-Kutta order [fwd|rk1|rk2|rk3]
+    fold:             number of iterations between iteration message
+    plot:             whether to show a plot of the solution
     """
     from reporting import terminal, iteration_msg
 
@@ -441,10 +517,9 @@ def driver(
     logger.info("start simulation")
     perf_timer = perf_time_sequence(mode=exec_mode)
 
-    for state in simulation(exec_mode, resolution, strategy, reconstruction):
-        if state.iteration % fold == 0:
-            zps = state.total_zones / next(perf_timer) * fold
-            term(iteration_msg(state.iteration, state.time, zps=zps))
+    for state in simulation(
+        exec_mode, resolution, strategy, reconstruction, time_integration
+    ):
 
         # if tasks.checkpoint.is_due(state.time):
         #     write_checkpoint(state, timeseries, tasks)
@@ -455,6 +530,10 @@ def driver(
 
         if state.time >= tfinal:
             break
+
+        if state.iteration % fold == 0:
+            zps = state.total_zones / next(perf_timer) * fold
+            term(iteration_msg(state.iteration, state.time, zps=zps))
 
     if plot:
         from matplotlib import pyplot as plt
@@ -469,7 +548,7 @@ def flatten_dict(
     sep: str = ".",
 ) -> MutableMapping:
     """
-    Create a flattened dictionary e from d, with e['a.b.c'] = d['a']['b']['c']
+    Create a flattened dictionary e from d, with e['a.b.c'] = d['a']['b']['c'].
     """
     items = list()
     for k, v in d.items():
@@ -524,7 +603,6 @@ def run(args):
         config=driver_args,
         newline=True,
     )
-
     driver(app_config, **driver_args)
 
 
