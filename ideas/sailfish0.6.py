@@ -103,6 +103,51 @@ def conservative_update(
     return u.size // 3, (u, f, dt, dx, u.size // 3)
 
 
+@kernel()
+def conservative_update_rk(
+    u: NDArray[float],
+    f: NDArray[float],
+    urk: NDArray[float],
+    dt: float,
+    dx: float,
+    rk: float,
+    ni: int = None,
+):
+    R"""
+    //
+    // Conservative difference an array of fluxes to update an array of conserved
+    // densities.
+    //
+    // Does not modify the first-2 or final-2 zones in the conserved variable
+    // array.
+    //
+    KERNEL void conservative_update_rk(
+        double *u,
+        double *f,
+        double *urk,
+        double dt,
+        double dx,
+        double rk,
+        int ni)
+    {
+        FOR_RANGE_1D(2, ni - 2)
+        {
+            double *uc = &u[3 * (i + 0)];
+            double *fm = &f[3 * (i + 0)];
+            double *fp = &f[3 * (i + 1)];
+
+            for (int q = 0; q < 3; ++q)
+            {
+                uc[q] -= (fp[q] - fm[q]) * dt / dx;
+                uc[q] *= (1.0 - rk);
+                uc[q] += rk * urk[3 * i + q];
+            }
+        }
+    }
+    """
+    return u.size // 3, (u, f, urk, dt, dx, rk, u.size // 3)
+
+
 @kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann], define_macros=dict(DIM=1))
 def update_prim_fwd_pcm(
     prd: NDArray[float],
@@ -178,8 +223,6 @@ def update_prim_rkn_pcm(
 
             for (int q = 0; q < NCONS; ++q)
             {
-                // uc[q] = (uc[q] - (fp[q] - fm[q]) * dt / dx) * (1.0 - rk) + urk[NCONS * i + q] * rk;
-
                 uc[q] -= (fp[q] - fm[q]) * dt / dx;
                 uc[q] *= (1.0 - rk);
                 uc[q] += rk * urk[NCONS * i + q];
@@ -348,44 +391,58 @@ def update_prim(
     """
     xp = numpy_or_cupy(exec_mode)
 
+    if time_integration == "fwd":
+        pass
+    elif time_integration == "rk1":
+        rks = [0.0]
+    elif time_integration == "rk2":
+        rks = [0.0, 0.5]
+    elif time_integration == "rk3":
+        rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
+    else:
+        raise ValueError(
+            f"time_integration must be [fwd|r1k|rk2|rk3], got {time_integration}"
+        )
+
     if strategy == "flux_per_face":
         f = xp.empty_like(p)
         u = xp.empty_like(p)
 
-        compute_godunov_fluxes(p, f, reconstruction, plm_theta)
-        prim_to_cons_array(p, u)
-        conservative_update(u, f, dt, dx)
-        cons_to_prim_array(u, p)
-        return p
+        if time_integration == "fwd":
+            compute_godunov_fluxes(p, f, reconstruction, plm_theta)
+            prim_to_cons_array(p, u)
+            conservative_update(u, f, dt, dx)
+            cons_to_prim_array(u, p)
+        else:
+            prim_to_cons_array(p, u)
+            urk = u.copy()
 
-    elif strategy == "flux_per_zone" and time_integration == "fwd":
-        prd = p
-        pwr = p.copy()
-        update_prim_fwd(prd, pwr, dt, dx, reconstruction, plm_theta)
-        return pwr
+            for rk in rks:
+                compute_godunov_fluxes(p, f, reconstruction, plm_theta)
+                conservative_update_rk(u, f, urk, dt, dx, rk)
+                cons_to_prim_array(u, p)
+        return p
 
     elif strategy == "flux_per_zone":
         prd = p
         pwr = p.copy()
-        urk = xp.zeros_like(prd)
-        prim_to_cons_array(prd, urk)
 
-        if time_integration == "rk1":
-            rks = [0.0]
-        elif time_integration == "rk2":
-            rks = [0.0, 0.5]
-        elif time_integration == "rk3":
-            rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
+        if time_integration == "fwd":
+            update_prim_fwd(prd, pwr, dt, dx, reconstruction, plm_theta)
         else:
-            raise ValueError(
-                f"time_integration must be [fwd|r1k|rk2|rk3], got {time_integration}"
-            )
+            if reconstruction == "plm":
+                raise NotImplementedError(
+                    "plm reconstruction not implemented for strategy=flux_per_zone "
+                    "and RK time integration"
+                )
 
-        for rk in rks:
-            update_prim_rkn_pcm(prd, pwr, urk, dt, dx, rk)
-            prd, pwr = pwr, prd
+            urk = xp.empty_like(prd)  # does this cause bug? was zeros_like last checked
+            prim_to_cons_array(prd, urk)
+
+            for rk in rks:
+                update_prim_rkn_pcm(prd, pwr, urk, dt, dx, rk)
+                prd, pwr = pwr, prd
         return pwr
-
     else:
         raise ValueError(f"unknown strategy {strategy}")
 
