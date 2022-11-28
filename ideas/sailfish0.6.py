@@ -296,6 +296,80 @@ def update_prim_fwd_plm(
     return prd.shape[0], (prd, pwr, dt, dx, plm_theta, prd.shape[0])
 
 
+@kernel(
+    device_funcs=[prim_to_cons, cons_to_prim, riemann, plm_minmod],
+    define_macros=dict(DIM=1),
+)
+def update_prim_rkn_plm(
+    prd: NDArray[float],  # read-from primitive
+    pwr: NDArray[float],  # write-to-primitive
+    urk: NDArray[float],  # u at time-level n
+    dt: float,  # time step dt
+    dx: float,  # grid spacing dx
+    rk: float,  # RK parameter
+    plm_theta: float,
+    ni: int = None,
+):
+    R"""
+    //
+    // A second-order-in-space update using flux-per-zone and PLM.
+    //
+    // The first-2 and final-2 elements of the primitive array are not modified.
+    //
+    KERNEL void update_prim_rkn_plm(
+        double *prd,
+        double *pwr,
+        double *urk,
+        double dt,
+        double dx,
+        double rk,
+        double plm_theta,
+        int ni)
+    {
+        FOR_RANGE_1D(2, ni - 2)
+        {
+            double uc[NCONS];
+            double plp[NCONS];
+            double pcm[NCONS];
+            double pcp[NCONS];
+            double prm[NCONS];
+            double fm[NCONS];
+            double fp[NCONS];
+
+            double *pk = &prd[NCONS * (i - 2)];
+            double *pl = &prd[NCONS * (i - 1)];
+            double *pc = &prd[NCONS * (i + 0)];
+            double *pr = &prd[NCONS * (i + 1)];
+            double *ps = &prd[NCONS * (i + 2)];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
+                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+
+                plp[q] = pl[q] + 0.5 * gl;
+                pcm[q] = pc[q] - 0.5 * gc;
+                pcp[q] = pc[q] + 0.5 * gc;
+                prm[q] = pr[q] - 0.5 * gr;
+            }
+            riemann(plp, pcm, fm, 1);
+            riemann(pcp, prm, fp, 1);
+            prim_to_cons(pc, uc);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uc[q] -= (fp[q] - fm[q]) * dt / dx;
+                uc[q] *= (1.0 - rk);
+                uc[q] += rk * urk[NCONS * i + q];
+            }
+            cons_to_prim(uc, &pwr[NCONS * i]);
+        }
+    }
+    """
+    return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
+
+
 @kernel(device_funcs=[riemann], define_macros=dict(DIM=1))
 def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = None):
     R"""
@@ -358,7 +432,7 @@ def compute_godunov_fluxes_plm(
     return p.shape[0], (p, f, plm_theta, p.shape[0])
 
 
-def update_prim_fwd(prd, pwr, dt, dx, reconstruction, plm_theta):
+def update_prim_fwd(prd, pwr, dt, dx, plm_theta, reconstruction):
     if reconstruction == "pcm":
         update_prim_fwd_pcm(prd, pwr, dt, dx)
     elif reconstruction == "plm":
@@ -367,7 +441,16 @@ def update_prim_fwd(prd, pwr, dt, dx, reconstruction, plm_theta):
         raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
 
 
-def compute_godunov_fluxes(p, f, reconstruction, plm_theta):
+def update_prim_rkn(prd, pwr, urk, dt, dx, rk, plm_theta, reconstruction):
+    if reconstruction == "pcm":
+        update_prim_rkn_pcm(prd, pwr, urk, dt, dx, rk)
+    elif reconstruction == "plm":
+        update_prim_rkn_plm(prd, pwr, urk, dt, dx, rk, plm_theta)
+    else:
+        raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
+
+
+def compute_godunov_fluxes(p, f, plm_theta, reconstruction):
     if reconstruction == "pcm":
         compute_godunov_fluxes_pcm(p, f)
     elif reconstruction == "plm":
@@ -409,7 +492,7 @@ def update_prim(
         u = xp.empty_like(p)
 
         if time_integration == "fwd":
-            compute_godunov_fluxes(p, f, reconstruction, plm_theta)
+            compute_godunov_fluxes(p, f, plm_theta, reconstruction)
             prim_to_cons_array(p, u)
             conservative_update(u, f, dt, dx)
             cons_to_prim_array(u, p)
@@ -418,7 +501,7 @@ def update_prim(
             urk = u.copy()
 
             for rk in rks:
-                compute_godunov_fluxes(p, f, reconstruction, plm_theta)
+                compute_godunov_fluxes(p, f, plm_theta, reconstruction)
                 conservative_update_rk(u, f, urk, dt, dx, rk)
                 cons_to_prim_array(u, p)
         return p
@@ -428,20 +511,16 @@ def update_prim(
         pwr = p.copy()
 
         if time_integration == "fwd":
-            update_prim_fwd(prd, pwr, dt, dx, reconstruction, plm_theta)
+            update_prim_fwd(prd, pwr, dt, dx, plm_theta, reconstruction)
         else:
-            if reconstruction == "plm":
-                raise NotImplementedError(
-                    "plm reconstruction not implemented for strategy=flux_per_zone "
-                    "and RK time integration"
-                )
-
             urk = xp.empty_like(prd)  # does this cause bug? was zeros_like last checked
             prim_to_cons_array(prd, urk)
 
+            # BUG HERE ... no updates with RK1 (plm or pcm)
             for rk in rks:
-                update_prim_rkn_pcm(prd, pwr, urk, dt, dx, rk)
+                update_prim_rkn(prd, pwr, urk, dt, dx, rk, plm_theta, reconstruction)
                 prd, pwr = pwr, prd
+
         return pwr
     else:
         raise ValueError(f"unknown strategy {strategy}")
