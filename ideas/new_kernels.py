@@ -459,6 +459,50 @@ def device(code: str = None, device_funcs=list(), static=str()):
     return decorator
 
 
+class KernelData:
+    """
+    Represents a maybe-compiled extension function (internal use)
+    """
+
+    def __init__(self, stub, code, device_funcs, define_macros):
+        self._compiled = False
+        self._stub = stub
+        self._code = code
+        self._device_funcs = device_funcs
+        self._define_macros = define_macros
+
+    def kernel_code(self):
+        return self._code or dedent(self._stub.__doc__)
+
+    def device_funcs(self):
+        return self._device_funcs
+
+    def define_macros(self):
+        return self._define_macros
+
+    def code(self):
+        a = collate_source_code(self._device_funcs)
+        b = self.kernel_code()
+        return a + b
+
+    def require_compiled(self):
+        if not self._compiled:
+            code = self.code()
+            name = self._stub.__name__
+            cpu_module = cpu_extension(code, name, self._define_macros)
+            gpu_module = gpu_extension(code, name, self._define_macros)
+            self.inject_modules(cpu_module, gpu_module)
+
+    def inject_modules(self, cpu_module, gpu_module):
+        self._func = extension_function(cpu_module, gpu_module, self._stub)
+        self._compiled = True
+
+    def copy(self):
+        return KernelData(
+            self._stub, self._code, self._device_funcs, self._define_macros
+        )
+
+
 def kernel(code: str = None, device_funcs=list(), define_macros=list()):
     """
     Return a decorator that replaces a 'stub' function with a 'kernel'.
@@ -484,38 +528,8 @@ def kernel(code: str = None, device_funcs=list(), define_macros=list()):
         define_macros = list(define_macros.items())
 
     def decorator(stub):
-        class kernel_data_cls:
-            def __init__(self):
-                self._compiled = False
 
-            def kernel_code(self):
-                return code or dedent(stub.__doc__)
-
-            def device_funcs(self):
-                return device_funcs
-
-            def define_macros(self):
-                return define_macros
-
-            def code(self):
-                a = collate_source_code(device_funcs)
-                b = self.kernel_code()
-                return a + b
-
-            def require_compiled(self):
-                if not self._compiled:
-                    code = self.code()
-                    name = stub.__name__
-                    cpu_module = cpu_extension(code, name, define_macros)
-                    gpu_module = gpu_extension(code, name, define_macros)
-                    self.inject_modules(cpu_module, gpu_module)
-
-            def inject_modules(self, cpu_module, gpu_module, method=False):
-                self._func = extension_function(cpu_module, gpu_module, stub)
-                self._compiled = True
-                self._method = method
-
-        k = kernel_data_cls()
+        k = KernelData(stub, code, device_funcs, define_macros)
 
         @wraps(stub)
         def wrapper(*args, exec_mode=None):
@@ -545,6 +559,13 @@ def kernel_class(cls):
     """
     cls_init = cls.__init__
 
+    def wrap_method(self, kernel_data):
+        @wraps(kernel_data._stub)
+        def wrapper(*args, exec_mode=None):
+            return kernel_data._func(self, *args, exec_mode=exec_mode)
+
+        return wrapper
+
     def __init__(self, *args, **kwargs):
         cls_init(self, *args, **kwargs)
 
@@ -564,13 +585,16 @@ def kernel_class(cls):
 
         if m := getattr(self, "define_macros", None):
             define_macros += m if type(m) is list else list(m.items())
+
         code = static + collate_source_code(device_funcs) + kernel_code
         name = cls.__name__
         cpu_module = cpu_extension(code, name, define_macros)
         gpu_module = gpu_extension(code, name, define_macros)
 
         for key, kernel_data in kernel_data_dict.items():
-            kernel_data.inject_modules(cpu_module, gpu_module, method=True)
+            k = kernel_data.copy()
+            k.inject_modules(cpu_module, gpu_module)
+            setattr(self, key, wrap_method(self, k))
 
     cls.__init__ = __init__
     return cls
@@ -765,7 +789,6 @@ def main():
     q = zeros_like(p)
     solver.primitive_to_conserved(p, u)
     solver.conserved_to_primitive(u, q)
-
     assert (p == q).all()
 
     # ==============================================================================
@@ -823,6 +846,13 @@ def main():
     """
     assert collate_source_code([device_func1, device_func2]) == dedent(collated)
 
+    # ==============================================================================
+    # 5.
+    #
+    # Demonstrates how a kernel class can be used to parameterize a set of
+    # kernel functions around instance-specific define macros.
+    # ==============================================================================
+
     @kernel_class
     class ConfigurableModule:
         def __init__(self, value):
@@ -842,10 +872,10 @@ def main():
             """
             return None, tuple()
 
-    m1 = ConfigurableModule(8)
-    m2 = ConfigurableModule(3)
-    print(m1.run())
-    print(m2.run())
+    m1 = ConfigurableModule(1)
+    m2 = ConfigurableModule(2)
+    assert m1.run() == 1
+    assert m2.run() == 2
 
 
 if __name__ == "__main__":
