@@ -268,7 +268,8 @@ def cpu_extension(code, name, define_macros=list()):
                 cache_dir, next(f for f in listdir(cache_dir) if f.endswith(".so"))
             )
             module = CDLL(target)
-            logger.success(f"load cached module {name}")
+            define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
+            logger.success(f"load cached module {name}({define_str})")
             logger.trace(f"cached library filename {target}")
             return module
 
