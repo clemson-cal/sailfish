@@ -255,6 +255,7 @@ def cpu_extension(code, name, define_macros=list()):
     sha.update(code.encode("utf-8"))
     sha.update(str(define_macros).encode("utf-8"))
     cache_dir = join(dirname(__file__), "__pycache__", sha.hexdigest())
+    define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
 
     try:
         from cffi import FFI, VerificationError
@@ -268,7 +269,6 @@ def cpu_extension(code, name, define_macros=list()):
                 cache_dir, next(f for f in listdir(cache_dir) if f.endswith(".so"))
             )
             module = CDLL(target)
-            define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
             logger.success(f"load cached module {name}({define_str})")
             logger.trace(f"cached library filename {target}")
             return module
@@ -290,7 +290,7 @@ def cpu_extension(code, name, define_macros=list()):
         ffi.set_source(name, code, define_macros=define_macros)
         target = ffi.compile(tmpdir=cache_dir or ".", verbose=verbose)
         module = CDLL(target)
-        logger.success(f"compile CPU module {name}")
+        logger.success(f"compile CPU module {name}({define_str})")
         return module
 
     except VerificationError as e:

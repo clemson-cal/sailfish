@@ -611,6 +611,9 @@ def update_prim2d(
             f"time_integration must be [fwd|r1k|rk2|rk3], got {time_integration}"
         )
 
+    if fluxing != "per_zone":
+        raise ValueError("only fluxing=per_zone supported in 2d")
+
     solver = FPZSolvers2D.get(time_integration, reconstruction)
     update = solver.update_prim
     prim_to_cons = solver.prim_to_cons_array
