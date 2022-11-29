@@ -549,7 +549,7 @@ def kernel_class(cls):
         cls_init(self, **kwargs)
 
         kernel_code = str()
-        device_funcs = set()
+        device_funcs = list()
         kernel_data_dict = dict()
         static = getattr(self, "static", str())
         define_macros = getattr(self, "define_macros", list())
@@ -561,7 +561,7 @@ def kernel_class(cls):
             if hasattr(getattr(self, k), "__kernel_data"):
                 kernel_data = getattr(self, k).__kernel_data
                 kernel_code += kernel_data.kernel_code()
-                device_funcs |= set(kernel_data.device_funcs())
+                device_funcs += kernel_data.device_funcs()
                 define_macros += kernel_data.define_macros()
                 kernel_data_dict[k] = kernel_data
 
