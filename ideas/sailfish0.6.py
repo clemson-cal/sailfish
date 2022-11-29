@@ -3,8 +3,14 @@ from collections import ChainMap
 from loguru import logger
 from numpy import linspace, meshgrid, zeros, logical_not
 from numpy.typing import NDArray
-from new_kernels import kernel, perf_time_sequence, configure_kernel_module, device
-from lib_euler import prim_to_cons, cons_to_prim, riemann
+from new_kernels import (
+    kernel,
+    kernel_class,
+    perf_time_sequence,
+    configure_kernel_module,
+    device,
+)
+from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
 from configuration import configurable, all_schemas
 
 
@@ -148,7 +154,9 @@ def conservative_update_rk(
     return u.size // 3, (u, f, urk, dt, dx, rk, u.size // 3)
 
 
-@kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann], define_macros=dict(DIM=1))
+@kernel(
+    device_funcs=[prim_to_cons, cons_to_prim, riemann_hlle], define_macros=dict(DIM=1)
+)
 def update_prim_fwd_pcm(
     prd: NDArray[float],
     pwr: NDArray[float],
@@ -175,8 +183,8 @@ def update_prim_fwd_pcm(
             double *pr = &prd[NCONS * (i + 1)];
 
             prim_to_cons(pc, uc);
-            riemann(pl, pc, fm, 1);
-            riemann(pc, pr, fp, 1);
+            riemann_hlle(pl, pc, fm, 1);
+            riemann_hlle(pc, pr, fp, 1);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -189,7 +197,9 @@ def update_prim_fwd_pcm(
     return prd.shape[0], (prd, pwr, dt, dx, prd.shape[0])
 
 
-@kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann], define_macros=dict(DIM=1))
+@kernel(
+    device_funcs=[prim_to_cons, cons_to_prim, riemann_hlle], define_macros=dict(DIM=1)
+)
 def update_prim_rkn_pcm(
     prd: NDArray[float],  # read-from primitive
     pwr: NDArray[float],  # write-to-primitive
@@ -218,8 +228,8 @@ def update_prim_rkn_pcm(
             double *pr = &prd[NCONS * (i + 1)];
 
             prim_to_cons(pc, uc);
-            riemann(pl, pc, fm, 1);
-            riemann(pc, pr, fp, 1);
+            riemann_hlle(pl, pc, fm, 1);
+            riemann_hlle(pc, pr, fp, 1);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -234,143 +244,104 @@ def update_prim_rkn_pcm(
     return prd.shape[0], (prd, pwr, urk, dt, dx, rk, prd.shape[0])
 
 
-@kernel(
-    device_funcs=[prim_to_cons, cons_to_prim, riemann, plm_minmod],
-    define_macros=dict(DIM=1),
-)
-def update_prim_fwd_plm(
-    prd: NDArray[float],
-    pwr: NDArray[float],
-    dt: float,
-    dx: float,
-    plm_theta: float,
-    ni: int = None,
-):
-    R"""
-    //
-    // A second-order-in-space update using flux-per-zone and PLM.
-    //
-    // The first-2 and final-2 elements of the primitive array are not modified.
-    //
-    KERNEL void update_prim_fwd_plm(double *prd, double *pwr, double dt, double dx, double plm_theta, int ni)
-    {
-        FOR_RANGE_1D(2, ni - 2)
+@kernel_class
+class PrimitiveUpdate:
+    def __init__(self, runge_kutta=False):
+        self.runge_kutta = runge_kutta
+
+    @property
+    def module_name(self):
+        if not self.runge_kutta:
+            return "primitive_update_fwd"
+        else:
+            return "primitive_update_rkn"
+
+    @property
+    def define_macros(self):
+        return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta))
+
+    @kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann_hlle, plm_minmod])
+    def update_prim(
+        self,
+        prd: NDArray[float],  # read-from primitive
+        pwr: NDArray[float],  # write-to-primitive
+        urk: NDArray[float],  # u at time-level n
+        dt: float,  # time step dt
+        dx: float,  # grid spacing dx
+        rk: float,  # RK parameter
+        plm_theta: float,
+        ni: int = None,
+    ):
+        R"""
+        //
+        // A second-order-in-space update using flux-per-zone and PLM.
+        //
+        // The first-2 and final-2 elements of the primitive array are not modified.
+        //
+        KERNEL void update_prim(
+            double *prd,
+            double *pwr,
+            double *urk,
+            double dt,
+            double dx,
+            double rk,
+            double plm_theta,
+            int ni)
         {
-            double uc[NCONS];
-            double plp[NCONS];
-            double pcm[NCONS];
-            double pcp[NCONS];
-            double prm[NCONS];
-            double fm[NCONS];
-            double fp[NCONS];
-
-            double *pk = &prd[NCONS * (i - 2)];
-            double *pl = &prd[NCONS * (i - 1)];
-            double *pc = &prd[NCONS * (i + 0)];
-            double *pr = &prd[NCONS * (i + 1)];
-            double *ps = &prd[NCONS * (i + 2)];
-
-            for (int q = 0; q < NCONS; ++q)
+            FOR_RANGE_1D(2, ni - 2)
             {
-                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
-                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+                double uc[NCONS];
+                double plp[NCONS];
+                double pcm[NCONS];
+                double pcp[NCONS];
+                double prm[NCONS];
+                double fm[NCONS];
+                double fp[NCONS];
 
-                plp[q] = pl[q] + 0.5 * gl;
-                pcm[q] = pc[q] - 0.5 * gc;
-                pcp[q] = pc[q] + 0.5 * gc;
-                prm[q] = pr[q] - 0.5 * gr;
-            }
-            riemann(plp, pcm, fm, 1);
-            riemann(pcp, prm, fp, 1);
-            prim_to_cons(pc, uc);
+                double *pk = &prd[NCONS * (i - 2)];
+                double *pl = &prd[NCONS * (i - 1)];
+                double *pc = &prd[NCONS * (i + 0)];
+                double *pr = &prd[NCONS * (i + 1)];
+                double *ps = &prd[NCONS * (i + 2)];
 
-            for (int q = 0; q < NCONS; ++q)
-            {
-                uc[q] -= (fp[q] - fm[q]) * dt / dx;
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
+                    double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                    double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+
+                    plp[q] = pl[q] + 0.5 * gl;
+                    pcm[q] = pc[q] - 0.5 * gc;
+                    pcp[q] = pc[q] + 0.5 * gc;
+                    prm[q] = pr[q] - 0.5 * gr;
+                }
+                riemann_hlle(plp, pcm, fm, 1);
+                riemann_hlle(pcp, prm, fp, 1);
+                prim_to_cons(pc, uc);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    uc[q] -= (fp[q] - fm[q]) * dt / dx;
+                    #if RUNGE_KUTTA == 1
+                    uc[q] *= (1.0 - rk);
+                    uc[q] += rk * urk[NCONS * i + q];
+                    #endif
+                }
+                cons_to_prim(uc, &pwr[NCONS * i]);
             }
-            cons_to_prim(uc, &pwr[NCONS * i]);
         }
-    }
-    """
-    return prd.shape[0], (prd, pwr, dt, dx, plm_theta, prd.shape[0])
+        """
+        return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
 
 
-@kernel(
-    device_funcs=[prim_to_cons, cons_to_prim, riemann, plm_minmod],
-    define_macros=dict(DIM=1),
-)
-def update_prim_rkn_plm(
-    prd: NDArray[float],  # read-from primitive
-    pwr: NDArray[float],  # write-to-primitive
-    urk: NDArray[float],  # u at time-level n
-    dt: float,  # time step dt
-    dx: float,  # grid spacing dx
-    rk: float,  # RK parameter
-    plm_theta: float,
-    ni: int = None,
-):
-    R"""
-    //
-    // A second-order-in-space update using flux-per-zone and PLM.
-    //
-    // The first-2 and final-2 elements of the primitive array are not modified.
-    //
-    KERNEL void update_prim_rkn_plm(
-        double *prd,
-        double *pwr,
-        double *urk,
-        double dt,
-        double dx,
-        double rk,
-        double plm_theta,
-        int ni)
-    {
-        FOR_RANGE_1D(2, ni - 2)
-        {
-            double uc[NCONS];
-            double plp[NCONS];
-            double pcm[NCONS];
-            double pcp[NCONS];
-            double prm[NCONS];
-            double fm[NCONS];
-            double fp[NCONS];
-
-            double *pk = &prd[NCONS * (i - 2)];
-            double *pl = &prd[NCONS * (i - 1)];
-            double *pc = &prd[NCONS * (i + 0)];
-            double *pr = &prd[NCONS * (i + 1)];
-            double *ps = &prd[NCONS * (i + 2)];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
-                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-
-                plp[q] = pl[q] + 0.5 * gl;
-                pcm[q] = pc[q] - 0.5 * gc;
-                pcp[q] = pc[q] + 0.5 * gc;
-                prm[q] = pr[q] - 0.5 * gr;
-            }
-            riemann(plp, pcm, fm, 1);
-            riemann(pcp, prm, fp, 1);
-            prim_to_cons(pc, uc);
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                uc[q] -= (fp[q] - fm[q]) * dt / dx;
-                uc[q] *= (1.0 - rk);
-                uc[q] += rk * urk[NCONS * i + q];
-            }
-            cons_to_prim(uc, &pwr[NCONS * i]);
-        }
-    }
-    """
-    return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
+class Solvers:
+    @classmethod
+    def init(cls):
+        cls.fwd_plm = PrimitiveUpdate(runge_kutta=False)
+        cls.rkn_plm = PrimitiveUpdate(runge_kutta=True)
 
 
-@kernel(device_funcs=[riemann], define_macros=dict(DIM=1))
+@kernel(device_funcs=[riemann_hlle], define_macros=dict(DIM=1))
 def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = None):
     R"""
     //
@@ -386,14 +357,14 @@ def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = N
             double *pr = &p[NCONS * (i + 1)];
             double *fp = &f[NCONS * (i + 1)];
 
-            riemann(pc, pr, fp, 1);
+            riemann_hlle(pc, pr, fp, 1);
         }
     }
     """
     return p.shape[0], (p, f, p.shape[0])
 
 
-@kernel(device_funcs=[riemann, plm_minmod], define_macros=dict(DIM=1))
+@kernel(device_funcs=[riemann_hlle, plm_minmod], define_macros=dict(DIM=1))
 def compute_godunov_fluxes_plm(
     p: NDArray[float],
     f: NDArray[float],
@@ -425,7 +396,7 @@ def compute_godunov_fluxes_plm(
                 pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
                 pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
             }
-            riemann(pm, pp, fh, 1);
+            riemann_hlle(pm, pp, fh, 1);
         }
     }
     """
@@ -511,16 +482,15 @@ def update_prim(
         pwr = p.copy()
 
         if time_integration == "fwd":
-            update_prim_fwd(prd, pwr, dt, dx, plm_theta, reconstruction)
+            Solvers.fwd_plm.update_prim(prd, pwr, None, dt, dx, 0.0, plm_theta)
             prd, pwr = pwr, prd
 
         else:
-            urk = xp.empty_like(prd)  # does this cause bug? was zeros_like last checked
+            urk = xp.empty_like(prd)
             prim_to_cons_array(prd, urk)
 
-            # BUG HERE ... no updates with RK1 (plm or pcm)
             for rk in rks:
-                update_prim_rkn(prd, pwr, urk, dt, dx, rk, plm_theta, reconstruction)
+                Solvers.rkn_plm.update_prim(prd, pwr, urk, dt, dx, rk, plm_theta)
                 prd, pwr = pwr, prd
 
         return prd
@@ -650,14 +620,23 @@ def driver(
     from reporting import terminal, iteration_msg
 
     configure_kernel_module(default_exec_mode=exec_mode)
+    Solvers.init()
+
     term = terminal(logger)
-
-    logger.info("start simulation")
+    sim = simulation(
+        exec_mode,
+        resolution,
+        strategy,
+        reconstruction,
+        time_integration,
+    )
     perf_timer = perf_time_sequence(mode=exec_mode)
+    state = next(sim)
+    logger.info(f"initialization tool {1e3 * next(perf_timer):.3f}ms")
+    logger.info("start simulation")
 
-    for state in simulation(
-        exec_mode, resolution, strategy, reconstruction, time_integration
-    ):
+    while state.time < tfinal:
+        state = next(sim)
 
         # if tasks.checkpoint.is_due(state.time):
         #     write_checkpoint(state, timeseries, tasks)
@@ -665,9 +644,6 @@ def driver(
         # if tasks.timeseries.is_due(state.time):
         #     for name, info in diagnostics.items():
         #         timeseries[name].append(state.diagnostic(info))
-
-        if state.time >= tfinal:
-            break
 
         if state.iteration % fold == 0:
             zps = state.total_zones / next(perf_timer) * fold

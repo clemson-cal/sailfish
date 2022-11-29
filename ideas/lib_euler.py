@@ -274,14 +274,14 @@ def outer_wavespeeds(
         outer_wavespeeds,
     ],
 )
-def riemann(
+def riemann_hlle(
     pl: NDArray[float],
     pr: NDArray[float],
     flux: NDArray[float],
     direction: int,
 ):
     R"""
-    DEVICE void riemann(double *pl, double *pr, double *flux, int direction)
+    DEVICE void riemann_hlle(double *pl, double *pr, double *flux, int direction)
     {
         double ul[NCONS];
         double ur[NCONS];
