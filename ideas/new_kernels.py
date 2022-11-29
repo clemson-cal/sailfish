@@ -545,17 +545,14 @@ def kernel_class(cls):
     """
     cls_init = cls.__init__
 
-    def __init__(self, **kwargs):
-        cls_init(self, **kwargs)
+    def __init__(self, *args, **kwargs):
+        cls_init(self, *args, **kwargs)
 
         kernel_code = str()
         device_funcs = list()
         kernel_data_dict = dict()
         static = getattr(self, "static", str())
-        define_macros = getattr(self, "define_macros", list())
-
-        if type(define_macros) is dict:
-            define_macros = list(define_macros.items())
+        define_macros = list()
 
         for k in dir(self):
             if hasattr(getattr(self, k), "__kernel_data"):
@@ -565,6 +562,8 @@ def kernel_class(cls):
                 define_macros += kernel_data.define_macros()
                 kernel_data_dict[k] = kernel_data
 
+        if m := getattr(self, "define_macros", None):
+            define_macros += m if type(m) is list else list(m.items())
         code = static + collate_source_code(device_funcs) + kernel_code
         name = cls.__name__
         cpu_module = cpu_extension(code, name, define_macros)
