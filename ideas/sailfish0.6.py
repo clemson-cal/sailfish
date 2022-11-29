@@ -39,9 +39,6 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 @kernel(device_funcs=[prim_to_cons], define_macros=dict(DIM=1))
 def prim_to_cons_array(p: NDArray[float], u: NDArray[float], ni: int = None):
     R"""
-    //
-    // Convert an array of primitive data to an array of conserved data
-    //
     KERNEL void prim_to_cons_array(double *p, double *u, int ni)
     {
         FOR_RANGE_1D(1, ni - 1)
@@ -53,146 +50,17 @@ def prim_to_cons_array(p: NDArray[float], u: NDArray[float], ni: int = None):
     return p.size // 3, (p, u, p.size // 3)
 
 
-# @kernel(device_funcs=[prim_to_cons, cons_to_prim])
-# def update_prim(
-#     p: NDArray[float],
-#     f: NDArray[float],
-#     dt: float,
-#     dx: float,
-#     ni: int = None,
-# ):
-#     R"""
-#     KERNEL void update_prim(
-#         double *p,
-#         double *f,
-#         double dt,
-#         double dx,
-#         int ni)
-#     {
-#         FOR_RANGE_1D(2, ni - 2)
-#         {
-#             double uc[3];
-#             double *pc = &p[3 * (i + 0)];
-#             double *fm = &f[3 * (i + 0)];
-#             double *fp = &f[3 * (i + 1)];
-
-#             prim_to_cons(pc, uc);
-
-#             for (int q = 0; q < 3; ++q)
-#             {
-#                 uc[q] -= (fp[q] - fm[q]) * dt / dx;
-#             }
-#             cons_to_prim(uc, pc);
-#         }
-#     }
-#     """
-#     return p.size // 3, (p, f, dt, dx, p.size // 3)
-
-
-# @kernel(device_funcs=[prim_to_cons, cons_to_prim])
-# def conservative_update_rk(
-#     p: NDArray[float],
-#     f: NDArray[float],
-#     urk: NDArray[float],
-#     dt: float,
-#     dx: float,
-#     rk: float,
-#     ni: int = None,
-# ):
-#     R"""
-#     KERNEL void conservative_update_rk(
-#         double *p,
-#         double *f,
-#         double *urk,
-#         double dt,
-#         double dx,
-#         double rk,
-#         int ni)
-#     {
-#         FOR_RANGE_1D(2, ni - 2)
-#         {
-#             double uc[3];
-#             double *pc = &p[3 * (i + 0)];
-#             double *fm = &f[3 * (i + 0)];
-#             double *fp = &f[3 * (i + 1)];
-
-#             prim_to_cons(pc, uc);
-
-#             for (int q = 0; q < 3; ++q)
-#             {
-#                 uc[q] -= (fp[q] - fm[q]) * dt / dx;
-#                 uc[q] *= (1.0 - rk);
-#                 uc[q] += rk * urk[3 * i + q];
-#             }
-#             cons_to_prim(uc, pc);
-#         }
-#     }
-#     """
-#     return p.size // 3, (p, f, urk, dt, dx, rk, p.size // 3)
-
-
-# @kernel(device_funcs=[riemann_hlle], define_macros=dict(DIM=1))
-# def compute_godunov_fluxes_pcm(p: NDArray[float], f: NDArray[float], ni: int = None):
-#     R"""
-#     KERNEL void compute_godunov_fluxes_pcm(double *p, double *f, int ni)
-#     {
-#         FOR_RANGE_1D(0, ni - 1)
-#         {
-#             double *pc = &p[NCONS * (i + 0)];
-#             double *pr = &p[NCONS * (i + 1)];
-#             double *fp = &f[NCONS * (i + 1)];
-
-#             riemann_hlle(pc, pr, fp, 1);
-#         }
-#     }
-#     """
-#     return p.shape[0], (p, f, p.shape[0])
-
-
-# @kernel(device_funcs=[riemann_hlle, plm_minmod], define_macros=dict(DIM=1))
-# def compute_godunov_fluxes_plm(
-#     p: NDArray[float],
-#     f: NDArray[float],
-#     plm_theta: float,
-#     ni: int = None,
-# ):
-#     R"""
-#     KERNEL void compute_godunov_fluxes_plm(double *p, double *f, double plm_theta, int ni)
-#     {
-#         FOR_RANGE_1D(1, ni - 2)
-#         {
-#             double pm[NCONS];
-#             double pp[NCONS];
-
-#             double *pl = &p[NCONS * (i - 1)];
-#             double *pc = &p[NCONS * (i + 0)];
-#             double *pr = &p[NCONS * (i + 1)];
-#             double *ps = &p[NCONS * (i + 2)];
-#             double *fh = &f[NCONS * (i + 1)];
-
-#             for (int q = 0; q < NCONS; ++q)
-#             {
-#                 pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-#                 pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-#             }
-#             riemann_hlle(pm, pp, fh, 1);
-#         }
-#     }
-#     """
-#     return p.shape[0], (p, f, plm_theta, p.shape[0])
-
-
-# def compute_godunov_fluxes(p, f, plm_theta, reconstruction):
-#     if reconstruction == "pcm":
-#         compute_godunov_fluxes_pcm(p, f)
-#     elif reconstruction == "plm":
-#         compute_godunov_fluxes_plm(p, f, plm_theta)
-#     else:
-#         raise ValueError(f"reconstruction must be [pcm|plm], got {reconstruction}")
-
-
 @kernel_class
 class FluxPerFaceSolver:
+    """
+    Solves 1d Euler equation with per-face fluxing at 1st or 2nd order.
+
+    This solver supports 4 configurations -- with/without gradient estimation
+    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
+    per-face, meaning that a Riemann problem is solved only once per face. This
+    approach is best in compute-limited settings because it minimizes flops.
+    """
+
     def __init__(self, runge_kutta=False, plm=False):
         self.runge_kutta = runge_kutta
         self.plm = plm
@@ -297,11 +165,11 @@ class FluxPerFaceSolver:
 @kernel_class
 class FluxPerZoneSolver:
     """
-    Solves 1d Euler equation per-zone (redundant) fluxing at 1st or 2nd order.
+    Solves 1d Euler equation with per-zone fluxing at 1st or 2nd order.
 
     This solver supports 4 configurations -- with/without gradient estimation
     (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
-    per-zone, meaning that Riemann problem is solved with two-fold redundancy;
+    per-zone, meaning that a Riemann problem is solved with two-fold redundancy;
     both zones sharing a given face compute the Godunov flux through it. This
     approach is best in memory bandwidth-limited settings because it minimizes
     access to global memory.
