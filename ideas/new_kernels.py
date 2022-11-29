@@ -823,6 +823,30 @@ def main():
     """
     assert collate_source_code([device_func1, device_func2]) == dedent(collated)
 
+    @kernel_class
+    class ConfigurableModule:
+        def __init__(self, value):
+            self.value = value
+
+        @property
+        def define_macros(self):
+            return dict(VALUE=self.value)
+
+        @kernel()
+        def run(self) -> int:
+            R"""
+            KERNEL int run()
+            {
+                return VALUE;
+            }
+            """
+            return None, tuple()
+
+    m1 = ConfigurableModule(8)
+    m2 = ConfigurableModule(3)
+    print(m1.run())
+    print(m2.run())
+
 
 if __name__ == "__main__":
     main()
