@@ -14,7 +14,7 @@ from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
 from configuration import configurable, all_schemas
 
 
-@device()
+@device
 def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
     R"""
     #define min2(a, b) ((a) < (b) ? (a) : (b))
@@ -76,7 +76,7 @@ class FluxPerFaceSolver:
             d.append(plm_minmod)
         return d
 
-    @kernel()
+    @kernel
     def compute_godunov_fluxes(
         self,
         p: NDArray[float],
@@ -123,7 +123,7 @@ class FluxPerFaceSolver:
         """
         return p.shape[0], (p, f, plm_theta, p.shape[0])
 
-    @kernel()
+    @kernel
     def update_prim(
         self,
         p: NDArray[float],
@@ -196,7 +196,7 @@ class FluxPerZoneSolver:
             d.append(plm_minmod)
         return d
 
-    @kernel()
+    @kernel
     def update_prim(
         self,
         prd: NDArray[float],  # read-from primitive

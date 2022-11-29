@@ -426,7 +426,7 @@ def collate_source_code(device_funcs: list):
     return a + b
 
 
-def device(code: str = None, device_funcs=list(), static=str()):
+def device_function(code: str = None, device_funcs=list(), static=str()):
     """
     Return a decorator that replaces a stub function with a 'device' function.
 
@@ -457,6 +457,16 @@ def device(code: str = None, device_funcs=list(), static=str()):
         return wrapper
 
     return decorator
+
+
+def device(*args, **kwargs):
+    """
+    Convenience for `device_function`, can be used with or without arguments.
+    """
+    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
+        return device_function()(args[0])
+    else:
+        return device_function(*args, **kwargs)
 
 
 class KernelData:
@@ -503,7 +513,7 @@ class KernelData:
         )
 
 
-def kernel(code: str = None, device_funcs=list(), define_macros=list()):
+def kernel_function(code: str = None, device_funcs=list(), define_macros=list()):
     """
     Return a decorator that replaces a 'stub' function with a 'kernel'.
 
@@ -541,6 +551,16 @@ def kernel(code: str = None, device_funcs=list(), define_macros=list()):
         return wrapper
 
     return decorator
+
+
+def kernel(*args, **kwargs):
+    """
+    Convenience for `kernel_function`, can be used with or without arguments.
+    """
+    if len(args) == 1 and len(kwargs) == 0 and callable(args[0]):
+        return kernel_function()(args[0])
+    else:
+        return kernel_function(*args, **kwargs)
 
 
 def kernel_class(cls):
@@ -670,7 +690,7 @@ def main():
     # written in the doc string.
     # ==============================================================================
 
-    @kernel()
+    @kernel
     def rank_one_kernel(a: float, x: NDArray[float], y: NDArray[float], ni: int = None):
         R"""
         KERNEL void rank_one_kernel(double a, double *x, double *y, int ni)
@@ -698,7 +718,7 @@ def main():
     # included at the top of the resulting source code.
     # ==============================================================================
 
-    @device()
+    @device
     def dot3(a, b, c):
         R"""
         DEVICE double dot3(double a, double b, double c)
@@ -801,7 +821,7 @@ def main():
     # programatic code generation.
     # ==============================================================================
 
-    @device()
+    @device
     def device_func0(a: int):
         R"""
         DEVICE int device_func0(int a)
@@ -865,7 +885,7 @@ def main():
         def define_macros(self):
             return dict(VALUE=self.value)
 
-        @kernel()
+        @kernel
         def run(self) -> int:
             R"""
             KERNEL int run()
