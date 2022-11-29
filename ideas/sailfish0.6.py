@@ -69,7 +69,14 @@ class FluxPerFaceSolver:
     def define_macros(self):
         return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
 
-    @kernel(device_funcs=[riemann_hlle, plm_minmod], define_macros=dict(DIM=1))
+    @property
+    def device_funcs(self):
+        d = [prim_to_cons, cons_to_prim, riemann_hlle]
+        if self.plm:
+            d.append(plm_minmod)
+        return d
+
+    @kernel()
     def compute_godunov_fluxes(
         self,
         p: NDArray[float],
@@ -87,7 +94,6 @@ class FluxPerFaceSolver:
                 double *fh = &f[NCONS * (i + 1)];
 
                 #if PLM == 0
-                (void) plm_minmod; // unused function
 
                 double *pc = &p[NCONS * (i + 0)];
                 double *pr = &p[NCONS * (i + 1)];
@@ -117,7 +123,7 @@ class FluxPerFaceSolver:
         """
         return p.shape[0], (p, f, plm_theta, p.shape[0])
 
-    @kernel(device_funcs=[prim_to_cons, cons_to_prim])
+    @kernel()
     def update_prim(
         self,
         p: NDArray[float],
@@ -183,7 +189,14 @@ class FluxPerZoneSolver:
     def define_macros(self):
         return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
 
-    @kernel(device_funcs=[prim_to_cons, cons_to_prim, riemann_hlle, plm_minmod])
+    @property
+    def device_funcs(self):
+        d = [prim_to_cons, cons_to_prim, riemann_hlle]
+        if self.plm:
+            d.append(plm_minmod)
+        return d
+
+    @kernel()
     def update_prim(
         self,
         prd: NDArray[float],  # read-from primitive
@@ -217,7 +230,6 @@ class FluxPerZoneSolver:
                 double prm[NCONS];
 
                 #if PLM == 0
-                (void) plm_minmod; // unused function
 
                 double *pl = &prd[NCONS * (i - 1)];
                 double *pc = &prd[NCONS * (i + 0)];

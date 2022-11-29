@@ -569,10 +569,10 @@ def kernel_class(cls):
     def __init__(self, *args, **kwargs):
         cls_init(self, *args, **kwargs)
 
-        kernel_code = str()
-        device_funcs = list()
-        kernel_data_dict = dict()
         static = getattr(self, "static", str())
+        kernel_code = str()
+        kernel_data_dict = dict()
+        device_funcs = list()
         define_macros = list()
 
         for k in dir(self):
@@ -582,6 +582,9 @@ def kernel_class(cls):
                 device_funcs += kernel_data.device_funcs()
                 define_macros += kernel_data.define_macros()
                 kernel_data_dict[k] = kernel_data
+
+        if d := getattr(self, "device_funcs", None):
+            device_funcs += d
 
         if m := getattr(self, "define_macros", None):
             define_macros += m if type(m) is list else list(m.items())
