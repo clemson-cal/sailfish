@@ -512,6 +512,8 @@ def update_prim(
 
         if time_integration == "fwd":
             update_prim_fwd(prd, pwr, dt, dx, plm_theta, reconstruction)
+            prd, pwr = pwr, prd
+
         else:
             urk = xp.empty_like(prd)  # does this cause bug? was zeros_like last checked
             prim_to_cons_array(prd, urk)
@@ -521,7 +523,7 @@ def update_prim(
                 update_prim_rkn(prd, pwr, urk, dt, dx, rk, plm_theta, reconstruction)
                 prd, pwr = pwr, prd
 
-        return pwr
+        return prd
     else:
         raise ValueError(f"unknown strategy {strategy}")
 
