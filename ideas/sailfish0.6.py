@@ -294,6 +294,106 @@ class FluxPerZoneSolver:
         return p.size // 3, (p, u, p.size // 3)
 
 
+@device(device_funcs=[prim_to_cons, cons_to_prim, riemann_hlle, plm_minmod])
+def update_prim_fpz():
+    R"""
+    DEVICE void update_prim_fpz(
+        double *prd,
+        double *pwr,
+        double *urk,
+        double dt,
+        double dx,
+        double rk,
+        double plm_theta,
+        int si,
+        int sj)
+    {
+        double ucc[NCONS];
+        double fm[NCONS];
+        double fp[NCONS];
+        double gm[NCONS];
+        double gp[NCONS];
+        double pilp[NCONS];
+        double picm[NCONS];
+        double picp[NCONS];
+        double pirm[NCONS];
+        double pjlp[NCONS];
+        double pjcm[NCONS];
+        double pjcp[NCONS];
+        double pjrm[NCONS];
+
+        #if PLM == 0
+        (void) plm_minmod;
+
+        double *pcc = &prd[0];
+        double *plc = &prd[-si];
+        double *prc = &prd[+si];
+        double *pcl = &prd[-sj];
+        double *pcr = &prd[+sj];
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            pilp[q] = plc[q];
+            picm[q] = pcc[q];
+            picp[q] = pcc[q];
+            pirm[q] = prc[q];
+            pjlp[q] = pcl[q];
+            pjcm[q] = pcc[q];
+            pjcp[q] = pcc[q];
+            pjrm[q] = pcr[q];
+        }
+        #else
+
+        double *pcc = &prd[0];
+        double *pkc = &prd[-2 * si];
+        double *plc = &prd[-1 * si];
+        double *prc = &prd[+1 * si];
+        double *psc = &prd[+2 * si];
+        double *pck = &prd[-2 * sj];
+        double *pcl = &prd[-1 * sj];
+        double *pcr = &prd[+1 * sj];
+        double *pcs = &prd[+2 * sj];
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            double gil = plm_minmod(pkc[q], plc[q], pcc[q], plm_theta);
+            double gic = plm_minmod(plc[q], pcc[q], prc[q], plm_theta);
+            double gir = plm_minmod(pcc[q], prc[q], psc[q], plm_theta);
+            double gjl = plm_minmod(pck[q], pcl[q], pcc[q], plm_theta);
+            double gjc = plm_minmod(pcl[q], pcc[q], pcr[q], plm_theta);
+            double gjr = plm_minmod(pcc[q], pcr[q], pcs[q], plm_theta);
+
+            pilp[q] = plc[q] + 0.5 * gil;
+            picm[q] = pcc[q] - 0.5 * gic;
+            picp[q] = pcc[q] + 0.5 * gic;
+            pirm[q] = prc[q] - 0.5 * gir;
+            pjlp[q] = pcl[q] + 0.5 * gjl;
+            pjcm[q] = pcc[q] - 0.5 * gjc;
+            pjcp[q] = pcc[q] + 0.5 * gjc;
+            pjrm[q] = pcr[q] - 0.5 * gjr;
+        }
+        #endif
+
+        riemann_hlle(pilp, picm, fm, 1);
+        riemann_hlle(picp, pirm, fp, 1);
+        riemann_hlle(pjlp, pjcm, gm, 2);
+        riemann_hlle(pjcp, pjrm, gp, 2);
+
+        prim_to_cons(pcc, ucc);
+
+        for (int q = 0; q < NCONS; ++q)
+        {
+            ucc[q] -= (fp[q] - fm[q] + gp[q] - gm[q]) * dt / dx;
+            #if RUNGE_KUTTA == 1
+            ucc[q] *= (1.0 - rk);
+            ucc[q] += rk * urk[q];
+            #endif
+        }
+        cons_to_prim(ucc, pwr);
+    }
+    """
+
+
 @kernel_class
 class FluxPerZoneSolver2D:
     """
@@ -317,7 +417,7 @@ class FluxPerZoneSolver2D:
 
     @property
     def device_funcs(self):
-        d = [prim_to_cons, cons_to_prim, riemann_hlle]
+        d = [prim_to_cons, cons_to_prim, riemann_hlle, update_prim_fpz]
         if self.plm:
             d.append(plm_minmod)
         return d
@@ -351,88 +451,8 @@ class FluxPerZoneSolver2D:
             {
                 int si = NCONS * nj;
                 int sj = NCONS;
-
-                double ucc[NCONS];
-                double fm[NCONS];
-                double fp[NCONS];
-                double gm[NCONS];
-                double gp[NCONS];
-                double pilp[NCONS];
-                double picm[NCONS];
-                double picp[NCONS];
-                double pirm[NCONS];
-                double pjlp[NCONS];
-                double pjcm[NCONS];
-                double pjcp[NCONS];
-                double pjrm[NCONS];
-
-                #if PLM == 0
-
-                double *pcc = &prd[(i + 0) * si + (j + 0) * sj];
-                double *plc = &prd[(i - 1) * si + (j + 0) * sj];
-                double *prc = &prd[(i + 1) * si + (j + 0) * sj];
-                double *pcl = &prd[(i + 0) * si + (j - 1) * sj];
-                double *pcr = &prd[(i + 0) * si + (j + 1) * sj];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    pilp[q] = plc[q];
-                    picm[q] = pcc[q];
-                    picp[q] = pcc[q];
-                    pirm[q] = prc[q];
-                    pjlp[q] = pcl[q];
-                    pjcm[q] = pcc[q];
-                    pjcp[q] = pcc[q];
-                    pjrm[q] = pcr[q];
-                }
-                #else
-
-                double *pcc = &prd[(i + 0) * si + (j + 0) * sj];
-                double *pkc = &prd[(i - 2) * si + (j + 0) * sj];
-                double *plc = &prd[(i - 1) * si + (j + 0) * sj];
-                double *prc = &prd[(i + 1) * si + (j + 0) * sj];
-                double *psc = &prd[(i + 2) * si + (j + 0) * sj];
-                double *pck = &prd[(i + 0) * si + (j - 2) * sj];
-                double *pcl = &prd[(i + 0) * si + (j - 1) * sj];
-                double *pcr = &prd[(i + 0) * si + (j + 1) * sj];
-                double *pcs = &prd[(i + 0) * si + (j + 2) * sj];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    double gil = plm_minmod(pkc[q], plc[q], pcc[q], plm_theta);
-                    double gic = plm_minmod(plc[q], pcc[q], prc[q], plm_theta);
-                    double gir = plm_minmod(pcc[q], prc[q], psc[q], plm_theta);
-                    double gjl = plm_minmod(pck[q], pcl[q], pcc[q], plm_theta);
-                    double gjc = plm_minmod(pcl[q], pcc[q], pcr[q], plm_theta);
-                    double gjr = plm_minmod(pcc[q], pcr[q], pcs[q], plm_theta);
-
-                    pilp[q] = plc[q] + 0.5 * gil;
-                    picm[q] = pcc[q] - 0.5 * gic;
-                    picp[q] = pcc[q] + 0.5 * gic;
-                    pirm[q] = prc[q] - 0.5 * gir;
-                    pjlp[q] = pcl[q] + 0.5 * gjl;
-                    pjcm[q] = pcc[q] - 0.5 * gjc;
-                    pjcp[q] = pcc[q] + 0.5 * gjc;
-                    pjrm[q] = pcr[q] - 0.5 * gjr;
-                }
-                #endif
-
-                riemann_hlle(pilp, picm, fm, 1);
-                riemann_hlle(picp, pirm, fp, 1);
-                riemann_hlle(pjlp, pjcm, gm, 2);
-                riemann_hlle(pjcp, pjrm, gp, 2);
-
-                prim_to_cons(pcc, ucc);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    ucc[q] -= (fp[q] - fm[q] + gp[q] - gm[q]) * dt / dx;
-                    #if RUNGE_KUTTA == 1
-                    ucc[q] *= (1.0 - rk);
-                    ucc[q] += rk * urk[i * si + j * sj + q];
-                    #endif
-                }
-                cons_to_prim(ucc, &pwr[i * si + j * sj]);
+                int n = i * si + j * sj;
+                update_prim_fpz(&prd[n], &pwr[n], &urk[i * si + j * sj], dt, dx, rk, plm_theta, si, sj);
             }
         }
         """
