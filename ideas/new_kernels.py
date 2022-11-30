@@ -40,6 +40,7 @@ PY_CTYPE_DICT = {
 
 
 KERNEL_DEFINE_MACROS_CPU = R"""
+#define CPU_MODE
 #define DEVICE static
 #define KERNEL
 
@@ -62,6 +63,7 @@ for (int k = K0; k < K1; ++k) \
 
 
 KERNEL_DEFINE_MACROS_GPU = R"""
+#define GPU_MODE
 #define DEVICE static __device__
 #define KERNEL extern "C" __global__
 
@@ -309,9 +311,10 @@ def gpu_extension(code, name, define_macros=list()):
 
         code = KERNEL_DEFINE_MACROS_GPU + code
         options = tuple(f"-D {k}={v}" for k, v in define_macros)
+        define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
         module = RawModule(code=code, options=options)
         module.compile()
-        logger.success(f"compile GPU module {name}")
+        logger.success(f"compile GPU module {name}[{define_str}]")
         return module
 
     except ImportError as e:
@@ -881,11 +884,11 @@ def main():
     class ConfigurableModule:
         def __init__(self, value):
             self.value = value
-
+            
         @property
         def define_macros(self):
             return dict(VALUE=self.value)
-
+                
         @kernel
         def run(self) -> int:
             R"""
