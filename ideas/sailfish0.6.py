@@ -294,8 +294,19 @@ class FluxPerZoneSolver:
         return p.size // 3, (p, u, p.size // 3)
 
 
-@device(device_funcs=[prim_to_cons, cons_to_prim, riemann_hlle, plm_minmod])
-def update_prim_fpz():
+@device
+def update_prim_fpz(
+    self,
+    prd: NDArray[float],  # read-from primitive (pointer to zone)
+    pwr: NDArray[float],  # write-to-primitive (pointer to zone)
+    urk: NDArray[float],  # u at time-level n (pointer to zone)
+    dt: float,  # time step dt
+    dx: float,  # grid spacing (both directions)
+    rk: float,  # RK parameter
+    plm_theta: float,  # PLM parameter
+    si: int,  # strides on i-axis (includes guard)
+    sj: int,  # strides on j-axis (includes guard)
+):
     R"""
     DEVICE void update_prim_fpz(
         double *prd,
@@ -323,7 +334,6 @@ def update_prim_fpz():
         double pjrm[NCONS];
 
         #if PLM == 0
-        (void) plm_minmod;
 
         double *pcc = &prd[0];
         double *plc = &prd[-si];
@@ -419,7 +429,7 @@ class FluxPerZoneSolver2D:
     def device_funcs(self):
         d = [prim_to_cons, cons_to_prim, riemann_hlle, update_prim_fpz]
         if self.plm:
-            d.append(plm_minmod)
+            d.insert(0, plm_minmod)
         return d
 
     @kernel
@@ -431,7 +441,7 @@ class FluxPerZoneSolver2D:
         dt: float,  # time step dt
         dx: float,  # grid spacing (both directions)
         rk: float,  # RK parameter
-        plm_theta: float,
+        plm_theta: float,  # PLM parameter
         ni: int = None,  # number of zones on i-axis (includes guard)
         nj: int = None,  # number of zones on j-axis (includes guard)
     ):
