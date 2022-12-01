@@ -544,19 +544,18 @@ class FPZSolvers2D(SolverClass):
         cls.rkn_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=True)
 
 
-@kernel(define_macros=dict(NCONS=3), device_funcs=[prim_to_cons])
+@kernel(define_macros=dict(NCONS=3, LDS_MODE=0), device_funcs=[prim_to_cons])
 def prim_to_cons_array_lds(p: NDArray[float], u: NDArray[float], ni: int = None):
     R"""
     KERNEL void prim_to_cons_array_lds(double *p, double *u, int ni)
     {
-        #ifdef CPU_MODE
-        FOR_RANGE_1D(1, ni - 1)
+        #if LDS_MODE == 0
+        FOR_RANGE_1D(0, ni)
         {
             prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
         }
-        #endif
 
-        #ifdef GPU_MODE
+        #elif LDS_MODE == 1
 
         // if there are 4 threads in the thread block:
         // glb = [[x x x] [x x x] [x x x] [x x x]]
@@ -569,7 +568,11 @@ def prim_to_cons_array_lds(p: NDArray[float], u: NDArray[float], ni: int = None)
         //                     5 -> 5
         //                     9 -> 9
 
-        __shared__ p_lds[64 * 3];
+        if (blockIdx.x * blockDim.x + threadIdx.x >= ni) {
+            return;
+        }
+
+        __shared__ double p_lds[64 * 3];
         double *p_blk = &p[blockIdx.x * blockDim.x * 3];
         double *u_blk = &u[blockIdx.x * blockDim.x * 3];
 
@@ -579,13 +582,15 @@ def prim_to_cons_array_lds(p: NDArray[float], u: NDArray[float], ni: int = None)
         }
         __syncthreads();
 
-        double u[3];
-        prim_to_cons(&p_lds[threadIdx.x * 3], u);
+        double *u_lds = p_lds;
+        prim_to_cons(&p_lds[threadIdx.x * 3], &u_lds[threadIdx.x * 3]);
 
         for (int q = 0; q < 3; ++q)
         {
-            u_blk[threadIdx.x + blockDim.x * q] = u[q];
+            u_blk[threadIdx.x + blockDim.x * q] = u_lds[threadIdx.x + blockDim.x * q];
         }
+        #else
+        #error("LDS_MODE must be 0 or 1")
         #endif
     }
     """
@@ -597,7 +602,7 @@ def prim_to_cons_array_no_lds(p: NDArray[float], u: NDArray[float], ni: int = No
     R"""
     KERNEL void prim_to_cons_array_no_lds(double *p, double *u, int ni)
     {
-        FOR_RANGE_1D(1, ni - 1)
+        FOR_RANGE_1D(0, ni)
         {
             prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
         }
