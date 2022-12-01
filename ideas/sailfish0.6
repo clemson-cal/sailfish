@@ -544,6 +544,68 @@ class FPZSolvers2D(SolverClass):
         cls.rkn_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=True)
 
 
+@kernel(define_macros=dict(NCONS=3), device_funcs=[prim_to_cons])
+def prim_to_cons_array_lds(p: NDArray[float], u: NDArray[float], ni: int = None):
+    R"""
+    KERNEL void prim_to_cons_array_lds(double *p, double *u, int ni)
+    {
+        #ifdef CPU_MODE
+        FOR_RANGE_1D(1, ni - 1)
+        {
+            prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
+        }
+        #endif
+
+        #ifdef GPU_MODE
+
+        // if there are 4 threads in the thread block:
+        // glb = [[x x x] [x x x] [x x x] [x x x]]
+        // thread: 0 1 2   3 0 1   2 3 0   1 2 3
+
+        // thread 0 loads from 0 -> 0
+        //                     4 -> 4
+        //                     8 -> 8
+        // thread 1 loads from 1 -> 1
+        //                     5 -> 5
+        //                     9 -> 9
+
+        __shared__ p_lds[64 * 3];
+        double *p_blk = &p[blockIdx.x * blockDim.x * 3];
+        double *u_blk = &u[blockIdx.x * blockDim.x * 3];
+
+        for (int q = 0; q < 3; ++q)
+        {
+            p_lds[threadIdx.x + blockDim.x * q] = p_blk[threadIdx.x + blockDim.x * q];
+        }
+        __syncthreads();
+
+        double u[3];
+        prim_to_cons(&p_lds[threadIdx.x * 3], u);
+
+        for (int q = 0; q < 3; ++q)
+        {
+            u_blk[threadIdx.x + blockDim.x * q] = u[q];
+        }
+        #endif
+    }
+    """
+    return p.size // 3, (p, u, p.size // 3)
+
+
+@kernel(define_macros=dict(NCONS=3), device_funcs=[prim_to_cons])
+def prim_to_cons_array_no_lds(p: NDArray[float], u: NDArray[float], ni: int = None):
+    R"""
+    KERNEL void prim_to_cons_array_no_lds(double *p, double *u, int ni)
+    {
+        FOR_RANGE_1D(1, ni - 1)
+        {
+            prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
+        }
+    }
+    """
+    return p.size // 3, (p, u, p.size // 3)
+
+
 def update_prim(
     p,
     dt,
@@ -611,6 +673,15 @@ def update_prim(
                 prd, pwr = pwr, prd
 
         return prd
+
+    elif fluxing == "profile_prim_to_cons":
+        prim_to_cons = prim_to_cons_array_lds
+
+        u = xp.empty_like(p)
+        for i in range(10):
+            prim_to_cons(p, u)
+        return p
+
     else:
         raise ValueError(f"unknown fluxing {fluxing}")
 
