@@ -289,7 +289,12 @@ def cpu_extension(code, name, define_macros=list()):
         # and save it to the cache directory. Then load it as a shared
         # library (CDLL).
         ffi = FFI()
-        ffi.set_source(name, code, define_macros=define_macros)
+        ffi.set_source(
+            name,
+            code,
+            define_macros=define_macros,
+            extra_compile_args=["-std=c99"],
+        )
         target = ffi.compile(tmpdir=cache_dir or ".", verbose=verbose)
         module = CDLL(target)
         logger.success(f"compile CPU module {name}({define_str})")
@@ -884,11 +889,11 @@ def main():
     class ConfigurableModule:
         def __init__(self, value):
             self.value = value
-            
+
         @property
         def define_macros(self):
             return dict(VALUE=self.value)
-                
+
         @kernel
         def run(self) -> int:
             R"""
