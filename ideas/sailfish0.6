@@ -455,31 +455,42 @@ class FluxPerZoneSolver:
                 _update_prim(&prd[n], &pwr[n], &urk[n], dt, dx, rk, plm_theta, si);
             }
             #elif LDS_MODE == 1
+            #warning("FluxPerZoneSolver LDS_MODE=1 is unfinished; ignores thread-block guard zones")
 
             if (blockIdx.x * blockDim.x + threadIdx.x >= ni)
             {
                 return;
             }
+
             __shared__ double lds[64 * NCONS * 3]; // this assumes the thread block size is 64!
-            double *prd_lds = lds[64 * NCONS * 0]; // ERROR: not pre-fetching guard zones
-            double *pwr_lds = lds[64 * NCONS * 1];
-            double *urk_lds = lds[64 * NCONS * 2];
+            double *prd_lds = &lds[64 * NCONS * 0]; // ERROR: not pre-fetching guard zones
+            double *pwr_lds = &lds[64 * NCONS * 1];
+            double *urk_lds = &lds[64 * NCONS * 2];
 
-            if (threadIdx.x < 2 || threadIdx.x >= 62)
-            {
-                return; // DON'T CAUSE MEMORY ERROR DUE TO NOT FETCHING GUARD ZONES
-            }
-
-            double *prd_blk = &p[blockIdx.x * blockDim.x * NCONS];
-            double *pwr_blk = &u[blockIdx.x * blockDim.x * NCONS];
+            double *prd_blk = &prd[blockIdx.x * blockDim.x * NCONS];
+            double *pwr_blk = &pwr[blockIdx.x * blockDim.x * NCONS];
+            double *urk_blk = &urk[blockIdx.x * blockDim.x * NCONS];
 
             for (int q = 0; q < NCONS; ++q)
             {
                 int n = threadIdx.x + blockDim.x * q;
                 prd_lds[n] = prd_blk[n];
+            }
+            __syncthreads();
+
+            #if RUNGE_KUTTA == 1
+            for (int q = 0; q < NCONS; ++q)
+            {
+                int n = threadIdx.x + blockDim.x * q;
                 urk_lds[n] = urk_blk[n];
             }
             __syncthreads();
+            #endif
+
+            if (threadIdx.x < 2 || threadIdx.x >= 62)
+            {
+                return; // DON'T CAUSE MEMORY ERROR DUE TO NOT FETCHING GUARD ZONES
+            }
 
             {
                 int n = threadIdx.x * si;
@@ -781,7 +792,7 @@ def update_prim(
         return p
 
     elif fluxing == "per_zone":
-        solver = FPZSolvers.get(time_integration, reconstruction, lds)
+        solver = FPZSolvers.get(time_integration, reconstruction)
         update = solver.update_prim
         prd = p
         pwr = p.copy()
