@@ -39,467 +39,6 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 
 @kernel_class
-class FluxPerFaceSolver:
-    """
-    Solves 1d Euler equation with per-face fluxing at 1st or 2nd order.
-
-    This solver supports 4 configurations -- with/without gradient estimation
-    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
-    per-face, meaning that a Riemann problem is solved only once per face. This
-    approach is best in compute-limited settings because it minimizes flops.
-    """
-
-    def __init__(self, runge_kutta=False, plm=False):
-        self.runge_kutta = runge_kutta
-        self.plm = plm
-
-    @property
-    def define_macros(self):
-        return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
-
-    @property
-    def device_funcs(self):
-        d = [prim_to_cons, cons_to_prim, riemann_hlle]
-        if self.plm:
-            d.append(plm_minmod)
-        return d
-
-    @kernel
-    def compute_godunov_fluxes(
-        self,
-        p: NDArray[float],
-        f: NDArray[float],
-        plm_theta: float,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void compute_godunov_fluxes(double *p, double *f, double plm_theta, int ni)
-        {
-            FOR_RANGE_1D(1, ni - 2)
-            {
-                double pm[NCONS];
-                double pp[NCONS];
-                double *fh = &f[NCONS * (i + 1)];
-
-                #if PLM == 0
-
-                double *pc = &p[NCONS * (i + 0)];
-                double *pr = &p[NCONS * (i + 1)];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    pm[q] = pc[q];
-                    pp[q] = pr[q];
-                }
-                #else
-
-                double *pl = &p[NCONS * (i - 1)];
-                double *pc = &p[NCONS * (i + 0)];
-                double *pr = &p[NCONS * (i + 1)];
-                double *ps = &p[NCONS * (i + 2)];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                    pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-                }
-                #endif
-
-                riemann_hlle(pm, pp, fh, 1);
-            }
-        }
-        """
-        return p.shape[0], (p, f, plm_theta, p.shape[0])
-
-    @kernel
-    def update_prim(
-        self,
-        p: NDArray[float],
-        f: NDArray[float],
-        urk: NDArray[float],
-        dt: float,
-        dx: float,
-        rk: float,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void update_prim(
-            double *p,
-            double *f,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            int ni)
-        {
-            FOR_RANGE_1D(2, ni - 2)
-            {
-                double uc[3];
-                double *pc = &p[3 * (i + 0)];
-                double *fm = &f[3 * (i + 0)];
-                double *fp = &f[3 * (i + 1)];
-
-                prim_to_cons(pc, uc);
-
-                for (int q = 0; q < 3; ++q)
-                {
-                    uc[q] -= (fp[q] - fm[q]) * dt / dx;
-                    #if RUNGE_KUTTA == 1
-                    uc[q] *= (1.0 - rk);
-                    uc[q] += rk * urk[3 * i + q];
-                    #endif
-                }
-                cons_to_prim(uc, pc);
-            }
-        }
-        """
-        return p.size // 3, (p, f, urk, dt, dx, rk, p.size // 3)
-
-
-@kernel_class
-class FluxPerZoneSolver:
-    """
-    Solves 1d Euler equation with per-zone fluxing at 1st or 2nd order.
-
-    This solver supports 4 configurations -- with/without gradient estimation
-    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
-    per-zone, meaning that a Riemann problem is solved with two-fold redundancy;
-    both zones sharing a given face compute the Godunov flux through it. This
-    approach is best in memory bandwidth-limited settings because it minimizes
-    access to global memory.
-    """
-
-    def __init__(self, runge_kutta=False, plm=False):
-        self.runge_kutta = runge_kutta
-        self.plm = plm
-
-    @property
-    def define_macros(self):
-        return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
-
-    @property
-    def device_funcs(self):
-        d = [prim_to_cons, cons_to_prim, riemann_hlle]
-        if self.plm:
-            d.append(plm_minmod)
-        return d
-
-    @kernel
-    def update_prim(
-        self,
-        prd: NDArray[float],  # read-from primitive
-        pwr: NDArray[float],  # write-to-primitive
-        urk: NDArray[float],  # u at time-level n
-        dt: float,  # time step dt
-        dx: float,  # grid spacing dx
-        rk: float,  # RK parameter
-        plm_theta: float,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void update_prim(
-            double *prd,
-            double *pwr,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            double plm_theta,
-            int ni)
-        {
-            FOR_RANGE_1D(2, ni - 2)
-            {
-                double uc[NCONS];
-                double fm[NCONS];
-                double fp[NCONS];
-                double plp[NCONS];
-                double pcm[NCONS];
-                double pcp[NCONS];
-                double prm[NCONS];
-
-                #if PLM == 0
-
-                double *pl = &prd[NCONS * (i - 1)];
-                double *pc = &prd[NCONS * (i + 0)];
-                double *pr = &prd[NCONS * (i + 1)];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    plp[q] = pl[q];
-                    pcm[q] = pc[q];
-                    pcp[q] = pc[q];
-                    prm[q] = pr[q];
-                }
-                #else
-
-                double *pk = &prd[NCONS * (i - 2)];
-                double *pl = &prd[NCONS * (i - 1)];
-                double *pc = &prd[NCONS * (i + 0)];
-                double *pr = &prd[NCONS * (i + 1)];
-                double *ps = &prd[NCONS * (i + 2)];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
-                    double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                    double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-
-                    plp[q] = pl[q] + 0.5 * gl;
-                    pcm[q] = pc[q] - 0.5 * gc;
-                    pcp[q] = pc[q] + 0.5 * gc;
-                    prm[q] = pr[q] - 0.5 * gr;
-                }
-                #endif
-
-                riemann_hlle(plp, pcm, fm, 1);
-                riemann_hlle(pcp, prm, fp, 1);
-                prim_to_cons(pc, uc);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    uc[q] -= (fp[q] - fm[q]) * dt / dx;
-                    #if RUNGE_KUTTA == 1
-                    uc[q] *= (1.0 - rk);
-                    uc[q] += rk * urk[NCONS * i + q];
-                    #endif
-                }
-                cons_to_prim(uc, &pwr[NCONS * i]);
-            }
-        }
-        """
-        return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
-
-
-@device
-def update_prim_fpz(
-    self,
-    prd: NDArray[float],  # read-from primitive (pointer to zone)
-    pwr: NDArray[float],  # write-to-primitive (pointer to zone)
-    urk: NDArray[float],  # u at time-level n (pointer to zone)
-    dt: float,  # time step dt
-    dx: float,  # grid spacing (both directions)
-    rk: float,  # RK parameter
-    plm_theta: float,  # PLM parameter
-    si: int,  # strides on i-axis (includes guard)
-    sj: int,  # strides on j-axis (includes guard)
-):
-    R"""
-    DEVICE void update_prim_fpz(
-        double *prd,
-        double *pwr,
-        double *urk,
-        double dt,
-        double dx,
-        double rk,
-        double plm_theta,
-        int si,
-        int sj)
-    {
-        double ucc[NCONS];
-        double fm[NCONS];
-        double fp[NCONS];
-        double gm[NCONS];
-        double gp[NCONS];
-        double pilp[NCONS];
-        double picm[NCONS];
-        double picp[NCONS];
-        double pirm[NCONS];
-        double pjlp[NCONS];
-        double pjcm[NCONS];
-        double pjcp[NCONS];
-        double pjrm[NCONS];
-
-        #if PLM == 0
-
-        double *pcc = &prd[0];
-        double *plc = &prd[-si];
-        double *prc = &prd[+si];
-        double *pcl = &prd[-sj];
-        double *pcr = &prd[+sj];
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            pilp[q] = plc[q];
-            picm[q] = pcc[q];
-            picp[q] = pcc[q];
-            pirm[q] = prc[q];
-            pjlp[q] = pcl[q];
-            pjcm[q] = pcc[q];
-            pjcp[q] = pcc[q];
-            pjrm[q] = pcr[q];
-        }
-        #else
-
-        double *pcc = &prd[0];
-        double *pkc = &prd[-2 * si];
-        double *plc = &prd[-1 * si];
-        double *prc = &prd[+1 * si];
-        double *psc = &prd[+2 * si];
-        double *pck = &prd[-2 * sj];
-        double *pcl = &prd[-1 * sj];
-        double *pcr = &prd[+1 * sj];
-        double *pcs = &prd[+2 * sj];
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            double gil = plm_minmod(pkc[q], plc[q], pcc[q], plm_theta);
-            double gic = plm_minmod(plc[q], pcc[q], prc[q], plm_theta);
-            double gir = plm_minmod(pcc[q], prc[q], psc[q], plm_theta);
-            double gjl = plm_minmod(pck[q], pcl[q], pcc[q], plm_theta);
-            double gjc = plm_minmod(pcl[q], pcc[q], pcr[q], plm_theta);
-            double gjr = plm_minmod(pcc[q], pcr[q], pcs[q], plm_theta);
-
-            pilp[q] = plc[q] + 0.5 * gil;
-            picm[q] = pcc[q] - 0.5 * gic;
-            picp[q] = pcc[q] + 0.5 * gic;
-            pirm[q] = prc[q] - 0.5 * gir;
-            pjlp[q] = pcl[q] + 0.5 * gjl;
-            pjcm[q] = pcc[q] - 0.5 * gjc;
-            pjcp[q] = pcc[q] + 0.5 * gjc;
-            pjrm[q] = pcr[q] - 0.5 * gjr;
-        }
-        #endif
-
-        riemann_hlle(pilp, picm, fm, 1);
-        riemann_hlle(picp, pirm, fp, 1);
-        riemann_hlle(pjlp, pjcm, gm, 2);
-        riemann_hlle(pjcp, pjrm, gp, 2);
-
-        prim_to_cons(pcc, ucc);
-
-        for (int q = 0; q < NCONS; ++q)
-        {
-            ucc[q] -= (fp[q] - fm[q] + gp[q] - gm[q]) * dt / dx;
-            #if RUNGE_KUTTA == 1
-            ucc[q] *= (1.0 - rk);
-            ucc[q] += rk * urk[q];
-            #endif
-        }
-        cons_to_prim(ucc, pwr);
-    }
-    """
-
-
-@kernel_class
-class FluxPerZoneSolver2D:
-    """
-    Solves 2d Euler equation with per-zone fluxing at 1st or 2nd order.
-
-    This solver supports 4 configurations -- with/without gradient estimation
-    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
-    per-zone, meaning that a Riemann problem is solved with two-fold redundancy;
-    both zones sharing a given face compute the Godunov flux through it. This
-    approach is best in memory bandwidth-limited settings because it minimizes
-    access to global memory.
-    """
-
-    def __init__(self, runge_kutta=False, plm=False):
-        self.runge_kutta = runge_kutta
-        self.plm = plm
-
-    @property
-    def define_macros(self):
-        return dict(DIM=2, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
-
-    @property
-    def device_funcs(self):
-        d = [prim_to_cons, cons_to_prim, riemann_hlle, update_prim_fpz]
-        if self.plm:
-            d.insert(0, plm_minmod)
-        return d
-
-    @kernel
-    def update_prim(
-        self,
-        prd: NDArray[float],  # read-from primitive
-        pwr: NDArray[float],  # write-to-primitive
-        urk: NDArray[float],  # u at time-level n
-        dt: float,  # time step dt
-        dx: float,  # grid spacing (both directions)
-        rk: float,  # RK parameter
-        plm_theta: float,  # PLM parameter
-        ni: int = None,  # number of zones on i-axis (includes guard)
-        nj: int = None,  # number of zones on j-axis (includes guard)
-    ):
-        R"""
-        KERNEL void update_prim(
-            double *prd,
-            double *pwr,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            double plm_theta,
-            int ni,
-            int nj)
-        {
-            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
-            {
-                int si = NCONS * nj;
-                int sj = NCONS;
-                int n = i * si + j * sj;
-                update_prim_fpz(&prd[n], &pwr[n], &urk[i * si + j * sj], dt, dx, rk, plm_theta, si, sj);
-            }
-        }
-        """
-        return prd.shape[:2], (
-            prd,
-            pwr,
-            urk,
-            dt,
-            dx,
-            rk,
-            plm_theta,
-            prd.shape[0],
-            prd.shape[1],
-        )
-
-
-class SolverClass:
-    @classmethod
-    def get(cls, time_integration, reconstruction):
-        if reconstruction == "pcm":
-            if time_integration == "fwd":
-                return cls.fwd_pcm
-            elif time_integration in ("rk1", "rk2", "rk3"):
-                return cls.rkn_pcm
-        elif reconstruction == "plm":
-            if time_integration == "fwd":
-                return cls.fwd_plm
-            elif time_integration in ("rk1", "rk2", "rk3"):
-                return cls.rkn_plm
-        else:
-            raise ValueError(f"no solver config {time_integration}/{reconstruction}")
-
-
-class FPFSolvers(SolverClass):
-    @classmethod
-    def init(cls):
-        cls.fwd_pcm = FluxPerFaceSolver(plm=False, runge_kutta=False)
-        cls.rkn_pcm = FluxPerFaceSolver(plm=False, runge_kutta=True)
-        cls.fwd_plm = FluxPerFaceSolver(plm=True, runge_kutta=False)
-        cls.rkn_plm = FluxPerFaceSolver(plm=True, runge_kutta=True)
-
-
-class FPZSolvers(SolverClass):
-    @classmethod
-    def init(cls):
-        cls.fwd_pcm = FluxPerZoneSolver(plm=False, runge_kutta=False)
-        cls.rkn_pcm = FluxPerZoneSolver(plm=False, runge_kutta=True)
-        cls.fwd_plm = FluxPerZoneSolver(plm=True, runge_kutta=False)
-        cls.rkn_plm = FluxPerZoneSolver(plm=True, runge_kutta=True)
-
-
-class FPZSolvers2D(SolverClass):
-    @classmethod
-    def init(cls):
-        cls.fwd_pcm = FluxPerZoneSolver2D(plm=False, runge_kutta=False)
-        cls.rkn_pcm = FluxPerZoneSolver2D(plm=False, runge_kutta=True)
-        cls.fwd_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=False)
-        cls.rkn_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=True)
-
-
-@kernel_class
 class PrimitiveToConserved:
     def __init__(self, dim=1, lds=False):
         self.dim = dim
@@ -532,7 +71,7 @@ class PrimitiveToConserved:
         return [prim_to_cons]
 
     @kernel
-    def prim_to_cons_array(p: NDArray[float], u: NDArray[float], ni: int = None):
+    def prim_to_cons_array(self, p: NDArray[float], u: NDArray[float], ni: int = None):
         R"""
         KERNEL void prim_to_cons_array(double *p, double *u, int ni)
         {
@@ -596,6 +135,549 @@ class PrimitiveToConserved:
             raise ValueError("array has wrong number of fields")
 
         return p.size // nq, (p, u, p.size // nq)
+
+
+@kernel_class
+class FluxPerFaceSolver:
+    """
+    Solves 1d Euler equation with per-face fluxing at 1st or 2nd order.
+
+    This solver supports 4 configurations -- with/without gradient estimation
+    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
+    per-face, meaning that a Riemann problem is solved only once per face. This
+    approach is best in compute-limited settings because it minimizes flops.
+    """
+
+    def __init__(self, runge_kutta=False, plm=False):
+        self.runge_kutta = runge_kutta
+        self.plm = plm
+
+    @property
+    def define_macros(self):
+        return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
+
+    @property
+    def device_funcs(self):
+        d = [
+            prim_to_cons,
+            cons_to_prim,
+            riemann_hlle,
+            self._compute_godunov_fluxes,
+            self._update_prim,
+        ]
+        if self.plm:
+            d.insert(0, plm_minmod)
+        return d
+
+    @device
+    def _compute_godunov_fluxes(
+        self,
+        p: NDArray[float],
+        f: NDArray[float],
+        plm_theta: float,
+        si: int,
+    ):
+        R"""
+        DEVICE void _compute_godunov_fluxes(double *p, double *f, double plm_theta, int si)
+        {
+            double pm[NCONS];
+            double pp[NCONS];
+            double *fh = &f[si];
+
+            #if PLM == 0
+
+            double *pc = &p[0 * si];
+            double *pr = &p[1 * si];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pm[q] = pc[q];
+                pp[q] = pr[q];
+            }
+            #else
+
+            double *pl = &p[-1 * si];
+            double *pc = &p[+0 * si];
+            double *pr = &p[+1 * si];
+            double *ps = &p[+2 * si];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+            }
+            #endif
+
+            riemann_hlle(pm, pp, fh, 1);
+        }
+        """
+
+    @kernel
+    def compute_godunov_fluxes(
+        self,
+        p: NDArray[float],
+        f: NDArray[float],
+        plm_theta: float,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void compute_godunov_fluxes(double *p, double *f, double plm_theta, int ni)
+        {
+            int si = NCONS;
+
+            FOR_RANGE_1D(1, ni - 2)
+            {
+                int n = i * si;
+                _compute_godunov_fluxes(&p[n], &f[n], plm_theta, si);
+            }
+        }
+        """
+        return p.shape[0], (p, f, plm_theta, p.shape[0])
+
+    @device
+    def _update_prim(
+        self,
+        p: NDArray[float],
+        f: NDArray[float],
+        urk: NDArray[float],
+        dt: float,
+        dx: float,
+        rk: float,
+        si: int,
+    ):
+        R"""
+        DEVICE void _update_prim(
+            double *p,
+            double *f,
+            double *urk,
+            double dt,
+            double dx,
+            double rk,
+            int si)
+        {
+            double uc[NCONS];
+            double *pc = &p[+si * 0];
+            double *fm = &f[+si * 0];
+            double *fp = &f[+si * 1];
+
+            prim_to_cons(pc, uc);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uc[q] -= (fp[q] - fm[q]) * dt / dx;
+                #if RUNGE_KUTTA == 1
+                uc[q] *= (1.0 - rk);
+                uc[q] += rk * urk[q];
+                #endif
+            }
+            cons_to_prim(uc, pc);
+        }
+        """
+
+    @kernel
+    def update_prim(
+        self,
+        p: NDArray[float],
+        f: NDArray[float],
+        urk: NDArray[float],
+        dt: float,
+        dx: float,
+        rk: float,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void update_prim(
+            double *p,
+            double *f,
+            double *urk,
+            double dt,
+            double dx,
+            double rk,
+            int ni)
+        {
+            int si = NCONS;
+
+            FOR_RANGE_1D(2, ni - 2)
+            {
+                int n = i * si;
+                _update_prim(&p[n], &f[n], &urk[n], dt, dx, rk, si);
+            }
+        }
+        """
+        return p.shape[0], (p, f, urk, dt, dx, rk, p.shape[0])
+
+
+@kernel_class
+class FluxPerZoneSolver:
+    """
+    Solves 1d Euler equation with per-zone fluxing at 1st or 2nd order.
+
+    This solver supports 4 configurations -- with/without gradient estimation
+    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
+    per-zone, meaning that a Riemann problem is solved with two-fold redundancy;
+    both zones sharing a given face compute the Godunov flux through it. This
+    approach is best in memory bandwidth-limited settings because it minimizes
+    access to global memory.
+    """
+
+    def __init__(self, runge_kutta=False, plm=False):
+        self.runge_kutta = runge_kutta
+        self.plm = plm
+
+    @property
+    def define_macros(self):
+        return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
+
+    @property
+    def device_funcs(self):
+        d = [prim_to_cons, cons_to_prim, riemann_hlle, self._update_prim]
+        if self.plm:
+            d.insert(0, plm_minmod)
+        return d
+
+    @device
+    def _update_prim(
+        self,
+        prd: NDArray[float],  # read-from primitive
+        pwr: NDArray[float],  # write-to-primitive
+        urk: NDArray[float],  # u at time-level n
+        dt: float,  # time step dt
+        dx: float,  # grid spacing dx
+        rk: float,  # RK parameter
+        plm_theta: float,  # PLM parameter
+        si: int,  # stride on i-axis
+    ):
+        R"""
+        DEVICE void _update_prim(
+            double *prd,
+            double *pwr,
+            double *urk,
+            double dt,
+            double dx,
+            double rk,
+            double plm_theta,
+            int si)
+        {
+            double uc[NCONS];
+            double fm[NCONS];
+            double fp[NCONS];
+            double plp[NCONS];
+            double pcm[NCONS];
+            double pcp[NCONS];
+            double prm[NCONS];
+
+            #if PLM == 0
+
+            double *pl = &prd[-1 * si];
+            double *pc = &prd[ 0 * si];
+            double *pr = &prd[+1 * si];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                plp[q] = pl[q];
+                pcm[q] = pc[q];
+                pcp[q] = pc[q];
+                prm[q] = pr[q];
+            }
+            #else
+
+            double *pk = &prd[-2 * si];
+            double *pl = &prd[-1 * si];
+            double *pc = &prd[ 0 * si];
+            double *pr = &prd[+1 * si];
+            double *ps = &prd[+2 * si];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
+                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+
+                plp[q] = pl[q] + 0.5 * gl;
+                pcm[q] = pc[q] - 0.5 * gc;
+                pcp[q] = pc[q] + 0.5 * gc;
+                prm[q] = pr[q] - 0.5 * gr;
+            }
+            #endif
+
+            riemann_hlle(plp, pcm, fm, 1);
+            riemann_hlle(pcp, prm, fp, 1);
+            prim_to_cons(pc, uc);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                uc[q] -= (fp[q] - fm[q]) * dt / dx;
+                #if RUNGE_KUTTA == 1
+                uc[q] *= (1.0 - rk);
+                uc[q] += rk * urk[q];
+                #endif
+            }
+            cons_to_prim(uc, pwr);
+        }
+        """
+
+    @kernel
+    def update_prim(
+        self,
+        prd: NDArray[float],  # read-from primitive
+        pwr: NDArray[float],  # write-to-primitive
+        urk: NDArray[float],  # u at time-level n
+        dt: float,  # time step dt
+        dx: float,  # grid spacing dx
+        rk: float,  # RK parameter
+        plm_theta: float,  # PLM parameter
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void update_prim(
+            double *prd,
+            double *pwr,
+            double *urk,
+            double dt,
+            double dx,
+            double rk,
+            double plm_theta,
+            int ni)
+        {
+            int si = NCONS;
+
+            FOR_RANGE_1D(2, ni - 2)
+            {
+                int n = i * si;
+                _update_prim(&prd[n], &pwr[n], &urk[n], dt, dx, rk, plm_theta, si);
+            }
+        }
+        """
+        return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
+
+
+@kernel_class
+class FluxPerZoneSolver2D:
+    """
+    Solves 2d Euler equation with per-zone fluxing at 1st or 2nd order.
+
+    This solver supports 4 configurations -- with/without gradient estimation
+    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
+    per-zone, meaning that a Riemann problem is solved with two-fold redundancy;
+    both zones sharing a given face compute the Godunov flux through it. This
+    approach is best in memory bandwidth-limited settings because it minimizes
+    access to global memory.
+    """
+
+    def __init__(self, runge_kutta=False, plm=False):
+        self.runge_kutta = runge_kutta
+        self.plm = plm
+
+    @property
+    def define_macros(self):
+        return dict(DIM=2, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
+
+    @property
+    def device_funcs(self):
+        d = [prim_to_cons, cons_to_prim, riemann_hlle, self.update_prim_zone]
+        if self.plm:
+            d.insert(0, plm_minmod)
+        return d
+
+    @device
+    def update_prim_zone(
+        self,
+        prd: NDArray[float],  # read-from primitive (pointer to zone)
+        pwr: NDArray[float],  # write-to-primitive (pointer to zone)
+        urk: NDArray[float],  # u at time-level n (pointer to zone)
+        dt: float,  # time step dt
+        dx: float,  # grid spacing (both directions)
+        rk: float,  # RK parameter
+        plm_theta: float,  # PLM parameter
+        si: int,  # stride on i-axis (includes guard)
+        sj: int,  # stride on j-axis (includes guard)
+    ):
+        R"""
+        DEVICE void update_prim_zone(
+            double *prd,
+            double *pwr,
+            double *urk,
+            double dt,
+            double dx,
+            double rk,
+            double plm_theta,
+            int si,
+            int sj)
+        {
+            double ucc[NCONS];
+            double fm[NCONS];
+            double fp[NCONS];
+            double gm[NCONS];
+            double gp[NCONS];
+            double pilp[NCONS];
+            double picm[NCONS];
+            double picp[NCONS];
+            double pirm[NCONS];
+            double pjlp[NCONS];
+            double pjcm[NCONS];
+            double pjcp[NCONS];
+            double pjrm[NCONS];
+
+            #if PLM == 0
+
+            double *pcc = &prd[0];
+            double *plc = &prd[-si];
+            double *prc = &prd[+si];
+            double *pcl = &prd[-sj];
+            double *pcr = &prd[+sj];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pilp[q] = plc[q];
+                picm[q] = pcc[q];
+                picp[q] = pcc[q];
+                pirm[q] = prc[q];
+                pjlp[q] = pcl[q];
+                pjcm[q] = pcc[q];
+                pjcp[q] = pcc[q];
+                pjrm[q] = pcr[q];
+            }
+            #else
+
+            double *pcc = &prd[0];
+            double *pkc = &prd[-2 * si];
+            double *plc = &prd[-1 * si];
+            double *prc = &prd[+1 * si];
+            double *psc = &prd[+2 * si];
+            double *pck = &prd[-2 * sj];
+            double *pcl = &prd[-1 * sj];
+            double *pcr = &prd[+1 * sj];
+            double *pcs = &prd[+2 * sj];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                double gil = plm_minmod(pkc[q], plc[q], pcc[q], plm_theta);
+                double gic = plm_minmod(plc[q], pcc[q], prc[q], plm_theta);
+                double gir = plm_minmod(pcc[q], prc[q], psc[q], plm_theta);
+                double gjl = plm_minmod(pck[q], pcl[q], pcc[q], plm_theta);
+                double gjc = plm_minmod(pcl[q], pcc[q], pcr[q], plm_theta);
+                double gjr = plm_minmod(pcc[q], pcr[q], pcs[q], plm_theta);
+
+                pilp[q] = plc[q] + 0.5 * gil;
+                picm[q] = pcc[q] - 0.5 * gic;
+                picp[q] = pcc[q] + 0.5 * gic;
+                pirm[q] = prc[q] - 0.5 * gir;
+                pjlp[q] = pcl[q] + 0.5 * gjl;
+                pjcm[q] = pcc[q] - 0.5 * gjc;
+                pjcp[q] = pcc[q] + 0.5 * gjc;
+                pjrm[q] = pcr[q] - 0.5 * gjr;
+            }
+            #endif
+
+            riemann_hlle(pilp, picm, fm, 1);
+            riemann_hlle(picp, pirm, fp, 1);
+            riemann_hlle(pjlp, pjcm, gm, 2);
+            riemann_hlle(pjcp, pjrm, gp, 2);
+
+            prim_to_cons(pcc, ucc);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                ucc[q] -= (fp[q] - fm[q] + gp[q] - gm[q]) * dt / dx;
+                #if RUNGE_KUTTA == 1
+                ucc[q] *= (1.0 - rk);
+                ucc[q] += rk * urk[q];
+                #endif
+            }
+            cons_to_prim(ucc, pwr);
+        }
+        """
+
+    @kernel
+    def update_prim(
+        self,
+        prd: NDArray[float],  # read-from primitive
+        pwr: NDArray[float],  # write-to-primitive
+        urk: NDArray[float],  # u at time-level n
+        dt: float,  # time step dt
+        dx: float,  # grid spacing (both directions)
+        rk: float,  # RK parameter
+        plm_theta: float,  # PLM parameter
+        ni: int = None,  # number of zones on i-axis (includes guard)
+        nj: int = None,  # number of zones on j-axis (includes guard)
+    ):
+        R"""
+        KERNEL void update_prim(
+            double *prd,
+            double *pwr,
+            double *urk,
+            double dt,
+            double dx,
+            double rk,
+            double plm_theta,
+            int ni,
+            int nj)
+        {
+            int si = NCONS * nj;
+            int sj = NCONS;
+
+            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
+            {
+                int n = i * si + j * sj;
+                update_prim_zone(&prd[n], &pwr[n], &urk[i * si + j * sj], dt, dx, rk, plm_theta, si, sj);
+            }
+        }
+        """
+        return prd.shape[:2], (
+            prd,
+            pwr,
+            urk,
+            dt,
+            dx,
+            rk,
+            plm_theta,
+            prd.shape[0],
+            prd.shape[1],
+        )
+
+
+class SolverClass:
+    @classmethod
+    def get(cls, time_integration, reconstruction):
+        if reconstruction == "pcm":
+            if time_integration == "fwd":
+                return cls.fwd_pcm
+            elif time_integration in ("rk1", "rk2", "rk3"):
+                return cls.rkn_pcm
+        elif reconstruction == "plm":
+            if time_integration == "fwd":
+                return cls.fwd_plm
+            elif time_integration in ("rk1", "rk2", "rk3"):
+                return cls.rkn_plm
+        else:
+            raise ValueError(f"no solver config {time_integration}/{reconstruction}")
+
+
+class FPFSolvers(SolverClass):
+    @classmethod
+    def init(cls):
+        cls.fwd_pcm = FluxPerFaceSolver(plm=False, runge_kutta=False)
+        cls.rkn_pcm = FluxPerFaceSolver(plm=False, runge_kutta=True)
+        cls.fwd_plm = FluxPerFaceSolver(plm=True, runge_kutta=False)
+        cls.rkn_plm = FluxPerFaceSolver(plm=True, runge_kutta=True)
+
+
+class FPZSolvers(SolverClass):
+    @classmethod
+    def init(cls):
+        cls.fwd_pcm = FluxPerZoneSolver(plm=False, runge_kutta=False)
+        cls.rkn_pcm = FluxPerZoneSolver(plm=False, runge_kutta=True)
+        cls.fwd_plm = FluxPerZoneSolver(plm=True, runge_kutta=False)
+        cls.rkn_plm = FluxPerZoneSolver(plm=True, runge_kutta=True)
+
+
+class FPZSolvers2D(SolverClass):
+    @classmethod
+    def init(cls):
+        cls.fwd_pcm = FluxPerZoneSolver2D(plm=False, runge_kutta=False)
+        cls.rkn_pcm = FluxPerZoneSolver2D(plm=False, runge_kutta=True)
+        cls.fwd_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=False)
+        cls.rkn_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=True)
 
 
 def update_prim(
@@ -975,7 +1057,7 @@ def driver(
     )
     perf_timer = perf_time_sequence(mode=exec_mode)
     state = next(sim)
-    logger.info(f"initialization tool {1e3 * next(perf_timer):.3f}ms")
+    logger.info(f"initialization took {1e3 * next(perf_timer):.3f}ms")
     logger.info("start simulation")
 
     while state.time < tfinal:
