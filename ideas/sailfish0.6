@@ -320,13 +320,19 @@ class FluxPerZoneSolver:
     access to global memory.
     """
 
-    def __init__(self, runge_kutta=False, plm=False):
+    def __init__(self, runge_kutta=False, plm=False, lds=False):
         self.runge_kutta = runge_kutta
         self.plm = plm
+        self.lds = lds
 
     @property
     def define_macros(self):
-        return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
+        return dict(
+            DIM=1,
+            RUNGE_KUTTA=int(self.runge_kutta),
+            PLM=int(self.plm),
+            LDS_MODE=int(self.lds),
+        )
 
     @property
     def device_funcs(self):
@@ -441,11 +447,57 @@ class FluxPerZoneSolver:
         {
             int si = NCONS;
 
+            #if LDS_MODE == 0 || defined(CPU_MODE)
+
             FOR_RANGE_1D(2, ni - 2)
             {
                 int n = i * si;
                 _update_prim(&prd[n], &pwr[n], &urk[n], dt, dx, rk, plm_theta, si);
             }
+            #elif LDS_MODE == 1
+
+            if (blockIdx.x * blockDim.x + threadIdx.x >= ni)
+            {
+                return;
+            }
+            __shared__ double lds[64 * NCONS * 3]; // this assumes the thread block size is 64!
+            double *prd_lds = lds[64 * NCONS * 0]; // ERROR: not pre-fetching guard zones
+            double *pwr_lds = lds[64 * NCONS * 1];
+            double *urk_lds = lds[64 * NCONS * 2];
+
+            if (threadIdx.x < 2 || threadIdx.x >= 62)
+            {
+                return; // DON'T CAUSE MEMORY ERROR DUE TO NOT FETCHING GUARD ZONES
+            }
+
+            double *prd_blk = &p[blockIdx.x * blockDim.x * NCONS];
+            double *pwr_blk = &u[blockIdx.x * blockDim.x * NCONS];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                int n = threadIdx.x + blockDim.x * q;
+                prd_lds[n] = prd_blk[n];
+                urk_lds[n] = urk_blk[n];
+            }
+            __syncthreads();
+
+            {
+                int n = threadIdx.x * si;
+                _update_prim(&prd_lds[n], &pwr_lds[n], &urk_lds[n], dt, dx, rk, plm_theta, si);
+            }
+            __syncthreads();
+
+            // ----------------------------------------------------------------
+            // Write the result back to global memory, coalesced.
+            // ----------------------------------------------------------------
+            for (int q = 0; q < NCONS; ++q)
+            {
+                int n = threadIdx.x + blockDim.x * q;
+                pwr_blk[n] = pwr_lds[n];
+            }
+            #else
+            #error("LDS_MODE must be [0|1]")
+            #endif
         }
         """
         return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
@@ -664,11 +716,11 @@ class FPFSolvers(SolverClass):
 
 class FPZSolvers(SolverClass):
     @classmethod
-    def init(cls):
-        cls.fwd_pcm = FluxPerZoneSolver(plm=False, runge_kutta=False)
-        cls.rkn_pcm = FluxPerZoneSolver(plm=False, runge_kutta=True)
-        cls.fwd_plm = FluxPerZoneSolver(plm=True, runge_kutta=False)
-        cls.rkn_plm = FluxPerZoneSolver(plm=True, runge_kutta=True)
+    def init(cls, lds):
+        cls.fwd_pcm = FluxPerZoneSolver(lds=lds, plm=False, runge_kutta=False)
+        cls.rkn_pcm = FluxPerZoneSolver(lds=lds, plm=False, runge_kutta=True)
+        cls.fwd_plm = FluxPerZoneSolver(lds=lds, plm=True, runge_kutta=False)
+        cls.rkn_plm = FluxPerZoneSolver(lds=lds, plm=True, runge_kutta=True)
 
 
 class FPZSolvers2D(SolverClass):
@@ -729,7 +781,7 @@ def update_prim(
         return p
 
     elif fluxing == "per_zone":
-        solver = FPZSolvers.get(time_integration, reconstruction)
+        solver = FPZSolvers.get(time_integration, reconstruction, lds)
         update = solver.update_prim
         prd = p
         pwr = p.copy()
@@ -1040,7 +1092,7 @@ def driver(
     from reporting import terminal, iteration_msg
 
     configure_kernel_module(default_exec_mode=exec_mode)
-    FPZSolvers.init()
+    FPZSolvers.init(lds=lds)
     FPFSolvers.init()
     FPZSolvers2D.init()
     PrimitiveToConserved.init()
