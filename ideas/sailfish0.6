@@ -155,19 +155,6 @@ class FluxPerFaceSolver:
         """
         return p.size // 3, (p, f, urk, dt, dx, rk, p.size // 3)
 
-    @kernel
-    def prim_to_cons_array(self, p: NDArray[float], u: NDArray[float], ni: int = None):
-        R"""
-        KERNEL void prim_to_cons_array(double *p, double *u, int ni)
-        {
-            FOR_RANGE_1D(1, ni - 1)
-            {
-                prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
-            }
-        }
-        """
-        return p.size // 3, (p, u, p.size // 3)
-
 
 @kernel_class
 class FluxPerZoneSolver:
@@ -281,19 +268,6 @@ class FluxPerZoneSolver:
         }
         """
         return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
-
-    @kernel
-    def prim_to_cons_array(self, p: NDArray[float], u: NDArray[float], ni: int = None):
-        R"""
-        KERNEL void prim_to_cons_array(double *p, double *u, int ni)
-        {
-            FOR_RANGE_1D(1, ni - 1)
-            {
-                prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
-            }
-        }
-        """
-        return p.size // 3, (p, u, p.size // 3)
 
 
 @device
@@ -480,25 +454,6 @@ class FluxPerZoneSolver2D:
             prd.shape[1],
         )
 
-    @kernel
-    def prim_to_cons_array(
-        self,
-        p: NDArray[float],
-        u: NDArray[float],
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void prim_to_cons_array(double *p, double *u, int ni)
-        {
-            FOR_EACH_1D(ni)
-            {
-                prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
-            }
-        }
-        """
-        nq = p.shape[-1]
-        return p.size // nq, (p, u, p.size // nq)
-
 
 class SolverClass:
     @classmethod
@@ -544,71 +499,103 @@ class FPZSolvers2D(SolverClass):
         cls.rkn_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=True)
 
 
-@kernel(define_macros=dict(NCONS=3, LDS_MODE=0), device_funcs=[prim_to_cons])
-def prim_to_cons_array_lds(p: NDArray[float], u: NDArray[float], ni: int = None):
-    R"""
-    KERNEL void prim_to_cons_array_lds(double *p, double *u, int ni)
-    {
-        #if LDS_MODE == 0
-        FOR_RANGE_1D(0, ni)
+@kernel_class
+class PrimitiveToConserved:
+    def __init__(self, dim=1, lds=False):
+        self.dim = dim
+        self.lds = lds
+
+    @classmethod
+    def init(cls):
+        cls.dim1_lds0 = PrimitiveToConserved(dim=1, lds=False)
+        cls.dim1_lds1 = PrimitiveToConserved(dim=1, lds=True)
+        cls.dim2_lds0 = PrimitiveToConserved(dim=2, lds=False)
+        cls.dim2_lds1 = PrimitiveToConserved(dim=2, lds=True)
+
+    @classmethod
+    def get(cls, dim, lds):
+        if dim == 1 and not lds:
+            return cls.dim1_lds0
+        if dim == 1 and lds:
+            return cls.dim1_lds1
+        if dim == 2 and not lds:
+            return cls.dim2_lds0
+        if dim == 2 and lds:
+            return cls.dim2_lds1
+
+    @property
+    def define_macros(self):
+        return dict(DIM=self.dim, LDS_MODE=int(self.lds))
+
+    @property
+    def device_funcs(self):
+        return [prim_to_cons]
+
+    @kernel
+    def prim_to_cons_array(p: NDArray[float], u: NDArray[float], ni: int = None):
+        R"""
+        KERNEL void prim_to_cons_array(double *p, double *u, int ni)
         {
-            prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
+            #if LDS_MODE == 0 || defined(CPU_MODE)
+
+            FOR_RANGE_1D(0, ni)
+            {
+                prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
+            }
+
+            #elif LDS_MODE == 1
+
+            if (blockIdx.x * blockDim.x + threadIdx.x >= ni)
+            {
+                return;
+            }
+            __shared__ double p_lds[64 * NCONS]; // this assumes the thread block size is 64!
+
+            double *p_blk = &p[blockIdx.x * blockDim.x * NCONS];
+            double *u_blk = &u[blockIdx.x * blockDim.x * NCONS];
+
+            // ----------------------------------------------------------------
+            // Fetch from global memory to LDS, coalesced.
+            //
+            // For example if there were 4 threads in the thread block:
+            //
+            // p:         [[x x x] [x x x] [x x x] [x x x]]
+            // thread:      0 1 2   3 0 1   2 3 0   1 2 3
+            // ----------------------------------------------------------------
+            for (int q = 0; q < NCONS; ++q)
+            {
+                int n = threadIdx.x + blockDim.x * q;
+                p_lds[n] = p_blk[n];
+            }
+            __syncthreads();
+
+            // ----------------------------------------------------------------
+            // Perform one cons -> prim per thread. It's done in-place.
+            // ----------------------------------------------------------------
+            double *u_lds = p_lds;
+            prim_to_cons(&p_lds[threadIdx.x * NCONS], &u_lds[threadIdx.x * NCONS]);
+            __syncthreads();
+
+            // ----------------------------------------------------------------
+            // Write the result back to global memory, coalesced.
+            // ----------------------------------------------------------------
+            for (int q = 0; q < NCONS; ++q)
+            {
+                int n = threadIdx.x + blockDim.x * q;
+                u_blk[n] = u_lds[n];
+            }
+            #else
+            #error("LDS_MODE must be [0|1]")
+            #endif
         }
+        """
 
-        #elif LDS_MODE == 1
+        nq = self.dim + 2
 
-        // if there are 4 threads in the thread block:
-        // glb = [[x x x] [x x x] [x x x] [x x x]]
-        // thread: 0 1 2   3 0 1   2 3 0   1 2 3
+        if p.shape[-1] != nq or p.shape != u.shape:
+            raise ValueError("array has wrong number of fields")
 
-        // thread 0 loads from 0 -> 0
-        //                     4 -> 4
-        //                     8 -> 8
-        // thread 1 loads from 1 -> 1
-        //                     5 -> 5
-        //                     9 -> 9
-
-        if (blockIdx.x * blockDim.x + threadIdx.x >= ni) {
-            return;
-        }
-
-        __shared__ double p_lds[64 * 3];
-        double *p_blk = &p[blockIdx.x * blockDim.x * 3];
-        double *u_blk = &u[blockIdx.x * blockDim.x * 3];
-
-        for (int q = 0; q < 3; ++q)
-        {
-            p_lds[threadIdx.x + blockDim.x * q] = p_blk[threadIdx.x + blockDim.x * q];
-        }
-        __syncthreads();
-
-        double *u_lds = p_lds;
-        prim_to_cons(&p_lds[threadIdx.x * 3], &u_lds[threadIdx.x * 3]);
-
-        for (int q = 0; q < 3; ++q)
-        {
-            u_blk[threadIdx.x + blockDim.x * q] = u_lds[threadIdx.x + blockDim.x * q];
-        }
-        #else
-        #error("LDS_MODE must be 0 or 1")
-        #endif
-    }
-    """
-    return p.size // 3, (p, u, p.size // 3)
-
-
-@kernel(define_macros=dict(NCONS=3), device_funcs=[prim_to_cons])
-def prim_to_cons_array_no_lds(p: NDArray[float], u: NDArray[float], ni: int = None):
-    R"""
-    KERNEL void prim_to_cons_array_no_lds(double *p, double *u, int ni)
-    {
-        FOR_RANGE_1D(0, ni)
-        {
-            prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
-        }
-    }
-    """
-    return p.size // 3, (p, u, p.size // 3)
+        return p.size // nq, (p, u, p.size // nq)
 
 
 def update_prim(
@@ -619,6 +606,7 @@ def update_prim(
     reconstruction="pcm",
     plm_theta=2.0,
     time_integration="fwd",
+    lds=True,
     exec_mode="cpu",
 ):
     """
@@ -638,12 +626,12 @@ def update_prim(
         raise ValueError(
             f"time_integration must be [fwd|r1k|rk2|rk3], got {time_integration}"
         )
+    prim_to_cons = PrimitiveToConserved.get(dim=1, lds=lds).prim_to_cons_array
 
     if fluxing == "per_face":
         solver = FPFSolvers.get(time_integration, reconstruction)
         update = solver.update_prim
         fluxes = solver.compute_godunov_fluxes
-        prim_to_cons = solver.prim_to_cons_array
         f = xp.empty_like(p)
 
         if time_integration == "fwd":
@@ -661,7 +649,6 @@ def update_prim(
     elif fluxing == "per_zone":
         solver = FPZSolvers.get(time_integration, reconstruction)
         update = solver.update_prim
-        prim_to_cons = solver.prim_to_cons_array
         prd = p
         pwr = p.copy()
 
@@ -679,14 +666,6 @@ def update_prim(
 
         return prd
 
-    elif fluxing == "profile_prim_to_cons":
-        prim_to_cons = prim_to_cons_array_lds
-
-        u = xp.empty_like(p)
-        for i in range(10):
-            prim_to_cons(p, u)
-        return p
-
     else:
         raise ValueError(f"unknown fluxing {fluxing}")
 
@@ -699,6 +678,7 @@ def update_prim2d(
     reconstruction="pcm",
     plm_theta=2.0,
     time_integration="fwd",
+    lds=True,
     exec_mode="cpu",
 ):
     """
@@ -724,7 +704,7 @@ def update_prim2d(
 
     solver = FPZSolvers2D.get(time_integration, reconstruction)
     update = solver.update_prim
-    prim_to_cons = solver.prim_to_cons_array
+    prim_to_cons = PrimitiveToConserved.get(dim=2, lds=lds).prim_to_cons_array
 
     prd = p
     pwr = p.copy()
@@ -855,7 +835,7 @@ class State:
         return self._p.shape[0]
 
 
-def simulation1d(exec_mode, resolution, fluxing, reconstruction, time_integration):
+def simulation1d(exec_mode, lds, resolution, fluxing, reconstruction, time_integration):
     from functools import partial
 
     xp = numpy_or_cupy(exec_mode)
@@ -875,6 +855,7 @@ def simulation1d(exec_mode, resolution, fluxing, reconstruction, time_integratio
         fluxing=fluxing,
         reconstruction=reconstruction,
         time_integration=time_integration,
+        lds=lds,
         exec_mode=exec_mode,
     )
     yield State(n, t, p)
@@ -912,7 +893,7 @@ class State2D:
         return self._p.shape[0] * self._p.shape[1]
 
 
-def simulation2d(exec_mode, resolution, fluxing, reconstruction, time_integration):
+def simulation2d(exec_mode, lds, resolution, fluxing, reconstruction, time_integration):
     from functools import partial
 
     xp = numpy_or_cupy(exec_mode)
@@ -947,6 +928,7 @@ def simulation2d(exec_mode, resolution, fluxing, reconstruction, time_integratio
 def driver(
     app_config,
     exec_mode: str = "cpu",
+    lds: bool = False,
     resolution: int = 10000,
     tfinal: float = 0.1,
     fluxing: str = "per_zone",
@@ -962,6 +944,7 @@ def driver(
     -------------
 
     exec_mode:        execution mode [cpu|gpu]
+    lds:              whether to use LDS fre-fetch where available
     resolution:       number of grid zones
     tfinal:           time to end the simulation
     fluxing:          solver fluxing [per_zone|per_face]
@@ -978,11 +961,13 @@ def driver(
     FPZSolvers.init()
     FPFSolvers.init()
     FPZSolvers2D.init()
+    PrimitiveToConserved.init()
 
     term = terminal(logger)
     simulation = [None, simulation1d, simulation2d][dim]
     sim = simulation(
         exec_mode,
+        lds,
         resolution,
         fluxing,
         reconstruction,
