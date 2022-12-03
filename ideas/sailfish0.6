@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+from functools import partial
 from collections.abc import MutableMapping
 from collections import ChainMap
 from loguru import logger
@@ -39,6 +40,85 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 
 @kernel_class
+class FluxPerZoneTransposedSolver:
+    @property
+    def define_macros(self):
+        return dict(DIM=1)
+
+    @property
+    def device_funcs(self):
+        return [cons_to_prim, riemann_hlle]
+
+    @kernel
+    def update_cons(
+        self,
+        urd: NDArray[float],
+        uwr: NDArray[float],
+        dt: float,
+        dx: float,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void update_cons(double *urd, double *uwr, double dt, double dx, int ni)
+        {
+            #ifdef CPU_MODE
+            #define blockIdx_x 0
+            #define blockDim_x ni
+            #define threadIdx_x i
+            #else
+            #define blockIdx_x blockIdx.x
+            #define blockDim_x blockDim.x
+            #define threadIdx_x threadIdx.x
+            #endif
+
+            FOR_RANGE_1D(1, ni - 1)
+            {
+                double *u_blk[NCONS];
+
+                double p_reg[3][NCONS];
+                double u_reg[3][NCONS];
+                double fp[NCONS];
+                double fm[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_blk[q] = &urd[q * ni + blockIdx_x * blockDim_x];
+                }
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_reg[0][q] = u_blk[q][threadIdx_x - 1];
+                    u_reg[1][q] = u_blk[q][threadIdx_x + 0];
+                    u_reg[2][q] = u_blk[q][threadIdx_x + 1];
+                }
+
+                cons_to_prim(u_reg[0], p_reg[0]);
+                cons_to_prim(u_reg[1], p_reg[1]);
+                cons_to_prim(u_reg[2], p_reg[2]);
+                riemann_hlle(p_reg[0], p_reg[1], fm, 1);
+                riemann_hlle(p_reg[1], p_reg[2], fp, 1);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_reg[1][q] -= (fp[q] - fm[q]) * dt / dx;
+                }
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_blk[q] = &uwr[q * ni + blockIdx_x * blockDim_x];
+                }
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_blk[q][threadIdx_x] = u_reg[1][q];
+                }
+            }
+        }
+        """
+        return urd.shape[1], (urd, uwr, dt, dx, urd.shape[1])
+
+
+@kernel_class
 class PrimitiveToConserved:
     def __init__(self, dim=1, lds=False):
         self.dim = dim
@@ -68,7 +148,25 @@ class PrimitiveToConserved:
 
     @property
     def device_funcs(self):
-        return [prim_to_cons]
+        return [prim_to_cons, cons_to_prim]
+
+    @kernel
+    def cons_to_prim_array(self, u: NDArray[float], p: NDArray[float], ni: int = None):
+        R"""
+        KERNEL void cons_to_prim_array(double *p, double *u, int ni)
+        {
+            FOR_RANGE_1D(0, ni)
+            {
+                cons_to_prim(&u[NCONS * i], &p[NCONS * i]);
+            }
+        }
+        """
+        nq = self.dim + 2
+
+        if u.shape[-1] != nq or u.shape != u.shape:
+            raise ValueError("array has wrong number of fields")
+
+        return u.size // nq, (u, p, u.size // nq)
 
     @kernel
     def prim_to_cons_array(self, p: NDArray[float], u: NDArray[float], ni: int = None):
@@ -743,7 +841,92 @@ class FPZSolvers2D(SolverClass):
         cls.rkn_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=True)
 
 
-def update_prim(
+def patch_spacing(index, nz, np):
+    level, (i, j) = index
+    dx = 1.0 / np / nz / (1 << level)
+    dy = 1.0 / np / nz / (1 << level)
+    return dx, dy
+
+
+def patch_extent(index, nz, np):
+    level, (i, j) = index
+    dx = 1.0 / np / (1 << level)
+    dy = 1.0 / np / (1 << level)
+    x0 = -0.5 + (i + 0) * dx
+    x1 = -0.5 + (i + 1) * dx
+    y0 = -0.5 + (j + 0) * dy
+    y1 = -0.5 + (j + 1) * dy
+    return (x0, x1), (y0, y1)
+
+
+def cell_centers_1d(ni):
+    from numpy import linspace
+
+    xv = linspace(0.0, 1.0, ni + 1)
+    xc = 0.5 * (xv[1:] + xv[:-1])
+    return xc
+
+
+def cell_centers_2d(index, nz, np):
+    (x0, x1), (y0, y1) = patch_extent(index, nz, np)
+    ni = nz
+    nj = nz
+    ddx = (x1 - x0) / ni
+    ddy = (y1 - y0) / nj
+    xv = linspace(x0 - 2 * ddx, x1 + 2 * ddy, ni + 5)
+    yv = linspace(y0 - 2 * ddx, y1 + 2 * ddy, nj + 5)
+    xc = 0.5 * (xv[1:] + xv[:-1])
+    yc = 0.5 * (yv[1:] + yv[:-1])
+    return meshgrid(xc, yc, indexing="ij")
+
+
+def linear_shocktube(x):
+    """
+    A linear shocktube setup
+    """
+
+    from numpy import array, zeros, logical_not
+
+    l = x < 0.5
+    r = logical_not(l)
+    p = zeros(x.shape + (3,))
+    p[l, :] = [1.0, 0.0, 1.000]
+    p[r, :] = [0.1, 0.0, 0.125]
+    return p
+
+
+def cylindrical_shocktube(x, y, radius: float = 0.1, pressure: float = 1.0):
+    """
+    A cylindrical shocktube setup
+
+    ----------
+    radius ........ radius of the high-pressure region
+    pressure ...... gas pressure inside the cylinder
+    """
+    disk = (x**2 + y**2) ** 0.5 < radius
+    fisk = logical_not(disk)
+    p = zeros(disk.shape + (4,))
+
+    p[disk, 0] = 1.000
+    p[fisk, 0] = 0.100
+    p[disk, 3] = pressure
+    p[fisk, 3] = 0.125
+    return p
+
+
+def numpy_or_cupy(exec_mode):
+    if exec_mode == "gpu":
+        import cupy
+
+        return cupy
+
+    if exec_mode == "cpu":
+        import numpy
+
+        return numpy
+
+
+def update_prim1d(
     p,
     dt,
     dx,
@@ -815,6 +998,119 @@ def update_prim(
         raise ValueError(f"unknown fluxing {fluxing}")
 
 
+class State1d:
+    def __init__(self, n, t, p):
+        self._n = n
+        self._t = t
+        self._p = p
+
+    @property
+    def iteration(self):
+        return self._n
+
+    @property
+    def time(self):
+        return self._t
+
+    @property
+    def primitive(self):
+        try:
+            return self._p.get()
+        except AttributeError:
+            return self._p
+
+    @property
+    def total_zones(self):
+        return self._p.shape[0]
+
+
+def simulation1d(exec_mode, lds, resolution, fluxing, reconstruction, time_integration):
+    xp = numpy_or_cupy(exec_mode)
+    nz = resolution
+    dx = 1.0 / nz
+    dt = dx * 1e-1
+    x = cell_centers_1d(nz)
+    p = linear_shocktube(x)
+    t = 0.0
+    n = 0
+    p = xp.array(p)
+
+    advance = partial(
+        update_prim1d,
+        dx=dx,
+        fluxing=fluxing,
+        reconstruction=reconstruction,
+        time_integration=time_integration,
+        lds=lds,
+        exec_mode=exec_mode,
+    )
+    yield State1d(n, t, p)
+
+    while True:
+        p = advance(p, dt)
+        t += dt
+        n += 1
+        yield State1d(n, t, p)
+
+
+class State1dTranspose:
+    def __init__(self, n, t, u, p2c):
+        self._n = n
+        self._t = t
+        self._u = u
+        self._p2c = p2c
+
+    @property
+    def iteration(self):
+        return self._n
+
+    @property
+    def time(self):
+        return self._t
+
+    @property
+    def primitive(self):
+        u = self._u.T.copy()
+        p = u.copy()
+        self._p2c.cons_to_prim_array(u, p)
+        try:
+            return p.get()
+        except AttributeError:
+            return p
+
+    @property
+    def total_zones(self):
+        return self._u.shape[1]
+
+
+def simulation1d_transpose(exec_mode, resolution):
+    xp = numpy_or_cupy(exec_mode)
+    nz = resolution
+    dx = 1.0 / nz
+    dt = dx * 1e-1
+    x = cell_centers_1d(nz)
+    p = linear_shocktube(x)
+    u = xp.zeros_like(p)
+    t = 0.0
+    n = 0
+    p = xp.array(p)
+
+    solver = FluxPerZoneTransposedSolver()
+    p2c = PrimitiveToConserved(dim=1)
+    p2c.prim_to_cons_array(p, u)
+    u1 = xp.ascontiguousarray(u.T)
+    u2 = u1.copy()
+
+    yield State1dTranspose(n, t, u1, p2c)
+
+    while True:
+        solver.update_cons(u1, u2, dt, dx)
+        u1, u2 = u2, u1
+        t += dt
+        n += 1
+        yield State1dTranspose(n, t, u1, p2c)
+
+
 def update_prim2d(
     p,
     dt,
@@ -869,149 +1165,6 @@ def update_prim2d(
     return prd
 
 
-def patch_spacing(index, nz, np):
-    level, (i, j) = index
-    dx = 1.0 / np / nz / (1 << level)
-    dy = 1.0 / np / nz / (1 << level)
-    return dx, dy
-
-
-def patch_extent(index, nz, np):
-    level, (i, j) = index
-    dx = 1.0 / np / (1 << level)
-    dy = 1.0 / np / (1 << level)
-    x0 = -0.5 + (i + 0) * dx
-    x1 = -0.5 + (i + 1) * dx
-    y0 = -0.5 + (j + 0) * dy
-    y1 = -0.5 + (j + 1) * dy
-    return (x0, x1), (y0, y1)
-
-
-def cell_centers_1d(ni):
-    from numpy import linspace
-
-    xv = linspace(0.0, 1.0, ni)
-    xc = 0.5 * (xv[1:] + xv[:-1])
-    return xc
-
-
-def cell_centers_2d(index, nz, np):
-    (x0, x1), (y0, y1) = patch_extent(index, nz, np)
-    ni = nz
-    nj = nz
-    ddx = (x1 - x0) / ni
-    ddy = (y1 - y0) / nj
-    xv = linspace(x0 - 2 * ddx, x1 + 2 * ddy, ni + 5)
-    yv = linspace(y0 - 2 * ddx, y1 + 2 * ddy, nj + 5)
-    xc = 0.5 * (xv[1:] + xv[:-1])
-    yc = 0.5 * (yv[1:] + yv[:-1])
-    return meshgrid(xc, yc, indexing="ij")
-
-
-def linear_shocktube(x):
-    """
-    A linear shocktube setup
-    """
-
-    from numpy import array, zeros, logical_not
-
-    l = x < 0.5
-    r = logical_not(l)
-    p = zeros(x.shape + (3,))
-    p[l, :] = [1.0, 0.0, 1.000]
-    p[r, :] = [0.1, 0.0, 0.125]
-    return p
-
-
-def cylindrical_shocktube(x, y, radius: float = 0.1, pressure: float = 1.0):
-    """
-    A cylindrical shocktube setup
-
-    ----------
-    radius ........ radius of the high-pressure region
-    pressure ...... gas pressure inside the cylinder
-    """
-    disk = (x**2 + y**2) ** 0.5 < radius
-    fisk = logical_not(disk)
-    p = zeros(disk.shape + (4,))
-
-    p[disk, 0] = 1.000
-    p[fisk, 0] = 0.100
-    p[disk, 3] = pressure
-    p[fisk, 3] = 0.125
-    return p
-
-
-def numpy_or_cupy(exec_mode):
-    if exec_mode == "gpu":
-        import cupy
-
-        return cupy
-
-    if exec_mode == "cpu":
-        import numpy
-
-        return numpy
-
-
-class State:
-    def __init__(self, n, t, p):
-        self._n = n
-        self._t = t
-        self._p = p
-
-    @property
-    def iteration(self):
-        return self._n
-
-    @property
-    def time(self):
-        return self._t
-
-    @property
-    def primitive(self):
-        try:
-            return self._p.get()
-        except AttributeError:
-            return self._p
-
-    @property
-    def total_zones(self):
-        return self._p.shape[0]
-
-
-def simulation1d(exec_mode, lds, resolution, fluxing, reconstruction, time_integration):
-    from functools import partial
-
-    xp = numpy_or_cupy(exec_mode)
-    nz = resolution
-    dx = 1.0 / nz
-    dt = dx * 1e-1
-    x = cell_centers_1d(nz)
-    p = linear_shocktube(x)
-    t = 0.0
-    n = 0
-    p = xp.array(p)
-    iteration = 0
-
-    advance = partial(
-        update_prim,
-        dx=dx,
-        fluxing=fluxing,
-        reconstruction=reconstruction,
-        time_integration=time_integration,
-        lds=lds,
-        exec_mode=exec_mode,
-    )
-    yield State(n, t, p)
-
-    while True:
-        p = advance(p, dt)
-        t += dt
-        n += 1
-        yield State(n, t, p)
-
-
 class State2D:
     def __init__(self, n, t, p):
         self._n = n
@@ -1039,8 +1192,6 @@ class State2D:
 
 
 def simulation2d(exec_mode, lds, resolution, fluxing, reconstruction, time_integration):
-    from functools import partial
-
     xp = numpy_or_cupy(exec_mode)
     nz = resolution
     dx = 1.0 / nz
@@ -1050,7 +1201,6 @@ def simulation2d(exec_mode, lds, resolution, fluxing, reconstruction, time_integ
     t = 0.0
     n = 0
     p = xp.array(p)
-    iteration = 0
 
     advance = partial(
         update_prim2d,
@@ -1081,6 +1231,7 @@ def driver(
     plm_theta: float = 1.5,
     time_integration: str = "fwd",
     dim: int = 1,
+    transpose: bool = False,
     fold: int = 100,
     plot: bool = False,
 ):
@@ -1097,6 +1248,7 @@ def driver(
     plm_theta:        PLM parameter [1.0, 2.0]
     time_integration: Runge-Kutta order [fwd|rk1|rk2|rk3]
     dim:              dimensionality of the domain
+    transpose:        whether to use the transpose solver (1d only)
     fold:             number of iterations between iteration message
     plot:             whether to show a plot of the solution
     """
@@ -1109,15 +1261,19 @@ def driver(
     PrimitiveToConserved.init()
 
     term = terminal(logger)
-    simulation = [None, simulation1d, simulation2d][dim]
-    sim = simulation(
-        exec_mode,
-        lds,
-        resolution,
-        fluxing,
-        reconstruction,
-        time_integration,
-    )
+
+    if transpose:
+        sim = simulation1d_transpose(exec_mode, resolution)
+    else:
+        simulation = [None, simulation1d, simulation2d][dim]
+        sim = simulation(
+            exec_mode,
+            lds,
+            resolution,
+            fluxing,
+            reconstruction,
+            time_integration,
+        )
     perf_timer = perf_time_sequence(mode=exec_mode)
     state = next(sim)
     logger.info(f"initialization took {1e3 * next(perf_timer):.3f}ms")
