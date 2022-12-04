@@ -5,7 +5,6 @@ Enables detection and validation of configuration schemas from functions
 
 from functools import wraps
 from inspect import signature, _empty
-from textwrap import dedent
 from sys import stdout
 
 SCHEMAS = list()
@@ -70,7 +69,7 @@ class Schema:
             pass
 
         if not data:
-            raise ValueError(f"no configuration data were found for {name}")
+            raise SchemaError(f"no configuration data were found for {name}")
 
         self.data = data
         self.func = func
@@ -183,6 +182,80 @@ def configurable(func):
     SCHEMAS.append(schema)
 
     return func
+
+
+def autodescribe(cls):
+    from dataclasses import dataclass
+
+    dataclass(cls)
+
+    lines = iter(cls.__doc__.splitlines())
+    name = cls.__name__
+    fields = cls.__dataclass_fields__
+
+    def print_schema(self, log, color=True, newline=False):
+        """
+        Print a formatted table of configuration items to a function
+
+        If `color` is `True` then the output is formatted in color, so the given
+        `log` function should interpret the color directives appropriately.
+        Otherwise, or if `log` is builtin `print`, the color formatting is
+        omitted.
+        """
+        fields = self.__dataclass_fields__
+        key_col = max(max(len(name) for name in fields) + 3, 22)
+        def_col = max(len(str(getattr(self, name))) for name in fields) + 1
+
+        if color and log is not print:
+            log(f"\n[cyan][u]{self.__class__.__name__}[/u][/cyan]\n")
+        else:
+            log(f"\n{self.__class__.__name__}\n")
+
+        for key, field in fields.items():
+            value = getattr(self, key)
+            descr = field.metadata["description"]
+
+            if color and log is not print:
+                msg = (
+                    f"[blue]{key :.<{key_col}}[/blue] "
+                    f"[yellow]{str(value) :<{def_col}}[/yellow] "
+                    f"[green]{descr}[/green]"
+                )
+            else:
+                msg = f"{key :.<{key_col}} {str(value) :<{def_col}} {descr}"
+            log(msg)
+
+        if newline:
+            log("\n")
+
+    cls.print_schema = print_schema
+
+    try:
+        while True:
+            line = next(lines)
+
+            if "Fields" in line:
+                if next(lines).strip() != "------":
+                    raise SchemaError("expect a line of '-' below 'Fields'")
+                if next(lines).strip():
+                    raise SchemaError("expect a blank line below 'Fields'")
+                break
+
+        while True:
+            if not (line := next(lines)).strip():
+                break
+
+            key, description = (x.strip() for x in line.split(":"))
+
+            try:
+                fields[key].metadata = dict(description=description)
+            except KeyError:
+                raise SchemaError(f"no class variable {name}.{key}")
+
+    except (StopIteration):
+        pass
+
+    return cls
 
 
 def all_schemas():

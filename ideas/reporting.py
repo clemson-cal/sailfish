@@ -26,8 +26,8 @@ def configure_logger(logger, log_level="success"):
         "<cyan>{name}</cyan>:<cyan>{function}</cyan>:<cyan>{line}</cyan> - "
         "<level>{message}</level>"
     )
-    logger.remove()
     logger.level("TERM", 0)
+    logger.remove()
     logger.add(
         stdout,
         level=log_level.upper(),
