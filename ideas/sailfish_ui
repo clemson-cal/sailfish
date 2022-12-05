@@ -28,14 +28,14 @@ class Dashboard:
 
     def __init__(self, app: Sailfish):
         progress = Progress()
-        run_task = progress.add_task("running...", total=app.driver.tfinal)
+        duration = app.driver.tfinal - app.driver.tstart
+        run_task = progress.add_task("running...", total=duration)
 
         self.app = app
         self.progress = progress
         self.run_task = run_task
         self.reports = deque()
         self.perf_timer = perf_time_sequence(mode=app.hardware)
-
         self.line = None
 
     def reports_table(self):
@@ -59,9 +59,10 @@ class Dashboard:
 
     def update(self, state):
         fold = self.app.driver.report.cadence
+        evolved_time = state.time - self.app.driver.tstart
 
         if state.iteration % fold == 0:
-            self.progress.update(self.run_task, completed=state.time)
+            self.progress.update(self.run_task, completed=evolved_time)
             zps = state.total_zones / next(self.perf_timer) * fold
             report = iteration_report(state.iteration, state.time, zps)
             self.reports.append(report)
@@ -79,7 +80,7 @@ class Dashboard:
                     x = linspace(0.0, 1.0, p.shape[0])
                     plt.ion()
                     fig, ax = plt.subplots()
-                    ln = self.line = ax.plot(x, p[:, 0], "-o", mfc="none")[0]
+                    ln = self.line = ax.plot(x, p[:, 0], mfc="none")[0]
                 else:
                     if not plt.get_fignums():
                         return  # the figure window was closed
@@ -116,8 +117,21 @@ def main():
     from argparse import ArgumentParser
     from json import load
 
+    def resolution(arg):
+        res = tuple(int(i) for i in arg.split(","))
+
+        if len(res) == 1:
+            return res + (1, 1)
+        if len(res) == 2:
+            return res + (1,)
+        if len(res) == 3:
+            return res
+        raise ValueError(f"invalid argument for resolution {arg}")
+
     parser = ArgumentParser()
-    parser.add_argument("config")
+    parser.add_argument("config", nargs="?")
+    parser.add_argument("-n", "--resolution", type=resolution, default=None)
+    parser.add_argument("-f", "--fold", type=int, default=None)
     args = parser.parse_args()
 
     from loguru import logger
@@ -125,9 +139,18 @@ def main():
 
     configure_logger(logger, "warning")
 
-    with open(args.config) as infile:
-        app = Sailfish(**load(infile))
-        run(app)
+    if args.config:
+        with open(args.config) as infile:
+            app = Sailfish(**load(infile))
+    else:
+        app = Sailfish()
+
+    if args.resolution is not None:
+        app.domain.num_zones = args.resolution
+    if args.fold is not None:
+        app.driver.report.cadence = args.fold
+
+    run(app)
 
 
 if __name__ == "__main__":
