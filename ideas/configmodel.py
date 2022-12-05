@@ -120,8 +120,6 @@ def configmodel_rich_table(d, console, options):
     table.add_column("value", style="green")
     table.add_column("description", style="magenta")
 
-    last_key = list(fields)[-1]
-
     for key, field in fields.items():
         value = getattr(d, key)
         descr = field.metadata.get("description", None)

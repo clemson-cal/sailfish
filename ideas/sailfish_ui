@@ -1,0 +1,129 @@
+#!/usr/bin/env python3
+
+
+from app_config import Sailfish
+from solver import make_solver
+from collections import deque
+from dataclasses import dataclass
+from rich.console import Console
+from rich.live import Live
+from rich.table import Table
+from rich.console import group
+from rich.panel import Panel
+from rich.progress import Progress
+from new_kernels import perf_time_sequence, configure_kernel_module
+
+
+@dataclass
+class iteration_report:
+    iteration: int
+    time: float
+    zones_per_second: float
+
+
+class Dashboard:
+    """
+    A rich-renderable run monitor
+    """
+
+    def __init__(self, app: Sailfish):
+        progress = Progress()
+        run_task = progress.add_task("running...", total=app.driver.tfinal)
+
+        self.run_config = app
+        self.progress = progress
+        self.run_task = run_task
+        self.reports = deque()
+
+    def reports_table(self):
+        table = Table(expand=True)
+        table.add_column("iteration", style="cyan", justify="right")
+        table.add_column("time", style="green")
+        table.add_column("zones per second (millions)", style="magenta", justify="left")
+
+        reports = self.reports
+
+        for report in reports:
+            table.add_row(
+                f"{report.iteration}",
+                f"{report.time:0.5f}",
+                f"{report.zones_per_second/1e6:0.3f}",
+            )
+        table.add_section()
+        avg_zps = sum(r.zones_per_second for r in reports) / max(1, len(reports))
+        table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
+        return table
+
+    def update(self, report: iteration_report):
+        self.progress.update(self.run_task, completed=report.time)
+        self.reports.append(report)
+
+        if len(self.reports) > 20:
+            self.reports.popleft()
+
+    @group()
+    def render(self):
+        yield self.run_config
+        yield self.reports_table()
+        yield Panel(self.progress)
+
+
+def run(app: Sailfish):
+    console = Console(width=100)
+    configure_kernel_module(default_exec_mode=app.hardware)
+
+    solver = make_solver(app)
+    state = next(solver)
+    perf_timer = perf_time_sequence(mode=app.hardware)
+    fold = app.driver.report.cadence
+
+    dashboard = Dashboard(app)
+
+    with Live(dashboard.render(), console=console) as view:
+        while state.time < app.driver.tfinal:
+            state = next(solver)
+
+            if state.iteration % fold == 0:
+                zps = state.total_zones / next(perf_timer) * fold
+                report = iteration_report(state.iteration, state.time, zps)
+
+                dashboard.update(report)
+                view.update(dashboard.render())
+                view.refresh()
+
+    if app.plot:
+        from matplotlib import pyplot as plt
+
+        dim = app.domain.dimensionality
+
+        if dim == 1:
+            plt.plot(state.primitive[:, 0], "-o", mfc="none")
+        if dim == 2:
+            plt.imshow(state.primitive[:, :, 0])
+        plt.show()
+
+
+def main():
+    from argparse import ArgumentParser
+    from json import load
+
+    parser = ArgumentParser()
+    parser.add_argument("config")
+    args = parser.parse_args()
+
+    from loguru import logger
+    from reporting import configure_logger
+
+    configure_logger(logger, "warning")
+
+    with open(args.config) as infile:
+        app = Sailfish(**load(infile))
+        run(app)
+
+
+if __name__ == "__main__":
+    try:
+        main()
+    except KeyboardInterrupt:
+        print()
+        print("ctrl-c interrupt")

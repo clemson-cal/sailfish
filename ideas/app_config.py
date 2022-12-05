@@ -21,11 +21,7 @@ class Diagnostic:
 @configmodel
 class Timeseries:
     cadence: float = 1.0
-    diagnostics: list[Diagnostic] = (
-        Diagnostic("thing1"),
-        Diagnostic("thing2"),
-        Diagnostic("thing3"),
-    )
+    diagnostics: list[Diagnostic] = None
 
 
 @configmodel
@@ -147,21 +143,24 @@ class Strategy:
 
 
 @configmodel
-class Application:
+class Sailfish:
     """
     Fields
     ------
 
-    driver:   runs the simulation main loop, handles IO
-    physics:  the physics equations to be solved
-    domain:   the physical domain of the problem
-    strategy: the solution strategy
+    driver:    runs the simulation main loop, handles IO
+    physics:   the physics equations to be solved
+    domain:    the physical domain of the problem
+    strategy:  the solution strategy
+    hardware:  compute device [cpu|gpu]
     """
 
     driver: Driver = Driver()
     physics: Euler | Isothermal = Euler()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
+    hardware: Literal["cpu"] | Literal["gpu"] = "cpu"
+    plot: bool = False
 
 
 if __name__ == "__main__":
@@ -170,7 +169,7 @@ if __name__ == "__main__":
 
     console = Console()
 
-    app = Application(physics=Isothermal())
+    app = Sailfish(physics=Isothermal())
 
     for field in app.__dataclass_fields__:
         console.print()
