@@ -30,10 +30,13 @@ class Dashboard:
         progress = Progress()
         run_task = progress.add_task("running...", total=app.driver.tfinal)
 
-        self.run_config = app
+        self.app = app
         self.progress = progress
         self.run_task = run_task
         self.reports = deque()
+        self.perf_timer = perf_time_sequence(mode=app.hardware)
+
+        self.line = None
 
     def reports_table(self):
         table = Table(expand=True)
@@ -54,16 +57,42 @@ class Dashboard:
         table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
         return table
 
-    def update(self, report: iteration_report):
-        self.progress.update(self.run_task, completed=report.time)
-        self.reports.append(report)
+    def update(self, state):
+        fold = self.app.driver.report.cadence
 
-        if len(self.reports) > 20:
-            self.reports.popleft()
+        if state.iteration % fold == 0:
+            self.progress.update(self.run_task, completed=state.time)
+            zps = state.total_zones / next(self.perf_timer) * fold
+            report = iteration_report(state.iteration, state.time, zps)
+            self.reports.append(report)
+
+            if len(self.reports) > 20:
+                self.reports.popleft()
+
+            if self.app.plot:
+                from matplotlib import pyplot as plt
+                from numpy import linspace
+
+                p = state.primitive
+
+                if self.line is None:
+                    x = linspace(0.0, 1.0, p.shape[0])
+                    plt.ion()
+                    fig, ax = plt.subplots()
+                    ln = self.line = ax.plot(x, p[:, 0], "-o", mfc="none")[0]
+                else:
+                    if not plt.get_fignums():
+                        return  # the figure window was closed
+
+                    ln = self.line
+                    ln.set_ydata(p[:, 0])
+
+                ln.figure.canvas.draw_idle()
+                ln.figure.canvas.flush_events()
 
     @group()
     def render(self):
-        yield self.run_config
+        yield self.app
         yield self.reports_table()
         yield Panel(self.progress)
 
@@ -73,34 +102,14 @@ def run(app: Sailfish):
     configure_kernel_module(default_exec_mode=app.hardware)
 
     solver = make_solver(app)
-    state = next(solver)
-    perf_timer = perf_time_sequence(mode=app.hardware)
-    fold = app.driver.report.cadence
-
     dashboard = Dashboard(app)
+    state = next(solver)
 
-    with Live(dashboard.render(), console=console) as view:
+    with Live(dashboard.render(), console=console, refresh_per_second=30) as view:
         while state.time < app.driver.tfinal:
             state = next(solver)
-
-            if state.iteration % fold == 0:
-                zps = state.total_zones / next(perf_timer) * fold
-                report = iteration_report(state.iteration, state.time, zps)
-
-                dashboard.update(report)
-                view.update(dashboard.render())
-                view.refresh()
-
-    if app.plot:
-        from matplotlib import pyplot as plt
-
-        dim = app.domain.dimensionality
-
-        if dim == 1:
-            plt.plot(state.primitive[:, 0], "-o", mfc="none")
-        if dim == 2:
-            plt.imshow(state.primitive[:, :, 0])
-        plt.show()
+            dashboard.update(state)
+            view.update(dashboard.render())
 
 
 def main():
