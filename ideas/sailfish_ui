@@ -8,7 +8,7 @@ from dataclasses import dataclass
 from rich.console import Console
 from rich.live import Live
 from rich.table import Table
-from rich.console import group
+from rich.console import Group
 from rich.panel import Panel
 from rich.progress import Progress
 from new_kernels import perf_time_sequence, configure_kernel_module
@@ -19,6 +19,56 @@ class iteration_report:
     iteration: int
     time: float
     zones_per_second: float
+
+
+class Plotting:
+    def __init__(self, app):
+        self._axes = None
+        self._line = None
+        self._live = app.plot == "live"
+
+        if app.plot:
+            from matplotlib import pyplot as plt
+
+            if app.plot == "live":
+                plt.ion()
+            self.plt = plt
+
+    def update(self, state):
+        if not self._live:
+            return
+        elif self._axes is None:
+            self.plot(state)
+        elif self.plt.get_fignums():
+            self.plot(state)
+            self._fig.canvas.flush_events()
+
+    def plot(self, state, action=None):
+        from numpy import linspace
+
+        p = state.primitive
+        x = linspace(0.0, 1.0, p.shape[0])
+        line = self._line
+
+        if line is None:
+            self._line = self.axes().plot(x, p[:, 0], mfc="none")[0]
+        else:
+            line.set_ydata(p[:, 0])
+
+        if action == "show":
+            self.plt.show()
+
+    def axes(self):
+        if self._axes:
+            return self._axes
+        else:
+            from matplotlib import pyplot as plt
+
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
+            self._axes = ax1
+            self._fig = fig
+            return ax1
 
 
 class Dashboard:
@@ -36,7 +86,7 @@ class Dashboard:
         self.run_task = run_task
         self.reports = deque()
         self.perf_timer = perf_time_sequence(mode=app.hardware)
-        self.line = None
+        self.group = Group(app, self.reports_table(), Panel(self.progress))
 
     def reports_table(self):
         table = Table(expand=True)
@@ -61,63 +111,50 @@ class Dashboard:
         fold = self.app.driver.report.cadence
         evolved_time = state.time - self.app.driver.tstart
 
-        if state.iteration % fold == 0:
-            self.progress.update(self.run_task, completed=evolved_time)
-            zps = state.total_zones / next(self.perf_timer) * fold
-            report = iteration_report(state.iteration, state.time, zps)
-            self.reports.append(report)
+        self.progress.update(self.run_task, completed=evolved_time)
+        zps = state.total_zones / next(self.perf_timer) * fold
+        report = iteration_report(state.iteration, state.time, zps)
+        self.reports.append(report)
 
-            if len(self.reports) > 20:
-                self.reports.popleft()
+        if len(self.reports) > 20:
+            self.reports.popleft()
 
-            if self.app.plot:
-                from matplotlib import pyplot as plt
-                from numpy import linspace
+        self.group.renderables[1] = self.reports_table()
 
-                p = state.primitive
-
-                if self.line is None:
-                    x = linspace(0.0, 1.0, p.shape[0])
-                    plt.ion()
-                    fig, ax = plt.subplots()
-                    ln = self.line = ax.plot(x, p[:, 0], mfc="none")[0]
-                else:
-                    if not plt.get_fignums():
-                        return  # the figure window was closed
-
-                    ln = self.line
-                    ln.set_ydata(p[:, 0])
-
-                ln.figure.canvas.draw_idle()
-                ln.figure.canvas.flush_events()
-
-    @group()
     def render(self):
-        yield self.app
-        yield self.reports_table()
-        yield Panel(self.progress)
+        return self.group
 
 
 def run(app: Sailfish):
     console = Console(width=100)
     configure_kernel_module(default_exec_mode=app.hardware)
 
+    dash = Dashboard(app)
+    plot = Plotting(app)
+    fold = app.driver.report.cadence
     solver = make_solver(app)
-    dashboard = Dashboard(app)
     state = next(solver)
 
-    with Live(dashboard.render(), console=console, refresh_per_second=30) as view:
+    with Live(dash.render(), console=console, refresh_per_second=30) as view:
         while state.time < app.driver.tfinal:
             state = next(solver)
-            dashboard.update(state)
-            view.update(dashboard.render())
+            if state.iteration % fold == 0:
+                dash.update(state)
+                plot.update(state)
+
+        if app.plot == "end":
+            plot.plot(state, action="show")
 
 
 def main():
+    from collections.abc import Mapping
+    from dataclasses import asdict
     from argparse import ArgumentParser
     from json import load
+    from loguru import logger
+    from reporting import configure_logger
 
-    def resolution(arg):
+    def num_zones(arg):
         res = tuple(int(i) for i in arg.split(","))
 
         if len(res) == 1:
@@ -126,30 +163,55 @@ def main():
             return res + (1,)
         if len(res) == 3:
             return res
-        raise ValueError(f"invalid argument for resolution {arg}")
+        raise ValueError(f"invalid argument for num_zones {arg}")
+
+    def deep_update(d, u):
+        for k, v in u.items():
+            if isinstance(v, Mapping):
+                d[k] = deep_update(d.get(k, dict()), v)
+            else:
+                d[k] = v
+        return d
 
     parser = ArgumentParser()
-    parser.add_argument("config", nargs="?")
-    parser.add_argument("-n", "--resolution", type=resolution, default=None)
-    parser.add_argument("-f", "--fold", type=int, default=None)
+    parser.add_argument("configs", nargs="*")
+    parser.add_argument(
+        "-n",
+        "--num-zones",
+        "--resolution",
+        type=num_zones,
+        default=None,
+    )
+    parser.add_argument(
+        "-f",
+        "--fold",
+        type=int,
+        default=None,
+    )
+    parser.add_argument(
+        "--plot",
+        nargs="?",
+        default=None,
+        choices=[None, "live", "end"],
+        const="end",
+    )
     args = parser.parse_args()
 
-    from loguru import logger
-    from reporting import configure_logger
-
     configure_logger(logger, "warning")
+    app_dict = asdict(Sailfish())
 
-    if args.config:
-        with open(args.config) as infile:
-            app = Sailfish(**load(infile))
-    else:
-        app = Sailfish()
+    for config in args.configs:
+        with open(config) as infile:
+            deep_update(app_dict, load(infile))
 
-    if args.resolution is not None:
-        app.domain.num_zones = args.resolution
+    if args.num_zones is not None:
+        app_dict["domain"]["num_zones"] = args.num_zones
     if args.fold is not None:
-        app.driver.report.cadence = args.fold
+        app_dict["driver"]["report"]["cadence"] = args.fold
+    if args.plot is not None:
+        app_dict["plot"] = args.plot
 
+    app = Sailfish(**app_dict)
     run(app)
 
 

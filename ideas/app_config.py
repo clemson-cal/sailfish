@@ -160,7 +160,7 @@ class Sailfish:
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
     hardware: Literal["cpu"] | Literal["gpu"] = "cpu"
-    plot: bool = False
+    plot: str = None
 
 
 if __name__ == "__main__":
