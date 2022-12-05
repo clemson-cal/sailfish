@@ -87,6 +87,7 @@ def configmodel_rich_table(d, console, options):
     """
     from rich.table import Table
     from rich.pretty import Pretty
+    from rich.style import Style
 
     def rep(key):
         value = getattr(d, key)
@@ -98,28 +99,37 @@ def configmodel_rich_table(d, console, options):
     fields = d.__dataclass_fields__
     short_descr = d.__configmodel__["short_descr"]
     long_descr = d.__configmodel__["long_descr"]
+    prop_descriptions = d.__configmodel__["prop_descriptions"]
+
+    if prop_descriptions:
+        long_descr = " ".join([long_descr, "*Derived property."])
 
     table = Table(
-        title=f"{d.__class__.__name__}: {short_descr.lower()}",
+        title=f"{d.__class__.__name__}: {short_descr.lower()}"
+        if short_descr
+        else d.__class__.__name__,
         caption=long_descr,
         caption_justify="left",
-        title_justify="center",
+        title_justify="left",
         show_edge=True,
         show_lines=False,
         show_header=False,
+        min_width=80,
     )
-
     table.add_column("property", style="cyan")
-    table.add_column("value", style="green", max_width=64)
+    table.add_column("value", style="green")
     table.add_column("description", style="magenta")
+
+    last_key = list(fields)[-1]
 
     for key, field in fields.items():
         value = getattr(d, key)
-        try:
-            descr = field.metadata["description"]
-            table.add_row(key, rep(key), descr)
-        except KeyError:
-            print(field)
+        descr = field.metadata.get("description", None)
+        table.add_row(key, rep(key), descr)
+
+    for key, descr in prop_descriptions.items():
+        value = getattr(d, key)
+        table.add_row(key, rep(key), descr + "*", style=Style(dim=True))
 
     yield table
 
@@ -127,16 +137,25 @@ def configmodel_rich_table(d, console, options):
 def configmodel(cls):
     from pydantic.dataclasses import dataclass
 
+    if cls.__doc__ is None:
+        cls.__doc__ = " "
     dataclass(cls)
 
     short_descr, long_descr, field_descriptions = parse_docstring(cls)
+    prop_descriptions = {
+        k: v.__doc__.strip() for k, v in vars(cls).items() if type(v) is property
+    }
     fields = cls.__dataclass_fields__
 
     for key, description in field_descriptions.items():
         fields[key].metadata = dict(description=description)
 
     cls.__rich_console__ = configmodel_rich_table
-    cls.__configmodel__ = dict(short_descr=short_descr, long_descr=long_descr)
+    cls.__configmodel__ = dict(
+        short_descr=short_descr,
+        long_descr=long_descr,
+        prop_descriptions=prop_descriptions,
+    )
     return cls
 
 
