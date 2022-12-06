@@ -56,6 +56,20 @@ class PrimitiveToConserved:
     def device_funcs(self):
         return [prim_to_cons, cons_to_prim]
 
+    @property
+    def static(self):
+        return R"""
+        #if defined(CPU_MODE)
+        #define blockIdx_x 0
+        #define blockDim_x ni
+        #define threadIdx_x i
+        #elif defined(GPU_MODE)
+        #define blockIdx_x (int)blockIdx.x
+        #define blockDim_x (int)blockDim.x
+        #define threadIdx_x (int)threadIdx.x
+        #endif
+        """
+
     @kernel
     def cons_to_prim_fields_last(
         self,
@@ -112,16 +126,6 @@ class PrimitiveToConserved:
         R"""
         KERNEL void cons_to_prim_fields_first(double *u, double *p, int ni)
         {
-            #if defined(CPU_MODE)
-            #define blockIdx_x 0
-            #define blockDim_x ni
-            #define threadIdx_x i
-            #elif defined(GPU_MODE)
-            #define blockIdx_x (int)blockIdx.x
-            #define blockDim_x (int)blockDim.x
-            #define threadIdx_x (int)threadIdx.x
-            #endif
-
             FOR_EACH_1D(ni)
             {
                 double *u_blk[NCONS];
@@ -161,16 +165,6 @@ class PrimitiveToConserved:
         R"""
         KERNEL void prim_to_cons_fields_first(double *p, double *u, int ni)
         {
-            #if defined(CPU_MODE)
-            #define blockIdx_x 0
-            #define blockDim_x ni
-            #define threadIdx_x i
-            #elif defined(GPU_MODE)
-            #define blockIdx_x blockIdx.x
-            #define blockDim_x blockDim.x
-            #define threadIdx_x threadIdx.x
-            #endif
-
             FOR_EACH_1D(ni)
             {
                 double *u_blk[NCONS];
@@ -203,13 +197,52 @@ class PrimitiveToConserved:
 
 @kernel_class
 class FluxPerZoneSolver:
+    def __init__(self, reconstruction):
+        define_macros = dict()
+        device_funcs = [
+            cons_to_prim,
+            riemann_hlle,
+            self._update_cons,
+            self._godunov_fluxes,
+        ]
+
+        if type(reconstruction) is str:
+            mode = reconstruction
+            define_macros["FLUX_STENCIL_SIZE"] = 2
+            self._plm_theta = 0.0  # unused
+            assert mode == "pcm"
+
+        if type(reconstruction) is tuple:
+            mode, plm_theta = reconstruction
+            self._plm_theta = plm_theta
+            define_macros["FLUX_STENCIL_SIZE"] = 4
+            device_funcs.insert(0, plm_minmod)
+            assert mode == "plm"
+
+        self._define_macros = define_macros
+        self._device_funcs = device_funcs
+
     @property
     def define_macros(self):
-        return dict(DIM=1)
+        return self._define_macros
 
     @property
     def device_funcs(self):
-        return [cons_to_prim, riemann_hlle, self._update_cons]
+        return self._device_funcs
+
+    @property
+    def static(self):
+        return R"""
+        #ifdef CPU_MODE
+        #define blockIdx_x 0
+        #define blockDim_x ni
+        #define threadIdx_x i
+        #else
+        #define blockIdx_x (int)blockIdx.x
+        #define blockDim_x (int)blockDim.x
+        #define threadIdx_x (int)threadIdx.x
+        #endif
+        """
 
     @device
     def _update_cons(self):
@@ -278,16 +311,6 @@ class FluxPerZoneSolver:
         R"""
         KERNEL void update_cons_fields_first(double *urd, double *uwr, double dt, double dx, int ni)
         {
-            #ifdef CPU_MODE
-            #define blockIdx_x 0
-            #define blockDim_x ni
-            #define threadIdx_x i
-            #else
-            #define blockIdx_x (int)blockIdx.x
-            #define blockDim_x (int)blockDim.x
-            #define threadIdx_x (int)threadIdx.x
-            #endif
-
             FOR_RANGE_1D(1, ni - 1)
             {
                 double u[3][NCONS];
@@ -310,6 +333,99 @@ class FluxPerZoneSolver:
         }
         """
         return urd.shape[1], (urd, uwr, dt, dx, urd.shape[1])
+
+    @device
+    def _godunov_fluxes(self):
+        R"""
+        DEVICE void _godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
+        {
+            double pm[NCONS];
+            double pp[NCONS];
+
+            #if FLUX_STENCIL_SIZE == 2
+
+            double *pc = p[0];
+            double *pr = p[1];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pm[q] = pc[q];
+                pp[q] = pr[q];
+            }
+            #elif FLUX_STENCIL_SIZE == 4
+
+            double *pl = p[0];
+            double *pc = p[1];
+            double *pr = p[2];
+            double *ps = p[3];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+            }
+            #endif
+            riemann_hlle(pm, pp, fh, 1);
+        }
+        """
+
+    @kernel
+    def godunov_fluxes_fields_last(
+        self,
+        urd: NDArray[float],
+        fwr: NDArray[float],
+        plm_theta: float = None,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void godunov_fluxes_fields_last(double *urd, double *fwr, double plm_theta, int ni)
+        {
+            FOR_RANGE_1D(1, ni - 2)
+            {
+                double u[FLUX_STENCIL_SIZE][NCONS];
+                double p[FLUX_STENCIL_SIZE][NCONS];
+                double f[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    #if FLUX_STENCIL_SIZE == 2
+                    u[0][q] = urd[(i + 0) * NCONS + q];
+                    u[1][q] = urd[(i + 1) * NCONS + q];
+                    #elif FLUX_STENCIL_SIZE == 4
+                    u[0][q] = urd[(i - 1) * NCONS + q];
+                    u[1][q] = urd[(i + 0) * NCONS + q];
+                    u[2][q] = urd[(i + 1) * NCONS + q];
+                    u[3][q] = urd[(i + 2) * NCONS + q];
+                    #else
+                    #error("FLUX_STENCIL_SIZE must be 2 or 4")
+                    #endif
+                }
+                for (int i = 0; i < FLUX_STENCIL_SIZE; ++i)
+                {
+                    cons_to_prim(u[i], p[i]);
+                }
+                _godunov_fluxes(p, f, plm_theta);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    fwr[i * NCONS + q] = f[q];
+                }
+            }
+        }
+        """
+        if plm_theta is None:
+            plm_theta = self._plm_theta
+        return urd.shape[0], (urd, fwr, plm_theta, urd.shape[0])
+
+
+def update_cons_from_fluxes(u, f, dt, dx, xp):
+    u[2:-2] -= xp.diff(f[1:-2], axis=0) * (dt / dx)
+
+
+def average_rk(u0, u1, rk):
+    if rk != 0.0:
+        u1 *= 1.0 - rk
+        u1 += u0 * rk
 
 
 class State:
@@ -348,30 +464,38 @@ class State:
             return self._u.shape[0]
 
 
-def simulation(
+def linear_shocktube(x):
+    """
+    A linear shocktube setup
+    """
+
+    l = x < 0.5
+    r = logical_not(l)
+    p = zeros(x.shape + (3,))
+    p[l, :] = [1.0, 0.0, 1.000]
+    p[r, :] = [0.1, 0.0, 0.125]
+    return p
+
+
+def cell_centers_1d(ni):
+    from numpy import linspace
+
+    xv = linspace(0.0, 1.0, ni + 1)
+    xc = 0.5 * (xv[1:] + xv[:-1])
+    return xc
+
+
+def solver(
     hardware: str,
     resolution: int,
-    data_layout="fields-last",
-    time_integration="fwd",
+    data_layout: str,
+    fluxing: str,
+    reconstruction: str,
+    time_integration: str,
 ) -> State:
-    def linear_shocktube(x):
-        """
-        A linear shocktube setup
-        """
-
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l, :] = [1.0, 0.0, 1.000]
-        p[r, :] = [0.1, 0.0, 0.125]
-        return p
-
-    def cell_centers_1d(ni):
-        from numpy import linspace
-
-        xv = linspace(0.0, 1.0, ni + 1)
-        xc = 0.5 * (xv[1:] + xv[:-1])
-        return xc
+    """
+    Solver for the 1d euler equations in many configurations
+    """
 
     xp = numpy_or_cupy(hardware)
     nz = resolution
@@ -383,19 +507,21 @@ def simulation(
     n = 0
     p = xp.array(p)
 
-    solver = FluxPerZoneSolver()
+    solver = FluxPerZoneSolver(reconstruction)
     p2c = PrimitiveToConserved(dim=1)
 
     if data_layout == "fields-last":
         prim_to_cons = p2c.prim_to_cons_fields_last
         cons_to_prim = p2c.cons_to_prim_fields_last
         update_cons = solver.update_cons_fields_last
+        godunov_fluxes = solver.godunov_fluxes_fields_last
         transpose = False
 
     if data_layout == "fields-first":
         prim_to_cons = p2c.prim_to_cons_fields_first
         cons_to_prim = p2c.cons_to_prim_fields_first
         update_cons = solver.update_cons_fields_first
+        godunov_fluxes = solver.godunov_fluxes_fields_first
         transpose = True
         p = xp.ascontiguousarray(p.T)
 
@@ -403,6 +529,9 @@ def simulation(
     u2 = xp.zeros_like(p)
     prim_to_cons(p, u1)
     prim_to_cons(p, u2)
+
+    if fluxing == "per-face":
+        fhat = xp.zeros_like(p)
 
     if time_integration == "fwd":
         rks = []
@@ -416,26 +545,39 @@ def simulation(
     yield State(n, t, u1, cons_to_prim, transpose=transpose)
 
     while True:
-        if not rks:
-            update_cons(u1, u2, dt, dx)
-            u1, u2 = u2, u1
-        else:
-            u0 = u1.copy()
-            for rk in rks:
+        if fluxing == "per-zone":
+            if not rks:
                 update_cons(u1, u2, dt, dx)
-                if rk == 0.0:
+                u1, u2 = u2, u1
+            else:
+                u0 = u1.copy()
+                for rk in rks:
+                    update_cons(u1, u2, dt, dx)
                     u1, u2 = u2, u1
-                else:
-                    u1 = u2 * (1.0 - rk) + u0 * rk
+                    average_rk(u0, u1, rk)
+
+        if fluxing == "per-face":
+            if not rks:
+                godunov_fluxes(u1, fhat)
+                update_cons_from_fluxes(u1, fhat, dt, dx, xp)
+            else:
+                u0 = u1.copy()
+                for rk in rks:
+                    godunov_fluxes(u1, fhat)
+                    update_cons_from_fluxes(u1, fhat, dt, dx, xp)
+                    average_rk(u0, u1, rk)
+
         t += dt
         n += 1
         yield State(n, t, u1, cons_to_prim, transpose=transpose)
 
 
 def make_solver(app: Sailfish):
-    return simulation(
+    return solver(
         app.hardware,
         app.domain.num_zones[0],
         data_layout=app.strategy.data_layout,
+        fluxing=app.strategy.fluxing,
+        reconstruction=app.scheme.reconstruction,
         time_integration=app.scheme.time_integration,
     )

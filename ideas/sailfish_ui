@@ -188,6 +188,14 @@ def num_zones(arg):
     raise ValueError(f"invalid argument for num_zones {arg}")
 
 
+def reconstruction(arg):
+    try:
+        mode, theta = arg.split(":")
+        return mode, float(theta)
+    except:
+        return arg
+
+
 def deep_update(d, u):
     """
     Update a dictionary and any nested dictionaries recursively
@@ -250,6 +258,14 @@ def main():
         choices=Scheme.type_args("time_integration"),
         help=Scheme.describe("time_integration"),
         dest="scheme.time_integration",
+    )
+    parser.add_argument(
+        "-r",
+        "--reconstruction",
+        type=reconstruction,
+        help=Scheme.describe("reconstruction"),
+        dest="scheme.reconstruction",
+        metavar="R",
     )
     parser.add_argument(
         "-e",
