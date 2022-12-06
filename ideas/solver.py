@@ -290,22 +290,21 @@ class FluxPerZoneSolver:
 
             FOR_RANGE_1D(1, ni - 1)
             {
-                double *u_blk[NCONS];
                 double u[3][NCONS];
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    u_blk[q] = &urd[q * ni + blockIdx_x * blockDim_x];
-                    u[0][q] = u_blk[q][threadIdx_x - 1];
-                    u[1][q] = u_blk[q][threadIdx_x + 0];
-                    u[2][q] = u_blk[q][threadIdx_x + 1];
+                    double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
+                    u[0][q] = u_blk[threadIdx_x - 1];
+                    u[1][q] = u_blk[threadIdx_x + 0];
+                    u[2][q] = u_blk[threadIdx_x + 1];
                 }
                 _update_cons(u, dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    u_blk[q] = &uwr[q * ni + blockIdx_x * blockDim_x];
-                    u_blk[q][threadIdx_x] = u[1][q];
+                    double *u_blk = &uwr[q * ni + blockIdx_x * blockDim_x];
+                    u_blk[threadIdx_x] = u[1][q];
                 }
             }
         }
@@ -353,6 +352,7 @@ def simulation(
     hardware: str,
     resolution: int,
     data_layout="fields-last",
+    time_integration="fwd",
 ) -> State:
     def linear_shocktube(x):
         """
@@ -404,11 +404,29 @@ def simulation(
     prim_to_cons(p, u1)
     prim_to_cons(p, u2)
 
+    if time_integration == "fwd":
+        rks = []
+    elif time_integration == "rk1":
+        rks = [0.0]
+    elif time_integration == "rk2":
+        rks = [0.0, 0.5]
+    elif time_integration == "rk3":
+        rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
+
     yield State(n, t, u1, cons_to_prim, transpose=transpose)
 
     while True:
-        update_cons(u1, u2, dt, dx)
-        u1, u2 = u2, u1
+        if not rks:
+            update_cons(u1, u2, dt, dx)
+            u1, u2 = u2, u1
+        else:
+            u0 = u1.copy()
+            for rk in rks:
+                update_cons(u1, u2, dt, dx)
+                if rk == 0.0:
+                    u1, u2 = u2, u1
+                else:
+                    u1 = u2 * (1.0 - rk) + u0 * rk
         t += dt
         n += 1
         yield State(n, t, u1, cons_to_prim, transpose=transpose)
@@ -419,4 +437,5 @@ def make_solver(app: Sailfish):
         app.hardware,
         app.domain.num_zones[0],
         data_layout=app.strategy.data_layout,
+        time_integration=app.scheme.time_integration,
     )

@@ -10,7 +10,6 @@ from logging import getLogger
 
 from rich import box
 from rich.console import Console
-from rich.console import Console
 from rich.console import Group
 from rich.live import Live
 from rich.logging import RichHandler
@@ -20,7 +19,7 @@ from rich.progress import Progress
 from rich.syntax import Syntax
 from rich.table import Table
 
-from app_config import Sailfish, Driver, Report, Strategy
+from app_config import Sailfish, Driver, Report, Strategy, Scheme
 from new_kernels import perf_time_sequence, configure_kernel_module
 from solver import make_solver
 
@@ -108,7 +107,6 @@ class Dashboard:
         table.add_column("iteration", style="cyan", justify="right")
         table.add_column("time", style="green")
         table.add_column("zones per second (millions)", style="magenta", justify="left")
-
         reports = self.reports
 
         for report in reports:
@@ -117,10 +115,6 @@ class Dashboard:
                 f"{report.time:0.5f}",
                 f"{report.zones_per_second/1e6:0.3f}",
             )
-
-        # while len(table.rows) < 20:
-        #     table.add_row(None, None, None)
-
         table.add_section()
         avg_zps = sum(r.zones_per_second for r in reports) / max(1, len(reports))
         table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
@@ -249,6 +243,13 @@ def main():
         type=num_zones,
         dest="domain.num_zones",
         metavar="N",
+    )
+    parser.add_argument(
+        "-m",
+        "--time-integration",
+        choices=Scheme.type_args("time_integration"),
+        help=Scheme.describe("time_integration"),
+        dest="scheme.time_integration",
     )
     parser.add_argument(
         "-e",

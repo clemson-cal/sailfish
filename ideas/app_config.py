@@ -124,12 +124,12 @@ class Scheme:
     Fields
     ------
 
-    space: spatial reconstruction method
-    time:  time-integration scheme (fwd|rk1|rk2|rk3)
+    reconstruction:    spatial reconstruction method
+    time_integration:  time-integration scheme (fwd|rk1|rk2|rk3)
     """
 
-    space: Reconstruction = "pcm"
-    time: TimeIntegration = "rk2"
+    reconstruction: Reconstruction = "pcm"
+    time_integration: TimeIntegration = "rk2"
 
 
 @configmodel
@@ -169,8 +169,9 @@ class Sailfish:
     physics: Union[Euler, Isothermal] = Euler()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
+    scheme: Scheme = Scheme()
     hardware: Literal["cpu", "gpu"] = "cpu"
-    show_config: Literal["table", "pretty", "json", "dict"] = "table"
+    show_config: Literal["pretty", "table", "json", "dict"] = "pretty"
     plot: Literal["live", "end"] = None
 
 
