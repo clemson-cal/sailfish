@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 
 
-from argparse import ArgumentParser
+from argparse import ArgumentParser, SUPPRESS
 from collections import deque
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
@@ -20,7 +20,7 @@ from rich.progress import Progress
 from rich.syntax import Syntax
 from rich.table import Table
 
-from app_config import Sailfish, Driver, Report
+from app_config import Sailfish, Driver, Report, Strategy
 from new_kernels import perf_time_sequence, configure_kernel_module
 from solver import make_solver
 
@@ -223,7 +223,11 @@ def unflatten(d):
 
 
 def main():
-    parser = ArgumentParser()
+    parser = ArgumentParser(
+        prog="sailfish_ui",
+        usage=SUPPRESS,
+        description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
+    )
     parser.add_argument("configs", nargs="*")
     parser.add_argument(
         "--log-level",
@@ -244,7 +248,7 @@ def main():
         "--resolution",
         type=num_zones,
         dest="domain.num_zones",
-        metavar="",
+        metavar="N",
     )
     parser.add_argument(
         "-e",
@@ -252,7 +256,7 @@ def main():
         type=float,
         help=Driver.describe("tfinal"),
         dest="driver.tfinal",
-        metavar="",
+        metavar="T",
     )
     parser.add_argument(
         "-f",
@@ -261,7 +265,14 @@ def main():
         type=int,
         help=Report.describe("cadence"),
         dest="driver.report.cadence",
-        metavar="",
+        metavar="F",
+    )
+    parser.add_argument(
+        "--data-layout",
+        type=str,
+        choices=Strategy.type_args("data_layout"),
+        help=Strategy.describe("data_layout"),
+        dest="strategy.data_layout",
     )
     parser.add_argument(
         "--plot",

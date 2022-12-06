@@ -140,9 +140,16 @@ class Strategy:
     With everything else held fixed, differences in the solver strategy should
     only affect how fast the code runs, and not the numerical solution it
     generates.
+
+    Fields
+    ------
+
+    fluxing: one Riemann problem per-face, versus redundant solves (per-zone)
+    data_layout: fields are contiguous (fields-last) or disjoint (fields-first)
     """
 
     fluxing: Literal["per-zone", "per-face"] = "per-zone"
+    data_layout: Literal["fields-first", "fields-last"] = "fields-last"
 
 
 @configmodel

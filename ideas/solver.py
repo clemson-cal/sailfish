@@ -202,17 +202,39 @@ class PrimitiveToConserved:
 
 
 @kernel_class
-class FluxPerZoneTransposedSolver:
+class FluxPerZoneSolver:
     @property
     def define_macros(self):
         return dict(DIM=1)
 
     @property
     def device_funcs(self):
-        return [cons_to_prim, riemann_hlle]
+        return [cons_to_prim, riemann_hlle, self._update_cons]
+
+    @device
+    def _update_cons(self):
+        R"""
+        DEVICE void _update_cons(double u[3][NCONS], double dt, double dx)
+        {
+            double p[3][NCONS];
+            double fp[NCONS];
+            double fm[NCONS];
+
+            cons_to_prim(u[0], p[0]);
+            cons_to_prim(u[1], p[1]);
+            cons_to_prim(u[2], p[2]);
+            riemann_hlle(p[0], p[1], fm, 1);
+            riemann_hlle(p[1], p[2], fp, 1);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                u[1][q] -= (fp[q] - fm[q]) * dt / dx;
+            }
+        }
+        """
 
     @kernel
-    def update_cons(
+    def update_cons_fields_last(
         self,
         urd: NDArray[float],
         uwr: NDArray[float],
@@ -221,7 +243,40 @@ class FluxPerZoneTransposedSolver:
         ni: int = None,
     ):
         R"""
-        KERNEL void update_cons(double *urd, double *uwr, double dt, double dx, int ni)
+        KERNEL void update_cons_fields_last(double *urd, double *uwr, double dt, double dx, int ni)
+        {
+            FOR_RANGE_1D(1, ni - 1)
+            {
+                double u[3][NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u[0][q] = urd[(i - 1) * NCONS + q];
+                    u[1][q] = urd[(i + 0) * NCONS + q];
+                    u[2][q] = urd[(i + 1) * NCONS + q];
+                }
+                _update_cons(u, dt, dx);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    uwr[i * NCONS + q] = u[1][q];
+                }
+            }
+        }
+        """
+        return urd.shape[0], (urd, uwr, dt, dx, urd.shape[0])
+
+    @kernel
+    def update_cons_fields_first(
+        self,
+        urd: NDArray[float],
+        uwr: NDArray[float],
+        dt: float,
+        dx: float,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void update_cons_fields_first(double *urd, double *uwr, double dt, double dx, int ni)
         {
             #ifdef CPU_MODE
             #define blockIdx_x 0
@@ -236,43 +291,21 @@ class FluxPerZoneTransposedSolver:
             FOR_RANGE_1D(1, ni - 1)
             {
                 double *u_blk[NCONS];
-
-                double p_reg[3][NCONS];
-                double u_reg[3][NCONS];
-                double fp[NCONS];
-                double fm[NCONS];
+                double u[3][NCONS];
 
                 for (int q = 0; q < NCONS; ++q)
                 {
                     u_blk[q] = &urd[q * ni + blockIdx_x * blockDim_x];
+                    u[0][q] = u_blk[q][threadIdx_x - 1];
+                    u[1][q] = u_blk[q][threadIdx_x + 0];
+                    u[2][q] = u_blk[q][threadIdx_x + 1];
                 }
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_reg[0][q] = u_blk[q][threadIdx_x - 1];
-                    u_reg[1][q] = u_blk[q][threadIdx_x + 0];
-                    u_reg[2][q] = u_blk[q][threadIdx_x + 1];
-                }
-
-                cons_to_prim(u_reg[0], p_reg[0]);
-                cons_to_prim(u_reg[1], p_reg[1]);
-                cons_to_prim(u_reg[2], p_reg[2]);
-                riemann_hlle(p_reg[0], p_reg[1], fm, 1);
-                riemann_hlle(p_reg[1], p_reg[2], fp, 1);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_reg[1][q] -= (fp[q] - fm[q]) * dt / dx;
-                }
+                _update_cons(u, dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
                     u_blk[q] = &uwr[q * ni + blockIdx_x * blockDim_x];
-                }
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_blk[q][threadIdx_x] = u_reg[1][q];
+                    u_blk[q][threadIdx_x] = u[1][q];
                 }
             }
         }
@@ -281,11 +314,12 @@ class FluxPerZoneTransposedSolver:
 
 
 class State:
-    def __init__(self, n, t, u, p2c):
+    def __init__(self, n, t, u, cons_to_prim, transpose):
         self._n = n
         self._t = t
         self._u = u
-        self._p2c = p2c
+        self._cons_to_prim = cons_to_prim
+        self._transpose = transpose
 
     @property
     def iteration(self):
@@ -299,18 +333,27 @@ class State:
     def primitive(self):
         u = self._u
         p = u.copy()
-        self._p2c.cons_to_prim_fields_first(u, p)
+        self._cons_to_prim(u, p)
+        if self._transpose:
+            p = p.T
         try:
-            return p.T.get()
+            return p.get()
         except AttributeError:
-            return p.T
+            return p
 
     @property
     def total_zones(self):
-        return self._u.shape[1]
+        if self._transpose:
+            return self._u.shape[1]
+        else:
+            return self._u.shape[0]
 
 
-def simulation(hardware: str, resolution: int) -> State:
+def simulation(
+    hardware: str,
+    resolution: int,
+    data_layout="fields-last",
+) -> State:
     def linear_shocktube(x):
         """
         A linear shocktube setup
@@ -336,26 +379,44 @@ def simulation(hardware: str, resolution: int) -> State:
     dt = dx * 1e-1
     x = cell_centers_1d(nz)
     p = linear_shocktube(x)
-    u = xp.zeros_like(p)
     t = 0.0
     n = 0
     p = xp.array(p)
 
-    solver = FluxPerZoneTransposedSolver()
+    solver = FluxPerZoneSolver()
     p2c = PrimitiveToConserved(dim=1)
-    p2c.prim_to_cons_fields_last(p, u)
-    u1 = xp.ascontiguousarray(u.T)
-    u2 = u1.copy()
 
-    yield State(n, t, u1, p2c)
+    if data_layout == "fields-last":
+        prim_to_cons = p2c.prim_to_cons_fields_last
+        cons_to_prim = p2c.cons_to_prim_fields_last
+        update_cons = solver.update_cons_fields_last
+        transpose = False
+
+    if data_layout == "fields-first":
+        prim_to_cons = p2c.prim_to_cons_fields_first
+        cons_to_prim = p2c.cons_to_prim_fields_first
+        update_cons = solver.update_cons_fields_first
+        transpose = True
+        p = xp.ascontiguousarray(p.T)
+
+    u1 = xp.zeros_like(p)
+    u2 = xp.zeros_like(p)
+    prim_to_cons(p, u1)
+    prim_to_cons(p, u2)
+
+    yield State(n, t, u1, cons_to_prim, transpose=transpose)
 
     while True:
-        solver.update_cons(u1, u2, dt, dx)
+        update_cons(u1, u2, dt, dx)
         u1, u2 = u2, u1
         t += dt
         n += 1
-        yield State(n, t, u1, p2c)
+        yield State(n, t, u1, cons_to_prim, transpose=transpose)
 
 
 def make_solver(app: Sailfish):
-    return simulation(app.hardware, app.domain.num_zones[0])
+    return simulation(
+        app.hardware,
+        app.domain.num_zones[0],
+        data_layout=app.strategy.data_layout,
+    )
