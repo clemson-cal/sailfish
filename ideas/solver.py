@@ -117,9 +117,9 @@ class PrimitiveToConserved:
             #define blockDim_x ni
             #define threadIdx_x i
             #elif defined(GPU_MODE)
-            #define blockIdx_x blockIdx.x
-            #define blockDim_x blockDim.x
-            #define threadIdx_x threadIdx.x
+            #define blockIdx_x (int)blockIdx.x
+            #define blockDim_x (int)blockDim.x
+            #define threadIdx_x (int)threadIdx.x
             #endif
 
             FOR_EACH_1D(ni)
@@ -228,9 +228,9 @@ class FluxPerZoneTransposedSolver:
             #define blockDim_x ni
             #define threadIdx_x i
             #else
-            #define blockIdx_x blockIdx.x
-            #define blockDim_x blockDim.x
-            #define threadIdx_x threadIdx.x
+            #define blockIdx_x (int)blockIdx.x
+            #define blockDim_x (int)blockDim.x
+            #define threadIdx_x (int)threadIdx.x
             #endif
 
             FOR_RANGE_1D(1, ni - 1)
