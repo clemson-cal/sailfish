@@ -417,9 +417,62 @@ class FluxPerZoneSolver:
             plm_theta = self._plm_theta
         return urd.shape[0], (urd, fwr, plm_theta, urd.shape[0])
 
+    @kernel
+    def godunov_fluxes_fields_first(
+        self,
+        urd: NDArray[float],
+        fwr: NDArray[float],
+        plm_theta: float = None,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void godunov_fluxes_fields_first(double *urd, double *fwr, double plm_theta, int ni)
+        {
+            FOR_RANGE_1D(1, ni - 2)
+            {
+                double u[FLUX_STENCIL_SIZE][NCONS];
+                double p[FLUX_STENCIL_SIZE][NCONS];
+                double f[NCONS];
 
-def update_cons_from_fluxes(u, f, dt, dx, xp):
-    u[2:-2] -= xp.diff(f[1:-2], axis=0) * (dt / dx)
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
+                    #if FLUX_STENCIL_SIZE == 2
+                    u[0][q] = u_blk[threadIdx_x + 0];
+                    u[1][q] = u_blk[threadIdx_x + 1];
+                    #elif FLUX_STENCIL_SIZE == 4
+                    u[0][q] = u_blk[threadIdx_x - 1];
+                    u[1][q] = u_blk[threadIdx_x + 0];
+                    u[2][q] = u_blk[threadIdx_x + 1];
+                    u[3][q] = u_blk[threadIdx_x + 2];
+                    #else
+                    #error("FLUX_STENCIL_SIZE must be 2 or 4")
+                    #endif
+                }
+                for (int i = 0; i < FLUX_STENCIL_SIZE; ++i)
+                {
+                    cons_to_prim(u[i], p[i]);
+                }
+                _godunov_fluxes(p, f, plm_theta);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    double *f_blk = &fwr[q * ni + blockIdx_x * blockDim_x];
+                    f_blk[threadIdx_x] = f[q];
+                }
+            }
+        }
+        """
+        if plm_theta is None:
+            plm_theta = self._plm_theta
+        return urd.shape[1], (urd, fwr, plm_theta, urd.shape[1])
+
+
+def update_cons_from_fluxes(u, f, dt, dx, transpose, xp):
+    if not transpose:
+        u[2:-2, :] -= xp.diff(f[1:-2, :], axis=0) * (dt / dx)
+    else:
+        u[:, 2:-2] -= xp.diff(f[:, 1:-2], axis=1) * (dt / dx)
 
 
 def average_rk(u0, u1, rk):
@@ -525,13 +578,16 @@ def solver(
         transpose = True
         p = xp.ascontiguousarray(p.T)
 
-    u1 = xp.zeros_like(p)
-    u2 = xp.zeros_like(p)
-    prim_to_cons(p, u1)
-    prim_to_cons(p, u2)
+    if fluxing == "per-zone":
+        u1 = xp.zeros_like(p)
+        u2 = xp.zeros_like(p)
+        prim_to_cons(p, u1)
+        prim_to_cons(p, u2)
 
     if fluxing == "per-face":
         fhat = xp.zeros_like(p)
+        u1 = xp.zeros_like(p)
+        prim_to_cons(p, u1)
 
     if time_integration == "fwd":
         rks = []
@@ -559,12 +615,12 @@ def solver(
         if fluxing == "per-face":
             if not rks:
                 godunov_fluxes(u1, fhat)
-                update_cons_from_fluxes(u1, fhat, dt, dx, xp)
+                update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
             else:
                 u0 = u1.copy()
                 for rk in rks:
                     godunov_fluxes(u1, fhat)
-                    update_cons_from_fluxes(u1, fhat, dt, dx, xp)
+                    update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
                     average_rk(u0, u1, rk)
 
         t += dt

@@ -18,6 +18,7 @@ from rich.pretty import Pretty
 from rich.progress import Progress
 from rich.syntax import Syntax
 from rich.table import Table
+from rich.traceback import install
 
 from app_config import Sailfish, Driver, Report, Strategy, Scheme
 from new_kernels import perf_time_sequence, configure_kernel_module
@@ -238,6 +239,10 @@ def main():
         help="log messages at and above this severity level",
     )
     parser.add_argument(
+        "--debug",
+        action="store_true",
+    )
+    parser.add_argument(
         "--mode",
         "--hardware",
         dest="hardware",
@@ -313,6 +318,8 @@ def main():
     logger = getLogger("sailfish")
     logger.addHandler(handler)
     logger.setLevel(args.log_level.upper())
+
+    install(show_locals=args.debug)  # rich traceback
 
     app_dict = asdict(Sailfish())
 
