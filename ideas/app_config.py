@@ -1,5 +1,5 @@
 from configmodel import configmodel
-from typing import Literal
+from typing import Literal, Union
 
 
 @configmodel
@@ -38,7 +38,7 @@ class Driver:
     report: Report = Report()
     checkpoint: Checkpoint = Checkpoint()
     timeseries: Timeseries = Timeseries()
-    cfl_number: float | Literal["auto"] = "auto"
+    cfl_number: Union[float, Literal["auto"]] = "auto"
 
 
 @configmodel
@@ -74,7 +74,9 @@ class Isothermal:
     fluid total energy density is not evolved.
     """
 
-    equation_of_state: UniformSoundSpeed | UniformMachNumber = UniformSoundSpeed(1.0)
+    equation_of_state: Union[UniformSoundSpeed, UniformMachNumber] = UniformSoundSpeed(
+        1.0
+    )
 
 
 @configmodel
@@ -107,7 +109,7 @@ class CoordinateBox:
         return sum(n > 1 for n in self.num_zones)
 
 
-Reconstruction = Literal["pcm"] | tuple[Literal["plm"], float]
+Reconstruction = Union[Literal["pcm"], tuple[Literal["plm"], float]]
 TimeIntegration = Literal["fwd", "rk1", "rk2", "rk3"]
 
 
@@ -140,7 +142,7 @@ class Strategy:
     generates.
     """
 
-    fluxing: Literal["per-zone"] | Literal["per-face"] = "per-zone"
+    fluxing: Literal["per-zone", "per-face"] = "per-zone"
 
 
 @configmodel
@@ -157,7 +159,7 @@ class Sailfish:
     """
 
     driver: Driver = Driver()
-    physics: Euler | Isothermal = Euler()
+    physics: Union[Euler, Isothermal] = Euler()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
     hardware: Literal["cpu", "gpu"] = "cpu"
