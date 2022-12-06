@@ -17,13 +17,13 @@ from os import listdir
 from os.path import join, dirname
 from textwrap import dedent
 from time import perf_counter
+from logging import getLogger
 
-
-# Numpy and logging imports
+# Numpy imports
 from numpy.typing import NDArray
 from numpy import ndarray
-from loguru import logger
 
+logger = getLogger("sailfish")
 
 KERNEL_VERBOSE_COMPILE = False  # passed to CFFI
 KERNEL_DISABLE_CACHE = False
@@ -156,11 +156,11 @@ def configure_kernel_module(
             raise ValueError("execution mode must be cpu or gpu")
         KERNEL_DEFAULT_EXEC_MODE = default_exec_mode
 
-    logger.trace(f"KERNEL_VERBOSE_COMPILE={KERNEL_VERBOSE_COMPILE}")
-    logger.trace(f"KERNEL_DISABLE_CACHE={KERNEL_DISABLE_CACHE}")
-    logger.trace(f"KERNEL_DISABLE_CPU_MODE={KERNEL_DISABLE_CPU_MODE}")
-    logger.trace(f"KERNEL_DISABLE_GPU_MODE={KERNEL_DISABLE_GPU_MODE}")
-    logger.trace(f"KERNEL_DEFAULT_EXEC_MODE={KERNEL_DEFAULT_EXEC_MODE}")
+    logger.debug(f"KERNEL_VERBOSE_COMPILE={KERNEL_VERBOSE_COMPILE}")
+    logger.debug(f"KERNEL_DISABLE_CACHE={KERNEL_DISABLE_CACHE}")
+    logger.debug(f"KERNEL_DISABLE_CPU_MODE={KERNEL_DISABLE_CPU_MODE}")
+    logger.debug(f"KERNEL_DISABLE_GPU_MODE={KERNEL_DISABLE_GPU_MODE}")
+    logger.debug(f"KERNEL_DEFAULT_EXEC_MODE={KERNEL_DEFAULT_EXEC_MODE}")
 
 
 def argtypes(f):
@@ -271,8 +271,8 @@ def cpu_extension(code, name, define_macros=list()):
                 cache_dir, next(f for f in listdir(cache_dir) if f.endswith(".so"))
             )
             module = CDLL(target)
-            logger.success(f"load cached module {name}({define_str})")
-            logger.trace(f"cached library filename {target}")
+            logger.info(f"load cached module {name}({define_str})")
+            # logger.debug(f"cached library filename {target}")
             return module
 
     except (FileNotFoundError, StopIteration):
@@ -297,7 +297,7 @@ def cpu_extension(code, name, define_macros=list()):
         )
         target = ffi.compile(tmpdir=cache_dir or ".", verbose=verbose)
         module = CDLL(target)
-        logger.success(f"compile CPU module {name}({define_str})")
+        logger.info(f"compile CPU module {name}({define_str})")
         return module
 
     except VerificationError as e:
@@ -319,7 +319,7 @@ def gpu_extension(code, name, define_macros=list()):
         define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
         module = RawModule(code=code, options=options)
         module.compile()
-        logger.success(f"compile GPU module {name}[{define_str}]")
+        logger.info(f"compile GPU module {name}[{define_str}]")
         return module
 
     except ImportError as e:
@@ -632,7 +632,6 @@ def kernel_class(cls):
     return cls
 
 
-@logger.catch
 def main():
 
     # ==============================================================================
@@ -640,7 +639,17 @@ def main():
     # ==============================================================================
 
     from argparse import ArgumentParser
+    from logging import basicConfig
     from sys import stdout
+
+    try:
+        from rich.logging import RichHandler
+
+        logging_handler = RichHandler(omit_repeated_times=False)
+    except ImportError:
+        from logging import StreamHandler
+
+        logging_handler = StreamHandler(stdout)
 
     parser = ArgumentParser()
     parser.add_argument(
@@ -653,13 +662,16 @@ def main():
     parser.add_argument(
         "--log-level",
         default="info",
-        choices=["trace", "debug", "info", "success", "warning", "error", "critical"],
+        choices=["debug", "info", "warning", "error", "critical"],
         help="log messages at and above this severity level",
     )
     args = parser.parse_args()
-    logger.remove()
-    logger.add(stdout, level=args.log_level.upper())
-    configure_kernel_module(default_exec_mode=args.exec_mode)
+
+    basicConfig(
+        level=args.log_level.upper(),
+        format="%(message)s",
+        handlers=[logging_handler],
+    )
 
     if args.exec_mode == "cpu":
         from numpy import array, linspace, zeros_like

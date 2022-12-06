@@ -114,7 +114,8 @@ def configmodel_rich_table(d, console, options):
         show_edge=True,
         show_lines=False,
         show_header=False,
-        min_width=80,
+        # min_width=80,
+        # box=box.SQUARE,
     )
     table.add_column("property", style="cyan")
     table.add_column("value", style="green")
@@ -148,12 +149,21 @@ def configmodel(cls):
     for key, description in field_descriptions.items():
         fields[key].metadata = dict(description=description)
 
+    def describe(self, key):
+        return self.__dataclass_fields__[key].metadata.get("description", None)
+
+    def type_args(self, key):
+        return self.__dataclass_fields__[key].type.__args__
+
     cls.__rich_console__ = configmodel_rich_table
     cls.__configmodel__ = dict(
         short_descr=short_descr,
         long_descr=long_descr,
         prop_descriptions=prop_descriptions,
     )
+    cls.describe = classmethod(describe)
+    cls.type_args = classmethod(type_args)
+
     return cls
 
 
@@ -162,9 +172,11 @@ def main():
     Examples of how to create configurable models.
     """
 
+    from inspect import getsource
     from rich.pretty import Pretty
     from rich.console import Console
     from rich.markdown import Markdown
+    from rich.syntax import Syntax
 
     @configmodel
     class Physics:
@@ -214,6 +226,8 @@ def main():
     console.print(model)
     print()
     console.print(Pretty(Physics(), expand_all=True, indent_guides=True))
+    print()
+    console.print(Syntax(getsource(CylindricalShocktube), "python"))
 
 
 if __name__ == "__main__":

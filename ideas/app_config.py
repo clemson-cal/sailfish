@@ -107,6 +107,10 @@ class CoordinateBox:
         return sum(n > 1 for n in self.num_zones)
 
 
+Reconstruction = Literal["pcm"] | tuple[Literal["plm"], float]
+TimeIntegration = Literal["fwd", "rk1", "rk2", "rk3"]
+
+
 @configmodel
 class Scheme:
     """
@@ -121,9 +125,6 @@ class Scheme:
     space: spatial reconstruction method
     time:  time-integration scheme (fwd|rk1|rk2|rk3)
     """
-
-    Reconstruction = Literal["pcm"] | tuple[Literal["plm"], float]
-    TimeIntegration = Literal["fwd"] | Literal["rk1"] | Literal["rk2"] | Literal["rk3"]
 
     space: Reconstruction = "pcm"
     time: TimeIntegration = "rk2"
@@ -159,8 +160,9 @@ class Sailfish:
     physics: Euler | Isothermal = Euler()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
-    hardware: Literal["cpu"] | Literal["gpu"] = "cpu"
-    plot: str = None
+    hardware: Literal["cpu", "gpu"] = "cpu"
+    show_config: Literal["table", "pretty", "json", "dict"] = "table"
+    plot: Literal["live", "end"] = None
 
 
 if __name__ == "__main__":

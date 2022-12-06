@@ -1,17 +1,28 @@
 #!/usr/bin/env python3
 
 
-from app_config import Sailfish
-from solver import make_solver
+from argparse import ArgumentParser
 from collections import deque
-from dataclasses import dataclass
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass
+from json import load, dumps
+from logging import getLogger
+
+from rich import box
 from rich.console import Console
-from rich.live import Live
-from rich.table import Table
+from rich.console import Console
 from rich.console import Group
+from rich.live import Live
+from rich.logging import RichHandler
 from rich.panel import Panel
+from rich.pretty import Pretty
 from rich.progress import Progress
+from rich.syntax import Syntax
+from rich.table import Table
+
+from app_config import Sailfish, Driver, Report
 from new_kernels import perf_time_sequence, configure_kernel_module
+from solver import make_solver
 
 
 @dataclass
@@ -86,7 +97,11 @@ class Dashboard:
         self.run_task = run_task
         self.reports = deque()
         self.perf_timer = perf_time_sequence(mode=app.hardware)
-        self.group = Group(app, self.reports_table(), Panel(self.progress))
+        self.group = Group(
+            self.app_config(),
+            self.reports_table(),
+            self.progress,
+        )
 
     def reports_table(self):
         table = Table(expand=True)
@@ -102,10 +117,26 @@ class Dashboard:
                 f"{report.time:0.5f}",
                 f"{report.zones_per_second/1e6:0.3f}",
             )
+
+        # while len(table.rows) < 20:
+        #     table.add_row(None, None, None)
+
         table.add_section()
         avg_zps = sum(r.zones_per_second for r in reports) / max(1, len(reports))
         table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
         return table
+
+    def app_config(self):
+        if self.app.show_config is None:
+            return str()
+        if self.app.show_config == "table":
+            return self.app
+        if self.app.show_config == "pretty":
+            return Pretty(self.app)
+        if self.app.show_config == "json":
+            return Syntax(dumps(asdict(self.app), indent=4), lexer="json")
+        if self.app.show_config == "dict":
+            return Pretty(asdict(self.app))
 
     def update(self, state):
         fold = self.app.driver.report.cadence
@@ -122,17 +153,16 @@ class Dashboard:
         self.group.renderables[1] = self.reports_table()
 
     def render(self):
-        return self.group
+        return Panel.fit(self.group, width=100, box=box.MINIMAL)
 
 
-def run(app: Sailfish):
-    console = Console(width=100)
+def run(app: Sailfish, console: Console):
     configure_kernel_module(default_exec_mode=app.hardware)
 
+    solver = make_solver(app)
     dash = Dashboard(app)
     plot = Plotting(app)
     fold = app.driver.report.cadence
-    solver = make_solver(app)
     state = next(solver)
 
     with Live(dash.render(), console=console, refresh_per_second=30) as view:
@@ -146,73 +176,126 @@ def run(app: Sailfish):
             plot.plot(state, action="show")
 
 
+def num_zones(arg):
+    """
+    Promote an integer or two-tuple to a three-tuple of integers
+
+    This factory function is used by the argparse type parameter to convert
+    user input to a domain.num_zones parameter.
+    """
+    res = tuple(int(i) for i in arg.split(","))
+
+    if len(res) == 1:
+        return res + (1, 1)
+    if len(res) == 2:
+        return res + (1,)
+    if len(res) == 3:
+        return res
+    raise ValueError(f"invalid argument for num_zones {arg}")
+
+
+def deep_update(d, u):
+    """
+    Update a dictionary and any nested dictionaries recursively
+    """
+    for k, v in u.items():
+        if isinstance(v, Mapping):
+            d[k] = deep_update(d.get(k, dict()), v)
+        else:
+            d[k] = v
+    return d
+
+
+def unflatten(d):
+    """
+    Create a nested dict from a flat one with keys like a.b.c
+    """
+    res = dict()
+    for key, value in d.items():
+        parts = key.split(".")
+        d = res
+        for part in parts[:-1]:
+            if part not in d:
+                d[part] = dict()
+            d = d[part]
+        d[parts[-1]] = value
+    return res
+
+
 def main():
-    from collections.abc import Mapping
-    from dataclasses import asdict
-    from argparse import ArgumentParser
-    from json import load
-    from loguru import logger
-    from reporting import configure_logger
-
-    def num_zones(arg):
-        res = tuple(int(i) for i in arg.split(","))
-
-        if len(res) == 1:
-            return res + (1, 1)
-        if len(res) == 2:
-            return res + (1,)
-        if len(res) == 3:
-            return res
-        raise ValueError(f"invalid argument for num_zones {arg}")
-
-    def deep_update(d, u):
-        for k, v in u.items():
-            if isinstance(v, Mapping):
-                d[k] = deep_update(d.get(k, dict()), v)
-            else:
-                d[k] = v
-        return d
-
     parser = ArgumentParser()
     parser.add_argument("configs", nargs="*")
+    parser.add_argument(
+        "--log-level",
+        default="warning",
+        choices=("debug", "info", "warning", "error", "critical"),
+        help="log messages at and above this severity level",
+    )
+    parser.add_argument(
+        "--mode",
+        "--hardware",
+        dest="hardware",
+        choices=Sailfish.type_args("hardware"),
+        help="execution mode",
+    )
     parser.add_argument(
         "-n",
         "--num-zones",
         "--resolution",
         type=num_zones,
-        default=None,
+        dest="domain.num_zones",
+        metavar="",
+    )
+    parser.add_argument(
+        "-e",
+        "--tfinal",
+        type=float,
+        help=Driver.describe("tfinal"),
+        dest="driver.tfinal",
+        metavar="",
     )
     parser.add_argument(
         "-f",
         "--fold",
+        "--report-cadence",
         type=int,
-        default=None,
+        help=Report.describe("cadence"),
+        dest="driver.report.cadence",
+        metavar="",
     )
     parser.add_argument(
         "--plot",
         nargs="?",
-        default=None,
-        choices=[None, "live", "end"],
         const="end",
+        help=Sailfish.describe("plot"),
+        choices=(None, "live", "end"),
+        dest="plot",
+    )
+    parser.add_argument(
+        "--show-config",
+        choices=Sailfish.type_args("show_config"),
+        help=Sailfish.describe("show_config"),
+        type=str,
+        dest="show_config",
     )
     args = parser.parse_args()
 
-    configure_logger(logger, "warning")
+    console = Console()
+    handler = RichHandler(omit_repeated_times=False, console=console)
+    logger = getLogger("sailfish")
+    logger.addHandler(handler)
+    logger.setLevel(args.log_level.upper())
+
     app_dict = asdict(Sailfish())
 
     for config in args.configs:
         with open(config) as infile:
             deep_update(app_dict, load(infile))
 
-    if args.num_zones is not None:
-        app_dict["domain"]["num_zones"] = args.num_zones
-    if args.fold is not None:
-        app_dict["driver"]["report"]["cadence"] = args.fold
-    if args.plot is not None:
-        app_dict["plot"] = args.plot
+    cmdline_dict = unflatten({k: v for k, v in vars(args).items() if v is not None})
+    deep_update(app_dict, cmdline_dict)
 
-    app = Sailfish(**app_dict)
-    run(app)
+    run(Sailfish(**app_dict), console=console)
 
 
 if __name__ == "__main__":
