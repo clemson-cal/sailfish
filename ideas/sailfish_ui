@@ -297,6 +297,13 @@ def main():
         dest="strategy.data_layout",
     )
     parser.add_argument(
+        "--fluxing",
+        type=str,
+        choices=Strategy.type_args("fluxing"),
+        help=Strategy.describe("fluxing"),
+        dest="strategy.fluxing",
+    )
+    parser.add_argument(
         "--plot",
         nargs="?",
         const="end",
