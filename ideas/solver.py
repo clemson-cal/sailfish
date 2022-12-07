@@ -591,7 +591,7 @@ def solver(
     hardware: str,
     resolution: int,
     data_layout: str,
-    fluxing: str,
+    cache_flux: bool,
     cache_prim: bool,
     reconstruction: str,
     time_integration: str,
@@ -628,14 +628,14 @@ def solver(
         transpose = True
         p = xp.ascontiguousarray(p.T)
 
-    if fluxing == "per-zone":
+    if not cache_flux:
         p1 = p if cache_prim else None
         u1 = xp.zeros_like(p)
         u2 = xp.zeros_like(p)
         prim_to_cons(p, u1)
         prim_to_cons(p, u2)
 
-    if fluxing == "per-face":
+    else:
         fhat = xp.zeros_like(p)
         u1 = xp.zeros_like(p)
         prim_to_cons(p, u1)
@@ -652,7 +652,7 @@ def solver(
     yield State(n, t, u1, cons_to_prim, transpose=transpose)
 
     while True:
-        if fluxing == "per-zone":
+        if not cache_flux:
             if not rks:
                 if p1 is not None:
                     cons_to_prim(u1, p1)
@@ -666,8 +666,7 @@ def solver(
                     update_cons(p1, u1, u2, dt, dx)
                     u1, u2 = u2, u1
                     average_rk(u0, u1, rk)
-
-        if fluxing == "per-face":
+        else:
             if not rks:
                 godunov_fluxes(u1, fhat)
                 update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
@@ -688,7 +687,7 @@ def make_solver(app: Sailfish):
         app.hardware,
         app.domain.num_zones[0],
         data_layout=app.strategy.data_layout,
-        fluxing=app.strategy.fluxing,
+        cache_flux=app.strategy.cache_flux,
         cache_prim=app.strategy.cache_prim,
         reconstruction=app.scheme.reconstruction,
         time_integration=app.scheme.time_integration,

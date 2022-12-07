@@ -144,12 +144,13 @@ class Strategy:
     Fields
     ------
 
-    fluxing: one Riemann problem per-face, versus redundant solves (per-zone)
     data_layout: fields are contiguous (fields-last) or disjoint (fields-first)
+    cache_flux: one Riemann problem per face, difference the resulting array
+    cache_prim: pre-compute primitive quantities, vs. re-compute over stencil
     """
 
-    fluxing: Literal["per-zone", "per-face"] = "per-zone"
     data_layout: Literal["fields-first", "fields-last"] = "fields-last"
+    cache_flux: bool = False
     cache_prim: bool = False
 
 
