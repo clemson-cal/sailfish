@@ -332,6 +332,24 @@ class Solver:
                 double p[FLUX_STENCIL_SIZE + 1][NCONS];
                 int c = FLUX_STENCIL_SIZE / 2;
 
+
+                // Below is a draft for how to possibly factor out the data fetching:
+                //
+                // #ifdef CACHE_PRIM
+
+                // fetch_stencil(&prd[(i - c) * NCONS], &p[0][0], FLUX_STENCIL_SIZE + 1);
+                // fetch_stencil(&urd[(i + 0) * NCONS], &u[c][0], 1);
+
+                // #else
+
+                // fetch_stencil(&urd[(i - c) * NCONS], &u[0][0], FLUX_STENCIL_SIZE + 1);
+
+                // for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
+                //     cons_to_prim(u[j], p[j]);
+
+                // #endif
+
+
                 #ifdef CACHE_PRIM
 
                 for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
