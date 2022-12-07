@@ -162,7 +162,6 @@ class Dashboard:
 def run(apps: list[Sailfish], console: Console):
     dash = Dashboard()
 
-    # if True:
     with Live(dash.render(), console=console, refresh_per_second=30) as view:
         for app in apps:
             configure_kernel_module(default_exec_mode=app.hardware)

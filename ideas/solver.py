@@ -6,7 +6,7 @@ from numpy import array, zeros, logical_not
 from numpy.typing import NDArray
 from new_kernels import kernel, kernel_class, device
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
-from app_config import Sailfish
+from app_config import Sailfish, Reconstruction
 
 
 def numpy_or_cupy(exec_mode):
@@ -60,13 +60,17 @@ class PrimitiveToConserved:
     def static(self):
         return R"""
         #if defined(CPU_MODE)
+
         #define blockIdx_x 0
         #define blockDim_x ni
         #define threadIdx_x i
+
         #elif defined(GPU_MODE)
+
         #define blockIdx_x (int)blockIdx.x
         #define blockDim_x (int)blockDim.x
         #define threadIdx_x (int)threadIdx.x
+
         #endif
         """
 
@@ -250,13 +254,49 @@ class Solver:
     @device
     def update_cons(self):
         R"""
-        DEVICE void update_cons(double p[3][NCONS], double u[NCONS], double dt, double dx)
+        DEVICE void update_cons(
+            double p[FLUX_STENCIL_SIZE + 1][NCONS],
+            double u[NCONS],
+            double plm_theta,
+            double dt,
+            double dx)
         {
             double fp[NCONS];
             double fm[NCONS];
 
+            #if FLUX_STENCIL_SIZE == 2
+
             riemann_hlle(p[0], p[1], fm, 1);
             riemann_hlle(p[1], p[2], fp, 1);
+
+            #elif FLUX_STENCIL_SIZE == 4
+
+            double *pk = p[0];
+            double *pl = p[1];
+            double *pc = p[2];
+            double *pr = p[3];
+            double *ps = p[4];
+            double pml[NCONS];
+            double pmr[NCONS];
+            double ppl[NCONS];
+            double ppr[NCONS];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
+                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+
+                pml[q] = pl[q] + 0.5 * gl;
+                pmr[q] = pc[q] - 0.5 * gc;
+                ppl[q] = pc[q] + 0.5 * gc;
+                ppr[q] = pr[q] - 0.5 * gr;
+            }
+
+            riemann_hlle(pml, pmr, fm, 1);
+            riemann_hlle(ppl, ppr, fp, 1);
+
+            #endif
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -271,12 +311,20 @@ class Solver:
         prd: NDArray[float],
         urd: NDArray[float],
         uwr: NDArray[float],
+        plm_theta: float,
         dt: float,
         dx: float,
         ni: int = None,
     ):
         R"""
-        KERNEL void update_cons_fields_last(double *prd, double *urd, double *uwr, double dt, double dx, int ni)
+        KERNEL void update_cons_fields_last(
+            double *prd,
+            double *urd,
+            double *uwr,
+            double plm_theta,
+            double dt,
+            double dx,
+            int ni)
         {
             FOR_RANGE_1D(1, ni - 1)
             {
@@ -290,7 +338,7 @@ class Solver:
                 {
                     for (int q = 0; q < NCONS; ++q)
                     {
-                        p[j][q] = prd[(i + j - 1) * NCONS + q];
+                        p[j][q] = prd[(i + j - c) * NCONS + q];
                     }
                 }
                 for (int q = 0; q < NCONS; ++q)
@@ -304,14 +352,14 @@ class Solver:
                 {
                     for (int q = 0; q < NCONS; ++q)
                     {
-                        u[j][q] = urd[(i + j - 1) * NCONS + q];
+                        u[j][q] = urd[(i + j - c) * NCONS + q];
                     }
                     cons_to_prim(u[j], p[j]);
                 }
 
                 #endif
 
-                update_cons(p, u[c], dt, dx);
+                update_cons(p, u[c], plm_theta, dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -320,7 +368,8 @@ class Solver:
             }
         }
         """
-        return urd.shape[0], (prd, urd, uwr, dt, dx, urd.shape[0])
+        plm = self._plm_theta if plm_theta is None else plm_theta
+        return urd.shape[0], (prd, urd, uwr, plm, dt, dx, urd.shape[0])
 
     @kernel
     def update_cons_fields_first(
@@ -328,12 +377,20 @@ class Solver:
         prd: NDArray[float],
         urd: NDArray[float],
         uwr: NDArray[float],
+        plm_theta: float,
         dt: float,
         dx: float,
         ni: int = None,
     ):
         R"""
-        KERNEL void update_cons_fields_first(double *prd, double *urd, double *uwr, double dt, double dx, int ni)
+        KERNEL void update_cons_fields_first(
+            double *prd,
+            double *urd,
+            double *uwr,
+            double plm_theta,
+            double dt,
+            double dx,
+            int ni)
         {
             FOR_RANGE_1D(1, ni - 1)
             {
@@ -348,7 +405,7 @@ class Solver:
                     for (int q = 0; q < NCONS; ++q)
                     {
                         double *p_blk = &prd[q * ni + blockIdx_x * blockDim_x];
-                        p[j][q] = p_blk[threadIdx_x + j - 1];
+                        p[j][q] = p_blk[threadIdx_x + j - c];
                     }
                 }
                 for (int q = 0; q < NCONS; ++q)
@@ -364,14 +421,14 @@ class Solver:
                     for (int q = 0; q < NCONS; ++q)
                     {
                         double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
-                        u[j][q] = u_blk[threadIdx_x + j - 1];
+                        u[j][q] = u_blk[threadIdx_x + j - c];
                     }
                     cons_to_prim(u[j], p[j]);
                 }
 
                 #endif
 
-                update_cons(p, u[c], dt, dx);
+                update_cons(p, u[c], plm_theta, dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -381,7 +438,8 @@ class Solver:
             }
         }
         """
-        return urd.shape[1], (prd, urd, uwr, dt, dx, urd.shape[1])
+        plm = self._plm_theta if plm_theta is None else plm_theta
+        return urd.shape[1], (prd, urd, uwr, plm, dt, dx, urd.shape[1])
 
     @device
     def godunov_fluxes(self):
@@ -401,6 +459,7 @@ class Solver:
                 pm[q] = pc[q];
                 pp[q] = pr[q];
             }
+
             #elif FLUX_STENCIL_SIZE == 4
 
             double *pl = p[0];
@@ -413,7 +472,9 @@ class Solver:
                 pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
                 pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
             }
+
             #endif
+
             riemann_hlle(pm, pp, fh, 1);
         }
         """
@@ -438,15 +499,17 @@ class Solver:
                 for (int q = 0; q < NCONS; ++q)
                 {
                     #if FLUX_STENCIL_SIZE == 2
+
                     u[0][q] = urd[(i + 0) * NCONS + q];
                     u[1][q] = urd[(i + 1) * NCONS + q];
+
                     #elif FLUX_STENCIL_SIZE == 4
+
                     u[0][q] = urd[(i - 1) * NCONS + q];
                     u[1][q] = urd[(i + 0) * NCONS + q];
                     u[2][q] = urd[(i + 1) * NCONS + q];
                     u[3][q] = urd[(i + 2) * NCONS + q];
-                    #else
-                    #error("FLUX_STENCIL_SIZE must be 2 or 4")
+
                     #endif
                 }
                 for (int i = 0; i < FLUX_STENCIL_SIZE; ++i)
@@ -462,9 +525,8 @@ class Solver:
             }
         }
         """
-        if plm_theta is None:
-            plm_theta = self._plm_theta
-        return urd.shape[0], (urd, fwr, plm_theta, urd.shape[0])
+        plm = self._plm_theta if plm_theta is None else plm_theta
+        return urd.shape[0], (urd, fwr, plm, urd.shape[0])
 
     @kernel
     def godunov_fluxes_fields_first(
@@ -486,16 +548,19 @@ class Solver:
                 for (int q = 0; q < NCONS; ++q)
                 {
                     double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
+
                     #if FLUX_STENCIL_SIZE == 2
+
                     u[0][q] = u_blk[threadIdx_x + 0];
                     u[1][q] = u_blk[threadIdx_x + 1];
+
                     #elif FLUX_STENCIL_SIZE == 4
+
                     u[0][q] = u_blk[threadIdx_x - 1];
                     u[1][q] = u_blk[threadIdx_x + 0];
                     u[2][q] = u_blk[threadIdx_x + 1];
                     u[3][q] = u_blk[threadIdx_x + 2];
-                    #else
-                    #error("FLUX_STENCIL_SIZE must be 2 or 4")
+
                     #endif
                 }
                 for (int i = 0; i < FLUX_STENCIL_SIZE; ++i)
@@ -512,9 +577,8 @@ class Solver:
             }
         }
         """
-        if plm_theta is None:
-            plm_theta = self._plm_theta
-        return urd.shape[1], (urd, fwr, plm_theta, urd.shape[1])
+        plm = self._plm_theta if plm_theta is None else plm_theta
+        return urd.shape[1], (urd, fwr, plm, urd.shape[1])
 
 
 def update_cons_from_fluxes(u, f, dt, dx, transpose, xp):
@@ -593,7 +657,7 @@ def solver(
     data_layout: str,
     cache_flux: bool,
     cache_prim: bool,
-    reconstruction: str,
+    reconstruction: Reconstruction,
     time_integration: str,
 ) -> State:
     """
@@ -656,14 +720,14 @@ def solver(
             if not rks:
                 if p1 is not None:
                     cons_to_prim(u1, p1)
-                update_cons(p1, u1, u2, dt, dx)
+                update_cons(p1, u1, u2, None, dt, dx)
                 u1, u2 = u2, u1
             else:
                 u0 = u1.copy()
                 for rk in rks:
                     if p1 is not None:
                         cons_to_prim(u1, p1)
-                    update_cons(p1, u1, u2, dt, dx)
+                    update_cons(p1, u1, u2, None, dt, dx)
                     u1, u2 = u2, u1
                     average_rk(u0, u1, rk)
         else:
