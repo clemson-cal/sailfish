@@ -162,6 +162,7 @@ class Dashboard:
 def run(apps: list[Sailfish], console: Console):
     dash = Dashboard()
 
+    # if True:
     with Live(dash.render(), console=console, refresh_per_second=30) as view:
         for app in apps:
             configure_kernel_module(default_exec_mode=app.hardware)
@@ -170,16 +171,16 @@ def run(apps: list[Sailfish], console: Console):
             solver = make_solver(app)
             fold = app.driver.report.cadence
             state = next(solver)
-            # plot = Plotting(app)
+            plot = Plotting(app)
 
             while state.time < app.driver.tfinal:
                 state = next(solver)
                 if state.iteration % fold == 0:
                     dash.update(state)
-                    # plot.update(state)
+                    plot.update(state)
 
-            # if app.plot == "end":
-            #     plot.plot(state, action="show")
+            if app.plot == "end":
+                plot.plot(state, action="show")
 
 
 def num_zones(arg):
@@ -315,6 +316,11 @@ def main():
         dest="strategy.fluxing",
     )
     parser.add_argument(
+        "--cache-prim",
+        action="store_true",
+        dest="strategy.cache_prim",
+    )
+    parser.add_argument(
         "--plot",
         nargs="?",
         const="end",
@@ -341,8 +347,11 @@ def main():
     cmdline_dict = unflatten({k: v for k, v in vars(args).items() if v is not None})
 
     def sailfish(config):
-        with open(config) as infile:
-            cs = load(infile)
+        if not config:
+            cs = dict()
+        else:
+            with open(config) as infile:
+                cs = load(infile)
         if type(cs) is dict:
             cs = [cs]
         for c in cs:
@@ -351,7 +360,7 @@ def main():
             deep_update(s, cmdline_dict)
             yield Sailfish(**s)
 
-    run(chain(*map(sailfish, args.configs)), console=console)
+    run(chain(*map(sailfish, [None] + args.configs)), console=console)
 
 
 if __name__ == "__main__":

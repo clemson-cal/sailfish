@@ -150,6 +150,7 @@ class Strategy:
 
     fluxing: Literal["per-zone", "per-face"] = "per-zone"
     data_layout: Literal["fields-first", "fields-last"] = "fields-last"
+    cache_prim: bool = False
 
 
 @configmodel

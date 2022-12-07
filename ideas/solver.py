@@ -196,15 +196,18 @@ class PrimitiveToConserved:
 
 
 @kernel_class
-class FluxPerZoneSolver:
-    def __init__(self, reconstruction):
+class Solver:
+    def __init__(self, reconstruction, cache_prim):
         define_macros = dict()
         device_funcs = [
             cons_to_prim,
             riemann_hlle,
-            self._update_cons,
-            self._godunov_fluxes,
+            self.update_cons,
+            self.godunov_fluxes,
         ]
+
+        if cache_prim:
+            define_macros["CACHE_PRIM"] = 1
 
         if type(reconstruction) is str:
             mode = reconstruction
@@ -245,23 +248,19 @@ class FluxPerZoneSolver:
         """
 
     @device
-    def _update_cons(self):
+    def update_cons(self):
         R"""
-        DEVICE void _update_cons(double u[3][NCONS], double dt, double dx)
+        DEVICE void update_cons(double p[3][NCONS], double u[NCONS], double dt, double dx)
         {
-            double p[3][NCONS];
             double fp[NCONS];
             double fm[NCONS];
 
-            cons_to_prim(u[0], p[0]);
-            cons_to_prim(u[1], p[1]);
-            cons_to_prim(u[2], p[2]);
             riemann_hlle(p[0], p[1], fm, 1);
             riemann_hlle(p[1], p[2], fp, 1);
 
             for (int q = 0; q < NCONS; ++q)
             {
-                u[1][q] -= (fp[q] - fm[q]) * dt / dx;
+                u[q] -= (fp[q] - fm[q]) * dt / dx;
             }
         }
         """
@@ -269,6 +268,7 @@ class FluxPerZoneSolver:
     @kernel
     def update_cons_fields_last(
         self,
+        prd: NDArray[float],
         urd: NDArray[float],
         uwr: NDArray[float],
         dt: float,
@@ -276,32 +276,56 @@ class FluxPerZoneSolver:
         ni: int = None,
     ):
         R"""
-        KERNEL void update_cons_fields_last(double *urd, double *uwr, double dt, double dx, int ni)
+        KERNEL void update_cons_fields_last(double *prd, double *urd, double *uwr, double dt, double dx, int ni)
         {
             FOR_RANGE_1D(1, ni - 1)
             {
-                double u[3][NCONS];
+                double u[FLUX_STENCIL_SIZE + 1][NCONS];
+                double p[FLUX_STENCIL_SIZE + 1][NCONS];
+                int c = FLUX_STENCIL_SIZE / 2;
 
-                for (int q = 0; q < NCONS; ++q)
+                #ifdef CACHE_PRIM
+
+                for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
                 {
-                    u[0][q] = urd[(i - 1) * NCONS + q];
-                    u[1][q] = urd[(i + 0) * NCONS + q];
-                    u[2][q] = urd[(i + 1) * NCONS + q];
+                    for (int q = 0; q < NCONS; ++q)
+                    {
+                        p[j][q] = prd[(i + j - 1) * NCONS + q];
+                    }
                 }
-                _update_cons(u, dt, dx);
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u[c][q] = urd[i * NCONS + q];
+                }
+
+                #else
+
+                for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
+                {
+                    for (int q = 0; q < NCONS; ++q)
+                    {
+                        u[j][q] = urd[(i + j - 1) * NCONS + q];
+                    }
+                    cons_to_prim(u[j], p[j]);
+                }
+
+                #endif
+
+                update_cons(p, u[c], dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    uwr[i * NCONS + q] = u[1][q];
+                    uwr[i * NCONS + q] = u[c][q];
                 }
             }
         }
         """
-        return urd.shape[0], (urd, uwr, dt, dx, urd.shape[0])
+        return urd.shape[0], (prd, urd, uwr, dt, dx, urd.shape[0])
 
     @kernel
     def update_cons_fields_first(
         self,
+        prd: NDArray[float],
         urd: NDArray[float],
         uwr: NDArray[float],
         dt: float,
@@ -309,35 +333,60 @@ class FluxPerZoneSolver:
         ni: int = None,
     ):
         R"""
-        KERNEL void update_cons_fields_first(double *urd, double *uwr, double dt, double dx, int ni)
+        KERNEL void update_cons_fields_first(double *prd, double *urd, double *uwr, double dt, double dx, int ni)
         {
             FOR_RANGE_1D(1, ni - 1)
             {
-                double u[3][NCONS];
+                double u[FLUX_STENCIL_SIZE + 1][NCONS];
+                double p[FLUX_STENCIL_SIZE + 1][NCONS];
+                int c = FLUX_STENCIL_SIZE / 2;
 
+                #ifdef CACHE_PRIM
+
+                for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
+                {
+                    for (int q = 0; q < NCONS; ++q)
+                    {
+                        double *p_blk = &prd[q * ni + blockIdx_x * blockDim_x];
+                        p[j][q] = p_blk[threadIdx_x + j - 1];
+                    }
+                }
                 for (int q = 0; q < NCONS; ++q)
                 {
                     double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
-                    u[0][q] = u_blk[threadIdx_x - 1];
-                    u[1][q] = u_blk[threadIdx_x + 0];
-                    u[2][q] = u_blk[threadIdx_x + 1];
+                    u[c][q] = u_blk[threadIdx_x];
                 }
-                _update_cons(u, dt, dx);
+
+                #else
+
+                for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
+                {
+                    for (int q = 0; q < NCONS; ++q)
+                    {
+                        double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
+                        u[j][q] = u_blk[threadIdx_x + j - 1];
+                    }
+                    cons_to_prim(u[j], p[j]);
+                }
+
+                #endif
+
+                update_cons(p, u[c], dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
                     double *u_blk = &uwr[q * ni + blockIdx_x * blockDim_x];
-                    u_blk[threadIdx_x] = u[1][q];
+                    u_blk[threadIdx_x] = u[c][q];
                 }
             }
         }
         """
-        return urd.shape[1], (urd, uwr, dt, dx, urd.shape[1])
+        return urd.shape[1], (prd, urd, uwr, dt, dx, urd.shape[1])
 
     @device
-    def _godunov_fluxes(self):
+    def godunov_fluxes(self):
         R"""
-        DEVICE void _godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
+        DEVICE void godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
         {
             double pm[NCONS];
             double pp[NCONS];
@@ -404,7 +453,7 @@ class FluxPerZoneSolver:
                 {
                     cons_to_prim(u[i], p[i]);
                 }
-                _godunov_fluxes(p, f, plm_theta);
+                godunov_fluxes(p, f, plm_theta);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -453,7 +502,7 @@ class FluxPerZoneSolver:
                 {
                     cons_to_prim(u[i], p[i]);
                 }
-                _godunov_fluxes(p, f, plm_theta);
+                godunov_fluxes(p, f, plm_theta);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -543,6 +592,7 @@ def solver(
     resolution: int,
     data_layout: str,
     fluxing: str,
+    cache_prim: bool,
     reconstruction: str,
     time_integration: str,
 ) -> State:
@@ -560,7 +610,7 @@ def solver(
     n = 0
     p = xp.array(p)
 
-    solver = FluxPerZoneSolver(reconstruction)
+    solver = Solver(reconstruction, cache_prim)
     p2c = PrimitiveToConserved(dim=1)
 
     if data_layout == "fields-last":
@@ -579,6 +629,7 @@ def solver(
         p = xp.ascontiguousarray(p.T)
 
     if fluxing == "per-zone":
+        p1 = p if cache_prim else None
         u1 = xp.zeros_like(p)
         u2 = xp.zeros_like(p)
         prim_to_cons(p, u1)
@@ -603,12 +654,16 @@ def solver(
     while True:
         if fluxing == "per-zone":
             if not rks:
-                update_cons(u1, u2, dt, dx)
+                if p1 is not None:
+                    cons_to_prim(u1, p1)
+                update_cons(p1, u1, u2, dt, dx)
                 u1, u2 = u2, u1
             else:
                 u0 = u1.copy()
                 for rk in rks:
-                    update_cons(u1, u2, dt, dx)
+                    if p1 is not None:
+                        cons_to_prim(u1, p1)
+                    update_cons(p1, u1, u2, dt, dx)
                     u1, u2 = u2, u1
                     average_rk(u0, u1, rk)
 
@@ -634,6 +689,7 @@ def make_solver(app: Sailfish):
         app.domain.num_zones[0],
         data_layout=app.strategy.data_layout,
         fluxing=app.strategy.fluxing,
+        cache_prim=app.strategy.cache_prim,
         reconstruction=app.scheme.reconstruction,
         time_integration=app.scheme.time_integration,
     )
