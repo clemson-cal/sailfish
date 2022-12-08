@@ -45,155 +45,102 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 @kernel_class
 class PrimitiveToConserved:
-    def __init__(self, dim=1):
+    def __init__(self, dim, transpose):
         self.dim = dim
+        self.transpose = transpose
 
     @property
     def define_macros(self):
-        return dict(DIM=self.dim)
+        return dict(DIM=self.dim, TRANSPOSE=int(self.transpose))
 
     @property
     def device_funcs(self):
         return [prim_to_cons, cons_to_prim]
 
-    @property
-    def static(self):
-        return R"""
-        #if defined(CPU_MODE)
-
-        #define blockIdx_x 0
-        #define blockDim_x ni
-        #define threadIdx_x i
-
-        #elif defined(GPU_MODE)
-
-        #define blockIdx_x (int)blockIdx.x
-        #define blockDim_x (int)blockDim.x
-        #define threadIdx_x (int)threadIdx.x
-
-        #endif
-        """
-
     @kernel
-    def cons_to_prim_fields_last(
+    def cons_to_prim_array(
         self,
         u: NDArray[float],
         p: NDArray[float],
         ni: int = None,
     ):
         R"""
-        KERNEL void cons_to_prim_fields_last(double *u, double *p, int ni)
+        KERNEL void cons_to_prim_array(double *u, double *p, int ni)
         {
+            #if TRANSPOSE == 0
+            int sq = 1;
+            int si = NCONS;
+            #elif TRANSPOSE == 1
+            int sq = ni;
+            int si = 1;
+            #endif
+
             FOR_EACH_1D(ni)
             {
-                cons_to_prim(&u[NCONS * i], &p[NCONS * i]);
-            }
-        }
-        """
-        nq = self.dim + 2
-
-        if u.shape[-1] != nq or u.shape != p.shape:
-            raise ValueError("array has wrong number of fields")
-
-        return u.size // nq, (u, p, u.size // nq)
-
-    @kernel
-    def prim_to_cons_fields_last(
-        self,
-        p: NDArray[float],
-        u: NDArray[float],
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void prim_to_cons_fields_last(double *p, double *u, int ni)
-        {
-            FOR_EACH_1D(ni)
-            {
-                prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
-            }
-        }
-        """
-        nq = self.dim + 2
-
-        if p.shape[-1] != nq or p.shape != u.shape:
-            raise ValueError("array has wrong number of fields")
-
-        return p.size // nq, (p, u, p.size // nq)
-
-    @kernel
-    def cons_to_prim_fields_first(
-        self,
-        u: NDArray[float],
-        p: NDArray[float],
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void cons_to_prim_fields_first(double *u, double *p, int ni)
-        {
-            FOR_EACH_1D(ni)
-            {
-                double *u_blk[NCONS];
-                double *p_blk[NCONS];
                 double u_reg[NCONS];
                 double p_reg[NCONS];
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    p_blk[q] = &p[q * ni + blockIdx_x * blockDim_x];
-                    u_blk[q] = &u[q * ni + blockIdx_x * blockDim_x];
-                    u_reg[q] = u_blk[q][threadIdx_x];
+                    u_reg[q] = u[i * si + q * sq];
                 }
                 cons_to_prim(u_reg, p_reg);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    p_blk[q][threadIdx_x] = p_reg[q];
+                    p[i * si + q * sq] = p_reg[q];
                 }
             }
         }
         """
         nq = self.dim + 2
+        iq = 0 if self.transpose else -1
 
-        if u.shape[0] != nq or u.shape != p.shape:
+        if u.shape[iq] != nq or u.shape != p.shape:
             raise ValueError("array has wrong number of fields")
 
         return u.size // nq, (u, p, u.size // nq)
 
     @kernel
-    def prim_to_cons_fields_first(
+    def prim_to_cons_array(
         self,
         p: NDArray[float],
         u: NDArray[float],
         ni: int = None,
     ):
         R"""
-        KERNEL void prim_to_cons_fields_first(double *p, double *u, int ni)
+        KERNEL void prim_to_cons_array(double *p, double *u, int ni)
         {
+            #if TRANSPOSE == 0
+            int sq = 1;
+            int si = NCONS;
+            #elif TRANSPOSE == 1
+            int sq = ni;
+            int si = 1;
+            #endif
+
             FOR_EACH_1D(ni)
             {
-                double *u_blk[NCONS];
-                double *p_blk[NCONS];
-                double u_reg[NCONS];
                 double p_reg[NCONS];
+                double u_reg[NCONS];
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    u_blk[q] = &u[q * ni + blockIdx_x * blockDim_x];
-                    p_blk[q] = &p[q * ni + blockIdx_x * blockDim_x];
-                    p_reg[q] = p_blk[q][threadIdx_x];
+                    p_reg[q] = p[i * si + q * sq];
                 }
                 prim_to_cons(p_reg, u_reg);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    u_blk[q][threadIdx_x] = u_reg[q];
+                    u[i * si + q * sq] = u_reg[q];
                 }
             }
         }
         """
         nq = self.dim + 2
+        iq = 0 if self.transpose else -1
 
-        if p.shape[0] != nq or p.shape != u.shape:
+        if p.shape[iq] != nq or p.shape != u.shape:
             raise ValueError("array has wrong number of fields")
 
         return p.size // nq, (p, u, p.size // nq)
@@ -201,14 +148,16 @@ class PrimitiveToConserved:
 
 @kernel_class
 class Solver:
-    def __init__(self, reconstruction, cache_prim):
+    def __init__(self, reconstruction, cache_prim, transpose):
         define_macros = dict()
         device_funcs = [
             cons_to_prim,
             riemann_hlle,
-            self.update_cons,
-            self.godunov_fluxes,
+            self._update_cons,
+            self._godunov_fluxes,
         ]
+
+        define_macros["TRANSPOSE"] = int(transpose)
 
         if cache_prim:
             define_macros["CACHE_PRIM"] = 1
@@ -226,6 +175,7 @@ class Solver:
             device_funcs.insert(0, plm_minmod)
             assert mode == "plm"
 
+        self._transpose = transpose
         self._define_macros = define_macros
         self._device_funcs = device_funcs
 
@@ -252,9 +202,9 @@ class Solver:
         """
 
     @device
-    def update_cons(self):
+    def _update_cons(self):
         R"""
-        DEVICE void update_cons(
+        DEVICE void _update_cons(
             double p[FLUX_STENCIL_SIZE + 1][NCONS],
             double u[NCONS],
             double plm_theta,
@@ -306,7 +256,7 @@ class Solver:
         """
 
     @kernel
-    def update_cons_fields_last(
+    def update_cons(
         self,
         prd: NDArray[float],
         urd: NDArray[float],
@@ -317,7 +267,7 @@ class Solver:
         ni: int = None,
     ):
         R"""
-        KERNEL void update_cons_fields_last(
+        KERNEL void update_cons(
             double *prd,
             double *urd,
             double *uwr,
@@ -326,90 +276,14 @@ class Solver:
             double dx,
             int ni)
         {
-            FOR_RANGE_1D(1, ni - 1)
-            {
-                double u[FLUX_STENCIL_SIZE + 1][NCONS];
-                double p[FLUX_STENCIL_SIZE + 1][NCONS];
-                int c = FLUX_STENCIL_SIZE / 2;
+            #if TRANSPOSE == 0
+            int sq = 1;
+            int si = NCONS;
+            #elif TRANSPOSE == 1
+            int sq = ni;
+            int si = 1;
+            #endif
 
-
-                // Below is a draft for how to possibly factor out the data fetching:
-                //
-                // #ifdef CACHE_PRIM
-
-                // fetch_stencil(&prd[(i - c) * NCONS], &p[0][0], FLUX_STENCIL_SIZE + 1);
-                // fetch_stencil(&urd[(i + 0) * NCONS], &u[c][0], 1);
-
-                // #else
-
-                // fetch_stencil(&urd[(i - c) * NCONS], &u[0][0], FLUX_STENCIL_SIZE + 1);
-
-                // for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
-                //     cons_to_prim(u[j], p[j]);
-
-                // #endif
-
-
-                #ifdef CACHE_PRIM
-
-                for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
-                {
-                    for (int q = 0; q < NCONS; ++q)
-                    {
-                        p[j][q] = prd[(i + j - c) * NCONS + q];
-                    }
-                }
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u[c][q] = urd[i * NCONS + q];
-                }
-
-                #else
-
-                for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
-                {
-                    for (int q = 0; q < NCONS; ++q)
-                    {
-                        u[j][q] = urd[(i + j - c) * NCONS + q];
-                    }
-                    cons_to_prim(u[j], p[j]);
-                }
-
-                #endif
-
-                update_cons(p, u[c], plm_theta, dt, dx);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    uwr[i * NCONS + q] = u[c][q];
-                }
-            }
-        }
-        """
-        plm = self._plm_theta if plm_theta is None else plm_theta
-        return urd.shape[0], (prd, urd, uwr, plm, dt, dx, urd.shape[0])
-
-    @kernel
-    def update_cons_fields_first(
-        self,
-        prd: NDArray[float],
-        urd: NDArray[float],
-        uwr: NDArray[float],
-        plm_theta: float,
-        dt: float,
-        dx: float,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void update_cons_fields_first(
-            double *prd,
-            double *urd,
-            double *uwr,
-            double plm_theta,
-            double dt,
-            double dx,
-            int ni)
-        {
             FOR_RANGE_1D(1, ni - 1)
             {
                 double u[FLUX_STENCIL_SIZE + 1][NCONS];
@@ -422,14 +296,12 @@ class Solver:
                 {
                     for (int q = 0; q < NCONS; ++q)
                     {
-                        double *p_blk = &prd[q * ni + blockIdx_x * blockDim_x];
-                        p[j][q] = p_blk[threadIdx_x + j - c];
+                        p[j][q] = prd[(i + j - c) * si + q * sq];
                     }
                 }
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
-                    u[c][q] = u_blk[threadIdx_x];
+                    u[c][q] = urd[i * si + q * sq];
                 }
 
                 #else
@@ -438,31 +310,30 @@ class Solver:
                 {
                     for (int q = 0; q < NCONS; ++q)
                     {
-                        double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
-                        u[j][q] = u_blk[threadIdx_x + j - c];
+                        u[j][q] = urd[(i + j - c) * si + q * sq];
                     }
                     cons_to_prim(u[j], p[j]);
                 }
 
                 #endif
 
-                update_cons(p, u[c], plm_theta, dt, dx);
+                _update_cons(p, u[c], plm_theta, dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    double *u_blk = &uwr[q * ni + blockIdx_x * blockDim_x];
-                    u_blk[threadIdx_x] = u[c][q];
+                    uwr[i * si + q * sq] = u[c][q];
                 }
             }
         }
         """
         plm = self._plm_theta if plm_theta is None else plm_theta
-        return urd.shape[1], (prd, urd, uwr, plm, dt, dx, urd.shape[1])
+        ii = -1 if self._transpose else 0
+        return urd.shape[ii], (prd, urd, uwr, plm, dt, dx, urd.shape[ii])
 
     @device
-    def godunov_fluxes(self):
+    def _godunov_fluxes(self):
         R"""
-        DEVICE void godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
+        DEVICE void _godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
         {
             double pm[NCONS];
             double pp[NCONS];
@@ -498,7 +369,7 @@ class Solver:
         """
 
     @kernel
-    def godunov_fluxes_fields_last(
+    def godunov_fluxes(
         self,
         urd: NDArray[float],
         fwr: NDArray[float],
@@ -506,8 +377,16 @@ class Solver:
         ni: int = None,
     ):
         R"""
-        KERNEL void godunov_fluxes_fields_last(double *urd, double *fwr, double plm_theta, int ni)
+        KERNEL void godunov_fluxes(double *urd, double *fwr, double plm_theta, int ni)
         {
+            #if TRANSPOSE == 0
+            int sq = 1;
+            int si = NCONS;
+            #elif TRANSPOSE == 1
+            int sq = ni;
+            int si = 1;
+            #endif
+
             FOR_RANGE_1D(1, ni - 2)
             {
                 double u[FLUX_STENCIL_SIZE][NCONS];
@@ -518,15 +397,15 @@ class Solver:
                 {
                     #if FLUX_STENCIL_SIZE == 2
 
-                    u[0][q] = urd[(i + 0) * NCONS + q];
-                    u[1][q] = urd[(i + 1) * NCONS + q];
+                    u[0][q] = urd[(i + 0) * si + q * sq];
+                    u[1][q] = urd[(i + 1) * si + q * sq];
 
                     #elif FLUX_STENCIL_SIZE == 4
 
-                    u[0][q] = urd[(i - 1) * NCONS + q];
-                    u[1][q] = urd[(i + 0) * NCONS + q];
-                    u[2][q] = urd[(i + 1) * NCONS + q];
-                    u[3][q] = urd[(i + 2) * NCONS + q];
+                    u[0][q] = urd[(i - 1) * si + q * sq];
+                    u[1][q] = urd[(i + 0) * si + q * sq];
+                    u[2][q] = urd[(i + 1) * si + q * sq];
+                    u[3][q] = urd[(i + 2) * si + q * sq];
 
                     #endif
                 }
@@ -534,69 +413,18 @@ class Solver:
                 {
                     cons_to_prim(u[i], p[i]);
                 }
-                godunov_fluxes(p, f, plm_theta);
+                _godunov_fluxes(p, f, plm_theta);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    fwr[i * NCONS + q] = f[q];
+                    fwr[i * si + q * sq] = f[q];
                 }
             }
         }
         """
         plm = self._plm_theta if plm_theta is None else plm_theta
-        return urd.shape[0], (urd, fwr, plm, urd.shape[0])
-
-    @kernel
-    def godunov_fluxes_fields_first(
-        self,
-        urd: NDArray[float],
-        fwr: NDArray[float],
-        plm_theta: float = None,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void godunov_fluxes_fields_first(double *urd, double *fwr, double plm_theta, int ni)
-        {
-            FOR_RANGE_1D(1, ni - 2)
-            {
-                double u[FLUX_STENCIL_SIZE][NCONS];
-                double p[FLUX_STENCIL_SIZE][NCONS];
-                double f[NCONS];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    double *u_blk = &urd[q * ni + blockIdx_x * blockDim_x];
-
-                    #if FLUX_STENCIL_SIZE == 2
-
-                    u[0][q] = u_blk[threadIdx_x + 0];
-                    u[1][q] = u_blk[threadIdx_x + 1];
-
-                    #elif FLUX_STENCIL_SIZE == 4
-
-                    u[0][q] = u_blk[threadIdx_x - 1];
-                    u[1][q] = u_blk[threadIdx_x + 0];
-                    u[2][q] = u_blk[threadIdx_x + 1];
-                    u[3][q] = u_blk[threadIdx_x + 2];
-
-                    #endif
-                }
-                for (int i = 0; i < FLUX_STENCIL_SIZE; ++i)
-                {
-                    cons_to_prim(u[i], p[i]);
-                }
-                godunov_fluxes(p, f, plm_theta);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    double *f_blk = &fwr[q * ni + blockIdx_x * blockDim_x];
-                    f_blk[threadIdx_x] = f[q];
-                }
-            }
-        }
-        """
-        plm = self._plm_theta if plm_theta is None else plm_theta
-        return urd.shape[1], (urd, fwr, plm, urd.shape[1])
+        ii = -1 if self._transpose else 0
+        return urd.shape[ii], (urd, fwr, plm, urd.shape[ii])
 
 
 def update_cons_from_fluxes(u, f, dt, dx, transpose, xp):
@@ -691,23 +519,17 @@ def solver(
     t = 0.0
     n = 0
     p = xp.array(p)
+    transpose = data_layout == "fields-first"
 
-    solver = Solver(reconstruction, cache_prim)
-    p2c = PrimitiveToConserved(dim=1)
+    solver = Solver(reconstruction, cache_prim, transpose=transpose)
+    p2c = PrimitiveToConserved(dim=1, transpose=transpose)
 
-    if data_layout == "fields-last":
-        prim_to_cons = p2c.prim_to_cons_fields_last
-        cons_to_prim = p2c.cons_to_prim_fields_last
-        update_cons = solver.update_cons_fields_last
-        godunov_fluxes = solver.godunov_fluxes_fields_last
-        transpose = False
+    prim_to_cons = p2c.prim_to_cons_array
+    cons_to_prim = p2c.cons_to_prim_array
+    update_cons = solver.update_cons
+    godunov_fluxes = solver.godunov_fluxes
 
-    if data_layout == "fields-first":
-        prim_to_cons = p2c.prim_to_cons_fields_first
-        cons_to_prim = p2c.cons_to_prim_fields_first
-        update_cons = solver.update_cons_fields_first
-        godunov_fluxes = solver.godunov_fluxes_fields_first
-        transpose = True
+    if transpose:
         p = xp.ascontiguousarray(p.T)
 
     if not cache_flux:
@@ -716,7 +538,6 @@ def solver(
         u2 = xp.zeros_like(p)
         prim_to_cons(p, u1)
         prim_to_cons(p, u2)
-
     else:
         fhat = xp.zeros_like(p)
         u1 = xp.zeros_like(p)
