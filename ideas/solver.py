@@ -44,6 +44,65 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 
 @kernel_class
+class GradientEsimation:
+    def __init__(self, nfields, transpose):
+        self.nfields = nfields
+        self.transpose = transpose
+
+    @property
+    def define_macros(self):
+        return dict(NFIELDS=self.nfields, TRANSPOSE=self.transpose)
+
+    @property
+    def device_funcs(self):
+        return [plm_minmod]
+
+    @kernel
+    def plm_gradient(
+        self,
+        y: NDArray[float],
+        g: NDArray[float],
+        plm_theta: float,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void plm_gradient(double *y, double *g, double plm_theta, int ni)
+        {
+            #if TRANSPOSE == 0
+            int sq = 1;
+            int si = NFIELDS;
+            #elif TRANSPOSE == 1
+            int sq = ni;
+            int si = 1;
+            #endif
+
+            FOR_RANGE_1D(1, ni - 1)
+            {
+                int ic = i;
+                int il = i - 1;
+                int ir = i + 1;
+
+                for (int q = 0; q < NFIELDS; ++q)
+                {
+                    double yc = y[ic * si + q * sq];
+                    double yl = y[il * si + q * sq];
+                    double yr = y[ir * si + q * sq];
+                    g[ic * si + q * sq] = plm_minmod(yl, yc, yr, plm_theta);
+                }
+            }
+        }
+        """
+        nq = self.nfields
+        ii = -1 if self.transpose else 0
+        iq = 0 if self.transpose else -1
+
+        if y.shape[iq] != nq or y.shape != g.shape:
+            raise ValueError("array has wrong number of fields")
+
+        return y.shape[ii], (y, g, plm_theta, y.shape[ii])
+
+
+@kernel_class
 class PrimitiveToConserved:
     def __init__(self, dim, transpose):
         self.dim = dim
@@ -153,17 +212,15 @@ class Solver:
         device_funcs = [
             cons_to_prim,
             riemann_hlle,
-            self._godunov_fluxes,
-            self._update_cons,
+            # self._update_cons,
         ]
 
         define_macros["TRANSPOSE"] = int(transpose)
-
-        if cache_prim:
-            define_macros["CACHE_PRIM"] = 1
+        define_macros["CACHE_PRIM"] = int(cache_prim)
 
         if type(reconstruction) is str:
             mode = reconstruction
+            define_macros["USE_PLM"] = 0
             define_macros["FLUX_STENCIL_SIZE"] = 2
             self._plm_theta = 0.0  # unused
             assert mode == "pcm"
@@ -171,6 +228,7 @@ class Solver:
         if type(reconstruction) is tuple:
             mode, plm_theta = reconstruction
             self._plm_theta = plm_theta
+            define_macros["USE_PLM"] = 1
             define_macros["FLUX_STENCIL_SIZE"] = 4
             device_funcs.insert(0, plm_minmod)
             assert mode == "plm"
@@ -187,92 +245,41 @@ class Solver:
     def device_funcs(self):
         return self._device_funcs
 
-    @property
-    def static(self):
-        return R"""
-        #ifdef CPU_MODE
-        #define blockIdx_x 0
-        #define blockDim_x ni
-        #define threadIdx_x i
-        #else
-        #define blockIdx_x (int)blockIdx.x
-        #define blockDim_x (int)blockDim.x
-        #define threadIdx_x (int)threadIdx.x
-        #endif
-        """
+    # @device
+    # def _update_cons(self):
+    #     R"""
+    #     DEVICE void _update_cons(
+    #         double p[FLUX_STENCIL_SIZE + 1][NCONS],
+    #         double u[NCONS],
+    #         double plm_theta,
+    #         double dt,
+    #         double dx)
+    #     {
+    #         double fp[NCONS];
+    #         double fm[NCONS];
 
-    @device
-    def _godunov_fluxes(self):
-        R"""
-        DEVICE void _godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
-        {
-            double pm[NCONS];
-            double pp[NCONS];
+    #         _godunov_fluxes(p[0], fm, plm_theta);
+    #         _godunov_fluxes(p[1], fp, plm_theta);
 
-            #if FLUX_STENCIL_SIZE == 2
-
-            double *pc = p[0];
-            double *pr = p[1];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                pm[q] = pc[q];
-                pp[q] = pr[q];
-            }
-
-            #elif FLUX_STENCIL_SIZE == 4
-
-            double *pl = p[0];
-            double *pc = p[1];
-            double *pr = p[2];
-            double *ps = p[3];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-            }
-
-            #endif
-
-            riemann_hlle(pm, pp, fh, 1);
-        }
-        """
-
-    @device
-    def _update_cons(self):
-        R"""
-        DEVICE void _update_cons(
-            double p[FLUX_STENCIL_SIZE + 1][NCONS],
-            double u[NCONS],
-            double plm_theta,
-            double dt,
-            double dx)
-        {
-            double fp[NCONS];
-            double fm[NCONS];
-
-            _godunov_fluxes(p[0], fm, plm_theta);
-            _godunov_fluxes(p[1], fp, plm_theta);
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                u[q] -= (fp[q] - fm[q]) * dt / dx;
-            }
-        }
-        """
+    #         for (int q = 0; q < NCONS; ++q)
+    #         {
+    #             u[q] -= (fp[q] - fm[q]) * dt / dx;
+    #         }
+    #     }
+    #     """
 
     @kernel
     def godunov_fluxes(
         self,
         prd: NDArray[float],
+        grd: NDArray[float],
         urd: NDArray[float],
         fwr: NDArray[float],
         plm_theta: float = None,
         ni: int = None,
     ):
         R"""
-        KERNEL void godunov_fluxes(double *prd, double *urd, double *fwr, double plm_theta, int ni)
+        KERNEL void godunov_fluxes(double *prd, double *grd, double *urd, double *fwr, double plm_theta, int ni)
         {
             #if TRANSPOSE == 0
             int sq = 1;
@@ -282,49 +289,122 @@ class Solver:
             int si = 1;
             #endif
 
-            double p[FLUX_STENCIL_SIZE][NCONS];
-            double f[NCONS];
-            int c = FLUX_STENCIL_SIZE / 2;
+            double fh[NCONS];
+            double pp[NCONS];
+            double pm[NCONS];
 
             FOR_RANGE_1D(1, ni - 2)
             {
-                #ifdef CACHE_PRIM
+                // =====================================================
+                #if USE_PLM == 0 && CACHE_PRIM == 0 && CACHE_GRAD == 0
 
-                for (int j = 0; j < FLUX_STENCIL_SIZE; ++j)
-                {
-                    for (int q = 0; q < NCONS; ++q)
-                    {
-                        p[j][q] = prd[(i + j - c + 1) * si + q * sq];
-                    }
-                }
-
-                #else
-
-                for (int j = 0; j < FLUX_STENCIL_SIZE; ++j)
-                {
-                    double u[NCONS];
-
-                    for (int q = 0; q < NCONS; ++q)
-                    {
-                        u[q] = urd[(i + j - c + 1) * si + q * sq];
-                    }
-                    cons_to_prim(u, p[j]);
-                }
-
-                #endif
-
-                _godunov_fluxes(p, f, plm_theta);
+                double ul[NCONS];
+                double ur[NCONS];
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    fwr[i * si + q * sq] = f[q];
+                    ul[q] = urd[(i + 0) * si + q * sq];
+                    ur[q] = urd[(i + 1) * si + q * sq];
+                }
+                cons_to_prim(ul, pm);
+                cons_to_prim(ur, pp);
+
+                // =====================================================
+                #elif USE_PLM == 0 && CACHE_PRIM == 0 && CACHE_GRAD == 1
+                #error("bad config: USE_PLM == 0 && CACHE_GRAD == 1")
+
+                // =====================================================
+                #elif USE_PLM == 0 && CACHE_PRIM == 1 && CACHE_GRAD == 0
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    pm[q] = prd[(i + 0) * si + q * sq];
+                    pp[q] = prd[(i + 1) * si + q * sq];
+                }
+
+                // =====================================================
+                #elif USE_PLM == 0 && CACHE_PRIM == 1 && CACHE_GRAD == 1
+                #error("bad config: USE_PLM == 0 && CACHE_GRAD == 1")
+
+                // =====================================================
+                #elif USE_PLM == 1 && CACHE_PRIM == 0 && CACHE_GRAD == 0
+                double u[4][NCONS];
+                double p[4][NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u[0][q] = urd[(i - 1) * si + q * sq];
+                    u[1][q] = urd[(i + 0) * si + q * sq];
+                    u[2][q] = urd[(i + 1) * si + q * sq];
+                    u[3][q] = urd[(i + 2) * si + q * sq];
+                }
+                cons_to_prim(u[0], p[0]);
+                cons_to_prim(u[1], p[1]);
+                cons_to_prim(u[2], p[2]);
+                cons_to_prim(u[3], p[3]);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    double gl = plm_minmod(p[0][q], p[1][q], p[2][q], plm_theta);
+                    double gr = plm_minmod(p[1][q], p[2][q], p[3][q], plm_theta);
+                    pm[q] = p[1][q] + 0.5 * gl;
+                    pp[q] = p[2][q] - 0.5 * gr;
+                }
+
+                // =====================================================
+                #elif USE_PLM == 1 && CACHE_PRIM == 0 && CACHE_GRAD == 1
+                #error("bad config: CACHE_PRIM == 0 && CACHE_GRAD == 1")
+
+                // =====================================================
+                #elif USE_PLM == 1 && CACHE_PRIM == 1 && CACHE_GRAD == 0
+                (void)cons_to_prim; // unused
+                double p[4][NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    p[0][q] = prd[(i - 1) * si + q * sq];
+                    p[1][q] = prd[(i + 0) * si + q * sq];
+                    p[2][q] = prd[(i + 1) * si + q * sq];
+                    p[3][q] = prd[(i + 2) * si + q * sq];
+                }
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    double gl = plm_minmod(p[0][q], p[1][q], p[2][q], plm_theta);
+                    double gr = plm_minmod(p[1][q], p[2][q], p[3][q], plm_theta);
+                    pm[q] = p[1][q] + 0.5 * gl;
+                    pp[q] = p[2][q] - 0.5 * gr;
+                }
+
+                // =====================================================
+                #elif USE_PLM == 1 && CACHE_PRIM == 1 && CACHE_GRAD == 1
+                double pp[NCONS];
+                double pm[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    double pl = prd[(i + 0) * si + q * sq];
+                    double pr = prd[(i + 1) * si + q * sq];
+                    double gl = grd[(i + 0) * si + q * sq];
+                    double gr = grd[(i + 1) * si + q * sq];
+                    pm[q] = pl + 0.5 * gl;
+                    pp[q] = pr - 0.5 * gr;
+                }
+                #endif
+
+                // =====================================================
+                riemann_hlle(pm, pp, fh, 1);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    fwr[i * si + q * sq] = fh[q];
                 }
             }
         }
         """
         plm = self._plm_theta if plm_theta is None else plm_theta
         ii = -1 if self._transpose else 0
-        return urd.shape[ii], (prd, urd, fwr, plm, urd.shape[ii])
+        return urd.shape[ii], (prd, grd, urd, fwr, plm, urd.shape[ii])
 
     @kernel
     def update_cons(
@@ -388,7 +468,7 @@ class Solver:
 
                 #endif
 
-                _update_cons(p, u[c], plm_theta, dt, dx);
+                // _update_cons(p, u[c], plm_theta, dt, dx);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -478,6 +558,7 @@ def solver(
     data_layout: str,
     cache_flux: bool,
     cache_prim: bool,
+    cache_grad: bool,
     reconstruction: Reconstruction,
     time_integration: str,
 ) -> State:
@@ -496,13 +577,16 @@ def solver(
     p = xp.array(p)
     transpose = data_layout == "fields-first"
 
+    gradient_estimation = GradientEsimation(nfields=3, transpose=transpose)
     solver = Solver(reconstruction, cache_prim=cache_prim, transpose=transpose)
-    p2c = PrimitiveToConserved(dim=1, transpose=transpose)
+    fields = PrimitiveToConserved(dim=1, transpose=transpose)
 
-    prim_to_cons = p2c.prim_to_cons_array
-    cons_to_prim = p2c.cons_to_prim_array
+    plm_theta = reconstruction[1] if type(reconstruction) is tuple else None
+    plm_gradient = gradient_estimation.plm_gradient
     update_cons = solver.update_cons
     godunov_fluxes = solver.godunov_fluxes
+    prim_to_cons = fields.prim_to_cons_array
+    cons_to_prim = fields.cons_to_prim_array
 
     if transpose:
         p = xp.ascontiguousarray(p.T)
@@ -517,6 +601,11 @@ def solver(
         fhat = xp.zeros_like(p)
         u1 = xp.zeros_like(p)
         prim_to_cons(p, u1)
+
+    if cache_grad:
+        g1 = xp.zeros_like(p)
+    else:
+        g1 = None
 
     if cache_prim:
         p1 = p
@@ -538,6 +627,8 @@ def solver(
 
     while True:
         if not cache_flux:
+            raise NotImplementedError("temporarily down")
+
             if not rks:
                 if p1 is not None:
                     cons_to_prim(u1, p1)
@@ -555,14 +646,18 @@ def solver(
             if not rks:
                 if p1 is not None:
                     cons_to_prim(u1, p1)
-                godunov_fluxes(p1, u1, fhat)
+                if g1 is not None:
+                    plm_gradient(p1, g1, plm_theta)
+                godunov_fluxes(p1, g1, u1, fhat)
                 update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
             else:
                 u0 = u1.copy()
                 for rk in rks:
                     if p1 is not None:
                         cons_to_prim(u1, p1)
-                    godunov_fluxes(p1, u1, fhat)
+                    if g1 is not None:
+                        plm_gradient(p1, g1, plm_theta)
+                    godunov_fluxes(p1, g1, u1, fhat)
                     update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
                     average_rk(u0, u1, rk)
 
@@ -578,6 +673,7 @@ def make_solver(app: Sailfish):
         data_layout=app.strategy.data_layout,
         cache_flux=app.strategy.cache_flux,
         cache_prim=app.strategy.cache_prim,
+        cache_grad=app.strategy.cache_grad,
         reconstruction=app.scheme.reconstruction,
         time_integration=app.scheme.time_integration,
     )

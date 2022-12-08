@@ -356,6 +356,11 @@ def main():
         dest="strategy.cache_flux",
     )
     parser.add_argument(
+        "--cache-grad",
+        action="store_true",
+        dest="strategy.cache_grad",
+    )
+    parser.add_argument(
         "--plot",
         nargs="?",
         const="end",
@@ -378,7 +383,7 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(args.log_level.upper())
 
-    install(show_locals=args.debug)  # rich traceback
+    install()  # rich traceback
     cmdline_dict = unflatten(
         {
             k: v

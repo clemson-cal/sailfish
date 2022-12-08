@@ -152,6 +152,7 @@ class Strategy:
     data_layout: Literal["fields-first", "fields-last"] = "fields-last"
     cache_flux: bool = False
     cache_prim: bool = False
+    cache_grad: bool = False
 
 
 @configmodel
