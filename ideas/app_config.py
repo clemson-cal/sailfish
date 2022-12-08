@@ -129,7 +129,7 @@ class Scheme:
     """
 
     reconstruction: Reconstruction = "pcm"
-    time_integration: TimeIntegration = "rk2"
+    time_integration: TimeIntegration = "fwd"
 
 
 @configmodel

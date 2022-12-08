@@ -135,10 +135,15 @@ def configmodel_rich_table(d, console, options):
 
 def configmodel(cls):
     from pydantic.dataclasses import dataclass
+    from pydantic import Extra
 
     if cls.__doc__ is None:
         cls.__doc__ = " "
-    dataclass(cls)
+
+    class ModelConfig:
+        extra = Extra.forbid
+
+    dataclass(config=ModelConfig)(cls)
 
     short_descr, long_descr, field_descriptions = parse_docstring(cls)
     prop_descriptions = {

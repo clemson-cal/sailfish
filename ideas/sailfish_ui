@@ -87,8 +87,8 @@ class Dashboard:
     A rich-renderable run monitor
     """
 
-    def __init__(self):
-        self._app = None
+    def __init__(self, app=None):
+        self._app = app
         self.group = Group("", "", "")
 
     @property
@@ -379,7 +379,13 @@ def main():
     logger.setLevel(args.log_level.upper())
 
     install(show_locals=args.debug)  # rich traceback
-    cmdline_dict = unflatten({k: v for k, v in vars(args).items() if v is not None})
+    cmdline_dict = unflatten(
+        {
+            k: v
+            for k, v in vars(args).items()
+            if v is not None and k not in ("configs", "log_level", "debug")
+        }
+    )
 
     def sailfish(config):
         if not config:
@@ -395,7 +401,7 @@ def main():
             deep_update(s, cmdline_dict)
             yield Sailfish(**s)
 
-    run(chain(*map(sailfish, [None] + args.configs)), console, not args.debug)
+    run(chain(*map(sailfish, args.configs)), console, not args.debug)
 
 
 if __name__ == "__main__":
