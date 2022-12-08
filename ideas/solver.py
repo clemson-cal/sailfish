@@ -153,8 +153,8 @@ class Solver:
         device_funcs = [
             cons_to_prim,
             riemann_hlle,
-            self._update_cons,
             self._godunov_fluxes,
+            self._update_cons,
         ]
 
         define_macros["TRANSPOSE"] = int(transpose)
@@ -202,6 +202,44 @@ class Solver:
         """
 
     @device
+    def _godunov_fluxes(self):
+        R"""
+        DEVICE void _godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
+        {
+            double pm[NCONS];
+            double pp[NCONS];
+
+            #if FLUX_STENCIL_SIZE == 2
+
+            double *pc = p[0];
+            double *pr = p[1];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pm[q] = pc[q];
+                pp[q] = pr[q];
+            }
+
+            #elif FLUX_STENCIL_SIZE == 4
+
+            double *pl = p[0];
+            double *pc = p[1];
+            double *pr = p[2];
+            double *ps = p[3];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
+                pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
+            }
+
+            #endif
+
+            riemann_hlle(pm, pp, fh, 1);
+        }
+        """
+
+    @device
     def _update_cons(self):
         R"""
         DEVICE void _update_cons(
@@ -214,39 +252,8 @@ class Solver:
             double fp[NCONS];
             double fm[NCONS];
 
-            #if FLUX_STENCIL_SIZE == 2
-
-            riemann_hlle(p[0], p[1], fm, 1);
-            riemann_hlle(p[1], p[2], fp, 1);
-
-            #elif FLUX_STENCIL_SIZE == 4
-
-            double *pk = p[0];
-            double *pl = p[1];
-            double *pc = p[2];
-            double *pr = p[3];
-            double *ps = p[4];
-            double pml[NCONS];
-            double pmr[NCONS];
-            double ppl[NCONS];
-            double ppr[NCONS];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
-                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-
-                pml[q] = pl[q] + 0.5 * gl;
-                pmr[q] = pc[q] - 0.5 * gc;
-                ppl[q] = pc[q] + 0.5 * gc;
-                ppr[q] = pr[q] - 0.5 * gr;
-            }
-
-            riemann_hlle(pml, pmr, fm, 1);
-            riemann_hlle(ppl, ppr, fp, 1);
-
-            #endif
+            _godunov_fluxes(p[0], fm, plm_theta);
+            _godunov_fluxes(p[1], fp, plm_theta);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -254,6 +261,70 @@ class Solver:
             }
         }
         """
+
+    @kernel
+    def godunov_fluxes(
+        self,
+        prd: NDArray[float],
+        urd: NDArray[float],
+        fwr: NDArray[float],
+        plm_theta: float = None,
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void godunov_fluxes(double *prd, double *urd, double *fwr, double plm_theta, int ni)
+        {
+            #if TRANSPOSE == 0
+            int sq = 1;
+            int si = NCONS;
+            #elif TRANSPOSE == 1
+            int sq = ni;
+            int si = 1;
+            #endif
+
+            double p[FLUX_STENCIL_SIZE][NCONS];
+            double f[NCONS];
+            int c = FLUX_STENCIL_SIZE / 2;
+
+            FOR_RANGE_1D(1, ni - 2)
+            {
+                #ifdef CACHE_PRIM
+
+                for (int j = 0; j < FLUX_STENCIL_SIZE; ++j)
+                {
+                    for (int q = 0; q < NCONS; ++q)
+                    {
+                        p[j][q] = prd[(i + j - c + 1) * si + q * sq];
+                    }
+                }
+
+                #else
+
+                for (int j = 0; j < FLUX_STENCIL_SIZE; ++j)
+                {
+                    double u[NCONS];
+
+                    for (int q = 0; q < NCONS; ++q)
+                    {
+                        u[q] = urd[(i + j - c + 1) * si + q * sq];
+                    }
+                    cons_to_prim(u, p[j]);
+                }
+
+                #endif
+
+                _godunov_fluxes(p, f, plm_theta);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    fwr[i * si + q * sq] = f[q];
+                }
+            }
+        }
+        """
+        plm = self._plm_theta if plm_theta is None else plm_theta
+        ii = -1 if self._transpose else 0
+        return urd.shape[ii], (prd, urd, fwr, plm, urd.shape[ii])
 
     @kernel
     def update_cons(
@@ -329,91 +400,6 @@ class Solver:
         plm = self._plm_theta if plm_theta is None else plm_theta
         ii = -1 if self._transpose else 0
         return urd.shape[ii], (prd, urd, uwr, plm, dt, dx, urd.shape[ii])
-
-    @device
-    def _godunov_fluxes(self):
-        R"""
-        DEVICE void _godunov_fluxes(double p[FLUX_STENCIL_SIZE][NCONS], double fh[NCONS], double plm_theta)
-        {
-            double pm[NCONS];
-            double pp[NCONS];
-
-            #if FLUX_STENCIL_SIZE == 2
-
-            double *pc = p[0];
-            double *pr = p[1];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                pm[q] = pc[q];
-                pp[q] = pr[q];
-            }
-
-            #elif FLUX_STENCIL_SIZE == 4
-
-            double *pl = p[0];
-            double *pc = p[1];
-            double *pr = p[2];
-            double *ps = p[3];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-            }
-
-            #endif
-
-            riemann_hlle(pm, pp, fh, 1);
-        }
-        """
-
-    @kernel
-    def godunov_fluxes(
-        self,
-        urd: NDArray[float],
-        fwr: NDArray[float],
-        plm_theta: float = None,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void godunov_fluxes(double *urd, double *fwr, double plm_theta, int ni)
-        {
-            #if TRANSPOSE == 0
-            int sq = 1;
-            int si = NCONS;
-            #elif TRANSPOSE == 1
-            int sq = ni;
-            int si = 1;
-            #endif
-
-            double u[FLUX_STENCIL_SIZE][NCONS];
-            double p[FLUX_STENCIL_SIZE][NCONS];
-            double f[NCONS];
-            int c = FLUX_STENCIL_SIZE / 2;
-
-            FOR_RANGE_1D(1, ni - 2)
-            {
-                for (int j = 0; j < FLUX_STENCIL_SIZE; ++j)
-                {
-                    for (int q = 0; q < NCONS; ++q)
-                    {
-                        u[j][q] = urd[(i + j - c + 1) * si + q * sq];
-                    }
-                    cons_to_prim(u[j], p[j]);
-                }
-                _godunov_fluxes(p, f, plm_theta);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    fwr[i * si + q * sq] = f[q];
-                }
-            }
-        }
-        """
-        plm = self._plm_theta if plm_theta is None else plm_theta
-        ii = -1 if self._transpose else 0
-        return urd.shape[ii], (urd, fwr, plm, urd.shape[ii])
 
 
 def update_cons_from_fluxes(u, f, dt, dx, transpose, xp):
@@ -510,7 +496,7 @@ def solver(
     p = xp.array(p)
     transpose = data_layout == "fields-first"
 
-    solver = Solver(reconstruction, cache_prim, transpose=transpose)
+    solver = Solver(reconstruction, cache_prim=cache_prim, transpose=transpose)
     p2c = PrimitiveToConserved(dim=1, transpose=transpose)
 
     prim_to_cons = p2c.prim_to_cons_array
@@ -531,6 +517,13 @@ def solver(
         fhat = xp.zeros_like(p)
         u1 = xp.zeros_like(p)
         prim_to_cons(p, u1)
+
+    if cache_prim:
+        p1 = p
+        del p
+    else:
+        p1 = None
+        del p
 
     if time_integration == "fwd":
         rks = []
@@ -560,12 +553,16 @@ def solver(
                     average_rk(u0, u1, rk)
         else:
             if not rks:
-                godunov_fluxes(u1, fhat)
+                if p1 is not None:
+                    cons_to_prim(u1, p1)
+                godunov_fluxes(p1, u1, fhat)
                 update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
             else:
                 u0 = u1.copy()
                 for rk in rks:
-                    godunov_fluxes(u1, fhat)
+                    if p1 is not None:
+                        cons_to_prim(u1, p1)
+                    godunov_fluxes(p1, u1, fhat)
                     update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
                     average_rk(u0, u1, rk)
 
