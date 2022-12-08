@@ -548,10 +548,12 @@ def solver(
     p = xp.array(p)
     transpose = data_layout == "fields-first"
 
+    # =========================================================================
+    # Solvers and solver functions
+    # =========================================================================
     gradient_estimation = GradientEsimation(nfields=3, transpose=transpose)
     solver = Solver(reconstruction, cache_prim=cache_prim, transpose=transpose)
     fields = PrimitiveToConserved(dim=1, transpose=transpose)
-
     plm_theta = reconstruction[1] if type(reconstruction) is tuple else None
     plm_gradient = gradient_estimation.plm_gradient
     update_cons = solver.update_cons
@@ -559,32 +561,18 @@ def solver(
     prim_to_cons = fields.prim_to_cons_array
     cons_to_prim = fields.cons_to_prim_array
 
+    # =========================================================================
+    # Whether the data layout is transposed, i.e. adjacent memory locations are
+    # the same field but in adjacent zones.
+    # =========================================================================
     if transpose:
         p = xp.ascontiguousarray(p.T)
 
-    if not cache_flux:
-        p1 = p if cache_prim else None
-        u1 = xp.zeros_like(p)
-        u2 = xp.zeros_like(p)
-        prim_to_cons(p, u1)
-        prim_to_cons(p, u2)
-    else:
-        fhat = xp.zeros_like(p)
-        u1 = xp.zeros_like(p)
-        prim_to_cons(p, u1)
-
-    if cache_grad:
-        g1 = xp.zeros_like(p)
-    else:
-        g1 = None
-
-    if cache_prim:
-        p1 = p
-        del p
-    else:
-        p1 = None
-        del p
-
+    # =========================================================================
+    # Time integration scheme: fwd and rk1 should produce the same result, but
+    # rk1 can be used to test the expense of the data which is not required for
+    # fwd.
+    # =========================================================================
     if time_integration == "fwd":
         rks = []
     elif time_integration == "rk1":
@@ -594,8 +582,51 @@ def solver(
     elif time_integration == "rk3":
         rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
 
+    # =========================================================================
+    # A buffer for the array of cached Runge-Kutta conserved fields
+    # =========================================================================
+    if rks:
+        u0 = xp.zeros_like(p)  # RK cons
+
+    # =========================================================================
+    # Buffers for either read-and-write conserved arrays (if single-step update,
+    # i.e. no cache-flux is used) or buffers for the conserved data and an array
+    # of Godunov fluxes.
+    # =========================================================================
+    if not cache_flux:
+        p1 = p if cache_prim else None
+        u1 = xp.zeros_like(p)
+        u2 = xp.zeros_like(p)
+        prim_to_cons(p, u1)
+        prim_to_cons(p, u2)
+    else:
+        fh = xp.zeros_like(p)
+        u1 = xp.zeros_like(p)  # read-from cons
+        prim_to_cons(p, u1)
+
+    # =========================================================================
+    # A buffer for the primitive fields they are being cached
+    # =========================================================================
+    if cache_prim:
+        p1 = p
+    else:
+        p1 = None
+
+    # =========================================================================
+    # A buffer for the primitive field gradients if gradients are being cached
+    # =========================================================================
+    if cache_grad:
+        g1 = xp.zeros_like(p)  # gradients
+    else:
+        g1 = None
+
+    del p  # no longer needed, will free memory if possible
+
     yield State(n, t, u1, cons_to_prim, transpose=transpose)
 
+    # =========================================================================
+    # Main loop: yield states until the caller stops calling next
+    # =========================================================================
     while True:
         if not cache_flux:
             if not rks:
@@ -604,7 +635,7 @@ def solver(
                 update_cons(p1, g1, u1, u2, None, dt, dx)
                 u1, u2 = u2, u1
             else:
-                u0 = u1.copy()
+                u0[...] = u1[...]
                 for rk in rks:
                     if p1 is not None:
                         cons_to_prim(u1, p1)
@@ -617,17 +648,17 @@ def solver(
                     cons_to_prim(u1, p1)
                 if g1 is not None:
                     plm_gradient(p1, g1, plm_theta)
-                godunov_fluxes(p1, g1, u1, fhat)
-                update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
+                godunov_fluxes(p1, g1, u1, fh)
+                update_cons_from_fluxes(u1, fh, dt, dx, transpose, xp)
             else:
-                u0 = u1.copy()
+                u0[...] = u1[...]
                 for rk in rks:
                     if p1 is not None:
                         cons_to_prim(u1, p1)
                     if g1 is not None:
                         plm_gradient(p1, g1, plm_theta)
-                    godunov_fluxes(p1, g1, u1, fhat)
-                    update_cons_from_fluxes(u1, fhat, dt, dx, transpose, xp)
+                    godunov_fluxes(p1, g1, u1, fh)
+                    update_cons_from_fluxes(u1, fh, dt, dx, transpose, xp)
                     average_rk(u0, u1, rk)
 
         t += dt
@@ -636,6 +667,9 @@ def solver(
 
 
 def make_solver(app: Sailfish):
+    """
+    Construct the 1d solver from an app instance
+    """
     return solver(
         app.hardware,
         app.domain.num_zones[0],
