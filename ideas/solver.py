@@ -284,12 +284,12 @@ class Solver:
             int si = 1;
             #endif
 
+            double u[FLUX_STENCIL_SIZE + 1][NCONS];
+            double p[FLUX_STENCIL_SIZE + 1][NCONS];
+            int c = FLUX_STENCIL_SIZE / 2;
+
             FOR_RANGE_1D(1, ni - 1)
             {
-                double u[FLUX_STENCIL_SIZE + 1][NCONS];
-                double p[FLUX_STENCIL_SIZE + 1][NCONS];
-                int c = FLUX_STENCIL_SIZE / 2;
-
                 #ifdef CACHE_PRIM
 
                 for (int j = 0; j < FLUX_STENCIL_SIZE + 1; ++j)
@@ -387,31 +387,20 @@ class Solver:
             int si = 1;
             #endif
 
+            double u[FLUX_STENCIL_SIZE][NCONS];
+            double p[FLUX_STENCIL_SIZE][NCONS];
+            double f[NCONS];
+            int c = FLUX_STENCIL_SIZE / 2;
+
             FOR_RANGE_1D(1, ni - 2)
             {
-                double u[FLUX_STENCIL_SIZE][NCONS];
-                double p[FLUX_STENCIL_SIZE][NCONS];
-                double f[NCONS];
-
-                for (int q = 0; q < NCONS; ++q)
+                for (int j = 0; j < FLUX_STENCIL_SIZE; ++j)
                 {
-                    #if FLUX_STENCIL_SIZE == 2
-
-                    u[0][q] = urd[(i + 0) * si + q * sq];
-                    u[1][q] = urd[(i + 1) * si + q * sq];
-
-                    #elif FLUX_STENCIL_SIZE == 4
-
-                    u[0][q] = urd[(i - 1) * si + q * sq];
-                    u[1][q] = urd[(i + 0) * si + q * sq];
-                    u[2][q] = urd[(i + 1) * si + q * sq];
-                    u[3][q] = urd[(i + 2) * si + q * sq];
-
-                    #endif
-                }
-                for (int i = 0; i < FLUX_STENCIL_SIZE; ++i)
-                {
-                    cons_to_prim(u[i], p[i]);
+                    for (int q = 0; q < NCONS; ++q)
+                    {
+                        u[j][q] = urd[(i + j - c + 1) * si + q * sq];
+                    }
+                    cons_to_prim(u[j], p[j]);
                 }
                 _godunov_fluxes(p, f, plm_theta);
 
