@@ -564,7 +564,7 @@ def solver(
     gradient_estimation = GradientEsimation(nfields=3, transpose=transpose)
     solver = Solver(reconstruction, cache_prim=cache_prim, transpose=transpose)
     fields = PrimitiveToConserved(dim=1, transpose=transpose)
-    plm_theta = reconstruction[1] if type(reconstruction) is tuple else None
+    plm_theta = reconstruction[1] if type(reconstruction) is tuple else 0.0
     plm_gradient = gradient_estimation.plm_gradient
     update_cons = solver.update_cons
     godunov_fluxes = solver.godunov_fluxes
