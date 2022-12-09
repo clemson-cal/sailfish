@@ -280,7 +280,7 @@ def main():
         usage=SUPPRESS,
         description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
     )
-    parser.add_argument("configs", nargs="*")
+    parser.add_argument("configs", nargs="*", default=[dict()])
     parser.add_argument(
         "--log-level",
         default="warning",

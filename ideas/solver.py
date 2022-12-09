@@ -263,7 +263,7 @@ class Solver:
             double pm[NCONS];
 
             // =====================================================
-            #if USE_PLM == 0 && CACHE_PRIM == 0 && CACHE_GRAD == 0
+            #if USE_PLM == 0 && CACHE_PRIM == 0
 
             double ul[NCONS];
             double ur[NCONS];
@@ -277,21 +277,13 @@ class Solver:
             cons_to_prim(ur, pp);
 
             // =====================================================
-            #elif USE_PLM == 0 && CACHE_PRIM == 0 && CACHE_GRAD == 1
-            #error("bad config: USE_PLM == 0 && CACHE_GRAD == 1")
-
-            // =====================================================
-            #elif USE_PLM == 0 && CACHE_PRIM == 1 && CACHE_GRAD == 0
+            #elif USE_PLM == 0 && CACHE_PRIM == 1
 
             for (int q = 0; q < NCONS; ++q)
             {
                 pm[q] = prd[(i - 1) * si + q * sq];
                 pp[q] = prd[(i + 0) * si + q * sq];
             }
-
-            // =====================================================
-            #elif USE_PLM == 0 && CACHE_PRIM == 1 && CACHE_GRAD == 1
-            #error("bad config: USE_PLM == 0 && CACHE_GRAD == 1")
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 0 && CACHE_GRAD == 0
@@ -320,11 +312,29 @@ class Solver:
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 0 && CACHE_GRAD == 1
-            #error("bad config: CACHE_PRIM == 0 && CACHE_GRAD == 1")
+            double ul[NCONS];
+            double ur[NCONS];
+            double pl[NCONS];
+            double pr[NCONS];
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                ul[q] = urd[(i - 1) * si + q * sq];
+                ur[q] = urd[(i + 0) * si + q * sq];
+            }
+            cons_to_prim(ul, pl);
+            cons_to_prim(ur, pr);
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                double gl = grd[(i - 1) * si + q * sq];
+                double gr = grd[(i + 0) * si + q * sq];
+                pm[q] = pl[q] + 0.5 * gl;
+                pp[q] = pr[q] - 0.5 * gr;
+            }
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 1 && CACHE_GRAD == 0
-            (void)cons_to_prim; // unused
             double p[4][NCONS];
 
             for (int q = 0; q < NCONS; ++q)
@@ -605,9 +615,9 @@ def solver(
         prim_to_cons(p, u1)
 
     # =========================================================================
-    # A buffer for the primitive fields they are being cached
+    # A buffer for the primitive fields they or gradients are cached
     # =========================================================================
-    if cache_prim:
+    if cache_prim or cache_grad:
         p1 = p
     else:
         p1 = None
@@ -673,10 +683,10 @@ def make_solver(app: Sailfish):
     return solver(
         app.hardware,
         app.domain.num_zones[0],
-        data_layout=app.strategy.data_layout,
-        cache_flux=app.strategy.cache_flux,
-        cache_prim=app.strategy.cache_prim,
-        cache_grad=app.strategy.cache_grad,
-        reconstruction=app.scheme.reconstruction,
-        time_integration=app.scheme.time_integration,
+        app.strategy.data_layout,
+        app.strategy.cache_flux,
+        app.strategy.cache_prim,
+        app.strategy.cache_grad,
+        app.scheme.reconstruction,
+        app.scheme.time_integration,
     )
