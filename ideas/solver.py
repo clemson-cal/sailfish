@@ -220,20 +220,19 @@ class Solver:
         define_macros["USE_RK"] = int(time_integration != "fwd")
 
         if type(reconstruction) is str:
-            mode = reconstruction
+            mode, plm_theta = reconstruction, 0.0
             define_macros["USE_PLM"] = 0
             define_macros["FLUX_STENCIL_SIZE"] = 2
-            self._plm_theta = 0.0  # unused
             assert mode == "pcm"
 
         if type(reconstruction) is tuple:
             mode, plm_theta = reconstruction
-            self._plm_theta = plm_theta
             define_macros["USE_PLM"] = 1
             define_macros["FLUX_STENCIL_SIZE"] = 4
             device_funcs.insert(0, plm_minmod)
             assert mode == "plm"
 
+        self._plm_theta = plm_theta
         self._transpose = transpose
         self._define_macros = define_macros
         self._device_funcs = device_funcs
@@ -295,7 +294,7 @@ class Solver:
             for (int q = 0; q < NCONS; ++q)
             {
                 u[0][q] = urd[(i - 2) * si + q * sq];
-                u[1][q] = urd[(i + 1) * si + q * sq];
+                u[1][q] = urd[(i - 1) * si + q * sq];
                 u[2][q] = urd[(i + 0) * si + q * sq];
                 u[3][q] = urd[(i + 1) * si + q * sq];
             }
@@ -412,7 +411,7 @@ class Solver:
             }
         }
         """
-        plm = self._plm_theta if plm_theta is None else plm_theta
+        plm = plm_theta if plm_theta is not None else self._plm_theta
         ii = -1 if self._transpose else 0
         return urd.shape[ii], (prd, grd, urd, fwr, plm, urd.shape[ii])
 
@@ -421,22 +420,26 @@ class Solver:
         self,
         prd: NDArray[float],
         grd: NDArray[float],
+        urk: NDArray[float],
         urd: NDArray[float],
         uwr: NDArray[float],
-        plm_theta: float,
         dt: float,
         dx: float,
+        rk: float = 0.0,
+        plm_theta: float = None,
         ni: int = None,
     ):
         R"""
         KERNEL void update_cons(
             double *prd,
             double *grd,
+            double *urk,
             double *urd,
             double *uwr,
-            double plm_theta,
             double dt,
             double dx,
+            double rk,
+            double plm_theta,
             int ni)
         {
             #if TRANSPOSE == 0
@@ -457,14 +460,23 @@ class Solver:
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    uwr[i * si + q * sq] = urd[i * si + q * sq] - (fp[q] - fm[q]) * dt / dx;
+                    int n = i * si + q * sq;
+                    uwr[n] = urd[n] - (fp[q] - fm[q]) * dt / dx;
+
+                    #if USE_RK == 1
+                    if (rk != 0.0)
+                    {
+                        uwr[n] *= (1.0 - rk);
+                        uwr[n] += rk * urk[n];
+                    }
+                    #endif
                 }
             }
         }
         """
-        plm = self._plm_theta if plm_theta is None else plm_theta
+        plm = plm_theta if plm_theta is not None else self._plm_theta
         ii = -1 if self._transpose else 0
-        return urd.shape[ii], (prd, grd, urd, uwr, plm, dt, dx, urd.shape[ii])
+        return urd.shape[ii], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, urd.shape[ii])
 
     @kernel
     def update_cons_from_fluxes(
@@ -520,19 +532,6 @@ class Solver:
         """
         ii = -1 if self._transpose else 0
         return u.shape[ii], (urk, u, f, dt, dx, rk, u.shape[ii])
-
-
-def update_cons_from_fluxes_np(u, f, dt, dx, transpose, xp):
-    if not transpose:
-        u[2:-2, :] -= xp.diff(f[2:-1, :], axis=0) * (dt / dx)
-    else:
-        u[:, 2:-2] -= xp.diff(f[:, 2:-1], axis=1) * (dt / dx)
-
-
-def average_rk(u0, u1, rk):
-    if rk != 0.0:
-        u1 *= 1.0 - rk
-        u1 += u0 * rk
 
 
 class State:
@@ -626,7 +625,7 @@ def solver(
     plm_theta = reconstruction[1] if type(reconstruction) is tuple else 0.0
     plm_gradient = gradient_estimation.plm_gradient
     update_cons = solver.update_cons
-    update_cons_from_fluxes_native = solver.update_cons_from_fluxes
+    update_cons_from_fluxes = solver.update_cons_from_fluxes
     godunov_fluxes = solver.godunov_fluxes
     prim_to_cons = fields.prim_to_cons_array
     cons_to_prim = fields.cons_to_prim_array
@@ -704,16 +703,15 @@ def solver(
             if not rks:
                 if p1 is not None:
                     cons_to_prim(u1, p1)
-                update_cons(p1, g1, u1, u2, plm_theta, dt, dx)
+                update_cons(p1, g1, u0, u1, u2, dt, dx)
                 u1, u2 = u2, u1
             else:
                 u0[...] = u1[...]
                 for rk in rks:
                     if p1 is not None:
                         cons_to_prim(u1, p1)
-                    update_cons(p1, g1, u1, u2, plm_theta, dt, dx)
+                    update_cons(p1, g1, u0, u1, u2, dt, dx, rk)
                     u1, u2 = u2, u1
-                    average_rk(u0, u1, rk)
         else:
             if not rks:
                 if p1 is not None:
@@ -721,10 +719,7 @@ def solver(
                 if g1 is not None:
                     plm_gradient(p1, g1, plm_theta)
                 godunov_fluxes(p1, g1, u1, fh)
-                if True:
-                    update_cons_from_fluxes_native(u0, u1, fh, dt, dx, 0.0)
-                else:
-                    update_cons_from_fluxes_np(u1, fh, dt, dx, transpose, xp)
+                update_cons_from_fluxes(u0, u1, fh, dt, dx, 0.0)
             else:
                 u0[...] = u1[...]
                 for rk in rks:
@@ -733,11 +728,7 @@ def solver(
                     if g1 is not None:
                         plm_gradient(p1, g1, plm_theta)
                     godunov_fluxes(p1, g1, u1, fh)
-                    if True:
-                        update_cons_from_fluxes_native(u0, u1, fh, dt, dx, rk)
-                    else:
-                        update_cons_from_fluxes_np(u1, fh, dt, dx, transpose, xp)
-                        average_rk(u0, u1, rk)
+                    update_cons_from_fluxes(u0, u1, fh, dt, dx, rk)
 
         t += dt
         n += 1
