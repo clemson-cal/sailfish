@@ -192,7 +192,7 @@ def run(apps: list[Sailfish], console: Console, use_dash=False):
     try:
         if use_dash:
             dash = Dashboard()
-            view = Live(dash.render(), console=console, refresh_per_second=30)
+            view = Live(dash.render(), console=console, refresh_per_second=2)
             view.start()
         else:
             dash = ScrollbackReporting(console)
