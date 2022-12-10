@@ -174,8 +174,6 @@ class Sailfish:
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()
     hardware: Literal["cpu", "gpu"] = "cpu"
-    show_config: Literal["pretty", "table", "json", "dict"] = "pretty"
-    plot: Literal["live", "end"] = None
 
 
 if __name__ == "__main__":
@@ -187,5 +185,7 @@ if __name__ == "__main__":
     app = Sailfish(physics=Isothermal())
 
     for field in app.__dataclass_fields__:
-        console.print()
-        console.print(getattr(app, field))
+        value = getattr(app, field)
+        if hasattr(value, "__configmodel__"):
+            console.print()
+            console.print(value)
