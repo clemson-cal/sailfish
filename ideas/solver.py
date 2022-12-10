@@ -45,9 +45,11 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 @kernel_class
 class GradientEsimation:
-    def __init__(self, nfields, transpose):
+    def __init__(self, nfields, transpose, reconstruction):
+        plm_theta = reconstruction[1] if type(reconstruction) is tuple else 0.0
         self.nfields = nfields
         self.transpose = transpose
+        self.plm_theta = plm_theta
 
     @property
     def define_macros(self):
@@ -62,7 +64,7 @@ class GradientEsimation:
         self,
         y: NDArray[float],
         g: NDArray[float],
-        plm_theta: float,
+        plm_theta: float = None,
         ni: int = None,
     ):
         R"""
@@ -92,6 +94,7 @@ class GradientEsimation:
             }
         }
         """
+        plm = plm_theta if plm_theta is not None else self.plm_theta
         nq = self.nfields
         ii = -1 if self.transpose else 0
         iq = 0 if self.transpose else -1
@@ -99,11 +102,11 @@ class GradientEsimation:
         if y.shape[iq] != nq or y.shape != g.shape:
             raise ValueError("array has wrong number of fields")
 
-        return y.shape[ii], (y, g, plm_theta, y.shape[ii])
+        return y.shape[ii], (y, g, plm, y.shape[ii])
 
 
 @kernel_class
-class PrimitiveToConserved:
+class Fields:
     def __init__(self, dim, transpose):
         self.dim = dim
         self.transpose = transpose
@@ -619,11 +622,10 @@ def solver(
     # =========================================================================
     # Solvers and solver functions
     # =========================================================================
-    gradient_estimation = GradientEsimation(nfields=3, transpose=transpose)
+    grad_est = GradientEsimation(3, transpose, reconstruction)
     solver = Solver(reconstruction, time_integration, cache_prim, transpose)
-    fields = PrimitiveToConserved(dim=1, transpose=transpose)
-    plm_theta = reconstruction[1] if type(reconstruction) is tuple else 0.0
-    plm_gradient = gradient_estimation.plm_gradient
+    fields = Fields(1, transpose)
+    plm_gradient = grad_est.plm_gradient
     update_cons = solver.update_cons
     update_cons_from_fluxes = solver.update_cons_from_fluxes
     godunov_fluxes = solver.godunov_fluxes
@@ -664,16 +666,16 @@ def solver(
     # i.e. no cache-flux is used) or buffers for the conserved data and an array
     # of Godunov fluxes.
     # =========================================================================
-    if not cache_flux:
+    if cache_flux:
+        fh = xp.zeros_like(p)
+        u1 = xp.zeros_like(p)
+        prim_to_cons(p, u1)
+    else:
         p1 = p if cache_prim else None
         u1 = xp.zeros_like(p)
         u2 = xp.zeros_like(p)
         prim_to_cons(p, u1)
         prim_to_cons(p, u2)
-    else:
-        fh = xp.zeros_like(p)
-        u1 = xp.zeros_like(p)  # read-from cons
-        prim_to_cons(p, u1)
 
     # =========================================================================
     # A buffer for the primitive fields they or gradients are cached
@@ -693,46 +695,30 @@ def solver(
 
     del p  # p is no longer needed, will free memory if possible
 
-    yield State(n, t, u1, cons_to_prim, transpose=transpose)
+    yield State(n, t, u1, cons_to_prim, transpose)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
     # =========================================================================
     while True:
-        if not cache_flux:
-            if not rks:
-                if p1 is not None:
-                    cons_to_prim(u1, p1)
+        if rks:
+            u0[...] = u1[...]
+
+        for rk in rks or [0.0]:
+            if cache_prim:
+                cons_to_prim(u1, p1)
+            if cache_grad:
+                plm_gradient(p1, g1)
+            if cache_flux:
+                godunov_fluxes(p1, g1, u1, fh)
+                update_cons_from_fluxes(u0, u1, fh, dt, dx, rk)
+            else:
                 update_cons(p1, g1, u0, u1, u2, dt, dx)
                 u1, u2 = u2, u1
-            else:
-                u0[...] = u1[...]
-                for rk in rks:
-                    if p1 is not None:
-                        cons_to_prim(u1, p1)
-                    update_cons(p1, g1, u0, u1, u2, dt, dx, rk)
-                    u1, u2 = u2, u1
-        else:
-            if not rks:
-                if p1 is not None:
-                    cons_to_prim(u1, p1)
-                if g1 is not None:
-                    plm_gradient(p1, g1, plm_theta)
-                godunov_fluxes(p1, g1, u1, fh)
-                update_cons_from_fluxes(u0, u1, fh, dt, dx, 0.0)
-            else:
-                u0[...] = u1[...]
-                for rk in rks:
-                    if p1 is not None:
-                        cons_to_prim(u1, p1)
-                    if g1 is not None:
-                        plm_gradient(p1, g1, plm_theta)
-                    godunov_fluxes(p1, g1, u1, fh)
-                    update_cons_from_fluxes(u0, u1, fh, dt, dx, rk)
 
         t += dt
         n += 1
-        yield State(n, t, u1, cons_to_prim, transpose=transpose)
+        yield State(n, t, u1, cons_to_prim, transpose)
 
 
 def make_solver(app: Sailfish):
