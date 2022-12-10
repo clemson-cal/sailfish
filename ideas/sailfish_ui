@@ -5,8 +5,8 @@ from argparse import ArgumentParser, SUPPRESS
 from collections import deque
 from collections.abc import Mapping
 from dataclasses import asdict, dataclass
-from itertools import chain
-from json import load, dumps
+from itertools import chain, product
+from json import load as load_json, dumps as dumps_json
 from logging import getLogger
 
 from rich import box
@@ -18,7 +18,7 @@ from rich.pretty import Pretty
 from rich.progress import Progress
 from rich.syntax import Syntax
 from rich.table import Table
-from rich.traceback import install
+from rich.traceback import install as install_rich_traceback
 
 from app_config import Sailfish, Driver, Report, Strategy, Scheme
 from new_kernels import perf_time_sequence, configure_kernel_module
@@ -137,7 +137,7 @@ class Dashboard:
         if self.app.show_config == "pretty":
             return Pretty(self.app)
         if self.app.show_config == "json":
-            return Syntax(dumps(asdict(self.app), indent=4), lexer="json")
+            return Syntax(dumps_json(asdict(self.app), indent=4), lexer="json")
         if self.app.show_config == "dict":
             return Pretty(asdict(self.app))
 
@@ -192,7 +192,7 @@ def run(apps: list[Sailfish], console: Console, use_dash=False):
     try:
         if use_dash:
             dash = Dashboard()
-            view = Live(dash.render(), console=console, refresh_per_second=2)
+            view = Live(dash.render(), console=console, refresh_per_second=10)
             view.start()
         else:
             dash = ScrollbackReporting(console)
@@ -274,15 +274,39 @@ def unflatten(d):
     return res
 
 
+def scan_strategy():
+    d = {
+        "strategy.data_layout": ("fields-last", "fields-first"),
+        "strategy.cache_flux": (True, False),
+        "strategy.cache_prim": (True, False),
+        "strategy.cache_grad": (True, False),
+    }
+    for p in product(*d.values()):
+        yield unflatten(dict(zip(d.keys(), p)))
+
+
+def sailfish_presets():
+    return {"scan-strategy": scan_strategy()}
+
+
 def main():
+    """
+    Main sailfish entry point and command line interface
+    """
+
     parser = ArgumentParser(
         prog="sailfish_ui",
         usage=SUPPRESS,
         description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
     )
-    parser.add_argument("configs", nargs="*", default=[dict()])
+    parser.add_argument(
+        "_configs",
+        nargs="*",
+        default=[dict()],
+    )
     parser.add_argument(
         "--log-level",
+        dest="_log_level",
         default="warning",
         choices=("debug", "info", "warning", "error", "critical"),
         help="log messages at and above this severity level",
@@ -290,6 +314,7 @@ def main():
     parser.add_argument(
         "--debug",
         action="store_true",
+        dest="_debug",
     )
     parser.add_argument(
         "--mode",
@@ -349,16 +374,19 @@ def main():
         "--cache-prim",
         action="store_true",
         dest="strategy.cache_prim",
+        default=None,
     )
     parser.add_argument(
         "--cache-flux",
         action="store_true",
         dest="strategy.cache_flux",
+        default=None,
     )
     parser.add_argument(
         "--cache-grad",
         action="store_true",
         dest="strategy.cache_grad",
+        default=None,
     )
     parser.add_argument(
         "--plot",
@@ -377,36 +405,61 @@ def main():
     )
     args = parser.parse_args()
 
+    # =========================================================================
+    # Configure logging
+    # =========================================================================
     console = Console()
     handler = RichHandler(omit_repeated_times=False, console=console)
     logger = getLogger("sailfish")
     logger.addHandler(handler)
-    logger.setLevel(args.log_level.upper())
+    logger.setLevel(args._log_level.upper())
 
-    install()  # rich traceback
-    cmdline_dict = unflatten(
-        {
-            k: v
-            for k, v in vars(args).items()
-            if v is not None and k not in ("configs", "log_level", "debug")
-        }
+    install_rich_traceback()
+
+    # =========================================================================
+    # Extract model configuration from parser args
+    # =========================================================================
+    overrides = unflatten(
+        {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
     )
 
     def sailfish(config):
+        """
+        Yield a sequence of sailfish app structs from a config
+
+        The config may be the name of a preset, which may then be a dictionary
+        or sequence of dictionaries, or it may be a path to a json file
+        containing a dictionary or a list of dictionaries.
+        """
+        presets = sailfish_presets()
+
         if not config:
             cs = dict()
-        else:
+        elif config in presets:
+            cs = presets[config]
+        elif config.endswith(".json"):
             with open(config) as infile:
-                cs = load(infile)
+                cs = load_json(infile)
+        else:
+            raise ValueError("config must be a preset or a json file")
+
         if type(cs) is dict:
             cs = [cs]
         for c in cs:
             s = asdict(Sailfish())
             deep_update(s, c)
-            deep_update(s, cmdline_dict)
+            deep_update(s, overrides)
             yield Sailfish(**s)
 
-    run(chain(*map(sailfish, args.configs)), console, not args.debug)
+    # =========================================================================
+    # Generate a sequence of sailfish struct apps from a file
+    # =========================================================================
+    apps = list(chain(*map(sailfish, args._configs)))
+
+    # =========================================================================
+    # Run the simulations
+    # =========================================================================
+    run(apps, console, not args._debug)
 
 
 if __name__ == "__main__":
