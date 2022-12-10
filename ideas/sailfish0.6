@@ -1,1443 +1,556 @@
 #!/usr/bin/env python3
 
-from functools import partial
-from collections.abc import MutableMapping
-from collections import ChainMap
 
-from loguru import logger
-from numpy import linspace, meshgrid, zeros, logical_not
-from numpy.typing import NDArray
-from new_kernels import (
-    kernel,
-    kernel_class,
-    perf_time_sequence,
-    configure_kernel_module,
-    device,
-)
-from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
-from configuration import configurable, all_schemas
+from argparse import ArgumentParser, SUPPRESS
+from collections import deque
+from collections.abc import Mapping
+from dataclasses import asdict, dataclass
+from itertools import chain, product
+from json import load as load_json, dumps as dumps_json
+from logging import getLogger
+
+from app_config import Sailfish, Driver, Report, Strategy, Scheme
+from new_kernels import perf_time_sequence, configure_kernel_module
+from solver import make_solver
 
 
-@device
-def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
-    R"""
-    #define min2(a, b) ((a) < (b) ? (a) : (b))
-    #define min3(a, b, c) min2(a, min2(b, c))
-    #define sign(x) copysign(1.0, x)
-    #define minabs(a, b, c) min3(fabs(a), fabs(b), fabs(c))
+# from rich import box
+# from rich.console import Console, Group
+# from rich.live import Live
+# from rich.logging import RichHandler
+# from rich.panel import Panel
+# from rich.pretty import Pretty
+# from rich.progress import Progress
+# from rich.syntax import Syntax
+# from rich.table import Table
+# from rich.traceback import install as install_rich_traceback
 
-    DEVICE double plm_minmod(
-        double yl,
-        double yc,
-        double yr,
-        double plm_theta)
-    {
-        double a = (yc - yl) * plm_theta;
-        double b = (yr - yl) * 0.5;
-        double c = (yr - yc) * plm_theta;
-        return 0.25 * fabs(sign(a) + sign(b)) * (sign(a) + sign(c)) * minabs(a, b, c);
+# class Plotting:
+#     def __init__(self, app):
+#         self._axes = None
+#         self._line = None
+#         self._live = app.plot == "live"
+
+#         if app.plot:
+#             from matplotlib import pyplot as plt
+
+#             if app.plot == "live":
+#                 plt.ion()
+#             self.plt = plt
+
+#     def update(self, state):
+#         if not self._live:
+#             return
+#         elif self._axes is None:
+#             self.plot(state)
+#         elif self.plt.get_fignums():
+#             self.plot(state)
+#             self._fig.canvas.flush_events()
+
+#     def plot(self, state, action=None):
+#         from numpy import linspace
+
+#         p = state.primitive
+#         x = linspace(0.0, 1.0, p.shape[0])
+#         line = self._line
+
+#         if line is None:
+#             self._line = self.axes().plot(x, p[:, 0], mfc="none")[0]
+#         else:
+#             line.set_ydata(p[:, 0])
+
+#         if action == "show":
+#             self.plt.show()
+
+#     def axes(self):
+#         if self._axes:
+#             return self._axes
+#         else:
+#             from matplotlib import pyplot as plt
+
+#             fig = plt.figure()
+#             ax1 = fig.add_subplot(111)
+#             self._axes = ax1
+#             self._fig = fig
+#             return ax1
+
+
+# class Dashboard:
+#     """
+#     A rich-renderable run monitor
+#     """
+
+#     def __init__(self, app=None):
+#         self._app = app
+#         self.group = Group("", "", "")
+
+#     @property
+#     def app(self):
+#         return self._app
+
+#     @app.setter
+#     def app(self, app):
+#         progress = Progress()
+#         duration = app.driver.tfinal - app.driver.tstart
+#         run_task = progress.add_task("running...", total=duration)
+
+#         self._app = app
+#         self.progress = progress
+#         self.run_task = run_task
+#         self.reports = deque()
+#         self.perf_timer = perf_time_sequence(mode=app.hardware)
+#         self.group.renderables[0] = self.app_config()
+#         self.group.renderables[1] = self.reports_table()
+#         self.group.renderables[2] = self.progress
+
+#     def reports_table(self):
+#         table = Table(expand=True)
+#         table.add_column("iteration", style="cyan", justify="right")
+#         table.add_column("time", style="green")
+#         table.add_column("zones per second (millions)", style="magenta", justify="left")
+#         reports = self.reports
+
+#         for report in reports:
+#             table.add_row(
+#                 f"{report.iteration}",
+#                 f"{report.time:0.5f}",
+#                 f"{report.zones_per_second/1e6:0.3f}",
+#             )
+
+#         table.add_section()
+#         avg_zps = sum(r.zones_per_second for r in reports) / max(1, len(reports))
+#         table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
+#         return table
+
+#     def app_config(self):
+#         if self.app.show_config is None:
+#             return str()
+#         if self.app.show_config == "table":
+#             return self.app
+#         if self.app.show_config == "pretty":
+#             return Pretty(self.app)
+#         if self.app.show_config == "json":
+#             return Syntax(dumps_json(asdict(self.app), indent=4), lexer="json")
+#         if self.app.show_config == "dict":
+#             return Pretty(asdict(self.app))
+
+#     def update(self, state):
+#         fold = self.app.driver.report.cadence
+#         evolved_time = state.time - self.app.driver.tstart
+#         zps = state.total_zones / next(self.perf_timer) * fold
+#         report = iteration_report(state.iteration, state.time, zps)
+
+#         self.progress.update(self.run_task, completed=evolved_time)
+#         self.reports.append(report)
+
+#         if len(self.reports) > 20:
+#             self.reports.popleft()
+
+#         self.group.renderables[1] = self.reports_table()
+
+#     def render(self):
+#         return Panel.fit(self.group, width=100, box=box.MINIMAL)
+
+
+# class ScrollbackReporting:
+#     def __init__(self, console):
+#         self.console = console
+#         self._app = None
+
+#     @property
+#     def app(self):
+#         return self._app
+
+#     @app.setter
+#     def app(self, app):
+#         self.perf_timer = perf_time_sequence(mode=app.hardware)
+#         self._app = app
+#         self.console.print(Panel(Pretty(app), width=100))
+
+#     def update(self, state):
+#         fold = self.app.driver.report.cadence
+#         zps = state.total_zones / next(self.perf_timer) * fold
+#         report = iteration_report(state.iteration, state.time, zps)
+#         self.console.print(
+#             f"[cyan]{report.iteration:06d}[/cyan] "
+#             f"[green]t={report.time:0.5f}[/green] "
+#             f"[magenta]Mzps={report.zones_per_second/1e6:0.3f}[/magenta]"
+#         )
+
+
+# def run(apps: list[Sailfish], console: Console, use_dash=False):
+#     """
+#     Run a sequence of sailfish apps, with a rich dashboard
+#     """
+#     try:
+#         if use_dash:
+#             dash = Dashboard()
+#             view = Live(dash.render(), console=console, refresh_per_second=10)
+#             view.start()
+#         else:
+#             dash = ScrollbackReporting(console)
+
+#         for app in apps:
+#             configure_kernel_module(default_exec_mode=app.hardware)
+
+#             dash.app = app
+#             solver = make_solver(app)
+#             fold = app.driver.report.cadence
+#             state = next(solver)
+#             plot = Plotting(app)
+
+#             while state.time < app.driver.tfinal:
+#                 state = next(solver)
+#                 if state.iteration % fold == 0:
+#                     dash.update(state)
+#                     plot.update(state)
+
+#             if app.plot == "end":
+#                 plot.plot(state, action="show")
+
+#     finally:
+#         if use_dash:
+#             view.stop()
+
+
+@dataclass
+class iteration_report:
+    iteration: int
+    time: float
+    zps: float
+
+    def __repr__(self):
+        return (
+            f"[{self.iteration:06d}] "
+            f"t={self.time:0.5f} "
+            f"Mzps={self.zps/1e6:0.3f} "
+        )
+
+    def __rich_console__(self, *args):
+        yield (
+            f"[cyan]{self.iteration:06d}[/cyan] "
+            f"[green]t={self.time:0.5f}[/green] "
+            f"[magenta]Mzps={self.zps/1e6:0.3f}[/magenta]"
+        )
+
+
+@dataclass
+class run_summary:
+    total_sec: float
+    mean_zps: float
+
+    def __repr__(self):
+        return (
+            f"total run time: {self.total_sec:0.5f} sec\n"
+            f"mean Mzps: {self.mean_zps/1e6:0.3f}"
+        )
+
+
+def run(apps: list[Sailfish]):
+    for app in apps:
+        yield app
+
+        configure_kernel_module(default_exec_mode=app.hardware)
+
+        fold = app.driver.report.cadence
+        tfinal = app.driver.tfinal
+        states = make_solver(app)
+        state = next(states)
+        app_timer = perf_time_sequence(mode=app.hardware)
+        fld_timer = perf_time_sequence(mode=app.hardware)
+
+        sum_zps = 0.0
+        fld_num = 0
+
+        while state.time < tfinal:
+            state = next(states)
+
+            if state.iteration % fold == 0:
+                sec = next(fld_timer)
+                zps = state.total_zones / sec * fold
+                sum_zps += zps
+                fld_num += 1
+                yield iteration_report(state.iteration, state.time, zps)
+                yield state
+
+        yield run_summary(total_sec=next(app_timer), mean_zps=sum_zps / fld_num)
+        yield state
+
+
+def scrollback_run_monitor(print):
+    while True:
+        event = yield
+
+        if type(event) is Sailfish:
+            app = event
+            print(app)
+
+        elif type(event) is run_summary:
+            summary = event
+            print()
+            print(summary)
+            print()
+
+        elif type(event) is iteration_report:
+            report = event
+            print(report)
+
+
+def num_zones(arg):
+    """
+    Promote an integer or two-tuple to a three-tuple of integers
+
+    This factory function is used by the argparse type parameter to convert
+    user input to a domain.num_zones parameter.
+    """
+    res = tuple(int(i) for i in arg.split(","))
+
+    if len(res) == 1:
+        return res + (1, 1)
+    if len(res) == 2:
+        return res + (1,)
+    if len(res) == 3:
+        return res
+    raise ValueError(f"invalid argument for num_zones {arg}")
+
+
+def reconstruction(arg):
+    """
+    Promote a string to a reconstruction model
+
+    This factory function is used by the argparse type parameter to convert
+    user input to a scheme.reconstruction parameter.
+    """
+    try:
+        mode, theta = arg.split(":")
+        return mode, float(theta)
+    except ValueError:
+        if arg == "plm":
+            return arg, 1.5
+        else:
+            return arg
+
+
+def deep_update(d, u):
+    """
+    Update a dictionary and any nested dictionaries recursively
+    """
+    for k, v in u.items():
+        if isinstance(v, Mapping):
+            d[k] = deep_update(d.get(k, dict()), v)
+        else:
+            d[k] = v
+    return d
+
+
+def unflatten(d):
+    """
+    Create a nested dict from a flat one with keys like a.b.c
+    """
+    res = dict()
+    for key, value in d.items():
+        parts = key.split(".")
+        d = res
+        for part in parts[:-1]:
+            if part not in d:
+                d[part] = dict()
+            d = d[part]
+        d[parts[-1]] = value
+    return res
+
+
+def scan_strategies():
+    d = {
+        "strategy.data_layout": ("fields-last", "fields-first"),
+        "strategy.cache_flux": (True, False),
+        "strategy.cache_prim": (True, False),
+        "strategy.cache_grad": (True, False),
     }
+    for p in product(*d.values()):
+        yield unflatten(dict(zip(d.keys(), p)))
+
+
+def sailfish_presets():
+    return {"scan-strategies": scan_strategies()}
+
+
+def sailfish(config, overrides):
     """
+    Yield a sequence of sailfish app structs from a config
 
-
-@kernel_class
-class FluxPerZoneTransposedSolver:
-    @property
-    def define_macros(self):
-        return dict(DIM=1)
-
-    @property
-    def device_funcs(self):
-        return [cons_to_prim, riemann_hlle]
-
-    @kernel
-    def update_cons(
-        self,
-        urd: NDArray[float],
-        uwr: NDArray[float],
-        dt: float,
-        dx: float,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void update_cons(double *urd, double *uwr, double dt, double dx, int ni)
-        {
-            #ifdef CPU_MODE
-            #define blockIdx_x 0
-            #define blockDim_x ni
-            #define threadIdx_x i
-            #else
-            #define blockIdx_x blockIdx.x
-            #define blockDim_x blockDim.x
-            #define threadIdx_x threadIdx.x
-            #endif
-
-            FOR_RANGE_1D(1, ni - 1)
-            {
-                double *u_blk[NCONS];
-
-                double p_reg[3][NCONS];
-                double u_reg[3][NCONS];
-                double fp[NCONS];
-                double fm[NCONS];
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_blk[q] = &urd[q * ni + blockIdx_x * blockDim_x];
-                }
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_reg[0][q] = u_blk[q][threadIdx_x - 1];
-                    u_reg[1][q] = u_blk[q][threadIdx_x + 0];
-                    u_reg[2][q] = u_blk[q][threadIdx_x + 1];
-                }
-
-                cons_to_prim(u_reg[0], p_reg[0]);
-                cons_to_prim(u_reg[1], p_reg[1]);
-                cons_to_prim(u_reg[2], p_reg[2]);
-                riemann_hlle(p_reg[0], p_reg[1], fm, 1);
-                riemann_hlle(p_reg[1], p_reg[2], fp, 1);
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_reg[1][q] -= (fp[q] - fm[q]) * dt / dx;
-                }
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_blk[q] = &uwr[q * ni + blockIdx_x * blockDim_x];
-                }
-
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    u_blk[q][threadIdx_x] = u_reg[1][q];
-                }
-            }
-        }
-        """
-        return urd.shape[1], (urd, uwr, dt, dx, urd.shape[1])
-
-
-@kernel_class
-class PrimitiveToConserved:
-    def __init__(self, dim=1, lds=False):
-        self.dim = dim
-        self.lds = lds
-
-    @classmethod
-    def init(cls):
-        cls.dim1_lds0 = PrimitiveToConserved(dim=1, lds=False)
-        cls.dim1_lds1 = PrimitiveToConserved(dim=1, lds=True)
-        cls.dim2_lds0 = PrimitiveToConserved(dim=2, lds=False)
-        cls.dim2_lds1 = PrimitiveToConserved(dim=2, lds=True)
-
-    @classmethod
-    def get(cls, dim, lds):
-        if dim == 1 and not lds:
-            return cls.dim1_lds0
-        if dim == 1 and lds:
-            return cls.dim1_lds1
-        if dim == 2 and not lds:
-            return cls.dim2_lds0
-        if dim == 2 and lds:
-            return cls.dim2_lds1
-
-    @property
-    def define_macros(self):
-        return dict(DIM=self.dim, LDS_MODE=int(self.lds))
-
-    @property
-    def device_funcs(self):
-        return [prim_to_cons, cons_to_prim]
-
-    @kernel
-    def cons_to_prim_array(self, u: NDArray[float], p: NDArray[float], ni: int = None):
-        R"""
-        KERNEL void cons_to_prim_array(double *p, double *u, int ni)
-        {
-            FOR_RANGE_1D(0, ni)
-            {
-                cons_to_prim(&u[NCONS * i], &p[NCONS * i]);
-            }
-        }
-        """
-        nq = self.dim + 2
-
-        if u.shape[-1] != nq or u.shape != u.shape:
-            raise ValueError("array has wrong number of fields")
-
-        return u.size // nq, (u, p, u.size // nq)
-
-    @kernel
-    def prim_to_cons_array(self, p: NDArray[float], u: NDArray[float], ni: int = None):
-        R"""
-        KERNEL void prim_to_cons_array(double *p, double *u, int ni)
-        {
-            #if LDS_MODE == 0 || defined(CPU_MODE)
-
-            FOR_RANGE_1D(0, ni)
-            {
-                prim_to_cons(&p[NCONS * i], &u[NCONS * i]);
-            }
-
-            #elif LDS_MODE == 1
-
-            if (blockIdx.x * blockDim.x + threadIdx.x >= ni)
-            {
-                return;
-            }
-            __shared__ double p_lds[64 * NCONS]; // this assumes the thread block size is 64!
-
-            double *p_blk = &p[blockIdx.x * blockDim.x * NCONS];
-            double *u_blk = &u[blockIdx.x * blockDim.x * NCONS];
-
-            // ----------------------------------------------------------------
-            // Fetch from global memory to LDS, coalesced.
-            //
-            // For example if there were 4 threads in the thread block:
-            //
-            // p:         [[x x x] [x x x] [x x x] [x x x]]
-            // thread:      0 1 2   3 0 1   2 3 0   1 2 3
-            // ----------------------------------------------------------------
-            for (int q = 0; q < NCONS; ++q)
-            {
-                int n = threadIdx.x + blockDim.x * q;
-                p_lds[n] = p_blk[n];
-            }
-            __syncthreads();
-
-            // ----------------------------------------------------------------
-            // Perform one cons -> prim per thread. It's done in-place.
-            // ----------------------------------------------------------------
-            double *u_lds = p_lds;
-            prim_to_cons(&p_lds[threadIdx.x * NCONS], &u_lds[threadIdx.x * NCONS]);
-            __syncthreads();
-
-            // ----------------------------------------------------------------
-            // Write the result back to global memory, coalesced.
-            // ----------------------------------------------------------------
-            for (int q = 0; q < NCONS; ++q)
-            {
-                int n = threadIdx.x + blockDim.x * q;
-                u_blk[n] = u_lds[n];
-            }
-            #else
-            #error("LDS_MODE must be [0|1]")
-            #endif
-        }
-        """
-
-        nq = self.dim + 2
-
-        if p.shape[-1] != nq or p.shape != u.shape:
-            raise ValueError("array has wrong number of fields")
-
-        return p.size // nq, (p, u, p.size // nq)
-
-
-@kernel_class
-class FluxPerFaceSolver:
+    The config may be the name of a preset, which may then be a dictionary
+    or sequence of dictionaries, or it may be a path to a json file
+    containing a dictionary or a list of dictionaries.
     """
-    Solves 1d Euler equation with per-face fluxing at 1st or 2nd order.
-
-    This solver supports 4 configurations -- with/without gradient estimation
-    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
-    per-face, meaning that a Riemann problem is solved only once per face. This
-    approach is best in compute-limited settings because it minimizes flops.
-    """
-
-    def __init__(self, runge_kutta=False, plm=False):
-        self.runge_kutta = runge_kutta
-        self.plm = plm
-
-    @property
-    def define_macros(self):
-        return dict(DIM=1, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
-
-    @property
-    def device_funcs(self):
-        d = [
-            prim_to_cons,
-            cons_to_prim,
-            riemann_hlle,
-            self._compute_godunov_fluxes,
-            self._update_prim,
-        ]
-        if self.plm:
-            d.insert(0, plm_minmod)
-        return d
-
-    @device
-    def _compute_godunov_fluxes(
-        self,
-        p: NDArray[float],
-        f: NDArray[float],
-        plm_theta: float,
-        si: int,
-    ):
-        R"""
-        DEVICE void _compute_godunov_fluxes(double *p, double *f, double plm_theta, int si)
-        {
-            double pm[NCONS];
-            double pp[NCONS];
-            double *fh = &f[si];
-
-            #if PLM == 0
-
-            double *pc = &p[0 * si];
-            double *pr = &p[1 * si];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                pm[q] = pc[q];
-                pp[q] = pr[q];
-            }
-            #else
-
-            double *pl = &p[-1 * si];
-            double *pc = &p[+0 * si];
-            double *pr = &p[+1 * si];
-            double *ps = &p[+2 * si];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                pm[q] = pc[q] + 0.5 * plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                pp[q] = pr[q] - 0.5 * plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-            }
-            #endif
-
-            riemann_hlle(pm, pp, fh, 1);
-        }
-        """
-
-    @kernel
-    def compute_godunov_fluxes(
-        self,
-        p: NDArray[float],
-        f: NDArray[float],
-        plm_theta: float,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void compute_godunov_fluxes(double *p, double *f, double plm_theta, int ni)
-        {
-            int si = NCONS;
-
-            FOR_RANGE_1D(1, ni - 2)
-            {
-                int n = i * si;
-                _compute_godunov_fluxes(&p[n], &f[n], plm_theta, si);
-            }
-        }
-        """
-        return p.shape[0], (p, f, plm_theta, p.shape[0])
-
-    @device
-    def _update_prim(
-        self,
-        p: NDArray[float],
-        f: NDArray[float],
-        urk: NDArray[float],
-        dt: float,
-        dx: float,
-        rk: float,
-        si: int,
-    ):
-        R"""
-        DEVICE void _update_prim(
-            double *p,
-            double *f,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            int si)
-        {
-            double uc[NCONS];
-            double *pc = &p[+si * 0];
-            double *fm = &f[+si * 0];
-            double *fp = &f[+si * 1];
-
-            prim_to_cons(pc, uc);
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                uc[q] -= (fp[q] - fm[q]) * dt / dx;
-                #if RUNGE_KUTTA == 1
-                uc[q] *= (1.0 - rk);
-                uc[q] += rk * urk[q];
-                #endif
-            }
-            cons_to_prim(uc, pc);
-        }
-        """
-
-    @kernel
-    def update_prim(
-        self,
-        p: NDArray[float],
-        f: NDArray[float],
-        urk: NDArray[float],
-        dt: float,
-        dx: float,
-        rk: float,
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void update_prim(
-            double *p,
-            double *f,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            int ni)
-        {
-            int si = NCONS;
-
-            FOR_RANGE_1D(2, ni - 2)
-            {
-                int n = i * si;
-                _update_prim(&p[n], &f[n], &urk[n], dt, dx, rk, si);
-            }
-        }
-        """
-        return p.shape[0], (p, f, urk, dt, dx, rk, p.shape[0])
-
-
-@kernel_class
-class FluxPerZoneSolver:
-    """
-    Solves 1d Euler equation with per-zone fluxing at 1st or 2nd order.
-
-    This solver supports 4 configurations -- with/without gradient estimation
-    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
-    per-zone, meaning that a Riemann problem is solved with two-fold redundancy;
-    both zones sharing a given face compute the Godunov flux through it. This
-    approach is best in memory bandwidth-limited settings because it minimizes
-    access to global memory.
-    """
-
-    def __init__(self, runge_kutta=False, plm=False, lds=False):
-        self.runge_kutta = runge_kutta
-        self.plm = plm
-        self.lds = lds
-
-    @property
-    def define_macros(self):
-        return dict(
-            DIM=1,
-            RUNGE_KUTTA=int(self.runge_kutta),
-            PLM=int(self.plm),
-            LDS_MODE=int(self.lds),
-        )
-
-    @property
-    def device_funcs(self):
-        d = [prim_to_cons, cons_to_prim, riemann_hlle, self._update_prim]
-        if self.plm:
-            d.insert(0, plm_minmod)
-        return d
-
-    @device
-    def _update_prim(
-        self,
-        prd: NDArray[float],  # read-from primitive
-        pwr: NDArray[float],  # write-to-primitive
-        urk: NDArray[float],  # u at time-level n
-        dt: float,  # time step dt
-        dx: float,  # grid spacing dx
-        rk: float,  # RK parameter
-        plm_theta: float,  # PLM parameter
-        si: int,  # stride on i-axis
-    ):
-        R"""
-        DEVICE void _update_prim(
-            double *prd,
-            double *pwr,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            double plm_theta,
-            int si)
-        {
-            double uc[NCONS];
-            double fm[NCONS];
-            double fp[NCONS];
-            double plp[NCONS];
-            double pcm[NCONS];
-            double pcp[NCONS];
-            double prm[NCONS];
-
-            #if PLM == 0
-
-            double *pl = &prd[-1 * si];
-            double *pc = &prd[ 0 * si];
-            double *pr = &prd[+1 * si];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                plp[q] = pl[q];
-                pcm[q] = pc[q];
-                pcp[q] = pc[q];
-                prm[q] = pr[q];
-            }
-            #else
-
-            double *pk = &prd[-2 * si];
-            double *pl = &prd[-1 * si];
-            double *pc = &prd[ 0 * si];
-            double *pr = &prd[+1 * si];
-            double *ps = &prd[+2 * si];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                double gl = plm_minmod(pk[q], pl[q], pc[q], plm_theta);
-                double gc = plm_minmod(pl[q], pc[q], pr[q], plm_theta);
-                double gr = plm_minmod(pc[q], pr[q], ps[q], plm_theta);
-
-                plp[q] = pl[q] + 0.5 * gl;
-                pcm[q] = pc[q] - 0.5 * gc;
-                pcp[q] = pc[q] + 0.5 * gc;
-                prm[q] = pr[q] - 0.5 * gr;
-            }
-            #endif
-
-            riemann_hlle(plp, pcm, fm, 1);
-            riemann_hlle(pcp, prm, fp, 1);
-            prim_to_cons(pc, uc);
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                uc[q] -= (fp[q] - fm[q]) * dt / dx;
-                #if RUNGE_KUTTA == 1
-                uc[q] *= (1.0 - rk);
-                uc[q] += rk * urk[q];
-                #endif
-            }
-            cons_to_prim(uc, pwr);
-        }
-        """
-
-    @kernel
-    def update_prim(
-        self,
-        prd: NDArray[float],  # read-from primitive
-        pwr: NDArray[float],  # write-to-primitive
-        urk: NDArray[float],  # u at time-level n
-        dt: float,  # time step dt
-        dx: float,  # grid spacing dx
-        rk: float,  # RK parameter
-        plm_theta: float,  # PLM parameter
-        ni: int = None,
-    ):
-        R"""
-        KERNEL void update_prim(
-            double *prd,
-            double *pwr,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            double plm_theta,
-            int ni)
-        {
-            int si = NCONS;
-
-            #if LDS_MODE == 0 || defined(CPU_MODE)
-
-            FOR_RANGE_1D(2, ni - 2)
-            {
-                int n = i * si;
-                _update_prim(&prd[n], &pwr[n], &urk[n], dt, dx, rk, plm_theta, si);
-            }
-            #elif LDS_MODE == 1
-            #warning("FluxPerZoneSolver LDS_MODE=1 is unfinished; ignores thread-block guard zones")
-
-            if (blockIdx.x * blockDim.x + threadIdx.x >= ni)
-            {
-                return;
-            }
-
-            __shared__ double lds[64 * NCONS * 3]; // this assumes the thread block size is 64!
-            double *prd_lds = &lds[64 * NCONS * 0]; // ERROR: not pre-fetching guard zones
-            double *pwr_lds = &lds[64 * NCONS * 1];
-            double *urk_lds = &lds[64 * NCONS * 2];
-
-            double *prd_blk = &prd[blockIdx.x * blockDim.x * NCONS];
-            double *pwr_blk = &pwr[blockIdx.x * blockDim.x * NCONS];
-            double *urk_blk = &urk[blockIdx.x * blockDim.x * NCONS];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                int n = threadIdx.x + blockDim.x * q;
-                prd_lds[n] = prd_blk[n];
-            }
-            __syncthreads();
-
-            #if RUNGE_KUTTA == 1
-            for (int q = 0; q < NCONS; ++q)
-            {
-                int n = threadIdx.x + blockDim.x * q;
-                urk_lds[n] = urk_blk[n];
-            }
-            __syncthreads();
-            #endif
-
-            if (threadIdx.x < 2 || threadIdx.x >= 62)
-            {
-                return; // DON'T CAUSE MEMORY ERROR DUE TO NOT FETCHING GUARD ZONES
-            }
-
-            {
-                int n = threadIdx.x * si;
-                _update_prim(&prd_lds[n], &pwr_lds[n], &urk_lds[n], dt, dx, rk, plm_theta, si);
-            }
-            __syncthreads();
-
-            // ----------------------------------------------------------------
-            // Write the result back to global memory, coalesced.
-            // ----------------------------------------------------------------
-            for (int q = 0; q < NCONS; ++q)
-            {
-                int n = threadIdx.x + blockDim.x * q;
-                pwr_blk[n] = pwr_lds[n];
-            }
-            #else
-            #error("LDS_MODE must be [0|1]")
-            #endif
-        }
-        """
-        return prd.shape[0], (prd, pwr, urk, dt, dx, rk, plm_theta, prd.shape[0])
-
-
-@kernel_class
-class FluxPerZoneSolver2D:
-    """
-    Solves 2d Euler equation with per-zone fluxing at 1st or 2nd order.
-
-    This solver supports 4 configurations -- with/without gradient estimation
-    (via PLM) and with/without explicit Runge-Kutta support. Fluxing is done
-    per-zone, meaning that a Riemann problem is solved with two-fold redundancy;
-    both zones sharing a given face compute the Godunov flux through it. This
-    approach is best in memory bandwidth-limited settings because it minimizes
-    access to global memory.
-    """
-
-    def __init__(self, runge_kutta=False, plm=False):
-        self.runge_kutta = runge_kutta
-        self.plm = plm
-
-    @property
-    def define_macros(self):
-        return dict(DIM=2, RUNGE_KUTTA=int(self.runge_kutta), PLM=int(self.plm))
-
-    @property
-    def device_funcs(self):
-        d = [prim_to_cons, cons_to_prim, riemann_hlle, self.update_prim_zone]
-        if self.plm:
-            d.insert(0, plm_minmod)
-        return d
-
-    @device
-    def update_prim_zone(
-        self,
-        prd: NDArray[float],  # read-from primitive (pointer to zone)
-        pwr: NDArray[float],  # write-to-primitive (pointer to zone)
-        urk: NDArray[float],  # u at time-level n (pointer to zone)
-        dt: float,  # time step dt
-        dx: float,  # grid spacing (both directions)
-        rk: float,  # RK parameter
-        plm_theta: float,  # PLM parameter
-        si: int,  # stride on i-axis (includes guard)
-        sj: int,  # stride on j-axis (includes guard)
-    ):
-        R"""
-        DEVICE void update_prim_zone(
-            double *prd,
-            double *pwr,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            double plm_theta,
-            int si,
-            int sj)
-        {
-            double ucc[NCONS];
-            double fm[NCONS];
-            double fp[NCONS];
-            double gm[NCONS];
-            double gp[NCONS];
-            double pilp[NCONS];
-            double picm[NCONS];
-            double picp[NCONS];
-            double pirm[NCONS];
-            double pjlp[NCONS];
-            double pjcm[NCONS];
-            double pjcp[NCONS];
-            double pjrm[NCONS];
-
-            #if PLM == 0
-
-            double *pcc = &prd[0];
-            double *plc = &prd[-si];
-            double *prc = &prd[+si];
-            double *pcl = &prd[-sj];
-            double *pcr = &prd[+sj];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                pilp[q] = plc[q];
-                picm[q] = pcc[q];
-                picp[q] = pcc[q];
-                pirm[q] = prc[q];
-                pjlp[q] = pcl[q];
-                pjcm[q] = pcc[q];
-                pjcp[q] = pcc[q];
-                pjrm[q] = pcr[q];
-            }
-            #else
-
-            double *pcc = &prd[0];
-            double *pkc = &prd[-2 * si];
-            double *plc = &prd[-1 * si];
-            double *prc = &prd[+1 * si];
-            double *psc = &prd[+2 * si];
-            double *pck = &prd[-2 * sj];
-            double *pcl = &prd[-1 * sj];
-            double *pcr = &prd[+1 * sj];
-            double *pcs = &prd[+2 * sj];
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                double gil = plm_minmod(pkc[q], plc[q], pcc[q], plm_theta);
-                double gic = plm_minmod(plc[q], pcc[q], prc[q], plm_theta);
-                double gir = plm_minmod(pcc[q], prc[q], psc[q], plm_theta);
-                double gjl = plm_minmod(pck[q], pcl[q], pcc[q], plm_theta);
-                double gjc = plm_minmod(pcl[q], pcc[q], pcr[q], plm_theta);
-                double gjr = plm_minmod(pcc[q], pcr[q], pcs[q], plm_theta);
-
-                pilp[q] = plc[q] + 0.5 * gil;
-                picm[q] = pcc[q] - 0.5 * gic;
-                picp[q] = pcc[q] + 0.5 * gic;
-                pirm[q] = prc[q] - 0.5 * gir;
-                pjlp[q] = pcl[q] + 0.5 * gjl;
-                pjcm[q] = pcc[q] - 0.5 * gjc;
-                pjcp[q] = pcc[q] + 0.5 * gjc;
-                pjrm[q] = pcr[q] - 0.5 * gjr;
-            }
-            #endif
-
-            riemann_hlle(pilp, picm, fm, 1);
-            riemann_hlle(picp, pirm, fp, 1);
-            riemann_hlle(pjlp, pjcm, gm, 2);
-            riemann_hlle(pjcp, pjrm, gp, 2);
-
-            prim_to_cons(pcc, ucc);
-
-            for (int q = 0; q < NCONS; ++q)
-            {
-                ucc[q] -= (fp[q] - fm[q] + gp[q] - gm[q]) * dt / dx;
-                #if RUNGE_KUTTA == 1
-                ucc[q] *= (1.0 - rk);
-                ucc[q] += rk * urk[q];
-                #endif
-            }
-            cons_to_prim(ucc, pwr);
-        }
-        """
-
-    @kernel
-    def update_prim(
-        self,
-        prd: NDArray[float],  # read-from primitive
-        pwr: NDArray[float],  # write-to-primitive
-        urk: NDArray[float],  # u at time-level n
-        dt: float,  # time step dt
-        dx: float,  # grid spacing (both directions)
-        rk: float,  # RK parameter
-        plm_theta: float,  # PLM parameter
-        ni: int = None,  # number of zones on i-axis (includes guard)
-        nj: int = None,  # number of zones on j-axis (includes guard)
-    ):
-        R"""
-        KERNEL void update_prim(
-            double *prd,
-            double *pwr,
-            double *urk,
-            double dt,
-            double dx,
-            double rk,
-            double plm_theta,
-            int ni,
-            int nj)
-        {
-            int si = NCONS * nj;
-            int sj = NCONS;
-
-            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
-            {
-                int n = i * si + j * sj;
-                update_prim_zone(&prd[n], &pwr[n], &urk[i * si + j * sj], dt, dx, rk, plm_theta, si, sj);
-            }
-        }
-        """
-        return prd.shape[:2], (
-            prd,
-            pwr,
-            urk,
-            dt,
-            dx,
-            rk,
-            plm_theta,
-            prd.shape[0],
-            prd.shape[1],
-        )
-
-
-class SolverClass:
-    @classmethod
-    def get(cls, time_integration, reconstruction):
-        if reconstruction == "pcm":
-            if time_integration == "fwd":
-                return cls.fwd_pcm
-            elif time_integration in ("rk1", "rk2", "rk3"):
-                return cls.rkn_pcm
-        elif reconstruction == "plm":
-            if time_integration == "fwd":
-                return cls.fwd_plm
-            elif time_integration in ("rk1", "rk2", "rk3"):
-                return cls.rkn_plm
-        else:
-            raise ValueError(f"no solver config {time_integration}/{reconstruction}")
-
-
-class FPFSolvers(SolverClass):
-    @classmethod
-    def init(cls):
-        cls.fwd_pcm = FluxPerFaceSolver(plm=False, runge_kutta=False)
-        cls.rkn_pcm = FluxPerFaceSolver(plm=False, runge_kutta=True)
-        cls.fwd_plm = FluxPerFaceSolver(plm=True, runge_kutta=False)
-        cls.rkn_plm = FluxPerFaceSolver(plm=True, runge_kutta=True)
-
-
-class FPZSolvers(SolverClass):
-    @classmethod
-    def init(cls, lds):
-        cls.fwd_pcm = FluxPerZoneSolver(lds=lds, plm=False, runge_kutta=False)
-        cls.rkn_pcm = FluxPerZoneSolver(lds=lds, plm=False, runge_kutta=True)
-        cls.fwd_plm = FluxPerZoneSolver(lds=lds, plm=True, runge_kutta=False)
-        cls.rkn_plm = FluxPerZoneSolver(lds=lds, plm=True, runge_kutta=True)
-
-
-class FPZSolvers2D(SolverClass):
-    @classmethod
-    def init(cls):
-        cls.fwd_pcm = FluxPerZoneSolver2D(plm=False, runge_kutta=False)
-        cls.rkn_pcm = FluxPerZoneSolver2D(plm=False, runge_kutta=True)
-        cls.fwd_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=False)
-        cls.rkn_plm = FluxPerZoneSolver2D(plm=True, runge_kutta=True)
-
-
-def patch_spacing(index, nz, np):
-    level, (i, j) = index
-    dx = 1.0 / np / nz / (1 << level)
-    dy = 1.0 / np / nz / (1 << level)
-    return dx, dy
-
-
-def patch_extent(index, nz, np):
-    level, (i, j) = index
-    dx = 1.0 / np / (1 << level)
-    dy = 1.0 / np / (1 << level)
-    x0 = -0.5 + (i + 0) * dx
-    x1 = -0.5 + (i + 1) * dx
-    y0 = -0.5 + (j + 0) * dy
-    y1 = -0.5 + (j + 1) * dy
-    return (x0, x1), (y0, y1)
-
-
-def cell_centers_1d(ni):
-    from numpy import linspace
-
-    xv = linspace(0.0, 1.0, ni + 1)
-    xc = 0.5 * (xv[1:] + xv[:-1])
-    return xc
-
-
-def cell_centers_2d(index, nz, np):
-    (x0, x1), (y0, y1) = patch_extent(index, nz, np)
-    ni = nz
-    nj = nz
-    ddx = (x1 - x0) / ni
-    ddy = (y1 - y0) / nj
-    xv = linspace(x0 - 2 * ddx, x1 + 2 * ddy, ni + 5)
-    yv = linspace(y0 - 2 * ddx, y1 + 2 * ddy, nj + 5)
-    xc = 0.5 * (xv[1:] + xv[:-1])
-    yc = 0.5 * (yv[1:] + yv[:-1])
-    return meshgrid(xc, yc, indexing="ij")
-
-
-def linear_shocktube(x):
-    """
-    A linear shocktube setup
-    """
-
-    from numpy import array, zeros, logical_not
-
-    l = x < 0.5
-    r = logical_not(l)
-    p = zeros(x.shape + (3,))
-    p[l, :] = [1.0, 0.0, 1.000]
-    p[r, :] = [0.1, 0.0, 0.125]
-    return p
-
-
-def cylindrical_shocktube(x, y, radius: float = 0.1, pressure: float = 1.0):
-    """
-    A cylindrical shocktube setup
-
-    ----------
-    radius ........ radius of the high-pressure region
-    pressure ...... gas pressure inside the cylinder
-    """
-    disk = (x**2 + y**2) ** 0.5 < radius
-    fisk = logical_not(disk)
-    p = zeros(disk.shape + (4,))
-
-    p[disk, 0] = 1.000
-    p[fisk, 0] = 0.100
-    p[disk, 3] = pressure
-    p[fisk, 3] = 0.125
-    return p
-
-
-def numpy_or_cupy(exec_mode):
-    if exec_mode == "gpu":
-        import cupy
-
-        return cupy
-
-    if exec_mode == "cpu":
-        import numpy
-
-        return numpy
-
-
-def update_prim1d(
-    p,
-    dt,
-    dx,
-    fluxing="per_zone",
-    reconstruction="pcm",
-    plm_theta=2.0,
-    time_integration="fwd",
-    lds=True,
-    exec_mode="cpu",
-):
-    """
-    Drives a first-order update of a primitive array
-    """
-    xp = numpy_or_cupy(exec_mode)
-
-    if time_integration == "fwd":
-        pass
-    elif time_integration == "rk1":
-        rks = [0.0]
-    elif time_integration == "rk2":
-        rks = [0.0, 0.5]
-    elif time_integration == "rk3":
-        rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
+    presets = sailfish_presets()
+
+    if not config:
+        cs = dict()
+    elif config in presets:
+        cs = presets[config]
+    elif config.endswith(".json"):
+        with open(config) as infile:
+            cs = load_json(infile)
     else:
-        raise ValueError(
-            f"time_integration must be [fwd|r1k|rk2|rk3], got {time_integration}"
-        )
-    prim_to_cons = PrimitiveToConserved.get(dim=1, lds=lds).prim_to_cons_array
+        raise ValueError("config must be a preset or a json file")
 
-    if fluxing == "per_face":
-        solver = FPFSolvers.get(time_integration, reconstruction)
-        update = solver.update_prim
-        fluxes = solver.compute_godunov_fluxes
-        f = xp.empty_like(p)
+    if type(cs) is dict:
+        cs = [cs]
 
-        if time_integration == "fwd":
-            fluxes(p, f, plm_theta)
-            update(p, f, None, dt, dx, 0.0)
-        else:
-            urk = xp.empty_like(p)
-            prim_to_cons(p, urk)
+    for c in cs:
+        s = asdict(Sailfish())
+        deep_update(s, c)
+        deep_update(s, overrides)
+        yield Sailfish(**s)
 
-            for rk in rks:
-                fluxes(p, f, plm_theta)
-                update(p, f, urk, dt, dx, rk)
-        return p
 
-    elif fluxing == "per_zone":
-        solver = FPZSolvers.get(time_integration, reconstruction)
-        update = solver.update_prim
-        prd = p
-        pwr = p.copy()
-
-        if time_integration == "fwd":
-            update(prd, pwr, None, dt, dx, 0.0, plm_theta)
-            prd, pwr = pwr, prd
-
-        else:
-            urk = xp.empty_like(prd)
-            prim_to_cons(prd, urk)
-
-            for rk in rks:
-                update(prd, pwr, urk, dt, dx, rk, plm_theta)
-                prd, pwr = pwr, prd
-
-        return prd
-
-    else:
-        raise ValueError(f"unknown fluxing {fluxing}")
-
-
-class State1d:
-    def __init__(self, n, t, p):
-        self._n = n
-        self._t = t
-        self._p = p
-
-    @property
-    def iteration(self):
-        return self._n
-
-    @property
-    def time(self):
-        return self._t
-
-    @property
-    def primitive(self):
-        try:
-            return self._p.get()
-        except AttributeError:
-            return self._p
-
-    @property
-    def total_zones(self):
-        return self._p.shape[0]
-
-
-def simulation1d(exec_mode, lds, resolution, fluxing, reconstruction, time_integration):
-    xp = numpy_or_cupy(exec_mode)
-    nz = resolution
-    dx = 1.0 / nz
-    dt = dx * 1e-1
-    x = cell_centers_1d(nz)
-    p = linear_shocktube(x)
-    t = 0.0
-    n = 0
-    p = xp.array(p)
-
-    advance = partial(
-        update_prim1d,
-        dx=dx,
-        fluxing=fluxing,
-        reconstruction=reconstruction,
-        time_integration=time_integration,
-        lds=lds,
-        exec_mode=exec_mode,
-    )
-    yield State1d(n, t, p)
-
-    while True:
-        p = advance(p, dt)
-        t += dt
-        n += 1
-        yield State1d(n, t, p)
-
-
-class State1dTranspose:
-    def __init__(self, n, t, u, p2c):
-        self._n = n
-        self._t = t
-        self._u = u
-        self._p2c = p2c
-
-    @property
-    def iteration(self):
-        return self._n
-
-    @property
-    def time(self):
-        return self._t
-
-    @property
-    def primitive(self):
-        u = self._u.T.copy()
-        p = u.copy()
-        self._p2c.cons_to_prim_array(u, p)
-        try:
-            return p.get()
-        except AttributeError:
-            return p
-
-    @property
-    def total_zones(self):
-        return self._u.shape[1]
-
-
-def simulation1d_transpose(exec_mode, resolution):
-    xp = numpy_or_cupy(exec_mode)
-    nz = resolution
-    dx = 1.0 / nz
-    dt = dx * 1e-1
-    x = cell_centers_1d(nz)
-    p = linear_shocktube(x)
-    u = xp.zeros_like(p)
-    t = 0.0
-    n = 0
-    p = xp.array(p)
-
-    solver = FluxPerZoneTransposedSolver()
-    p2c = PrimitiveToConserved(dim=1)
-    p2c.prim_to_cons_array(p, u)
-    u1 = xp.ascontiguousarray(u.T)
-    u2 = u1.copy()
-
-    yield State1dTranspose(n, t, u1, p2c)
-
-    while True:
-        solver.update_cons(u1, u2, dt, dx)
-        u1, u2 = u2, u1
-        t += dt
-        n += 1
-        yield State1dTranspose(n, t, u1, p2c)
-
-
-def update_prim2d(
-    p,
-    dt,
-    dx,
-    fluxing="per_zone",
-    reconstruction="pcm",
-    plm_theta=2.0,
-    time_integration="fwd",
-    lds=True,
-    exec_mode="cpu",
-):
-    """
-    Drives a first-order update of a primitive array
-    """
-    xp = numpy_or_cupy(exec_mode)
-
-    if time_integration == "fwd":
-        pass
-    elif time_integration == "rk1":
-        rks = [0.0]
-    elif time_integration == "rk2":
-        rks = [0.0, 0.5]
-    elif time_integration == "rk3":
-        rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
-    else:
-        raise ValueError(
-            f"time_integration must be [fwd|r1k|rk2|rk3], got {time_integration}"
-        )
-
-    if fluxing != "per_zone":
-        raise ValueError("only fluxing=per_zone supported in 2d")
-
-    solver = FPZSolvers2D.get(time_integration, reconstruction)
-    update = solver.update_prim
-    prim_to_cons = PrimitiveToConserved.get(dim=2, lds=lds).prim_to_cons_array
-
-    prd = p
-    pwr = p.copy()
-
-    if time_integration == "fwd":
-        update(prd, pwr, None, dt, dx, 0.0, plm_theta)
-        prd, pwr = pwr, prd
-
-    else:
-        urk = xp.empty_like(prd)
-        prim_to_cons(prd, urk)
-
-        for rk in rks:
-            update(prd, pwr, urk, dt, dx, rk, plm_theta)
-            prd, pwr = pwr, prd
-
-    return prd
-
-
-class State2D:
-    def __init__(self, n, t, p):
-        self._n = n
-        self._t = t
-        self._p = p
-
-    @property
-    def iteration(self):
-        return self._n
-
-    @property
-    def time(self):
-        return self._t
-
-    @property
-    def primitive(self):
-        try:
-            return self._p.get()
-        except AttributeError:
-            return self._p
-
-    @property
-    def total_zones(self):
-        return self._p.shape[0] * self._p.shape[1]
-
-
-def simulation2d(exec_mode, lds, resolution, fluxing, reconstruction, time_integration):
-    xp = numpy_or_cupy(exec_mode)
-    nz = resolution
-    dx = 1.0 / nz
-    dt = dx * 1e-1
-    x, y = cell_centers_2d(index=(0, (0, 0)), nz=nz, np=1)
-    p = cylindrical_shocktube(x, y)
-    t = 0.0
-    n = 0
-    p = xp.array(p)
-
-    advance = partial(
-        update_prim2d,
-        dx=dx,
-        fluxing=fluxing,
-        reconstruction=reconstruction,
-        time_integration=time_integration,
-        exec_mode=exec_mode,
-    )
-    yield State2D(n, t, p)
-
-    while True:
-        p = advance(p, dt)
-        t += dt
-        n += 1
-        yield State2D(n, t, p)
-
-
-@configurable
-def driver(
-    app_config,
-    exec_mode: str = "cpu",
-    lds: bool = False,
-    resolution: int = 10000,
-    tfinal: float = 0.1,
-    fluxing: str = "per_zone",
-    reconstruction: str = "pcm",
-    plm_theta: float = 1.5,
-    time_integration: str = "fwd",
-    dim: int = 1,
-    transpose: bool = False,
-    fold: int = 100,
-    plot: bool = False,
-):
-    """
-    Configuration
-    -------------
-
-    exec_mode:        execution mode [cpu|gpu]
-    lds:              whether to use LDS fre-fetch where available
-    resolution:       number of grid zones
-    tfinal:           time to end the simulation
-    fluxing:          solver fluxing [per_zone|per_face]
-    reconstruction:   first or second-order reconstruction [pcm|plm]
-    plm_theta:        PLM parameter [1.0, 2.0]
-    time_integration: Runge-Kutta order [fwd|rk1|rk2|rk3]
-    dim:              dimensionality of the domain
-    transpose:        whether to use the transpose solver (1d only)
-    fold:             number of iterations between iteration message
-    plot:             whether to show a plot of the solution
-    """
-    from reporting import terminal, iteration_msg
-
-    configure_kernel_module(default_exec_mode=exec_mode)
-    FPZSolvers.init(lds=lds)
-    FPFSolvers.init()
-    FPZSolvers2D.init()
-    PrimitiveToConserved.init()
-
-    term = terminal(logger)
-
-    if transpose:
-        sim = simulation1d_transpose(exec_mode, resolution)
-    else:
-        simulation = [None, simulation1d, simulation2d][dim]
-        sim = simulation(
-            exec_mode,
-            lds,
-            resolution,
-            fluxing,
-            reconstruction,
-            time_integration,
-        )
-    perf_timer = perf_time_sequence(mode=exec_mode)
-    state = next(sim)
-    logger.info(f"initialization took {1e3 * next(perf_timer):.3f}ms")
-    logger.info("start simulation")
-
-    while state.time < tfinal:
-        state = next(sim)
-
-        # if tasks.checkpoint.is_due(state.time):
-        #     write_checkpoint(state, timeseries, tasks)
-
-        # if tasks.timeseries.is_due(state.time):
-        #     for name, info in diagnostics.items():
-        #         timeseries[name].append(state.diagnostic(info))
-
-        if state.iteration % fold == 0:
-            zps = state.total_zones / next(perf_timer) * fold
-            term(iteration_msg(state.iteration, state.time, zps=zps))
-
-    if plot:
-        from matplotlib import pyplot as plt
-
-        if dim == 1:
-            plt.plot(state.primitive[:, 0], "-o", mfc="none", label=fluxing)
-        if dim == 2:
-            plt.imshow(state.primitive[:, :, 0])
-        plt.show()
-
-
-def flatten_dict(
-    d: MutableMapping,
-    parent_key: str = "",
-    sep: str = ".",
-) -> MutableMapping:
-    """
-    Create a flattened dictionary e from d, with e['a.b.c'] = d['a']['b']['c'].
-    """
-    items = list()
-    for k, v in d.items():
-        new_key = parent_key + sep + k if parent_key else k
-        if isinstance(v, MutableMapping):
-            items.extend(flatten_dict(v, new_key, sep=sep).items())
-        else:
-            items.append((new_key, v))
-    return dict(items)
-
-
-def dict_section(d: MutableMapping, section: str):
-    """
-    From a map with keys like section.b.c, return a dict with keys like b.c.
-    """
-    return {k[k.index(".") + 1 :]: v for k, v in d.items() if k.startswith(section)}
-
-
-def load_config(config):
-    """
-    Attempt to load configuration data from a file: either JSON or YAML.
-    """
-    if config.endswith(".json"):
-        from json import load
-
-        with open(config, "r") as infile:
-            return load(infile)
-
-    elif config.endswith(".yaml"):
-        from yaml import load, CLoader
-
-        with open(config, "r") as infile:
-            return load(infile, Loader=CLoader)
-
-    else:
-        raise ValueError(f"unknown configuration file {config}")
-
-
-def short_help(args):
-    args.parser.print_usage()
-
-
-def run(args):
-    app_config = ChainMap(
-        {k: v for k, v in vars(args).items() if v is not None and "." in k}
-    )
-    app_config.maps.extend(flatten_dict(load_config(c)) for c in reversed(args.configs))
-    driver_args = dict_section(app_config, "driver")
-    driver.schema.validate(**driver_args)
-    driver.schema.print_schema(
-        args.term,
-        config=driver_args,
-        newline=True,
-    )
-    driver(app_config, **driver_args)
-
-
-def show_config(args):
-    if args.defaults:
-        for schema in all_schemas():
-            schema.print_schema(args.term)
-
-    else:
-        app_cfg = {s.component_name: s.defaults_dict() for s in all_schemas()}
-
-        if args.format == "json":
-            from json import dumps
-
-            print(dumps(app_cfg, indent=4))
-
-        if args.format == "yaml":
-            try:
-                from yaml import dump, CDumper
-
-                print(dump(app_cfg, Dumper=CDumper))
-
-            except ImportError as e:
-                print(e)
-
-
-@logger.catch
 def main():
-    from argparse import ArgumentParser
-    from reporting import add_logging_arguments, terminal, configure_logger
+    """
+    Main sailfish entry point and command line interface
+    """
+    from rich.console import Console
+    from rich.logging import RichHandler
+    from rich.traceback import install as install_rich_traceback
 
-    parser = ArgumentParser()
-    parser.set_defaults(func=short_help)
-    parser.set_defaults(term=terminal(logger))
-    parser.set_defaults(parser=parser)
-    parser.set_defaults(log_level="info")
-    subparsers = parser.add_subparsers()
-
-    show_config_parser = subparsers.add_parser(
-        "show-config",
-        help="show global configuration data",
+    parser = ArgumentParser(
+        prog="sailfish_ui",
+        usage=SUPPRESS,
+        description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
     )
-    show_config_parser.set_defaults(func=show_config)
-    group = show_config_parser.add_mutually_exclusive_group()
-    group.add_argument(
-        "--format",
-        type=str,
-        default="json",
-        choices=["json", "yaml"],
-        help="output format for the configuration data",
-    )
-    group.add_argument(
-        "--defaults",
-        action="store_true",
-        help="print defaults and help messages for configurable components",
-    )
-    run_parser = subparsers.add_parser(
-        "run",
-        help="run a simulation",
-    )
-    run_parser.set_defaults(func=run)
-    run_parser.add_argument(
-        "configs",
+    parser.add_argument(
+        "_configs",
+        metavar="configs",
         nargs="*",
-        help="sequence of presets, configuration files, or checkpoints",
+        default=[dict()],
     )
-    driver.schema.argument_parser(run_parser, dest_prefix="driver")
-    add_logging_arguments(run_parser)
-
+    parser.add_argument(
+        "--log-level",
+        dest="_log_level",
+        default="warning",
+        choices=("debug", "info", "warning", "error", "critical"),
+        help="log messages at and above this severity level",
+    )
+    # parser.add_argument(
+    #     "--debug",
+    #     action="store_true",
+    #     dest="_debug",
+    # )
+    # parser.add_argument(
+    #     "--plot",
+    #     nargs="?",
+    #     const="end",
+    #     help=Sailfish.describe("plot"),
+    #     choices=(None, "live", "end"),
+    #     dest="plot",
+    # )
+    # parser.add_argument(
+    #     "--show-config",
+    #     choices=Sailfish.type_args("show_config"),
+    #     help=Sailfish.describe("show_config"),
+    #     type=str,
+    #     dest="show_config",
+    # )
+    parser.add_argument(
+        "--mode",
+        "--hardware",
+        dest="hardware",
+        choices=Sailfish.type_args("hardware"),
+        help="execution mode",
+    )
+    parser.add_argument(
+        "-n",
+        "--num-zones",
+        "--resolution",
+        type=num_zones,
+        dest="domain.num_zones",
+        metavar="N",
+    )
+    parser.add_argument(
+        "-m",
+        "--time-integration",
+        choices=Scheme.type_args("time_integration"),
+        help=Scheme.describe("time_integration"),
+        dest="scheme.time_integration",
+    )
+    parser.add_argument(
+        "-r",
+        "--reconstruction",
+        type=reconstruction,
+        help=Scheme.describe("reconstruction"),
+        dest="scheme.reconstruction",
+        metavar="R",
+    )
+    parser.add_argument(
+        "-e",
+        "--tfinal",
+        type=float,
+        help=Driver.describe("tfinal"),
+        dest="driver.tfinal",
+        metavar="T",
+    )
+    parser.add_argument(
+        "-f",
+        "--fold",
+        "--report-cadence",
+        type=int,
+        help=Report.describe("cadence"),
+        dest="driver.report.cadence",
+        metavar="F",
+    )
+    parser.add_argument(
+        "--data-layout",
+        type=str,
+        choices=Strategy.type_args("data_layout"),
+        help=Strategy.describe("data_layout"),
+        dest="strategy.data_layout",
+    )
+    parser.add_argument(
+        "--cache-prim",
+        action="store_true",
+        dest="strategy.cache_prim",
+        default=None,
+    )
+    parser.add_argument(
+        "--cache-flux",
+        action="store_true",
+        dest="strategy.cache_flux",
+        default=None,
+    )
+    parser.add_argument(
+        "--cache-grad",
+        action="store_true",
+        dest="strategy.cache_grad",
+        default=None,
+    )
     args = parser.parse_args()
-    configure_logger(logger, log_level=args.log_level)
 
-    args.func(args)
+    # =========================================================================
+    # Configure logging
+    # =========================================================================
+    console = Console()
+    handler = RichHandler(omit_repeated_times=False, console=console)
+    logger = getLogger("sailfish")
+    logger.addHandler(handler)
+    logger.setLevel(args._log_level.upper())
+
+    install_rich_traceback()
+
+    # =========================================================================
+    # Extract model configuration from parser args
+    # =========================================================================
+    overrides = unflatten(
+        {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
+    )
+
+    # =========================================================================
+    # Generate a sequence of sailfish app structs and run them
+    # =========================================================================
+    apps = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
+    monitor = scrollback_run_monitor(console.print)
+    next(monitor)
+
+    for event in run(apps):
+        monitor.send(event)
 
 
 if __name__ == "__main__":
@@ -1445,4 +558,4 @@ if __name__ == "__main__":
         main()
     except KeyboardInterrupt:
         print()
-        logger.success("ctrl-c interrupt")
+        print("ctrl-c interrupt")
