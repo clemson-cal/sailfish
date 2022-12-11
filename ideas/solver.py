@@ -607,7 +607,6 @@ def solver(
     """
     Solver for the 1d euler equations in many configurations
     """
-
     xp = numpy_or_cupy(hardware)
     nz = resolution
     dx = 1.0 / nz

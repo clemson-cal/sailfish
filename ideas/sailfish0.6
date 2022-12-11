@@ -3,7 +3,7 @@
 
 from argparse import ArgumentParser, SUPPRESS
 from collections import deque
-from collections.abc import Mapping
+from collections.abc import Mapping, Iterable
 from dataclasses import asdict, dataclass
 from itertools import chain, product
 from json import load as load_json, dumps as dumps_json
@@ -17,6 +17,10 @@ from solver import make_solver
 
 @dataclass
 class iteration_report:
+    """
+    Light-weight status of an iteration or group of iterations
+    """
+
     iteration: int
     time: float
     zps: float
@@ -38,6 +42,10 @@ class iteration_report:
 
 @dataclass
 class run_summary:
+    """
+    Light-weight epilog of a run
+    """
+
     app: Sailfish
     total_sec: float
     mean_zps: float
@@ -50,7 +58,12 @@ class run_summary:
         )
 
 
-def run(apps: list[Sailfish]):
+def run(apps: Iterable[Sailfish]):
+    """
+    Main simulation driver function
+
+    This function drives a sequence of applications
+    """
     for app in apps:
         yield app
 
@@ -63,8 +76,7 @@ def run(apps: list[Sailfish]):
         app_timer = perf_time_sequence(mode=app.hardware)
         fld_timer = perf_time_sequence(mode=app.hardware)
 
-        sum_zps = 0.0
-        fld_num = 0
+        zps_log = list()
 
         while state.time < tfinal:
             state = next(states)
@@ -72,16 +84,21 @@ def run(apps: list[Sailfish]):
             if state.iteration % fold == 0:
                 sec = next(fld_timer)
                 zps = state.total_zones / sec * fold
-                sum_zps += zps
-                fld_num += 1
-                yield iteration_report(state.iteration, state.time, zps)
+                zps_log.append(zps)
                 yield state
+                yield iteration_report(state.iteration, state.time, zps)
 
-        yield run_summary(app, next(app_timer), sum_zps / fld_num)
         yield state
+        yield run_summary(app, next(app_timer), sum(zps_log) / len(zps_log))
 
 
 def scrollback(print):
+    """
+    A run monitor that writes run status and iteration reports to the console
+
+    The print function can be builtin, or something else such as rich.print.
+    """
+
     while True:
         event = yield
 
@@ -100,7 +117,10 @@ def scrollback(print):
             print(report)
 
 
-def reports_table(reports: list[iteration_report]):
+def reports_table(reports: Iterable[iteration_report]):
+    """
+    Generate a rich table from a sequence of iteration reports
+    """
     from rich.table import Table
     from rich.panel import Panel
 
@@ -122,10 +142,14 @@ def reports_table(reports: list[iteration_report]):
         avg_zps = sum(r.zps for r in reports) / max(1, len(reports))
         table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
 
-    return Panel(table, border_style="blue")
+    return Panel(table, style="dim", border_style="blue", padding=(2, 2))
 
 
 def summaries_table(summaries: list[run_summary]):
+    """
+    Generate a rich table from a sequence of run summary reports
+    """
+
     from rich.table import Table
     from rich.panel import Panel
 
@@ -136,7 +160,7 @@ def summaries_table(summaries: list[run_summary]):
     for summary in summaries:
         table.add_row(f"{summary.app.name}", f"{summary.mean_zps/1e6:0.5f}")
 
-    return Panel(table, border_style="red")
+    return Panel(table, style="dim", border_style="red", padding=(2, 2))
 
 
 def dashboard(console, screen=False):
@@ -152,7 +176,7 @@ def dashboard(console, screen=False):
     app_struct = str()
     job_num = 0
 
-    app_view = Layout(str(), name="app")
+    app_view = Layout(str(), name="app", ratio=5)
     progress_view = Layout(
         Panel(
             progress,
@@ -160,10 +184,11 @@ def dashboard(console, screen=False):
             padding=(2, 2),
             border_style="green",
         ),
+        ratio=3,
         name="progress",
     )
-    reports_view = Layout(reports_table(reports), name="reports", ratio=5)
-    summaries_view = Layout(summaries_table(reports), name="summaries", ratio=3)
+    reports_view = Layout(reports_table(reports), name="reports", ratio=3)
+    summaries_view = Layout(summaries_table(reports), name="summaries", ratio=5)
 
     root = Layout(name="root")
     root.split_column(Layout(name="upper", ratio=2), Layout(name="lower", ratio=3))
@@ -278,13 +303,26 @@ def unflatten(d):
     return res
 
 
-@contextmanager
-def closing(gen):
-    next(gen)
-    try:
-        yield gen
-    finally:
-        gen.close()
+def init_logging(level):
+    from rich.console import Console
+    from rich.logging import RichHandler
+
+    console = Console()
+    handler = RichHandler(omit_repeated_times=False, console=console)
+    logger = getLogger("sailfish")
+    logger.addHandler(handler)
+    logger.setLevel(level.upper())
+
+    return console
+
+
+# @contextmanager
+# def closing(gen):
+#     next(gen)
+#     try:
+#         yield gen
+#     finally:
+#         gen.close()
 
 
 def scan_strategies():
@@ -332,13 +370,10 @@ def sailfish(config, overrides):
         yield Sailfish(**s)
 
 
-def main():
+def argument_parser():
     """
-    Main sailfish entry point and command line interface
+    Create an argument parser instance for running from the command line
     """
-    from rich.console import Console
-    from rich.logging import RichHandler
-
     parser = ArgumentParser(
         prog="sailfish_ui",
         usage=SUPPRESS,
@@ -369,26 +404,6 @@ def main():
         action="store_true",
         help="transient screen in dash mode (better look but disappears after the run)",
     )
-    # parser.add_argument(
-    #     "--debug",
-    #     action="store_true",
-    #     dest="_debug",
-    # )
-    # parser.add_argument(
-    #     "--plot",
-    #     nargs="?",
-    #     const="end",
-    #     help=Sailfish.describe("plot"),
-    #     choices=(None, "live", "end"),
-    #     dest="plot",
-    # )
-    # parser.add_argument(
-    #     "--show-config",
-    #     choices=Sailfish.type_args("show_config"),
-    #     help=Sailfish.describe("show_config"),
-    #     type=str,
-    #     dest="show_config",
-    # )
     parser.add_argument(
         "--mode",
         "--hardware",
@@ -461,39 +476,34 @@ def main():
         dest="strategy.cache_grad",
         default=None,
     )
-    args = parser.parse_args()
+    return parser
 
-    # =========================================================================
-    # Configure logging
-    # =========================================================================
-    console = Console()
-    handler = RichHandler(omit_repeated_times=False, console=console)
-    logger = getLogger("sailfish")
-    logger.addHandler(handler)
-    logger.setLevel(args._log_level.upper())
 
-    # =========================================================================
-    # Extract model configuration from parser args
-    # =========================================================================
-    overrides = unflatten(
-        {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
-    )
-
-    # =========================================================================
-    # Generate a sequence of sailfish app structs and run them
-    # =========================================================================
-    apps = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
-
-    if args._dash:
-        monitor = dashboard(console, args._screen)
-    else:
-        monitor = scrollback(console.print)
-
+def main():
+    """
+    Main sailfish entry point and command line interface
+    """
     try:
-        with closing(monitor) as monitor:
-            for event in run(apps):
-                monitor.send(event)
+        parser = argument_parser()
+        args = parser.parse_args()
+        console = init_logging(args._log_level)
+        overrides = unflatten(
+            {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
+        )
+        apps = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
+
+        if args._dash:
+            monitor = dashboard(console, args._screen)
+        else:
+            monitor = scrollback(console.print)
+
+        next(monitor)
+
+        for event in run(apps):
+            monitor.send(event)
+
     except Exception:
+        monitor.close()
         console.print_exception()
 
 
