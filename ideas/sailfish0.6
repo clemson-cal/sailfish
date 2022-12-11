@@ -296,6 +296,75 @@ def scrollback_run_monitor(print):
             print(report)
 
 
+def reports_table(reports):
+    from rich.table import Table
+
+    table = Table(expand=False)
+    table.add_column("iteration", style="cyan", justify="right")
+    table.add_column("time", style="green")
+    table.add_column("zones per second (millions)", style="magenta", justify="left")
+
+    for report in reports:
+        table.add_row(
+            f"{report.iteration}",
+            f"{report.time:0.5f}",
+            f"{report.zps/1e6:0.3f}",
+        )
+
+    table.add_section()
+
+    if any(reports):
+        avg_zps = sum(r.zps for r in reports) / max(1, len(reports))
+        table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
+
+    return table
+
+
+def dashboard_run_monitor(console):
+    from rich.live import Live
+    from rich.pretty import Pretty
+    from rich.progress import Progress
+    from rich.columns import Columns
+
+    reports = deque()
+    progress = Progress()
+    app_struct = Pretty(str())
+    dash = Columns([app_struct, reports_table(reports), progress])
+    run_task = None
+    job_num = 0
+
+    with Live(dash, console=console, refresh_per_second=10) as live:
+        while True:
+            event = yield
+
+            if type(event) is Sailfish:
+                app = event
+                job_num += 1
+                duration = app.driver.tfinal - app.driver.tstart
+
+                if run_task is not None:
+                    progress.remove_task(run_task)
+
+                run_task = progress.add_task(f"running {job_num}", total=duration)
+                dash.renderables[0] = Pretty(app)
+
+            elif type(event) is iteration_report:
+                report = event
+                reports.append(report)
+
+                if len(reports) > 20:
+                    reports.popleft()
+                dash.renderables[1] = reports_table(reports)
+
+            elif type(event) is run_summary:
+                reports = deque()
+
+            else:
+                state = event
+                evolved_time = state.time - app.driver.tstart
+                progress.update(run_task, completed=evolved_time)
+
+
 def num_zones(arg):
     """
     Promote an integer or two-tuple to a three-tuple of integers
@@ -546,7 +615,9 @@ def main():
     # Generate a sequence of sailfish app structs and run them
     # =========================================================================
     apps = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
-    monitor = scrollback_run_monitor(console.print)
+    # monitor = scrollback_run_monitor(console.print)
+
+    monitor = dashboard_run_monitor(console)
     next(monitor)
 
     for event in run(apps):
