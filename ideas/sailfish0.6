@@ -14,205 +14,6 @@ from new_kernels import perf_time_sequence, configure_kernel_module
 from solver import make_solver
 
 
-# from rich import box
-# from rich.console import Console, Group
-# from rich.live import Live
-# from rich.logging import RichHandler
-# from rich.panel import Panel
-# from rich.pretty import Pretty
-# from rich.progress import Progress
-# from rich.syntax import Syntax
-# from rich.table import Table
-# from rich.traceback import install as install_rich_traceback
-
-# class Plotting:
-#     def __init__(self, app):
-#         self._axes = None
-#         self._line = None
-#         self._live = app.plot == "live"
-
-#         if app.plot:
-#             from matplotlib import pyplot as plt
-
-#             if app.plot == "live":
-#                 plt.ion()
-#             self.plt = plt
-
-#     def update(self, state):
-#         if not self._live:
-#             return
-#         elif self._axes is None:
-#             self.plot(state)
-#         elif self.plt.get_fignums():
-#             self.plot(state)
-#             self._fig.canvas.flush_events()
-
-#     def plot(self, state, action=None):
-#         from numpy import linspace
-
-#         p = state.primitive
-#         x = linspace(0.0, 1.0, p.shape[0])
-#         line = self._line
-
-#         if line is None:
-#             self._line = self.axes().plot(x, p[:, 0], mfc="none")[0]
-#         else:
-#             line.set_ydata(p[:, 0])
-
-#         if action == "show":
-#             self.plt.show()
-
-#     def axes(self):
-#         if self._axes:
-#             return self._axes
-#         else:
-#             from matplotlib import pyplot as plt
-
-#             fig = plt.figure()
-#             ax1 = fig.add_subplot(111)
-#             self._axes = ax1
-#             self._fig = fig
-#             return ax1
-
-
-# class Dashboard:
-#     """
-#     A rich-renderable run monitor
-#     """
-
-#     def __init__(self, app=None):
-#         self._app = app
-#         self.group = Group("", "", "")
-
-#     @property
-#     def app(self):
-#         return self._app
-
-#     @app.setter
-#     def app(self, app):
-#         progress = Progress()
-#         duration = app.driver.tfinal - app.driver.tstart
-#         run_task = progress.add_task("running...", total=duration)
-
-#         self._app = app
-#         self.progress = progress
-#         self.run_task = run_task
-#         self.reports = deque()
-#         self.perf_timer = perf_time_sequence(mode=app.hardware)
-#         self.group.renderables[0] = self.app_config()
-#         self.group.renderables[1] = self.reports_table()
-#         self.group.renderables[2] = self.progress
-
-#     def reports_table(self):
-#         table = Table(expand=True)
-#         table.add_column("iteration", style="cyan", justify="right")
-#         table.add_column("time", style="green")
-#         table.add_column("zones per second (millions)", style="magenta", justify="left")
-#         reports = self.reports
-
-#         for report in reports:
-#             table.add_row(
-#                 f"{report.iteration}",
-#                 f"{report.time:0.5f}",
-#                 f"{report.zones_per_second/1e6:0.3f}",
-#             )
-
-#         table.add_section()
-#         avg_zps = sum(r.zones_per_second for r in reports) / max(1, len(reports))
-#         table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
-#         return table
-
-#     def app_config(self):
-#         if self.app.show_config is None:
-#             return str()
-#         if self.app.show_config == "table":
-#             return self.app
-#         if self.app.show_config == "pretty":
-#             return Pretty(self.app)
-#         if self.app.show_config == "json":
-#             return Syntax(dumps_json(asdict(self.app), indent=4), lexer="json")
-#         if self.app.show_config == "dict":
-#             return Pretty(asdict(self.app))
-
-#     def update(self, state):
-#         fold = self.app.driver.report.cadence
-#         evolved_time = state.time - self.app.driver.tstart
-#         zps = state.total_zones / next(self.perf_timer) * fold
-#         report = iteration_report(state.iteration, state.time, zps)
-
-#         self.progress.update(self.run_task, completed=evolved_time)
-#         self.reports.append(report)
-
-#         if len(self.reports) > 20:
-#             self.reports.popleft()
-
-#         self.group.renderables[1] = self.reports_table()
-
-#     def render(self):
-#         return Panel.fit(self.group, width=100, box=box.MINIMAL)
-
-
-# class ScrollbackReporting:
-#     def __init__(self, console):
-#         self.console = console
-#         self._app = None
-
-#     @property
-#     def app(self):
-#         return self._app
-
-#     @app.setter
-#     def app(self, app):
-#         self.perf_timer = perf_time_sequence(mode=app.hardware)
-#         self._app = app
-#         self.console.print(Panel(Pretty(app), width=100))
-
-#     def update(self, state):
-#         fold = self.app.driver.report.cadence
-#         zps = state.total_zones / next(self.perf_timer) * fold
-#         report = iteration_report(state.iteration, state.time, zps)
-#         self.console.print(
-#             f"[cyan]{report.iteration:06d}[/cyan] "
-#             f"[green]t={report.time:0.5f}[/green] "
-#             f"[magenta]Mzps={report.zones_per_second/1e6:0.3f}[/magenta]"
-#         )
-
-
-# def run(apps: list[Sailfish], console: Console, use_dash=False):
-#     """
-#     Run a sequence of sailfish apps, with a rich dashboard
-#     """
-#     try:
-#         if use_dash:
-#             dash = Dashboard()
-#             view = Live(dash.render(), console=console, refresh_per_second=10)
-#             view.start()
-#         else:
-#             dash = ScrollbackReporting(console)
-
-#         for app in apps:
-#             configure_kernel_module(default_exec_mode=app.hardware)
-
-#             dash.app = app
-#             solver = make_solver(app)
-#             fold = app.driver.report.cadence
-#             state = next(solver)
-#             plot = Plotting(app)
-
-#             while state.time < app.driver.tfinal:
-#                 state = next(solver)
-#                 if state.iteration % fold == 0:
-#                     dash.update(state)
-#                     plot.update(state)
-
-#             if app.plot == "end":
-#                 plot.plot(state, action="show")
-
-#     finally:
-#         if use_dash:
-#             view.stop()
-
-
 @dataclass
 class iteration_report:
     iteration: int
@@ -236,11 +37,13 @@ class iteration_report:
 
 @dataclass
 class run_summary:
+    app: Sailfish
     total_sec: float
     mean_zps: float
 
     def __repr__(self):
         return (
+            f"run name: {self.app.name}\n"
             f"total run time: {self.total_sec:0.5f} sec\n"
             f"mean Mzps: {self.mean_zps/1e6:0.3f}"
         )
@@ -273,7 +76,7 @@ def run(apps: list[Sailfish]):
                 yield iteration_report(state.iteration, state.time, zps)
                 yield state
 
-        yield run_summary(total_sec=next(app_timer), mean_zps=sum_zps / fld_num)
+        yield run_summary(app, next(app_timer), sum_zps / fld_num)
         yield state
 
 
@@ -296,10 +99,11 @@ def scrollback_run_monitor(print):
             print(report)
 
 
-def reports_table(reports):
+def reports_table(reports: list[iteration_report]):
     from rich.table import Table
+    from rich.panel import Panel
 
-    table = Table(expand=False)
+    table = Table(expand=True, show_edge=False)
     table.add_column("iteration", style="cyan", justify="right")
     table.add_column("time", style="green")
     table.add_column("zones per second (millions)", style="magenta", justify="left")
@@ -317,23 +121,60 @@ def reports_table(reports):
         avg_zps = sum(r.zps for r in reports) / max(1, len(reports))
         table.add_row(None, None, f"{avg_zps/1e6:0.3f}", style="italic")
 
-    return table
+    return Panel(table, border_style="blue")
+
+
+def summaries_table(summaries: list[run_summary]):
+    from rich.table import Table
+    from rich.panel import Panel
+
+    table = Table(expand=True, show_edge=False)
+    table.add_column("run name", style="cyan", justify="left")
+    table.add_column("<zones per second> (millions)", style="magenta", justify="left")
+
+    for summary in summaries:
+        table.add_row(f"{summary.app.name}", f"{summary.mean_zps/1e6:0.5f}")
+
+    return Panel(table, border_style="red")
 
 
 def dashboard_run_monitor(console):
     from rich.live import Live
     from rich.pretty import Pretty
     from rich.progress import Progress
-    from rich.columns import Columns
+    from rich.layout import Layout
+    from rich.panel import Panel
 
     reports = deque()
+    summaries = list()
     progress = Progress()
-    app_struct = Pretty(str())
-    dash = Columns([app_struct, reports_table(reports), progress])
-    run_task = None
+    app_struct = str()
     job_num = 0
 
-    with Live(dash, console=console, refresh_per_second=10) as live:
+    app_view = Layout(str(), name="app")
+    progress_view = Layout(
+        Panel(
+            progress,
+            title="Job Progress",
+            padding=(2, 2),
+            border_style="green",
+        ),
+        name="progress",
+    )
+    reports_view = Layout(reports_table(reports), name="reports", ratio=5)
+    summaries_view = Layout(summaries_table(reports), name="summaries", ratio=3)
+
+    root = Layout(name="root")
+    root.split_column(Layout(name="upper", ratio=2), Layout(name="lower", ratio=3))
+    root["upper"].split_row(app_view, progress_view)
+    root["lower"].split_row(reports_view, summaries_view)
+
+    with Live(
+        root,
+        console=console,
+        refresh_per_second=4,
+        screen=True,
+    ) as live:
         while True:
             event = yield
 
@@ -341,12 +182,15 @@ def dashboard_run_monitor(console):
                 app = event
                 job_num += 1
                 duration = app.driver.tfinal - app.driver.tstart
-
-                if run_task is not None:
-                    progress.remove_task(run_task)
-
-                run_task = progress.add_task(f"running {job_num}", total=duration)
-                dash.renderables[0] = Pretty(app)
+                run_task = progress.add_task(f"job {job_num}", total=duration)
+                app_view.update(
+                    Panel(
+                        Pretty(app),
+                        title="Run Description",
+                        padding=(2, 2),
+                        border_style="bright_blue",
+                    )
+                )
 
             elif type(event) is iteration_report:
                 report = event
@@ -354,10 +198,13 @@ def dashboard_run_monitor(console):
 
                 if len(reports) > 20:
                     reports.popleft()
-                dash.renderables[1] = reports_table(reports)
+                reports_view.update(reports_table(reports))
 
             elif type(event) is run_summary:
+                summary = event
                 reports = deque()
+                summaries.append(summary)
+                summaries_view.update(summaries_table(summaries))
 
             else:
                 state = event
@@ -436,7 +283,7 @@ def scan_strategies():
         "strategy.cache_grad": (True, False),
     }
     for p in product(*d.values()):
-        yield unflatten(dict(zip(d.keys(), p)))
+        yield unflatten(dict(name=str(p), **dict(zip(d.keys(), p))))
 
 
 def sailfish_presets():

@@ -161,6 +161,7 @@ class Sailfish:
     Fields
     ------
 
+    name:      a name given to the run
     driver:    runs the simulation main loop, handles IO
     physics:   the physics equations to be solved
     domain:    the physical domain of the problem
@@ -168,6 +169,7 @@ class Sailfish:
     hardware:  compute device [cpu|gpu]
     """
 
+    name: str = None
     driver: Driver = Driver()
     physics: Union[Euler, Isothermal] = Euler()
     domain: CoordinateBox = CoordinateBox()
