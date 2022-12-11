@@ -8,6 +8,7 @@ from dataclasses import asdict, dataclass
 from itertools import chain, product
 from json import load as load_json, dumps as dumps_json
 from logging import getLogger
+from contextlib import contextmanager
 
 from app_config import Sailfish, Driver, Report, Strategy, Scheme
 from new_kernels import perf_time_sequence, configure_kernel_module
@@ -80,7 +81,7 @@ def run(apps: list[Sailfish]):
         yield state
 
 
-def scrollback_run_monitor(print):
+def scrollback(print):
     while True:
         event = yield
 
@@ -138,7 +139,7 @@ def summaries_table(summaries: list[run_summary]):
     return Panel(table, border_style="red")
 
 
-def dashboard_run_monitor(console):
+def dashboard(console, screen=False):
     from rich.live import Live
     from rich.pretty import Pretty
     from rich.progress import Progress
@@ -172,8 +173,8 @@ def dashboard_run_monitor(console):
     with Live(
         root,
         console=console,
-        refresh_per_second=4,
-        screen=True,
+        auto_refresh=False,
+        screen=screen,
     ) as live:
         while True:
             event = yield
@@ -210,6 +211,8 @@ def dashboard_run_monitor(console):
                 state = event
                 evolved_time = state.time - app.driver.tstart
                 progress.update(run_task, completed=evolved_time)
+
+            live.refresh()
 
 
 def num_zones(arg):
@@ -275,6 +278,15 @@ def unflatten(d):
     return res
 
 
+@contextmanager
+def closing(gen):
+    next(gen)
+    try:
+        yield gen
+    finally:
+        gen.close()
+
+
 def scan_strategies():
     d = {
         "strategy.data_layout": ("fields-last", "fields-first"),
@@ -326,7 +338,6 @@ def main():
     """
     from rich.console import Console
     from rich.logging import RichHandler
-    from rich.traceback import install as install_rich_traceback
 
     parser = ArgumentParser(
         prog="sailfish_ui",
@@ -345,6 +356,18 @@ def main():
         default="warning",
         choices=("debug", "info", "warning", "error", "critical"),
         help="log messages at and above this severity level",
+    )
+    parser.add_argument(
+        "--dash",
+        dest="_dash",
+        action="store_true",
+        help="show a dashboard instead of a scrollback",
+    )
+    parser.add_argument(
+        "--screen",
+        dest="_screen",
+        action="store_true",
+        help="transient screen in dash mode (better look but disappears after the run)",
     )
     # parser.add_argument(
     #     "--debug",
@@ -449,8 +472,6 @@ def main():
     logger.addHandler(handler)
     logger.setLevel(args._log_level.upper())
 
-    install_rich_traceback()
-
     # =========================================================================
     # Extract model configuration from parser args
     # =========================================================================
@@ -462,13 +483,18 @@ def main():
     # Generate a sequence of sailfish app structs and run them
     # =========================================================================
     apps = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
-    # monitor = scrollback_run_monitor(console.print)
 
-    monitor = dashboard_run_monitor(console)
-    next(monitor)
+    if args._dash:
+        monitor = dashboard(console, args._screen)
+    else:
+        monitor = scrollback(console.print)
 
-    for event in run(apps):
-        monitor.send(event)
+    try:
+        with closing(monitor) as monitor:
+            for event in run(apps):
+                monitor.send(event)
+    except Exception:
+        console.print_exception()
 
 
 if __name__ == "__main__":
