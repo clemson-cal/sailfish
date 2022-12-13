@@ -595,6 +595,7 @@ def cell_centers_1d(ni):
 
 
 def solver(
+    checkpoint: dict,
     hardware: str,
     resolution: int,
     data_layout: str,
@@ -612,9 +613,16 @@ def solver(
     dx = 1.0 / nz
     dt = dx * 1e-1
     x = cell_centers_1d(nz)
-    p = linear_shocktube(x)
-    t = 0.0
-    n = 0
+
+    if checkpoint:
+        p = checkpoint["primitive"]
+        t = checkpoint["time"]
+        n = checkpoint["iteration"]
+    else:
+        p = linear_shocktube(x)
+        t = 0.0
+        n = 0
+
     p = xp.array(p)
     transpose = data_layout == "fields-first"
 
@@ -720,11 +728,12 @@ def solver(
         yield State(n, t, u1, cons_to_prim, transpose)
 
 
-def make_solver(app: Sailfish):
+def make_solver(app: Sailfish, checkpoint: dict = None):
     """
     Construct the 1d solver from an app instance
     """
     return solver(
+        checkpoint,
         app.hardware,
         app.domain.num_zones[0],
         app.strategy.data_layout,

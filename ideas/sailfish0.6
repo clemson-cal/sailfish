@@ -7,10 +7,10 @@ from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from itertools import chain, product
-from pickle import dump as dump_pickle
+from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json, dumps as dumps_json
 from logging import getLogger
-from typing import NamedTuple
+from typing import Any
 
 from app_config import Sailfish, Driver, Report, Strategy, Scheme, Checkpoint
 from new_kernels import perf_time_sequence, configure_kernel_module
@@ -64,10 +64,9 @@ class run_summary:
 class event_state:
     number: int
     last_time: float
-    action: any = None
 
 
-def recurring_event(interval: float, last_time: float = None, number: int = 0):
+def recurring_event(interval: float, number: int = 0, last_time: float = None):
     """
     A generator which yields True or False based on whether a task is due
     """
@@ -94,11 +93,7 @@ def timeseries(app, state, timeseries, event_states):
     time = timeseries.setdefault("time", list())
     time.append(state.time)
 
-    return event_state(
-        number=number,
-        last_time=state.time,
-        action=f"timeseries {state.time}",
-    )
+    return f"timeseries {number}"
 
 
 def checkpoint(app, state, timeseries, event_states):
@@ -108,58 +103,70 @@ def checkpoint(app, state, timeseries, event_states):
     with open(filename, "wb") as outf:
         dump_pickle(
             dict(
-                app=app,
-                state=state.primitive,
+                config=asdict(app),
+                primitive=state.primitive,
+                time=state.time,
+                iteration=state.iteration,
                 timeseries=timeseries,
-                event_states=event_states,
+                event_states={k: asdict(v) for k, v in event_states.items()},
             ),
             outf,
         )
 
-    return event_state(
-        number=number,
-        last_time=state.time,
-        action=f"checkpoint {filename}",
-    )
+    return filename
 
 
-def run(apps: Iterable[Sailfish]):
+def run(setups: Iterable[tuple[Sailfish, dict]]):
     """
     Main simulation driver function
 
     This function drives a sequence of applications
     """
-    for app in apps:
+    for app, chkpt in setups:
         yield app
 
         configure_kernel_module(default_exec_mode=app.hardware)
 
-        fold = app.driver.report.cadence
-        tfinal = app.driver.tfinal
-        states = make_solver(app)
-        app_timer = perf_time_sequence(mode=app.hardware)
-        fld_timer = perf_time_sequence(mode=app.hardware)
-        event_states = dict()
+        driver = app.driver
+        fold = driver.report.cadence
+        tfinal = driver.tfinal
+        states = make_solver(app, chkpt)
         timeseries_data = dict()
         zps_log = [0.0]
+        app_timer = perf_time_sequence(mode=app.hardware)
+        fld_timer = perf_time_sequence(mode=app.hardware)
+
+        # =====================================================================
+        # Set up timeseries and checkpoint task handlers
+        # =====================================================================
+        if chkpt:
+            ts_state = chkpt["event_states"]["timeseries"]
+            cp_state = chkpt["event_states"]["checkpoint"]
+        else:
+            ts_state = dict()
+            cp_state = dict()
+        event_states = dict()
         events = dict(
-            timeseries=recurring_event(app.driver.timeseries.cadence),
-            checkpoint=recurring_event(app.driver.checkpoint.cadence),
+            timeseries=recurring_event(driver.timeseries.cadence, **ts_state),
+            checkpoint=recurring_event(driver.checkpoint.cadence, **cp_state),
+        )
+        event_funcs = dict(
+            timeseries=timeseries,
+            checkpoint=checkpoint,
         )
         for event in events.values():
             event.send(None)
 
+        # =====================================================================
+        # Get initial state from solver, and start the main loop
+        # =====================================================================
         state = next(states)
 
         while True:
-
-            if e := events["timeseries"].send(state.time):
-                event_states["timeseries"] = e
-                yield timeseries(app, state, timeseries_data, event_states)
-
-            if e := events["checkpoint"].send(state.time):
-                event_states["checkpoint"] = e
-                yield checkpoint(app, state, timeseries_data, event_states)
+            for name in events:
+                if e := events[name].send(state.time):
+                    event_states[name] = e
+                    yield event_funcs[name](app, state, timeseries_data, event_states)
 
             if state.time >= tfinal:
                 break
@@ -249,6 +256,17 @@ def summaries_table(summaries: list[run_summary]):
     return Panel(table, style="dim", border_style="red", padding=(2, 2))
 
 
+def checkpoints_table(checkpoints: list[str]):
+    from rich.columns import Columns
+    from rich.panel import Panel
+
+    return Panel(
+        Columns(checkpoints),
+        border_style="red",
+        padding=(2, 2),
+    )
+
+
 def dashboard(console, screen=False):
     from rich.live import Live
     from rich.pretty import Pretty
@@ -259,6 +277,7 @@ def dashboard(console, screen=False):
     reports = deque()
     summaries = list()
     progress = Progress()
+    checkpoints = list()
     app_struct = str()
     job_num = 0
 
@@ -275,11 +294,13 @@ def dashboard(console, screen=False):
     )
     reports_view = Layout(reports_table(reports), name="reports", ratio=3)
     summaries_view = Layout(summaries_table(reports), name="summaries", ratio=5)
+    checkpoints_view = Layout(checkpoints_table(checkpoints), name="checkpoints")
 
     root = Layout(name="root")
     root.split_column(Layout(name="upper", ratio=2), Layout(name="lower", ratio=3))
     root["upper"].split_row(app_view, progress_view)
-    root["lower"].split_row(reports_view, summaries_view)
+    root["lower"].split_row(Layout(name="lower-left", ratio=3), summaries_view)
+    root["lower-left"].split_column(reports_view, checkpoints_view)
 
     with Live(
         root,
@@ -303,6 +324,7 @@ def dashboard(console, screen=False):
                         border_style="bright_blue",
                     )
                 )
+                checkpoints.clear()
 
             elif type(event) is iteration_report:
                 report = event
@@ -314,6 +336,10 @@ def dashboard(console, screen=False):
                 reports_view.update(reports_table(reports))
                 evolved_time = report.time - app.driver.tstart
                 progress.update(run_task, completed=evolved_time)
+
+            elif type(event) is str and "chkpt" in event:
+                checkpoints.append(event)
+                checkpoints_view.update(checkpoints_table(checkpoints))
 
             elif type(event) is run_summary:
                 summary = event
@@ -424,6 +450,7 @@ def sailfish(config, overrides):
     containing a dictionary or a list of dictionaries.
     """
     presets = sailfish_presets()
+    chkpt = None
 
     if not config:
         cs = dict()
@@ -432,6 +459,10 @@ def sailfish(config, overrides):
     elif config.endswith(".json"):
         with open(config) as infile:
             cs = load_json(infile)
+    elif config.endswith(".pk"):
+        with open(config, "rb") as infile:
+            chkpt = load_pickle(infile)
+            cs = chkpt["config"]
     else:
         raise ValueError("config must be a preset or a json file")
 
@@ -442,7 +473,7 @@ def sailfish(config, overrides):
         s = asdict(Sailfish())
         deep_update(s, c)
         deep_update(s, overrides)
-        yield Sailfish(**s)
+        yield Sailfish(**s), chkpt
 
 
 def argument_parser():
