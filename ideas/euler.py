@@ -11,7 +11,7 @@ Author: Jonathan Zrake
 from contextlib import contextmanager
 from time import perf_counter
 from numpy.typing import NDArray
-from new_kernels import kernel, kernel_class
+from kernels import kernel, kernel_class
 
 static = R"""
 #define min2(a, b) ((a) < (b) ? (a) : (b))
@@ -205,7 +205,7 @@ def main():
     from sys import stdout
     from argparse import ArgumentParser
     from loguru import logger
-    from new_kernels import configure_kernel_module
+    from kernels import configure_kernel_module
 
     parser = ArgumentParser()
     parser.add_argument(

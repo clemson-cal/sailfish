@@ -4,7 +4,7 @@ Exports the `EulerEquations` class
 
 
 from numpy.typing import NDArray
-from new_kernels import kernel_class, kernel_method
+from kernels import kernel_class, kernel_method
 
 
 code = R"""

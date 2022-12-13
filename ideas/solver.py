@@ -4,9 +4,9 @@ A solver is a generator function and a state object
 
 from numpy import array, zeros, logical_not
 from numpy.typing import NDArray
-from new_kernels import kernel, kernel_class, device
+from kernels import kernel, kernel_class, device
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
-from app_config import Sailfish, Reconstruction
+from models import Sailfish, Reconstruction
 
 
 def numpy_or_cupy(exec_mode):

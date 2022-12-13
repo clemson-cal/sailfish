@@ -3,7 +3,7 @@ from argparse import ArgumentParser
 from loguru import logger
 from numpy import linspace, meshgrid, zeros, logical_not
 from reporting import configure_logger, terminal, add_logging_arguments, iteration_msg
-from new_kernels import configure_kernel_module, perf_time_sequence
+from kernels import configure_kernel_module, perf_time_sequence
 from hydro_euler import EulerEquations
 from gradient_estimation import plm_gradient_1d, plm_gradient_2d, extrapolate
 import fmr_grid

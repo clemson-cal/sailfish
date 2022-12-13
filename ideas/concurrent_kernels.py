@@ -9,7 +9,7 @@ This program is also useful in determining how big an array needs to be to
 from cupy import zeros
 from cupy.cuda import Stream
 from numpy.typing import NDArray
-from new_kernels import kernel, perf_time_sequence
+from kernels import kernel, perf_time_sequence
 
 
 code = R"""

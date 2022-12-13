@@ -1,5 +1,5 @@
 from numpy.typing import NDArray
-from new_kernels import device
+from kernels import device
 
 
 static = R"""
@@ -310,7 +310,7 @@ def riemann_hlle(
 
 if __name__ == "__main__":
     from numpy import array, zeros_like, allclose
-    from new_kernels import kernel
+    from kernels import kernel
 
     @kernel(device_funcs=[cons_to_prim], define_macros=dict(DIM=2))
     def kernel_cons_to_prim(u: NDArray[float], p: NDArray[float], ni: int = None):

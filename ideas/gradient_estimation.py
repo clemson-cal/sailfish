@@ -3,7 +3,7 @@ Exports functions for estimating gradients on rectilinear grids.
 """
 
 
-from new_kernels import device
+from kernels import device
 from numpy.typing import NDArray
 
 
