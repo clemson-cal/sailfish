@@ -165,7 +165,8 @@ class Sailfish:
     driver:    runs the simulation main loop, handles IO
     physics:   the physics equations to be solved
     domain:    the physical domain of the problem
-    strategy:  the solution strategy
+    strategy:  the solution strategy; does not affect the numerical solution
+    scheme:    algorithmic choices which can affect the solution accuracy
     hardware:  compute device [cpu|gpu]
     """
 

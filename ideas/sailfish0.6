@@ -120,7 +120,16 @@ def run(setups: Iterable[tuple[Sailfish, dict]]):
     """
     Main simulation driver function
 
-    This function drives a sequence of applications
+    This function drives a sequence of applications. The `setups` argument is
+    a sequence of tuples: a `Sailfish` configuration instance, and a possible
+    checkpoint file from which the run is to be restarted.
+
+    This function does not write anything to the console, instead it yields
+    items to be dealt with by a run monitor: either a terminal scrollback or
+    dashboard, or maybe eventually a full UI.
+
+    This function does handle checkpointing and the collection of time series
+    data from the solver.
     """
     for app, chkpt in setups:
         yield app
