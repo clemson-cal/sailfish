@@ -141,7 +141,7 @@ def run(setups: Iterable[tuple[Sailfish, dict]]):
         tfinal = driver.tfinal
         states = make_solver(app, chkpt)
         timeseries_data = dict()
-        zps_log = [0.0]
+        zps_log = list()
         app_timer = perf_time_sequence(mode=app.hardware)
         fld_timer = perf_time_sequence(mode=app.hardware)
 
@@ -185,11 +185,12 @@ def run(setups: Iterable[tuple[Sailfish, dict]]):
             if state.iteration % fold == 0:
                 sec = next(fld_timer)
                 zps = state.total_zones / sec * fold
-                zps_log.append(zps)
+                if state.iteration > 0:
+                    zps_log.append(zps)
                 yield iteration_report(state.iteration, state.time, zps)
 
         yield state
-        yield run_summary(app, next(app_timer), sum(zps_log) / len(zps_log))
+        yield run_summary(app, next(app_timer), sum(zps_log) / max(1, len(zps_log)))
 
 
 def scrollback(print):
@@ -198,26 +199,32 @@ def scrollback(print):
 
     The print function can be builtin, or something else such as rich.print.
     """
+    summaries = list()
 
-    while True:
-        event = yield
+    try:
+        while True:
+            event = yield
 
-        if type(event) is Sailfish:
-            app = event
-            print(app)
+            if type(event) is Sailfish:
+                app = event
+                print(app)
 
-        elif type(event) is run_summary:
-            summary = event
-            print()
-            print(summary)
-            print()
+            elif type(event) is run_summary:
+                summary = event
+                print()
+                print(summary)
+                print()
+                summaries.append(summary)
 
-        elif type(event) is iteration_report:
-            report = event
-            print(report)
+            elif type(event) is iteration_report:
+                report = event
+                print(report)
 
-        else:
-            print(event)
+            else:
+                print(event)
+
+    finally:
+        print(list(asdict(s) for s in summaries))
 
 
 def reports_table(reports: Iterable[iteration_report]):
