@@ -424,26 +424,82 @@ class Solver:
             int nj,
             int nk)
         {
+            int nq = NCONS;
+            int nd = ni * nj * nk * nq;
+
             #if TRANSPOSE == 0
+            #if DIM == 1
+            int si = nq;
             int sq = 1;
-            int si = NCONS;
+            #elif DIM == 2
+            int si = nq * nj;
+            int sj = nq;
+            int sq = 1;
+            #elif DIM == 3
+            int si = nq * nj * nk;
+            int sj = nq * nj;
+            int sk = nq;
+            int sq = 1;
+            #endif
             #elif TRANSPOSE == 1
+            #if DIM == 1
             int sq = ni;
             int si = 1;
+            #elif DIM == 2
+            int sq = nj * ni;
+            int si = nj;
+            int sj = 1;
+            #elif DIM == 3
+            int sq = nk * nj * ni;
+            int si = nk * nj;
+            int sj = nk;
+            int sk = 1;
+            #endif
             #endif
 
-            double fh[NCONS];
+            double fm[NCONS];
 
+            #if DIM == 1
             FOR_RANGE_1D(2, ni - 1)
+            #elif DIM == 2
+            FOR_RANGE_2D(2, ni - 1, 2, nj - 1)
+            #elif DIM == 3
+            FOR_RANGE_3D(2, ni - 1, 2, nj - 2, 2, nk - 1)
+            #endif
             {
-                int n = i * si;
+                #if DIM == 1
+                int nc = i * si;
+                #elif DIM == 2
+                int nc = i * si + j * sj;
+                #elif DIM == 3
+                int nc = i * si + j * sj + k * sk;
+                #endif
 
-                _godunov_fluxes(prd + n, grd + n, urd + n, fh, plm_theta, 1, si, sq);
-
+                #if DIM >= 1
+                _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    fwr[n + q * sq] = fh[q];
+                    fwr[0 * nd + nc + q * sq] = fm[q];
                 }
+                #endif
+
+                #if DIM >= 2
+                double gm[NCONS];
+                _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    fwr[1 * nd + nc + q * sq] = fm[q];
+                }
+                #endif
+
+                #if DIM >= 3
+                double hm[NCONS];
+                _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    fwr[2 * nd + nc + q * sq] = fm[q];
+                }
+                #endif
             }
         }
         """
@@ -486,15 +542,33 @@ class Solver:
             int nd = ni * nj * nk * nq;
 
             #if TRANSPOSE == 0
+            #if DIM == 1
+            int si = nq;
+            int sq = 1;
+            #elif DIM == 2
+            int si = nq * nj;
+            int sj = nq;
+            int sq = 1;
+            #elif DIM == 3
             int si = nq * nj * nk;
             int sj = nq * nj;
             int sk = nq;
             int sq = 1;
+            #endif
             #elif TRANSPOSE == 1
+            #if DIM == 1
+            int sq = ni;
+            int si = 1;
+            #elif DIM == 2
+            int sq = nj * ni;
+            int si = nj;
+            int sj = 1;
+            #elif DIM == 3
             int sq = nk * nj * ni;
             int si = nk * nj;
             int sj = nk;
             int sk = 1;
+            #endif
             #endif
 
             #if DIM >= 1
@@ -540,7 +614,7 @@ class Solver:
                 _godunov_fluxes(prd + nccc, grd + 1 * nd + nccc, urd + nccc, gm, plm_theta, 2, sj, sq);
                 _godunov_fluxes(prd + ncrc, grd + 1 * nd + ncrc, urd + ncrc, gp, plm_theta, 2, sj, sq);
                 #endif
-                #if DIM >= 2
+                #if DIM >= 3
                 _godunov_fluxes(prd + nccc, grd + 2 * nd + nccc, urd + nccc, hm, plm_theta, 3, sk, sq);
                 _godunov_fluxes(prd + nccr, grd + 2 * nd + nccr, urd + nccr, hp, plm_theta, 3, sk, sq);
                 #endif
@@ -603,34 +677,95 @@ class Solver:
             int nj,
             int nk)
         {
+            int nq = NCONS;
+            int nd = ni * nj * nk * nq;
+
             #if TRANSPOSE == 0
+            #if DIM == 1
+            int si = nq;
             int sq = 1;
-            int si = NCONS;
+            #elif DIM == 2
+            int si = nq * nj;
+            int sj = nq;
+            int sq = 1;
+            #elif DIM == 3
+            int si = nq * nj * nk;
+            int sj = nq * nj;
+            int sk = nq;
+            int sq = 1;
+            #endif
             #elif TRANSPOSE == 1
+            #if DIM == 1
             int sq = ni;
             int si = 1;
+            #elif DIM == 2
+            int sq = nj * ni;
+            int si = nj;
+            int sj = 1;
+            #elif DIM == 3
+            int sq = nk * nj * ni;
+            int si = nk * nj;
+            int sj = nk;
+            int sk = 1;
+            #endif
             #endif
 
+            #if DIM == 1
             FOR_RANGE_1D(2, ni - 2)
+            #elif DIM == 2
+            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
+            #elif DIM == 3
+            FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
+            #endif
             {
-                double *uc = &u[i * si];
+                #if DIM == 1
+                int nccc = (i + 0) * si;
+                int nrcc = (i + 1) * si;
+                #elif DIM == 2
+                int nccc = (i + 0) * si + (j + 0) * sj;
+                int nrcc = (i + 1) * si + (j + 0) * sj;
+                int ncrc = (i + 0) * si + (j + 1) * sj;
+                #elif DIM == 3
+                int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+                int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+                int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+                int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+                #endif
+
+                double *uc = &u[nccc];
                 #if USE_RK == 1
-                double *u0 = &urk[i * si];
+                double *u0 = &urk[nccc];
                 #endif
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    double fm = f[(i + 0) * si + q * sq];
-                    double fp = f[(i + 1) * si + q * sq];
-                    uc[q] -= (fp - fm) * dt / dx;
+                    double u1 = uc[q];
+
+                    #if DIM >= 1
+                    double fm = f[0 * nd + nccc + q * sq];
+                    double fp = f[0 * nd + nrcc + q * sq];
+                    u1 -= (fp - fm) * dt / dx;
+                    #endif
+                    #if DIM >= 2
+                    double gm = f[1 * nd + nccc + q * sq];
+                    double gp = f[1 * nd + ncrc + q * sq];
+                    u1 -= (gp - gm) * dt / dx;
+                    #endif
+                    #if DIM >= 3
+                    double hm = f[2 * nd + nccc + q * sq];
+                    double hp = f[2 * nd + nccr + q * sq];
+                    u1 -= (hp - hm) * dt / dx;
+                    #endif
 
                     #if USE_RK == 1
                     if (rk != 0.0)
                     {
-                        uc[q] *= (1.0 - rk);
-                        uc[q] += rk * u0[q];
+                        u1 *= (1.0 - rk);
+                        u1 += rk * u0[q];
                     }
                     #endif
+
+                    uc[q] = u1;
                 }
             }
         }
