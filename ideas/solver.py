@@ -210,14 +210,21 @@ class Fields:
 
 @kernel_class
 class Solver:
-    def __init__(self, reconstruction, time_integration, cache_prim, transpose):
-        define_macros = dict()
+    """
+    Flexible Godunov solver using method-of-lines and many strategy modes
+    """
+
+    def __init__(self, dim, transpose, reconstruction, time_integration, cache_prim):
+        if dim != 1:
+            raise NotImplementedError
+
         device_funcs = [
             cons_to_prim,
             riemann_hlle,
             self._godunov_fluxes,
         ]
-
+        define_macros = dict()
+        define_macros["DIM"] = dim
         define_macros["TRANSPOSE"] = int(transpose)
         define_macros["CACHE_PRIM"] = int(cache_prim)
         define_macros["USE_RK"] = int(time_integration != "fwd")
@@ -225,16 +232,15 @@ class Solver:
         if type(reconstruction) is str:
             mode, plm_theta = reconstruction, 0.0
             define_macros["USE_PLM"] = 0
-            define_macros["FLUX_STENCIL_SIZE"] = 2
             assert mode == "pcm"
 
         if type(reconstruction) is tuple:
             mode, plm_theta = reconstruction
             define_macros["USE_PLM"] = 1
-            define_macros["FLUX_STENCIL_SIZE"] = 4
             device_funcs.insert(0, plm_minmod)
             assert mode == "plm"
 
+        self._dim = dim
         self._plm_theta = plm_theta
         self._transpose = transpose
         self._define_macros = define_macros
@@ -248,20 +254,35 @@ class Solver:
     def device_funcs(self):
         return self._device_funcs
 
+    def array_shape(self, a):
+        if self._transpose:
+            if self._dim == 1:
+                return a.shape[1], 1, 1
+            elif self._dim == 2:
+                return a.shape[1], a.shape[2], 1
+            elif self._dim == 3:
+                return a.shape[1:4]
+        else:
+            if self._dim == 1:
+                return a.shape[0], 1, 1
+            elif self._dim == 2:
+                return a.shape[0], a.shape[1], 1
+            elif self._dim == 3:
+                return a.shape[0:3]
+
     @device
     def _godunov_fluxes(self):
         R"""
         DEVICE void _godunov_fluxes(
-            double *prd, double *grd, double *urd, double fh[NCONS], double plm_theta, int ni, int i)
+            double *prd,
+            double *grd,
+            double *urd,
+            double fh[NCONS],
+            double plm_theta,
+            int axis,
+            int si,
+            int sq)
         {
-            #if TRANSPOSE == 0
-            int sq = 1;
-            int si = NCONS;
-            #elif TRANSPOSE == 1
-            int sq = ni;
-            int si = 1;
-            #endif
-
             double pp[NCONS];
             double pm[NCONS];
 
@@ -273,8 +294,8 @@ class Solver:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                ul[q] = urd[(i - 1) * si + q * sq];
-                ur[q] = urd[(i + 0) * si + q * sq];
+                ul[q] = urd[-1 * si + q * sq];
+                ur[q] = urd[+0 * si + q * sq];
             }
             cons_to_prim(ul, pm);
             cons_to_prim(ur, pp);
@@ -284,8 +305,8 @@ class Solver:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                pm[q] = prd[(i - 1) * si + q * sq];
-                pp[q] = prd[(i + 0) * si + q * sq];
+                pm[q] = prd[-1 * si + q * sq];
+                pp[q] = prd[+0 * si + q * sq];
             }
             (void) cons_to_prim; // unused
 
@@ -296,10 +317,10 @@ class Solver:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                u[0][q] = urd[(i - 2) * si + q * sq];
-                u[1][q] = urd[(i - 1) * si + q * sq];
-                u[2][q] = urd[(i + 0) * si + q * sq];
-                u[3][q] = urd[(i + 1) * si + q * sq];
+                u[0][q] = urd[-2 * si + q * sq];
+                u[1][q] = urd[-1 * si + q * sq];
+                u[2][q] = urd[+0 * si + q * sq];
+                u[3][q] = urd[+1 * si + q * sq];
             }
             cons_to_prim(u[0], p[0]);
             cons_to_prim(u[1], p[1]);
@@ -323,16 +344,16 @@ class Solver:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                ul[q] = urd[(i - 1) * si + q * sq];
-                ur[q] = urd[(i + 0) * si + q * sq];
+                ul[q] = urd[-1 * si + q * sq];
+                ur[q] = urd[+0 * si + q * sq];
             }
             cons_to_prim(ul, pl);
             cons_to_prim(ur, pr);
 
             for (int q = 0; q < NCONS; ++q)
             {
-                double gl = grd[(i - 1) * si + q * sq];
-                double gr = grd[(i + 0) * si + q * sq];
+                double gl = grd[-1 * si + q * sq];
+                double gr = grd[+0 * si + q * sq];
                 pm[q] = pl[q] + 0.5 * gl;
                 pp[q] = pr[q] - 0.5 * gr;
             }
@@ -343,10 +364,10 @@ class Solver:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                p[0][q] = prd[(i - 2) * si + q * sq];
-                p[1][q] = prd[(i - 1) * si + q * sq];
-                p[2][q] = prd[(i + 0) * si + q * sq];
-                p[3][q] = prd[(i + 1) * si + q * sq];
+                p[0][q] = prd[-2 * si + q * sq];
+                p[1][q] = prd[-1 * si + q * sq];
+                p[2][q] = prd[+0 * si + q * sq];
+                p[3][q] = prd[+1 * si + q * sq];
             }
 
             for (int q = 0; q < NCONS; ++q)
@@ -365,10 +386,10 @@ class Solver:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                double pl = prd[(i - 1) * si + q * sq];
-                double pr = prd[(i + 0) * si + q * sq];
-                double gl = grd[(i - 1) * si + q * sq];
-                double gr = grd[(i + 0) * si + q * sq];
+                double pl = prd[-1 * si + q * sq];
+                double pr = prd[+0 * si + q * sq];
+                double gl = grd[-1 * si + q * sq];
+                double gr = grd[+0 * si + q * sq];
                 pm[q] = pl + 0.5 * gl;
                 pp[q] = pr - 0.5 * gr;
             }
@@ -376,7 +397,7 @@ class Solver:
             #endif
 
             // =====================================================
-            riemann_hlle(pm, pp, fh, 1);
+            riemann_hlle(pm, pp, fh, axis);
         }
         """
 
@@ -389,9 +410,19 @@ class Solver:
         fwr: NDArray[float],
         plm_theta: float = None,
         ni: int = None,
+        nj: int = None,
+        nk: int = None,
     ):
         R"""
-        KERNEL void godunov_fluxes(double *prd, double *grd, double *urd, double *fwr, double plm_theta, int ni)
+        KERNEL void godunov_fluxes(
+            double *prd,
+            double *grd,
+            double *urd,
+            double *fwr,
+            double plm_theta,
+            int ni,
+            int nj,
+            int nk)
         {
             #if TRANSPOSE == 0
             int sq = 1;
@@ -405,18 +436,20 @@ class Solver:
 
             FOR_RANGE_1D(2, ni - 1)
             {
-                _godunov_fluxes(prd, grd, urd, fh, plm_theta, ni, i);
+                int n = i * si;
+
+                _godunov_fluxes(prd + n, grd + n, urd + n, fh, plm_theta, 1, si, sq);
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    fwr[i * si + q * sq] = fh[q];
+                    fwr[n + q * sq] = fh[q];
                 }
             }
         }
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
-        ii = -1 if self._transpose else 0
-        return urd.shape[ii], (prd, grd, urd, fwr, plm, urd.shape[ii])
+        s = self.array_shape(urd)
+        return s, (prd, grd, urd, fwr, plm, *s)
 
     @kernel
     def update_cons(
@@ -431,6 +464,8 @@ class Solver:
         rk: float = 0.0,
         plm_theta: float = None,
         ni: int = None,
+        nj: int = None,
+        nk: int = None,
     ):
         R"""
         KERNEL void update_cons(
@@ -443,28 +478,90 @@ class Solver:
             double dx,
             double rk,
             double plm_theta,
-            int ni)
+            int ni,
+            int nj,
+            int nk)
         {
+            int nq = NCONS;
+            int nd = ni * nj * nk * nq;
+
             #if TRANSPOSE == 0
+            int si = nq * nj * nk;
+            int sj = nq * nj;
+            int sk = nq;
             int sq = 1;
-            int si = NCONS;
             #elif TRANSPOSE == 1
-            int sq = ni;
-            int si = 1;
+            int sq = nk * nj * ni;
+            int si = nk * nj;
+            int sj = nk;
+            int sk = 1;
             #endif
 
+            #if DIM >= 1
             double fm[NCONS];
             double fp[NCONS];
+            #endif
+            #if DIM >= 2
+            double gm[NCONS];
+            double gp[NCONS];
+            #endif
+            #if DIM >= 3
+            double hm[NCONS];
+            double hp[NCONS];
+            #endif
 
+            #if DIM == 1
             FOR_RANGE_1D(2, ni - 2)
+            #elif DIM == 2
+            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
+            #elif DIM == 3
+            FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
+            #endif
             {
-                _godunov_fluxes(prd, grd, urd, fm, plm_theta, ni, i);
-                _godunov_fluxes(prd, grd, urd, fp, plm_theta, ni, i + 1);
+                #if DIM == 1
+                int nccc = (i + 0) * si;
+                int nrcc = (i + 1) * si;
+                #elif DIM == 2
+                int nccc = (i + 0) * si + (j + 0) * sj;
+                int nrcc = (i + 1) * si + (j + 0) * sj;
+                int ncrc = (i + 0) * si + (j + 1) * sj;
+                #elif DIM == 3
+                int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+                int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+                int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+                int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+                #endif
+
+                #if DIM >= 1
+                _godunov_fluxes(prd + nccc, grd + 0 * nd + nccc, urd + nccc, fm, plm_theta, 1, si, sq);
+                _godunov_fluxes(prd + nrcc, grd + 0 * nd + nrcc, urd + nrcc, fp, plm_theta, 1, si, sq);
+                #endif
+                #if DIM >= 2
+                _godunov_fluxes(prd + nccc, grd + 1 * nd + nccc, urd + nccc, gm, plm_theta, 2, sj, sq);
+                _godunov_fluxes(prd + ncrc, grd + 1 * nd + ncrc, urd + ncrc, gp, plm_theta, 2, sj, sq);
+                #endif
+                #if DIM >= 2
+                _godunov_fluxes(prd + nccc, grd + 2 * nd + nccc, urd + nccc, hm, plm_theta, 3, sk, sq);
+                _godunov_fluxes(prd + nccr, grd + 2 * nd + nccr, urd + nccr, hp, plm_theta, 3, sk, sq);
+                #endif
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    int n = i * si + q * sq;
-                    uwr[n] = urd[n] - (fp[q] - fm[q]) * dt / dx;
+                    int n = nccc + q * sq;
+                    double du = 0.0;
+
+                    #if DIM >= 1
+                    du -= fp[q] - fm[q];
+                    #endif
+                    #if DIM >= 2
+                    du -= gp[q] - gm[q];
+                    #endif
+                    #if DIM >= 3
+                    du -= hp[q] - hm[q];
+                    #endif
+
+                    du *= dt / dx;
+                    uwr[n] = urd[n] + du;
 
                     #if USE_RK == 1
                     if (rk != 0.0)
@@ -478,8 +575,8 @@ class Solver:
         }
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
-        ii = -1 if self._transpose else 0
-        return urd.shape[ii], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, urd.shape[ii])
+        s = self.array_shape(urd)
+        return s, (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
 
     @kernel
     def update_cons_from_fluxes(
@@ -491,6 +588,8 @@ class Solver:
         dx: float,
         rk: float,
         ni: int = None,
+        nj: int = None,
+        nk: int = None,
     ):
         R"""
         KERNEL void update_cons_from_fluxes(
@@ -500,7 +599,9 @@ class Solver:
             double dt,
             double dx,
             double rk,
-            int ni)
+            int ni,
+            int nj,
+            int nk)
         {
             #if TRANSPOSE == 0
             int sq = 1;
@@ -522,6 +623,7 @@ class Solver:
                     double fm = f[(i + 0) * si + q * sq];
                     double fp = f[(i + 1) * si + q * sq];
                     uc[q] -= (fp - fm) * dt / dx;
+
                     #if USE_RK == 1
                     if (rk != 0.0)
                     {
@@ -533,8 +635,8 @@ class Solver:
             }
         }
         """
-        ii = -1 if self._transpose else 0
-        return u.shape[ii], (urk, u, f, dt, dx, rk, u.shape[ii])
+        s = self.array_shape(u)
+        return s, (urk, u, f, dt, dx, rk, *s)
 
 
 class State:
@@ -630,7 +732,7 @@ def solver(
     # Solvers and solver functions
     # =========================================================================
     grad_est = GradientEsimation(3, transpose, reconstruction)
-    solver = Solver(reconstruction, time_integration, cache_prim, transpose)
+    solver = Solver(1, transpose, reconstruction, time_integration, cache_prim)
     fields = Fields(1, transpose)
     plm_gradient = grad_est.plm_gradient
     update_cons = solver.update_cons
