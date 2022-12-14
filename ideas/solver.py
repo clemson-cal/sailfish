@@ -214,31 +214,41 @@ class Solver:
     Flexible Godunov solver using method-of-lines and many strategy modes
     """
 
-    def __init__(self, dim, transpose, reconstruction, time_integration, cache_prim):
+    def __init__(
+        self,
+        dim: int,
+        transpose: bool,
+        reconstruction: Reconstruction,
+        time_integration: str,
+        cache_prim: bool,
+        cache_grad: bool,
+    ):
         if dim != 1:
             raise NotImplementedError
 
-        device_funcs = [
-            cons_to_prim,
-            riemann_hlle,
-            self._godunov_fluxes,
-        ]
+        device_funcs = list()
         define_macros = dict()
         define_macros["DIM"] = dim
         define_macros["TRANSPOSE"] = int(transpose)
         define_macros["CACHE_PRIM"] = int(cache_prim)
+        define_macros["CACHE_GRAD"] = int(cache_grad)
         define_macros["USE_RK"] = int(time_integration != "fwd")
 
         if type(reconstruction) is str:
             mode, plm_theta = reconstruction, 0.0
             define_macros["USE_PLM"] = 0
-            assert mode == "pcm"
 
         if type(reconstruction) is tuple:
             mode, plm_theta = reconstruction
             define_macros["USE_PLM"] = 1
-            device_funcs.insert(0, plm_minmod)
-            assert mode == "plm"
+            if not cache_grad:
+                device_funcs.append(plm_minmod)
+
+        if not cache_prim:
+            device_funcs.append(cons_to_prim)
+
+        device_funcs.append(riemann_hlle)
+        device_funcs.append(self._godunov_fluxes)
 
         self._dim = dim
         self._plm_theta = plm_theta
@@ -308,7 +318,6 @@ class Solver:
                 pm[q] = prd[-1 * si + q * sq];
                 pp[q] = prd[+0 * si + q * sq];
             }
-            (void) cons_to_prim; // unused
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 0 && CACHE_GRAD == 0
@@ -337,6 +346,7 @@ class Solver:
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 0 && CACHE_GRAD == 1
+
             double ul[NCONS];
             double ur[NCONS];
             double pl[NCONS];
@@ -360,6 +370,7 @@ class Solver:
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 1 && CACHE_GRAD == 0
+
             double p[4][NCONS];
 
             for (int q = 0; q < NCONS; ++q)
@@ -377,12 +388,9 @@ class Solver:
                 pm[q] = p[1][q] + 0.5 * gl;
                 pp[q] = p[2][q] - 0.5 * gr;
             }
-            (void) cons_to_prim; // unused
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 1 && CACHE_GRAD == 1
-            double pp[NCONS];
-            double pm[NCONS];
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -393,7 +401,6 @@ class Solver:
                 pm[q] = pl + 0.5 * gl;
                 pp[q] = pr - 0.5 * gr;
             }
-            (void) cons_to_prim; // unused
             #endif
 
             // =====================================================
@@ -870,8 +877,15 @@ def solver(
     # Solvers and solver functions
     # =========================================================================
     grad_est = GradientEsimation(3, transpose, reconstruction)
-    solver = Solver(1, transpose, reconstruction, time_integration, cache_prim)
     fields = Fields(1, transpose)
+    solver = Solver(
+        1,
+        transpose,
+        reconstruction,
+        time_integration,
+        cache_prim,
+        cache_grad,
+    )
     plm_gradient = grad_est.plm_gradient
     update_cons = solver.update_cons
     update_cons_from_fluxes = solver.update_cons_from_fluxes
