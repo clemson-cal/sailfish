@@ -504,8 +504,9 @@ class Solver:
         }
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
+        dim = self._dim
         s = self.array_shape(urd)
-        return s, (prd, grd, urd, fwr, plm, *s)
+        return s[:dim], (prd, grd, urd, fwr, plm, *s)
 
     @kernel
     def update_cons(
@@ -649,8 +650,9 @@ class Solver:
         }
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
+        dim = self._dim
         s = self.array_shape(urd)
-        return s, (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
+        return s[:dim], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
 
     @kernel
     def update_cons_from_fluxes(
@@ -770,8 +772,9 @@ class Solver:
             }
         }
         """
+        dim = self._dim
         s = self.array_shape(u)
-        return s, (urk, u, f, dt, dx, rk, *s)
+        return s[:dim], (urk, u, f, dt, dx, rk, *s)
 
 
 class State:
