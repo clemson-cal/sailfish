@@ -353,6 +353,7 @@ def cpu_extension_function(module, stub):
         cargs = to_ctypes(pyargs, c_func.argtypes)
         return c_func(*cargs)
 
+    wrapper.__cpu_func__ = c_func
     return wrapper
 
 
@@ -386,12 +387,13 @@ def gpu_extension_function(module, stub):
 
         gpu_func(nb, bs, pyargs)
 
+    wrapper.__gpu_func__ = gpu_func
     return wrapper
 
 
 def extension_function(cpu_module, gpu_module, stub):
-    cpu_func = cpu_extension_function(cpu_module, stub) if cpu_module else None
-    gpu_func = gpu_extension_function(gpu_module, stub) if gpu_module else None
+    cpu_func = cpu_extension_function(cpu_module, stub)
+    gpu_func = gpu_extension_function(gpu_module, stub)
 
     @wraps(stub)
     def wrapper(*args, exec_mode=None):
@@ -401,6 +403,9 @@ def extension_function(cpu_module, gpu_module, stub):
             return cpu_func(*args)
         if exec_mode == "gpu":
             return gpu_func(*args)
+
+    wrapper.__cpu_func__ = getattr(cpu_func, "__cpu_func__", None)
+    wrapper.__gpu_func__ = getattr(gpu_func, "__gpu_func__", None)
 
     return wrapper
 
@@ -547,7 +552,6 @@ def kernel_function(code: str = None, device_funcs=list(), define_macros=list())
         define_macros = list(define_macros.items())
 
     def decorator(stub):
-
         k = KernelData(stub, code, device_funcs, define_macros)
 
         @wraps(stub)
@@ -556,7 +560,6 @@ def kernel_function(code: str = None, device_funcs=list(), define_macros=list())
             return k._func(*args, exec_mode=exec_mode)
 
         wrapper.__kernel_data = k
-
         return wrapper
 
     return decorator
@@ -593,6 +596,8 @@ def kernel_class(cls):
         def wrapper(*args, exec_mode=None):
             return kernel_data._func(self, *args, exec_mode=exec_mode)
 
+        wrapper.__cpu_func__ = kernel_data._func.__cpu_func__
+        wrapper.__gpu_func__ = kernel_data._func.__gpu_func__
         return wrapper
 
     def __init__(self, *args, **kwargs):
@@ -630,6 +635,21 @@ def kernel_class(cls):
 
     cls.__init__ = __init__
     return cls
+
+
+def kernel_metadata(kernel):
+    metadata = dict()
+    cpu_func = kernel.__cpu_func__
+    gpu_func = kernel.__gpu_func__
+
+    metadata["name"] = kernel.__name__
+
+    try:
+        metadata["num_regs"] = gpu_func.num_regs
+    except AttributeError:
+        pass
+
+    return metadata
 
 
 def main():

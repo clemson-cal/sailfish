@@ -2,11 +2,14 @@
 A solver is a generator function and a state object
 """
 
+from logging import getLogger
 from numpy import array, zeros, logical_not
 from numpy.typing import NDArray
-from kernels import kernel, kernel_class, device
+from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
 from models import Sailfish, Reconstruction
+
+logger = getLogger("sailfish")
 
 
 def numpy_or_cupy(exec_mode):
@@ -298,7 +301,6 @@ class Solver:
 
             // =====================================================
             #if USE_PLM == 0 && CACHE_PRIM == 0
-
             double ul[NCONS];
             double ur[NCONS];
 
@@ -312,7 +314,6 @@ class Solver:
 
             // =====================================================
             #elif USE_PLM == 0 && CACHE_PRIM == 1
-
             for (int q = 0; q < NCONS; ++q)
             {
                 pm[q] = prd[-1 * si + q * sq];
@@ -346,7 +347,6 @@ class Solver:
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 0 && CACHE_GRAD == 1
-
             double ul[NCONS];
             double ur[NCONS];
             double pl[NCONS];
@@ -370,7 +370,6 @@ class Solver:
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 1 && CACHE_GRAD == 0
-
             double p[4][NCONS];
 
             for (int q = 0; q < NCONS; ++q)
@@ -391,7 +390,6 @@ class Solver:
 
             // =====================================================
             #elif USE_PLM == 1 && CACHE_PRIM == 1 && CACHE_GRAD == 1
-
             for (int q = 0; q < NCONS; ++q)
             {
                 double pl = prd[-1 * si + q * sq];
@@ -892,6 +890,16 @@ def solver(
     godunov_fluxes = solver.godunov_fluxes
     prim_to_cons = fields.prim_to_cons_array
     cons_to_prim = fields.cons_to_prim_array
+
+    for kernel in [
+        plm_gradient,
+        update_cons,
+        update_cons_from_fluxes,
+        godunov_fluxes,
+        prim_to_cons,
+        cons_to_prim,
+    ]:
+        logger.info(f"using kernel {kernel_metadata(kernel)}")
 
     # =========================================================================
     # Whether the data layout is transposed, i.e. adjacent memory locations are
