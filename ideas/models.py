@@ -10,7 +10,7 @@ class Report:
 @configmodel
 class Checkpoint:
     cadence: float = 1.0
-    format: str = "pickle"
+    format: Literal["none", "pickle"] = "pickle"
 
 
 @configmodel

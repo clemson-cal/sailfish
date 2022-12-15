@@ -92,6 +92,9 @@ def timeseries(config, state, timeseries, event_states):
 
 
 def checkpoint(config, state, timeseries, event_states):
+    if config.driver.checkpoint.format == "none":
+        return "skip checkpoint (format=none)"
+
     number = event_states["checkpoint"].number
     filename = f"chkpt.{number:04d}.pk"
 
@@ -212,9 +215,6 @@ def scrollback(print):
         elif type(event) is iteration_report:
             report = event
             print(report)
-
-        else:
-            print(event)
 
 
 def reports_table(reports: Iterable[iteration_report]):
@@ -458,6 +458,7 @@ def init_logging(level):
 
 def scan_strategies():
     d = {
+        "driver.checkpoint.format": ("none",),
         "strategy.data_layout": ("fields-last", "fields-first"),
         "strategy.cache_flux": (True, False),
         "strategy.cache_prim": (True, False),
