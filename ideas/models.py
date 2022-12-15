@@ -27,9 +27,18 @@ class Timeseries:
 @configmodel
 class Driver:
     """
+    Deals with the simulation control flow and input/output
+
+    The simulation driver takes care of setting problem initial data,
+    constructing solver instances, recording timeseries data (on-the-fly
+    science products), and writing checkpoint files.
+
     Fields
     ------
 
+    tstart: time when the simulation starts (does not need to be t=0)
+    tfinal: time when the simulation ends
+    report: number of iterations between one-line report messages
     timeseries: high-cadence recording of science products
     """
 
@@ -158,6 +167,8 @@ class Strategy:
 @configmodel
 class Sailfish:
     """
+    Top-level application configuration struct
+
     Fields
     ------
 

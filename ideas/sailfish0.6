@@ -8,13 +8,14 @@ from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from itertools import chain, product
 from pickle import load as load_pickle, dump as dump_pickle
-from json import load as load_json, dumps as dumps_json
+from json import load as load_json, dump as dump_json, dumps as dumps_json
 from logging import getLogger
 from typing import Any
 
 from models import Sailfish, Driver, Report, Strategy, Scheme, Checkpoint
 from kernels import perf_time_sequence, configure_kernel_module
 from solver import make_solver
+from system import system_info
 
 
 @dataclass
@@ -48,16 +49,16 @@ class run_summary:
     Light-weight epilog of a run
     """
 
-    app: Sailfish
+    config: Sailfish
     total_sec: float
     mean_zps: float
 
-    def __repr__(self):
-        return (
-            f"run name: {self.app.name}\n"
-            f"total run time: {self.total_sec:0.5f} sec\n"
-            f"mean Mzps: {self.mean_zps/1e6:0.3f}"
-        )
+    # def __repr__(self):
+    #     return (
+    #         f"run name: {self.config.name}\n"
+    #         f"total run time: {self.total_sec:0.5f} sec\n"
+    #         f"mean Mzps: {self.mean_zps/1e6:0.3f}"
+    #     )
 
 
 @dataclass
@@ -88,7 +89,7 @@ def recurring_event(interval: float, number: int = 0, last_time: float = None):
             is_due = False
 
 
-def timeseries(app, state, timeseries, event_states):
+def timeseries(config, state, timeseries, event_states):
     number = event_states["timeseries"].number
     time = timeseries.setdefault("time", list())
     time.append(state.time)
@@ -96,14 +97,14 @@ def timeseries(app, state, timeseries, event_states):
     return f"timeseries {number}"
 
 
-def checkpoint(app, state, timeseries, event_states):
+def checkpoint(config, state, timeseries, event_states):
     number = event_states["checkpoint"].number
     filename = f"chkpt.{number:04d}.pk"
 
     with open(filename, "wb") as outf:
         dump_pickle(
             dict(
-                config=asdict(app),
+                config=asdict(config),
                 primitive=state.primitive,
                 time=state.time,
                 iteration=state.iteration,
@@ -116,7 +117,7 @@ def checkpoint(app, state, timeseries, event_states):
     return filename
 
 
-def run(setups: Iterable[tuple[Sailfish, dict]]):
+def drive(setups: Iterable[tuple[Sailfish, dict]]):
     """
     Main simulation driver function
 
@@ -131,19 +132,19 @@ def run(setups: Iterable[tuple[Sailfish, dict]]):
     This function does handle checkpointing and the collection of time series
     data from the solver.
     """
-    for app, chkpt in setups:
-        yield app
+    for config, chkpt in setups:
+        yield config
 
-        configure_kernel_module(default_exec_mode=app.hardware)
+        configure_kernel_module(default_exec_mode=config.hardware)
 
-        driver = app.driver
+        driver = config.driver
         fold = driver.report.cadence
         tfinal = driver.tfinal
-        states = make_solver(app, chkpt)
+        states = make_solver(config, chkpt)
         timeseries_data = dict()
         zps_log = list()
-        app_timer = perf_time_sequence(mode=app.hardware)
-        fld_timer = perf_time_sequence(mode=app.hardware)
+        app_timer = perf_time_sequence(mode=config.hardware)
+        fld_timer = perf_time_sequence(mode=config.hardware)
 
         # =====================================================================
         # Set up timeseries and checkpoint task handlers
@@ -175,7 +176,9 @@ def run(setups: Iterable[tuple[Sailfish, dict]]):
             for name in events:
                 if e := events[name].send(state.time):
                     event_states[name] = e
-                    yield event_funcs[name](app, state, timeseries_data, event_states)
+                    yield event_funcs[name](
+                        config, state, timeseries_data, event_states
+                    )
 
             if state.time >= tfinal:
                 break
@@ -190,7 +193,7 @@ def run(setups: Iterable[tuple[Sailfish, dict]]):
                 yield iteration_report(state.iteration, state.time, zps)
 
         yield state
-        yield run_summary(app, next(app_timer), sum(zps_log) / max(1, len(zps_log)))
+        yield run_summary(config, next(app_timer), sum(zps_log) / max(1, len(zps_log)))
 
 
 def scrollback(print):
@@ -199,32 +202,25 @@ def scrollback(print):
 
     The print function can be builtin, or something else such as rich.print.
     """
-    summaries = list()
+    while True:
+        event = yield
 
-    try:
-        while True:
-            event = yield
+        if type(event) is Sailfish:
+            config = event
+            print(config)
 
-            if type(event) is Sailfish:
-                app = event
-                print(app)
+        elif type(event) is run_summary:
+            summary = event
+            print()
+            print(summary)
+            print()
 
-            elif type(event) is run_summary:
-                summary = event
-                print()
-                print(summary)
-                print()
-                summaries.append(summary)
+        elif type(event) is iteration_report:
+            report = event
+            print(report)
 
-            elif type(event) is iteration_report:
-                report = event
-                print(report)
-
-            else:
-                print(event)
-
-    finally:
-        print(list(asdict(s) for s in summaries))
+        else:
+            print(event)
 
 
 def reports_table(reports: Iterable[iteration_report]):
@@ -268,7 +264,7 @@ def summaries_table(summaries: list[run_summary]):
     table.add_column("<zones per second> (millions)", style="magenta", justify="left")
 
     for summary in summaries:
-        table.add_row(f"{summary.app.name}", f"{summary.mean_zps/1e6:0.5f}")
+        table.add_row(f"{summary.config.name}", f"{summary.mean_zps/1e6:0.5f}")
 
     return Panel(table, style="dim", border_style="red", padding=(2, 2))
 
@@ -298,7 +294,7 @@ def dashboard(console, screen=False):
     app_struct = str()
     job_num = 0
 
-    app_view = Layout(str(), name="app", ratio=5)
+    config_view = Layout(str(), name="config", ratio=5)
     progress_view = Layout(
         Panel(
             progress,
@@ -315,7 +311,7 @@ def dashboard(console, screen=False):
 
     root = Layout(name="root")
     root.split_column(Layout(name="upper", ratio=2), Layout(name="lower", ratio=3))
-    root["upper"].split_row(app_view, progress_view)
+    root["upper"].split_row(config_view, progress_view)
     root["lower"].split_row(Layout(name="lower-left", ratio=3), summaries_view)
     root["lower-left"].split_column(reports_view, checkpoints_view)
 
@@ -329,13 +325,13 @@ def dashboard(console, screen=False):
             event = yield
 
             if type(event) is Sailfish:
-                app = event
+                config = event
                 job_num += 1
-                duration = app.driver.tfinal - app.driver.tstart
+                duration = config.driver.tfinal - config.driver.tstart
                 run_task = progress.add_task(f"job {job_num}", total=duration)
-                app_view.update(
+                config_view.update(
                     Panel(
-                        Pretty(app),
+                        Pretty(config),
                         title="Run Description",
                         padding=(2, 2),
                         border_style="bright_blue",
@@ -351,7 +347,7 @@ def dashboard(console, screen=False):
                     reports.popleft()
 
                 reports_view.update(reports_table(reports))
-                evolved_time = report.time - app.driver.tstart
+                evolved_time = report.time - config.driver.tstart
                 progress.update(run_task, completed=evolved_time)
 
             elif type(event) is str and "chkpt" in event:
@@ -525,39 +521,52 @@ def argument_parser():
         usage=SUPPRESS,
         description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
     )
-    app = parser.add_argument_group("app")
-    run = parser.add_argument_group("run")
-    app.add_argument(
+    subparsers = parser.add_subparsers()
+    sys = subparsers.add_parser("sys", help="how platform and hardware information")
+    doc = subparsers.add_parser("doc", help="read documentation")
+    run = subparsers.add_parser("run", help="run a simulation")
+
+    sys.set_defaults(_command="sys")
+    doc.set_defaults(_command="doc")
+    run.set_defaults(_command="run")
+
+    run.add_argument(
         "_configs",
         metavar="configs",
         nargs="*",
         default=[dict()],
         help="sequence of configuration files, checkpoints, or preset/setup names",
     )
-    app.add_argument(
+    parser.add_argument(
         "--log-level",
         dest="_log_level",
         default="warning",
         choices=("debug", "info", "warning", "error", "critical"),
         help="log messages at and above this severity level",
     )
-    app.add_argument(
+    run.add_argument(
         "--dash",
         dest="_dash",
         action="store_true",
         help="show a dashboard instead of a scrollback",
     )
-    app.add_argument(
+    run.add_argument(
         "--screen",
         dest="_screen",
         action="store_true",
         help="transient screen in dash mode (better look but disappears after the run)",
     )
-    app.add_argument(
+    run.add_argument(
         "--plot",
         dest="_plot",
         action="store_true",
         help="show a plot of the solution",
+    )
+    run.add_argument(
+        "--dump-summaries",
+        dest="_dump_summaries",
+        default=None,
+        help="a filename to dump a JSON object with run summaries",
     )
     run.add_argument(
         "--mode",
@@ -648,17 +657,12 @@ def argument_parser():
     return parser
 
 
-def main():
-    """
-    Main sailfish entry point and command line interface
-    """
-    parser = argument_parser()
-    args = parser.parse_args()
-    console = init_logging(args._log_level)
+def run(args, console):
     overrides = unflatten(
         {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
     )
     runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
+    summaries = list()
 
     try:
         if args._dash:
@@ -673,14 +677,56 @@ def main():
         next(monitor)
         next(plotter)
 
-        for event in run(runs):
+        for event in drive(runs):
             monitor.send(event)
             plotter.send(event)
+
+            if type(event) is run_summary:
+                summaries.append(asdict(event))
 
     except Exception:
         monitor.close()
         plotter.close()
         console.print_exception()
+
+    finally:
+        if args._dump_summaries:
+            with open(args._dump_summaries, "w") as outf:
+                dump_json(
+                    dict(summaries=summaries, system_info=system_info()),
+                    outf,
+                    indent=4,
+                )
+
+
+def doc(args, console):
+    from rich.markdown import Markdown
+
+    console.print(Driver())
+    console.print()
+    console.print(Strategy())
+    console.print()
+    console.print(Scheme())
+
+
+def sys(args, console):
+    console.print(system_info())
+
+
+def main():
+    """
+    Main sailfish entry point and command line interface
+    """
+    parser = argument_parser()
+    args = parser.parse_args()
+    console = init_logging(args._log_level)
+
+    if args._command == "run":
+        run(args, console)
+    if args._command == "doc":
+        doc(args, console)
+    if args._command == "sys":
+        sys(args, console)
 
 
 if __name__ == "__main__":
