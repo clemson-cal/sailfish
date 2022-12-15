@@ -164,12 +164,14 @@ class Strategy:
     data_layout: array-of-struct (fields-last) or struct-of-array (fields-first)
     cache_flux: one Riemann problem per face, difference the resulting array
     cache_prim: pre-compute primitive quantities, vs. re-compute over stencil
+    num_patches: decompose domain to enable threads, streams, or multiple GPU's
     """
 
     data_layout: Literal["fields-first", "fields-last"] = "fields-last"
     cache_flux: bool = False
     cache_prim: bool = False
     cache_grad: bool = False
+    num_patches: int = 1
 
     @property
     def transpose(self):

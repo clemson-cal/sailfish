@@ -941,7 +941,7 @@ def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
         yield (i0, i1), replace(box, extent_i=(x0, x1), num_zones=(i1 - i0, 1, 1))
 
 
-class solver_kernels(NamedTuple):
+class SolverKernels(NamedTuple):
     plm_gradient: Callable
     update_cons: Callable
     update_cons_from_fluxes: Callable
@@ -955,7 +955,7 @@ def solver(
     time: float,
     iteration: int,
     box: CoordinateBox,
-    kernels: solver_kernels,
+    kernels: SolverKernels,
     hardware: str,
     transpose: bool,
     cache_flux: bool,
@@ -1108,7 +1108,7 @@ def make_solver_kernels(
         cache_prim,
         cache_grad,
     )
-    return solver_kernels(
+    return SolverKernels(
         grad_est.plm_gradient,
         scheme.update_cons,
         scheme.update_cons_from_fluxes,
@@ -1133,8 +1133,9 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
     patch_solvers = list()
+    num_patches = config.strategy.num_patches
 
-    for (i0, i1), box in decompose(config.domain, 1):
+    for (i0, i1), box in decompose(config.domain, num_patches):
         if checkpoint:
             p = checkpoint["primitive"][i0:i1]
             t = checkpoint["time"]

@@ -515,14 +515,14 @@ def argument_parser():
     Create an argument parser instance for running from the command line
     """
     parser = ArgumentParser(
-        prog="sailfish_ui",
+        prog="sailfish",
         usage=SUPPRESS,
         description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
     )
     subparsers = parser.add_subparsers()
-    sys = subparsers.add_parser("sys", help="how platform and hardware information")
-    doc = subparsers.add_parser("doc", help="read documentation")
-    run = subparsers.add_parser("run", help="run a simulation")
+    sys = subparsers.add_parser("sys", usage=SUPPRESS, help="show platform information")
+    doc = subparsers.add_parser("doc", usage=SUPPRESS, help="read documentation")
+    run = subparsers.add_parser("run", usage=SUPPRESS, help="run a simulation")
 
     sys.set_defaults(_command="sys")
     doc.set_defaults(_command="doc")
@@ -580,6 +580,14 @@ def argument_parser():
         type=parse_num_zones,
         dest="domain.num_zones",
         metavar="N",
+    )
+    run.add_argument(
+        "--patches",
+        type=int,
+        default=None,
+        metavar="P",
+        help=Strategy.describe("num_patches"),
+        dest="strategy.num_patches",
     )
     run.add_argument(
         "-m",
