@@ -117,6 +117,14 @@ class CoordinateBox:
         """
         return sum(n > 1 for n in self.num_zones)
 
+    @property
+    def grid_spacing(self):
+        """
+        spacing between zones on each axis
+        """
+        extent = (self.extent_i, self.extent_j, self.extent_k)
+        return tuple((e[1] - e[0]) / n for e, n in zip(extent, self.num_zones))
+
 
 Reconstruction = Union[Literal["pcm"], tuple[Literal["plm"], float]]
 TimeIntegration = Literal["fwd", "rk1", "rk2", "rk3"]
@@ -153,7 +161,7 @@ class Strategy:
     Fields
     ------
 
-    data_layout: fields are contiguous (fields-last) or disjoint (fields-first)
+    data_layout: array-of-struct (fields-last) or struct-of-array (fields-first)
     cache_flux: one Riemann problem per face, difference the resulting array
     cache_prim: pre-compute primitive quantities, vs. re-compute over stencil
     """
@@ -166,7 +174,7 @@ class Strategy:
     @property
     def transpose(self):
         """
-        Synonym for fields-first (also called struct-of-arrays) data layout
+        synonym for fields-first (also called struct-of-arrays) data layout
         """
         return self.data_layout == "fields-first"
 
@@ -203,10 +211,10 @@ if __name__ == "__main__":
 
     console = Console()
 
-    app = Sailfish(physics=Isothermal())
+    config = Sailfish(physics=Isothermal())
 
-    for field in app.__dataclass_fields__:
-        value = getattr(app, field)
+    for field in config.__dataclass_fields__:
+        value = getattr(config, field)
         if hasattr(value, "__configmodel__"):
             console.print()
             console.print(value)

@@ -372,7 +372,7 @@ def plot():
         if type(event) is run_summary:
             if plt.get_fignums():
                 ax1 = fig.add_subplot(111)
-                ax1.plot(state.primitive[:, 0], "-o", mfc="none")
+                ax1.plot(state.zone_centers, state.primitive[:, 0], "-o", mfc="none")
                 plt.show()
 
 

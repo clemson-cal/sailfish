@@ -3,14 +3,15 @@ A solver is a generator function and a state object
 """
 
 from logging import getLogger
-from typing import NamedTuple, Callable
+from typing import NamedTuple, Callable, Iterable
+from dataclasses import replace
 
 from numpy import array, zeros, logical_not
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
-from models import Sailfish, Reconstruction
+from models import Sailfish, Reconstruction, CoordinateBox
 
 logger = getLogger("sailfish")
 
@@ -786,10 +787,11 @@ class Scheme:
 
 
 class State:
-    def __init__(self, n, t, u, cons_to_prim, transpose):
+    def __init__(self, n, t, u, box, cons_to_prim, transpose):
         self._n = n
         self._t = t
         self._u = u
+        self._box = box
         self._cons_to_prim = cons_to_prim
         self._transpose = transpose
 
@@ -820,6 +822,10 @@ class State:
         else:
             return self._u.shape[0]
 
+    @property
+    def zone_centers(self):
+        return cell_centers_1d(self._box)
+
 
 def linear_shocktube(x):
     """
@@ -834,10 +840,12 @@ def linear_shocktube(x):
     return p
 
 
-def cell_centers_1d(ni):
+def cell_centers_1d(box):
     from numpy import linspace
 
-    xv = linspace(0.0, 1.0, ni + 1)
+    ni = box.num_zones[0]
+    x0, x1 = box.extent_i
+    xv = linspace(x0, x1, ni + 1)
     xc = 0.5 * (xv[1:] + xv[:-1])
     return xc
 
@@ -854,8 +862,8 @@ class solver_kernels(NamedTuple):
 def solver(
     kernels: solver_kernels,
     checkpoint: dict,
+    box: CoordinateBox,
     hardware: str,
-    resolution: int,
     transpose: bool,
     cache_flux: bool,
     cache_prim: bool,
@@ -876,10 +884,10 @@ def solver(
     ) = kernels
 
     xp = numpy_or_cupy(hardware)
-    nz = resolution
-    dx = 1.0 / nz
+    nz = box.num_zones[0]
+    dx = box.grid_spacing[0]
     dt = dx * 1e-1
-    x = cell_centers_1d(nz)
+    x = cell_centers_1d(box)
 
     if checkpoint:
         p = checkpoint["primitive"]
@@ -955,7 +963,7 @@ def solver(
 
     del p  # p is no longer needed, will free memory if possible
 
-    yield State(n, t, u1, cons_to_prim, transpose)
+    yield State(n, t, u1, box, cons_to_prim, transpose)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
@@ -978,7 +986,7 @@ def solver(
 
         t += dt
         n += 1
-        yield State(n, t, u1, cons_to_prim, transpose)
+        yield State(n, t, u1, box, cons_to_prim, transpose)
 
 
 def make_solver_kernels(
@@ -1008,6 +1016,52 @@ def make_solver_kernels(
     )
 
 
+def partition(elements: int, num_parts: int):
+    """
+    Equitably divide the given number of elements into `num_parts` partitions.
+
+    The sum of the partitions is `elements`. The number of partitions must be
+    less than or equal to the number of elements.
+    """
+    n = elements // num_parts
+    r = elements % num_parts
+
+    for i in range(num_parts):
+        yield n + (1 if i < r else 0)
+
+
+def subdivide(interval: tuple[int, int], num_parts: int):
+    """
+    Divide an interval into non-overlapping contiguous sub-intervals.
+    """
+    a, b = interval
+
+    for n in partition(b - a, num_parts):
+        yield a, a + n
+        a += n
+
+
+def with_guard_zones(box: CoordinateBox, num_guard: int):
+    ni = box.num_zones[0]
+    dx = box.grid_spacing[0]
+    x0 = box.extent_i[0] - num_guard * dx
+    x1 = box.extent_i[1] + num_guard * dx
+    return replace(box, extent_i=(x0, x1), num_zones=(ni + 2 * num_guard, 1, 1))
+
+
+def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
+    """
+    Decompose a 1d coordinate box into a sequence of non-overlapping boxes
+    """
+    dx = box.grid_spacing[0]
+
+    for i0, i1 in subdivide((0, box.num_zones[0]), num_parts):
+        x0 = box.extent_i[0] + dx * i0
+        x1 = box.extent_i[0] + dx * i1
+        sub_box = replace(box, extent_i=(x0, x1), num_zones=(i1 - i0, 1, 1))
+        yield with_guard_zones(sub_box, num_guard=2)
+
+
 def make_solver(config: Sailfish, checkpoint: dict = None):
     """
     Construct the 1d solver from a config instance
@@ -1022,11 +1076,13 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     for kernel in kernels:
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
+    box = with_guard_zones(config.domain, num_guard=2)
+
     return solver(
         kernels,
         checkpoint,
+        box,
         config.hardware,
-        config.domain.num_zones[0],
         config.strategy.transpose,
         config.strategy.cache_flux,
         config.strategy.cache_prim,
