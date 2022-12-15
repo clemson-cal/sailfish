@@ -216,6 +216,8 @@ def scrollback(print):
         elif type(event) is iteration_report:
             report = event
             print(report)
+        elif type(event) is str:
+            print(event)
 
 
 def reports_table(reports: Iterable[iteration_report]):

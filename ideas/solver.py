@@ -790,8 +790,17 @@ def exchange_guard_zones(us):
     for i, u in enumerate(us):
         if i > 0:
             u[:+2] = us[i - 1][-4:-2]
+        else:
+            u[:+2] = u[+2:+4]
         if i < len(us) - 1:
             u[-2:] = us[i + 1][+2:+4]
+        else:
+            u[-2:] = u[-4:-2]
+
+
+class FillGuardZones:
+    def __init__(self, array):
+        self.array = array
 
 
 class State:
@@ -832,7 +841,7 @@ class State:
 
     @property
     def zone_centers(self):
-        return cell_centers_1d(trim(self._box, 2))
+        return cell_centers_1d(trim_box(self._box, 2))
 
 
 class MacroState:
@@ -909,7 +918,7 @@ def subdivide(interval: tuple[int, int], num_parts: int):
         a += n
 
 
-def extend(box: CoordinateBox, count: int):
+def extend_box(box: CoordinateBox, count: int):
     ni = box.num_zones[0]
     dx = box.grid_spacing[0]
     x0 = box.extent_i[0] - count * dx
@@ -917,7 +926,13 @@ def extend(box: CoordinateBox, count: int):
     return replace(box, extent_i=(x0, x1), num_zones=(ni + 2 * count, 1, 1))
 
 
-def trim(box: CoordinateBox, count: int):
+def extend_array(a: NDArray[float], count: int):
+    b = zeros([a.shape[0] + 2 * count, a.shape[1]])
+    b[2:-2] = a
+    return b
+
+
+def trim_box(box: CoordinateBox, count: int):
     ni = box.num_zones[0]
     dx = box.grid_spacing[0]
     x0 = box.extent_i[0] + count * dx
@@ -934,7 +949,7 @@ def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
     for i0, i1 in subdivide((0, box.num_zones[0]), num_parts):
         x0 = box.extent_i[0] + dx * i0
         x1 = box.extent_i[0] + dx * i1
-        yield replace(box, extent_i=(x0, x1), num_zones=(i1 - i0, 1, 1))
+        yield (i0, i1), replace(box, extent_i=(x0, x1), num_zones=(i1 - i0, 1, 1))
 
 
 class solver_kernels(NamedTuple):
@@ -947,9 +962,11 @@ class solver_kernels(NamedTuple):
 
 
 def solver(
-    kernels: solver_kernels,
-    checkpoint: dict,
+    primitive: NDArray[float],
+    time: float,
+    iteration: int,
     box: CoordinateBox,
+    kernels: solver_kernels,
     hardware: str,
     transpose: bool,
     cache_flux: bool,
@@ -974,18 +991,11 @@ def solver(
     nz = box.num_zones[0]
     dx = box.grid_spacing[0]
     dt = dx * 1e-1
-    x = cell_centers_1d(box)
+    p = xp.array(primitive)
+    t = time
+    n = iteration
 
-    if checkpoint:
-        p = checkpoint["primitive"]
-        t = checkpoint["time"]
-        n = checkpoint["iteration"]
-    else:
-        p = linear_shocktube(x)
-        t = 0.0
-        n = 0
-
-    p = xp.array(p)
+    yield FillGuardZones(p)
 
     # =========================================================================
     # Whether the data layout is transposed, i.e. adjacent memory locations are
@@ -1048,7 +1058,7 @@ def solver(
     else:
         g1 = None
 
-    del p  # p is no longer needed, will free memory if possible
+    del primitive, p  # p is no longer needed, will free memory if possible
 
     yield State(n, t, u1, box, cons_to_prim, transpose)
 
@@ -1070,7 +1080,7 @@ def solver(
             else:
                 update_cons(p1, g1, u0, u1, u2, dt, dx)
                 u1, u2 = u2, u1
-                yield u1
+            yield FillGuardZones(u1)
 
         t += dt
         n += 1
@@ -1120,12 +1130,25 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
 
     patch_solvers = list()
 
-    for box in decompose(config.domain, 1):
-        box = extend(box, count=2)
+    for (i0, i1), box in decompose(config.domain, 5):
+        if checkpoint:
+            p = checkpoint["primitive"][i0:i1]
+            t = checkpoint["time"]
+            n = checkpoint["iteration"]
+        else:
+            x = cell_centers_1d(box)
+            p = linear_shocktube(x)
+            t = 0.0
+            n = 0
+        p = extend_array(p, count=2)
+        b = extend_box(box, count=2)
+
         patch_solver = solver(
+            p,
+            t,
+            n,
+            b,
             kernels,
-            checkpoint,
-            box,
             config.hardware,
             config.strategy.transpose,
             config.strategy.cache_flux,
@@ -1143,6 +1166,6 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             states = events
             yield MacroState(states)
 
-        else:
-            u_arrays = events
-            exchange_guard_zones(u_arrays)
+        elif type(events[0]) is FillGuardZones:
+            arrays = list(e.array for e in events)
+            exchange_guard_zones(arrays)
