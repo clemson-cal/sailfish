@@ -6,6 +6,7 @@ from collections import deque
 from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
+from datetime import datetime
 from itertools import chain, product
 from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json, dump as dump_json, dumps as dumps_json
@@ -52,13 +53,6 @@ class run_summary:
     config: Sailfish
     total_sec: float
     mean_zps: float
-
-    # def __repr__(self):
-    #     return (
-    #         f"run name: {self.config.name}\n"
-    #         f"total run time: {self.total_sec:0.5f} sec\n"
-    #         f"mean Mzps: {self.mean_zps/1e6:0.3f}"
-    #     )
 
 
 @dataclass
@@ -565,8 +559,8 @@ def argument_parser():
     run.add_argument(
         "--dump-summaries",
         dest="_dump_summaries",
-        default=None,
-        help="a filename to dump a JSON object with run summaries",
+        action="store_true",
+        help="dump a JSON object with run summaries",
     )
     run.add_argument(
         "--mode",
@@ -691,12 +685,11 @@ def run(args, console):
 
     finally:
         if args._dump_summaries:
-            with open(args._dump_summaries, "w") as outf:
-                dump_json(
-                    dict(summaries=summaries, system_info=system_info()),
-                    outf,
-                    indent=4,
-                )
+            fname = datetime.now().strftime("%m-%d-%Y-%H%M.json")
+            dump = dict(summaries=summaries, system_info=system_info())
+            with open(fname, "w") as outf:
+                console.print(f"write summaries to {fname}")
+                dump_json(dump, outf, indent=4)
 
 
 def doc(args, console):

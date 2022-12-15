@@ -22,11 +22,25 @@ def system_info():
     code["commit"] = str(check_output(["git", "rev-parse", "HEAD"]), "utf-8").strip()
 
     try:
-        from cupy.cuda.device import getDeviceProperties, getDeviceCount
+        from cpuinfo import get_cpu_info
 
-        gpu_info = list(getDeviceProperties(i) for i in range(getDeviceCount()))
+        cpu_info = get_cpu_info()
+    except ImportError:
+        cpu_info = None
 
+    try:
+        from cupy.cuda.runtime import getDeviceProperties, getDeviceCount
+
+        nobin = lambda d: {k: v for k, v in d.items() if type(v) is not bytes}
+
+        gpu_info = list(nobin(getDeviceProperties(i)) for i in range(getDeviceCount()))
     except ImportError:
         gpu_info = None
 
-    return dict(host=host, code=code, gpu_info=gpu_info, datetime=str(datetime.now()))
+    return dict(
+        host=host,
+        code=code,
+        cpu_info=cpu_info,
+        gpu_info=gpu_info,
+        datetime=str(datetime.now()),
+    )
