@@ -163,6 +163,13 @@ class Strategy:
     cache_prim: bool = False
     cache_grad: bool = False
 
+    @property
+    def transpose(self):
+        """
+        Synonym for fields-first (also called struct-of-arrays) data layout
+        """
+        return self.data_layout == "fields-first"
+
 
 @configmodel
 class Sailfish:

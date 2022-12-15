@@ -3,8 +3,11 @@ A solver is a generator function and a state object
 """
 
 from logging import getLogger
+from typing import NamedTuple, Callable
+
 from numpy import array, zeros, logical_not
 from numpy.typing import NDArray
+
 from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
 from models import Sailfish, Reconstruction
@@ -212,9 +215,9 @@ class Fields:
 
 
 @kernel_class
-class Solver:
+class Scheme:
     """
-    Flexible Godunov solver using method-of-lines and many strategy modes
+    Godunov scheme using method-of-lines and many strategy modes
     """
 
     def __init__(
@@ -839,11 +842,21 @@ def cell_centers_1d(ni):
     return xc
 
 
+class solver_kernels(NamedTuple):
+    plm_gradient: Callable
+    update_cons: Callable
+    update_cons_from_fluxes: Callable
+    godunov_fluxes: Callable
+    prim_to_cons: Callable
+    cons_to_prim: Callable
+
+
 def solver(
+    kernels: solver_kernels,
     checkpoint: dict,
     hardware: str,
     resolution: int,
-    data_layout: str,
+    transpose: bool,
     cache_flux: bool,
     cache_prim: bool,
     cache_grad: bool,
@@ -853,6 +866,15 @@ def solver(
     """
     Solver for the 1d euler equations in many configurations
     """
+    (
+        plm_gradient,
+        update_cons,
+        update_cons_from_fluxes,
+        godunov_fluxes,
+        prim_to_cons,
+        cons_to_prim,
+    ) = kernels
+
     xp = numpy_or_cupy(hardware)
     nz = resolution
     dx = 1.0 / nz
@@ -869,37 +891,6 @@ def solver(
         n = 0
 
     p = xp.array(p)
-    transpose = data_layout == "fields-first"
-
-    # =========================================================================
-    # Solvers and solver functions
-    # =========================================================================
-    grad_est = GradientEsimation(3, transpose, reconstruction)
-    fields = Fields(1, transpose)
-    solver = Solver(
-        1,
-        transpose,
-        reconstruction,
-        time_integration,
-        cache_prim,
-        cache_grad,
-    )
-    plm_gradient = grad_est.plm_gradient
-    update_cons = solver.update_cons
-    update_cons_from_fluxes = solver.update_cons_from_fluxes
-    godunov_fluxes = solver.godunov_fluxes
-    prim_to_cons = fields.prim_to_cons_array
-    cons_to_prim = fields.cons_to_prim_array
-
-    for kernel in [
-        plm_gradient,
-        update_cons,
-        update_cons_from_fluxes,
-        godunov_fluxes,
-        prim_to_cons,
-        cons_to_prim,
-    ]:
-        logger.info(f"using kernel {kernel_metadata(kernel)}")
 
     # =========================================================================
     # Whether the data layout is transposed, i.e. adjacent memory locations are
@@ -990,18 +981,56 @@ def solver(
         yield State(n, t, u1, cons_to_prim, transpose)
 
 
-def make_solver(app: Sailfish, checkpoint: dict = None):
+def make_solver_kernels(
+    transpose: bool,
+    cache_prim: bool,
+    cache_grad: bool,
+    reconstruction: Reconstruction,
+    time_integration: str,
+):
+    grad_est = GradientEsimation(3, transpose, reconstruction)
+    fields = Fields(1, transpose)
+    scheme = Scheme(
+        1,
+        transpose,
+        reconstruction,
+        time_integration,
+        cache_prim,
+        cache_grad,
+    )
+    return solver_kernels(
+        grad_est.plm_gradient,
+        scheme.update_cons,
+        scheme.update_cons_from_fluxes,
+        scheme.godunov_fluxes,
+        fields.prim_to_cons_array,
+        fields.cons_to_prim_array,
+    )
+
+
+def make_solver(config: Sailfish, checkpoint: dict = None):
     """
-    Construct the 1d solver from an app instance
+    Construct the 1d solver from a config instance
     """
+    kernels = make_solver_kernels(
+        config.strategy.transpose,
+        config.strategy.cache_prim,
+        config.strategy.cache_grad,
+        config.scheme.reconstruction,
+        config.scheme.time_integration,
+    )
+    for kernel in kernels:
+        logger.info(f"using kernel {kernel_metadata(kernel)}")
+
     return solver(
+        kernels,
         checkpoint,
-        app.hardware,
-        app.domain.num_zones[0],
-        app.strategy.data_layout,
-        app.strategy.cache_flux,
-        app.strategy.cache_prim,
-        app.strategy.cache_grad,
-        app.scheme.reconstruction,
-        app.scheme.time_integration,
+        config.hardware,
+        config.domain.num_zones[0],
+        config.strategy.transpose,
+        config.strategy.cache_flux,
+        config.strategy.cache_prim,
+        config.strategy.cache_grad,
+        config.scheme.reconstruction,
+        config.scheme.time_integration,
     )

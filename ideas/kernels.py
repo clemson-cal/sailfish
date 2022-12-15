@@ -466,7 +466,7 @@ def device_function(code: str = None, device_funcs=list(), static=str()):
 
         @wraps(stub)
         def wrapper(*args, **kwargs):
-            raise NotImplementedError("cannot call a device function")
+            raise NotImplementedError(f"cannot call a device function {stub.__name__}")
 
         return wrapper
 
