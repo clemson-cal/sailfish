@@ -2,9 +2,10 @@
 A solver is a generator function and a state object
 """
 
-from logging import getLogger
-from typing import NamedTuple, Callable, Iterable
 from dataclasses import replace
+from logging import getLogger
+from math import prod
+from typing import NamedTuple, Callable, Iterable
 
 from numpy import array, zeros, logical_not, concatenate
 from numpy.typing import NDArray
@@ -804,13 +805,12 @@ class FillGuardZones:
 
 
 class State:
-    def __init__(self, n, t, u, box, cons_to_prim, transpose):
+    def __init__(self, n, t, u, box, to_user_prim):
         self._n = n
         self._t = t
         self._u = u
         self._box = box
-        self._cons_to_prim = cons_to_prim
-        self._transpose = transpose
+        self._to_user_prim = to_user_prim
 
     @property
     def iteration(self):
@@ -822,26 +822,15 @@ class State:
 
     @property
     def primitive(self):
-        u = self._u
-        p = u.copy()
-        self._cons_to_prim(u, p)
-        if self._transpose:
-            p = p.T
-        try:
-            return p[2:-2].get()
-        except AttributeError:
-            return p[2:-2]
+        return self._to_user_prim(self._u)
 
     @property
     def total_zones(self):
-        if self._transpose:
-            return self._u.shape[1] - 4
-        else:
-            return self._u.shape[0] - 4
+        return prod(self._box.num_zones)
 
     @property
     def zone_centers(self):
-        return cell_centers_1d(trim_box(self._box, 2))
+        return cell_centers_1d(self._box)
 
 
 class MacroState:
@@ -994,15 +983,30 @@ def solver(
     p = xp.array(primitive)
     t = time
     n = iteration
-
-    yield FillGuardZones(p)
+    interior_box = trim_box(box, 2)
 
     # =========================================================================
     # Whether the data layout is transposed, i.e. adjacent memory locations are
     # the same field but in adjacent zones.
     # =========================================================================
+    standard_layout_view = lambda a: a.T if transpose else a
+
     if transpose:
         p = xp.ascontiguousarray(p.T)
+
+    def cons_to_user_prim(u):
+        """
+        Return primitives in standard layout host memory and with no guards
+        """
+        p = xp.empty_like(u)
+        cons_to_prim(u, p)
+        p = standard_layout_view(p)
+        try:
+            return p[2:-2].get()
+        except AttributeError:
+            return p[2:-2]
+
+    yield FillGuardZones(standard_layout_view(p))
 
     # =========================================================================
     # Time integration scheme: fwd and rk1 should produce the same result, but
@@ -1060,7 +1064,7 @@ def solver(
 
     del primitive, p  # p is no longer needed, will free memory if possible
 
-    yield State(n, t, u1, box, cons_to_prim, transpose)
+    yield State(n, t, u1, interior_box, cons_to_user_prim)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
@@ -1080,11 +1084,11 @@ def solver(
             else:
                 update_cons(p1, g1, u0, u1, u2, dt, dx)
                 u1, u2 = u2, u1
-            yield FillGuardZones(u1)
+            yield FillGuardZones(standard_layout_view(u1))
 
         t += dt
         n += 1
-        yield State(n, t, u1, box, cons_to_prim, transpose)
+        yield State(n, t, u1, interior_box, cons_to_user_prim)
 
 
 def make_solver_kernels(
@@ -1130,7 +1134,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
 
     patch_solvers = list()
 
-    for (i0, i1), box in decompose(config.domain, 5):
+    for (i0, i1), box in decompose(config.domain, 1):
         if checkpoint:
             p = checkpoint["primitive"][i0:i1]
             t = checkpoint["time"]
@@ -1167,5 +1171,4 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             yield MacroState(states)
 
         elif type(events[0]) is FillGuardZones:
-            arrays = list(e.array for e in events)
-            exchange_guard_zones(arrays)
+            exchange_guard_zones([e.array for e in events])
