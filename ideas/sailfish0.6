@@ -11,6 +11,7 @@ from itertools import chain, product
 from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json, dump as dump_json, dumps as dumps_json
 from logging import getLogger
+from sys import argv
 from typing import Any
 
 from models import Sailfish, Driver, Report, Strategy, Scheme, Checkpoint
@@ -687,7 +688,7 @@ def run(args, console):
     finally:
         if args._dump_summaries:
             fname = datetime.now().strftime("%m-%d-%Y-%H%M.json")
-            dump = dict(summaries=summaries, system_info=system_info())
+            dump = dict(cmdline=argv, summaries=summaries, system_info=system_info())
             with open(fname, "w") as outf:
                 console.print(f"write summaries to {fname}")
                 dump_json(dump, outf, indent=4)
