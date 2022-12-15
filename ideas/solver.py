@@ -6,7 +6,7 @@ from logging import getLogger
 from typing import NamedTuple, Callable, Iterable
 from dataclasses import replace
 
-from numpy import array, zeros, logical_not
+from numpy import array, zeros, logical_not, concatenate
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
@@ -786,6 +786,14 @@ class Scheme:
         return s[:dim], (urk, u, f, dt, dx, rk, *s)
 
 
+def exchange_guard_zones(us):
+    for i, u in enumerate(us):
+        if i > 0:
+            u[:+2] = us[i - 1][-4:-2]
+        if i < len(us) - 1:
+            u[-2:] = us[i + 1][+2:+4]
+
+
 class State:
     def __init__(self, n, t, u, box, cons_to_prim, transpose):
         self._n = n
@@ -811,20 +819,46 @@ class State:
         if self._transpose:
             p = p.T
         try:
-            return p.get()
+            return p[2:-2].get()
         except AttributeError:
-            return p
+            return p[2:-2]
 
     @property
     def total_zones(self):
         if self._transpose:
-            return self._u.shape[1]
+            return self._u.shape[1] - 4
         else:
-            return self._u.shape[0]
+            return self._u.shape[0] - 4
 
     @property
     def zone_centers(self):
-        return cell_centers_1d(self._box)
+        return cell_centers_1d(trim(self._box, 2))
+
+
+class MacroState:
+    def __init__(self, states: list[State]):
+        self._states = states
+        self._total_zones = sum(s.total_zones for s in self._states)
+
+    @property
+    def primitive(self):
+        return concatenate([s.primitive for s in self._states])
+
+    @property
+    def zone_centers(self):
+        return concatenate([s.zone_centers for s in self._states])
+
+    @property
+    def total_zones(self):
+        return self._total_zones
+
+    @property
+    def iteration(self):
+        return self._states[0].iteration
+
+    @property
+    def time(self):
+        return self._states[0].time
 
 
 def linear_shocktube(x):
@@ -848,6 +882,59 @@ def cell_centers_1d(box):
     xv = linspace(x0, x1, ni + 1)
     xc = 0.5 * (xv[1:] + xv[:-1])
     return xc
+
+
+def partition(elements: int, num_parts: int):
+    """
+    Equitably divide the given number of elements into `num_parts` partitions.
+
+    The sum of the partitions is `elements`. The number of partitions must be
+    less than or equal to the number of elements.
+    """
+    n = elements // num_parts
+    r = elements % num_parts
+
+    for i in range(num_parts):
+        yield n + (1 if i < r else 0)
+
+
+def subdivide(interval: tuple[int, int], num_parts: int):
+    """
+    Divide an interval into non-overlapping contiguous sub-intervals.
+    """
+    a, b = interval
+
+    for n in partition(b - a, num_parts):
+        yield a, a + n
+        a += n
+
+
+def extend(box: CoordinateBox, count: int):
+    ni = box.num_zones[0]
+    dx = box.grid_spacing[0]
+    x0 = box.extent_i[0] - count * dx
+    x1 = box.extent_i[1] + count * dx
+    return replace(box, extent_i=(x0, x1), num_zones=(ni + 2 * count, 1, 1))
+
+
+def trim(box: CoordinateBox, count: int):
+    ni = box.num_zones[0]
+    dx = box.grid_spacing[0]
+    x0 = box.extent_i[0] + count * dx
+    x1 = box.extent_i[1] - count * dx
+    return replace(box, extent_i=(x0, x1), num_zones=(ni - 2 * count, 1, 1))
+
+
+def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
+    """
+    Decompose a 1d coordinate box into a sequence of non-overlapping boxes
+    """
+    dx = box.grid_spacing[0]
+
+    for i0, i1 in subdivide((0, box.num_zones[0]), num_parts):
+        x0 = box.extent_i[0] + dx * i0
+        x1 = box.extent_i[0] + dx * i1
+        yield replace(box, extent_i=(x0, x1), num_zones=(i1 - i0, 1, 1))
 
 
 class solver_kernels(NamedTuple):
@@ -983,6 +1070,7 @@ def solver(
             else:
                 update_cons(p1, g1, u0, u1, u2, dt, dx)
                 u1, u2 = u2, u1
+                yield u1
 
         t += dt
         n += 1
@@ -1016,52 +1104,6 @@ def make_solver_kernels(
     )
 
 
-def partition(elements: int, num_parts: int):
-    """
-    Equitably divide the given number of elements into `num_parts` partitions.
-
-    The sum of the partitions is `elements`. The number of partitions must be
-    less than or equal to the number of elements.
-    """
-    n = elements // num_parts
-    r = elements % num_parts
-
-    for i in range(num_parts):
-        yield n + (1 if i < r else 0)
-
-
-def subdivide(interval: tuple[int, int], num_parts: int):
-    """
-    Divide an interval into non-overlapping contiguous sub-intervals.
-    """
-    a, b = interval
-
-    for n in partition(b - a, num_parts):
-        yield a, a + n
-        a += n
-
-
-def with_guard_zones(box: CoordinateBox, num_guard: int):
-    ni = box.num_zones[0]
-    dx = box.grid_spacing[0]
-    x0 = box.extent_i[0] - num_guard * dx
-    x1 = box.extent_i[1] + num_guard * dx
-    return replace(box, extent_i=(x0, x1), num_zones=(ni + 2 * num_guard, 1, 1))
-
-
-def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
-    """
-    Decompose a 1d coordinate box into a sequence of non-overlapping boxes
-    """
-    dx = box.grid_spacing[0]
-
-    for i0, i1 in subdivide((0, box.num_zones[0]), num_parts):
-        x0 = box.extent_i[0] + dx * i0
-        x1 = box.extent_i[0] + dx * i1
-        sub_box = replace(box, extent_i=(x0, x1), num_zones=(i1 - i0, 1, 1))
-        yield with_guard_zones(sub_box, num_guard=2)
-
-
 def make_solver(config: Sailfish, checkpoint: dict = None):
     """
     Construct the 1d solver from a config instance
@@ -1076,17 +1118,31 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     for kernel in kernels:
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
-    box = with_guard_zones(config.domain, num_guard=2)
+    patch_solvers = list()
 
-    return solver(
-        kernels,
-        checkpoint,
-        box,
-        config.hardware,
-        config.strategy.transpose,
-        config.strategy.cache_flux,
-        config.strategy.cache_prim,
-        config.strategy.cache_grad,
-        config.scheme.reconstruction,
-        config.scheme.time_integration,
-    )
+    for box in decompose(config.domain, 1):
+        box = extend(box, count=2)
+        patch_solver = solver(
+            kernels,
+            checkpoint,
+            box,
+            config.hardware,
+            config.strategy.transpose,
+            config.strategy.cache_flux,
+            config.strategy.cache_prim,
+            config.strategy.cache_grad,
+            config.scheme.reconstruction,
+            config.scheme.time_integration,
+        )
+        patch_solvers.append(patch_solver)
+
+    while True:
+        events = list(next(s) for s in patch_solvers)
+
+        if type(events[0]) is State:
+            states = events
+            yield MacroState(states)
+
+        else:
+            u_arrays = events
+            exchange_guard_zones(u_arrays)
