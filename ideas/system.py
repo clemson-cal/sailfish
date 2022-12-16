@@ -31,9 +31,20 @@ def system_info():
     try:
         from cupy.cuda.runtime import getDeviceProperties, getDeviceCount
 
-        nobin = lambda d: {k: v for k, v in d.items() if type(v) is not bytes}
+        def strkey(v):
+            if type(v) is bytes:
+                try:
+                    return str(v, "utf-8")
+                except UnicodeDecodeError:
+                    return None
+            else:
+                return v
 
-        gpu_info = list(nobin(getDeviceProperties(i)) for i in range(getDeviceCount()))
+        gpu_info = list(
+            {k: strkey(v) for k, v in getDeviceProperties(i).items()}
+            for i in range(getDeviceCount())
+        )
+
     except ImportError:
         gpu_info = None
 
