@@ -15,8 +15,6 @@ from sys import argv
 from typing import Any
 
 from models import Sailfish, Driver, Report, Strategy, Scheme, Checkpoint
-from kernels import perf_time_sequence, configure_kernel_module
-from solver import make_solver
 from system import system_info
 
 
@@ -130,6 +128,9 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
     This function does handle checkpointing and the collection of time series
     data from the solver.
     """
+    from kernels import perf_time_sequence, configure_kernel_module
+    from solver import make_solver
+
     for config, chkpt in setups:
         yield config
 
@@ -519,13 +520,17 @@ def argument_parser():
         usage=SUPPRESS,
         description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
     )
+    parser.set_defaults(_command="help")
+
     subparsers = parser.add_subparsers()
     sys = subparsers.add_parser("sys", usage=SUPPRESS, help="show platform information")
     doc = subparsers.add_parser("doc", usage=SUPPRESS, help="read documentation")
+    dep = subparsers.add_parser("dep", usage=SUPPRESS, help="show dependencies")
     run = subparsers.add_parser("run", usage=SUPPRESS, help="run a simulation")
 
     sys.set_defaults(_command="sys")
     doc.set_defaults(_command="doc")
+    dep.set_defaults(_command="dep")
     run.set_defaults(_command="run")
 
     run.add_argument(
@@ -714,6 +719,31 @@ def doc(args, console):
     console.print(Scheme())
 
 
+def dep(args, console):
+    from importlib import import_module
+    from rich.table import Table
+
+    def have(m):
+        try:
+            import_module(m)
+            return "[green]yes[/green]"
+        except ImportError:
+            return "[red]no[/red]"
+
+    table = Table()
+    table.add_column("module")
+    table.add_column("present")
+    table.add_column("required for")
+    table.add_column("pip3 install --user")
+    table.add_row("[blue]pydantic", have("pydantic"), "everything", "pydantic")
+    table.add_row("[blue]numpy", have("numpy"), "everything", "numpy")
+    table.add_row("[blue]cupy", have("cupy"), "GPU acceleration", "cupy-cuda116")
+    table.add_row("[blue]cffi", have("cffi"), "CPU native code", "cffi")
+    table.add_row("[blue]rich", have("rich"), "formatted output", "rich")
+    table.add_row("[blue]cpuinfo", have("cpuinfo"), "detailed CPU info", "py-cpuinfo")
+    console.print(table)
+
+
 def sys(args, console):
     console.print(system_info())
 
@@ -726,10 +756,14 @@ def main():
     args = parser.parse_args()
     console = init_logging(args._log_level)
 
+    if args._command == "help":
+        parser.print_help()
     if args._command == "run":
         run(args, console)
     if args._command == "doc":
         doc(args, console)
+    if args._command == "dep":
+        dep(args, console)
     if args._command == "sys":
         sys(args, console)
 
