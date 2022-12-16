@@ -161,12 +161,14 @@ class Strategy:
     Fields
     ------
 
+    hardware:  compute device [cpu|gpu]
     data_layout: array-of-struct (fields-last) or struct-of-array (fields-first)
-    cache_flux: one Riemann problem per face, difference the resulting array
-    cache_prim: pre-compute primitive quantities, vs. re-compute over stencil
+    cache_flux:  one Riemann problem per face, difference the resulting array
+    cache_prim:  pre-compute primitive quantities, vs. re-compute over stencil
     num_patches: decompose domain to enable threads, streams, or multiple GPU's
     """
 
+    hardware: Literal["cpu", "gpu"] = "cpu"
     data_layout: Literal["fields-first", "fields-last"] = "fields-last"
     cache_flux: bool = False
     cache_prim: bool = False
@@ -195,7 +197,6 @@ class Sailfish:
     domain:    the physical domain of the problem
     strategy:  the solution strategy; does not affect the numerical solution
     scheme:    algorithmic choices which can affect the solution accuracy
-    hardware:  compute device [cpu|gpu]
     """
 
     name: str = None
@@ -204,7 +205,6 @@ class Sailfish:
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()
-    hardware: Literal["cpu", "gpu"] = "cpu"
 
 
 if __name__ == "__main__":
@@ -212,7 +212,6 @@ if __name__ == "__main__":
     from rich.live import Live
 
     console = Console()
-
     config = Sailfish(physics=Isothermal())
 
     for field in config.__dataclass_fields__:

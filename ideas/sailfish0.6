@@ -134,7 +134,8 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
     for config, chkpt in setups:
         yield config
 
-        configure_kernel_module(default_exec_mode=config.hardware)
+        mode = config.strategy.hardware
+        configure_kernel_module(default_exec_mode=mode)
 
         driver = config.driver
         fold = driver.report.cadence
@@ -142,8 +143,8 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
         states = make_solver(config, chkpt)
         timeseries_data = dict()
         zps_log = list()
-        app_timer = perf_time_sequence(mode=config.hardware)
-        fld_timer = perf_time_sequence(mode=config.hardware)
+        app_timer = perf_time_sequence(mode)
+        fld_timer = perf_time_sequence(mode)
 
         # =====================================================================
         # Set up timeseries and checkpoint task handlers
@@ -575,7 +576,7 @@ def argument_parser():
         "--mode",
         "--hardware",
         dest="hardware",
-        choices=Sailfish.type_args("hardware"),
+        choices=Strategy.type_args("hardware"),
         help="execution mode",
     )
     run.add_argument(
