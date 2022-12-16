@@ -2,6 +2,7 @@
 A solver is a generator function and a state object
 """
 
+from contextlib import nullcontext
 from dataclasses import replace
 from logging import getLogger
 from math import prod
@@ -12,21 +13,9 @@ from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
-from models import Sailfish, Reconstruction, CoordinateBox
+from models import Sailfish, Strategy, Reconstruction, CoordinateBox
 
 logger = getLogger("sailfish")
-
-
-def numpy_or_cupy(exec_mode):
-    if exec_mode == "gpu":
-        import cupy
-
-        return cupy
-
-    if exec_mode == "cpu":
-        import numpy
-
-        return numpy
 
 
 @device
@@ -917,7 +906,7 @@ def extend_box(box: CoordinateBox, count: int):
 
 def extend_array(a: NDArray[float], count: int):
     b = zeros([a.shape[0] + 2 * count, a.shape[1]])
-    b[2:-2] = a
+    b[count:-count] = a
     return b
 
 
@@ -950,23 +939,24 @@ class SolverKernels(NamedTuple):
     cons_to_prim: Callable
 
 
-def solver(
+def patch_solver(
     primitive: NDArray[float],
     time: float,
     iteration: int,
     box: CoordinateBox,
     kernels: SolverKernels,
-    hardware: str,
-    transpose: bool,
-    cache_flux: bool,
-    cache_prim: bool,
-    cache_grad: bool,
-    reconstruction: Reconstruction,
-    time_integration: str,
+    strategy: Strategy,
+    scheme: Scheme,
 ) -> State:
     """
     Solver for the 1d euler equations in many configurations
     """
+    hardware = strategy.hardware
+    transpose = strategy.transpose
+    cache_flux = strategy.cache_flux
+    cache_prim = strategy.cache_prim
+    cache_grad = strategy.cache_grad
+
     (
         plm_gradient,
         update_cons,
@@ -976,7 +966,11 @@ def solver(
         cons_to_prim,
     ) = kernels
 
-    xp = numpy_or_cupy(hardware)
+    if hardware == "gpu":
+        import cupy as xp
+    if hardware == "cpu":
+        import numpy as xp
+
     nz = box.num_zones[0]
     dx = box.grid_spacing[0]
     dt = dx * 1e-1
@@ -984,6 +978,8 @@ def solver(
     t = time
     n = iteration
     interior_box = trim_box(box, 2)
+
+    yield FillGuardZones(p)
 
     # =========================================================================
     # Whether the data layout is transposed, i.e. adjacent memory locations are
@@ -1006,20 +1002,18 @@ def solver(
         except AttributeError:
             return p[2:-2]
 
-    yield FillGuardZones(standard_layout_view(p))
-
     # =========================================================================
     # Time integration scheme: fwd and rk1 should produce the same result, but
     # rk1 can be used to test the expense of the data which is not required for
     # fwd.
     # =========================================================================
-    if time_integration == "fwd":
+    if scheme.time_integration == "fwd":
         rks = []
-    elif time_integration == "rk1":
+    elif scheme.time_integration == "rk1":
         rks = [0.0]
-    elif time_integration == "rk2":
+    elif scheme.time_integration == "rk2":
         rks = [0.0, 0.5]
-    elif time_integration == "rk3":
+    elif scheme.time_integration == "rk3":
         rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
 
     # =========================================================================
@@ -1118,6 +1112,15 @@ def make_solver_kernels(
     )
 
 
+def make_stream(mode):
+    if mode == "cpu":
+        return nullcontext()
+    if mode == "gpu":
+        from cupy.cuda import Stream
+
+        return Stream()
+
+
 def make_solver(config: Sailfish, checkpoint: dict = None):
     """
     Construct the 1d solver from a config instance
@@ -1132,10 +1135,15 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     for kernel in kernels:
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
-    patch_solvers = list()
-    num_patches = config.strategy.num_patches
+    strategy = config.strategy
+    scheme = config.scheme
+    npat = strategy.num_patches
+    mode = strategy.hardware
 
-    for (i0, i1), box in decompose(config.domain, num_patches):
+    streams = list()
+    solvers = list()
+
+    for (i0, i1), box in decompose(config.domain, npat):
         if checkpoint:
             p = checkpoint["primitive"][i0:i1]
             t = checkpoint["time"]
@@ -1148,28 +1156,20 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         p = extend_array(p, count=2)
         b = extend_box(box, count=2)
 
-        patch_solver = solver(
-            p,
-            t,
-            n,
-            b,
-            kernels,
-            config.hardware,
-            config.strategy.transpose,
-            config.strategy.cache_flux,
-            config.strategy.cache_prim,
-            config.strategy.cache_grad,
-            config.scheme.reconstruction,
-            config.scheme.time_integration,
-        )
-        patch_solvers.append(patch_solver)
+        with (stream := make_stream(mode)):
+            solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
+            streams.append(stream)
+            solvers.append(solver)
 
     while True:
-        events = list(next(s) for s in patch_solvers)
+        events = list()
+
+        for stream, solver in zip(streams, solvers):
+            with stream:
+                events.append(next(solver))
 
         if type(events[0]) is State:
-            states = events
-            yield MacroState(states)
+            yield MacroState(events)
 
         elif type(events[0]) is FillGuardZones:
             exchange_guard_zones([e.array for e in events])
