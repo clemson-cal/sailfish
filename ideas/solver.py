@@ -2,13 +2,15 @@
 A solver is a generator function and a state object
 """
 
+
 from contextlib import nullcontext
 from dataclasses import replace
 from logging import getLogger
 from math import prod
+from multiprocessing.pool import ThreadPool
+from numpy import array, zeros, logical_not, concatenate
 from typing import NamedTuple, Callable, Iterable
 
-from numpy import array, zeros, logical_not, concatenate
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
@@ -1137,13 +1139,14 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
 
     strategy = config.strategy
     scheme = config.scheme
-    npat = strategy.num_patches
+    num_patches = strategy.num_patches
+    num_threads = strategy.num_threads
     mode = strategy.hardware
 
     streams = list()
     solvers = list()
 
-    for (i0, i1), box in decompose(config.domain, npat):
+    for (i0, i1), box in decompose(config.domain, num_patches):
         if checkpoint:
             p = checkpoint["primitive"][i0:i1]
             t = checkpoint["time"]
@@ -1161,15 +1164,18 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             streams.append(stream)
             solvers.append(solver)
 
-    while True:
-        events = list()
+    def next_with(arg):
+        context, gen = arg
 
-        for stream, solver in zip(streams, solvers):
-            with stream:
-                events.append(next(solver))
+        with context:
+            return next(gen)
 
-        if type(events[0]) is State:
-            yield MacroState(events)
+    with ThreadPool(num_threads) as pool:
+        while True:
+            events = list(pool.map(next_with, zip(streams, solvers)))
 
-        elif type(events[0]) is FillGuardZones:
-            exchange_guard_zones([e.array for e in events])
+            if type(events[0]) is State:
+                yield MacroState(events)
+
+            elif type(events[0]) is FillGuardZones:
+                exchange_guard_zones([e.array for e in events])

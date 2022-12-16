@@ -161,11 +161,12 @@ class Strategy:
     Fields
     ------
 
-    hardware:  compute device [cpu|gpu]
+    hardware:    compute device [cpu|gpu]
     data_layout: array-of-struct (fields-last) or struct-of-array (fields-first)
     cache_flux:  one Riemann problem per face, difference the resulting array
     cache_prim:  pre-compute primitive quantities, vs. re-compute over stencil
     num_patches: decompose domain to enable threads, streams, or multiple GPU's
+    num_threads: use a thread pool of this size to drive a multi-patch solver
     """
 
     hardware: Literal["cpu", "gpu"] = "cpu"
@@ -174,6 +175,7 @@ class Strategy:
     cache_prim: bool = False
     cache_grad: bool = False
     num_patches: int = 1
+    num_threads: int = 1
 
     @property
     def transpose(self):

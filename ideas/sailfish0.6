@@ -596,6 +596,14 @@ def argument_parser():
         dest="strategy.num_patches",
     )
     run.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        metavar="T",
+        help=Strategy.describe("num_threads"),
+        dest="strategy.num_threads",
+    )
+    run.add_argument(
         "-m",
         "--time-integration",
         choices=Scheme.type_args("time_integration"),
