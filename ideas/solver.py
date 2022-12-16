@@ -1114,13 +1114,16 @@ def make_solver_kernels(
     )
 
 
-def make_stream(mode):
-    if mode == "cpu":
+def make_stream(hardware: str, gpu_streams: str):
+    if hardware == "cpu":
         return nullcontext()
-    if mode == "gpu":
+    if hardware == "gpu":
         from cupy.cuda import Stream
 
-        return Stream()
+        if gpu_streams == "per-thread":
+            return Stream.ptds
+        if gpu_streams == "per-patch":
+            return Stream()
 
 
 def make_solver(config: Sailfish, checkpoint: dict = None):
@@ -1141,7 +1144,8 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     scheme = config.scheme
     num_patches = strategy.num_patches
     num_threads = strategy.num_threads
-    mode = strategy.hardware
+    hardware = strategy.hardware
+    gpu_streams = strategy.gpu_streams
 
     streams = list()
     solvers = list()
@@ -1159,7 +1163,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         p = extend_array(p, count=2)
         b = extend_box(box, count=2)
 
-        with (stream := make_stream(mode)):
+        with (stream := make_stream(hardware, gpu_streams)):
             solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
             streams.append(stream)
             solvers.append(solver)

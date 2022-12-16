@@ -604,6 +604,14 @@ def argument_parser():
         dest="strategy.num_threads",
     )
     run.add_argument(
+        "--streams",
+        type=str,
+        choices=Strategy.type_args("gpu_streams"),
+        metavar="S",
+        help=Strategy.describe("gpu_streams"),
+        dest="strategy.gpu_streams",
+    )
+    run.add_argument(
         "-m",
         "--time-integration",
         choices=Scheme.type_args("time_integration"),
