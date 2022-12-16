@@ -517,7 +517,7 @@ class Scheme:
         uwr: NDArray[float],
         dt: float,
         dx: float,
-        rk: float = 0.0,
+        rk: float,
         plm_theta: float = None,
         ni: int = None,
         nj: int = None,
@@ -1076,7 +1076,7 @@ def patch_solver(
                 godunov_fluxes(p1, g1, u1, fh)
                 update_cons_from_fluxes(u0, u1, fh, dt, dx, rk)
             else:
-                update_cons(p1, g1, u0, u1, u2, dt, dx)
+                update_cons(p1, g1, u0, u1, u2, dt, dx, rk)
                 u1, u2 = u2, u1
             yield FillGuardZones(standard_layout_view(u1))
 
