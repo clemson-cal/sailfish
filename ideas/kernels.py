@@ -195,7 +195,7 @@ def to_ctypes(args, signature):
         if isinstance(arg, ndarray):
             yield arg.ctypes.data_as(t)
         elif isinstance(arg, Structure):
-            yield arg  # array(arg, dtype=t)
+            yield arg
         else:
             yield arg
 
@@ -203,7 +203,7 @@ def to_ctypes(args, signature):
 def to_cupy_args(args):
     for arg in args:
         if isinstance(arg, Structure):
-            yield array(arg, dtype=type(arg))
+            yield array(arg)
         else:
             yield arg
 
@@ -701,6 +701,7 @@ def main():
     )
     args = parser.parse_args()
 
+    configure_kernel_module(default_exec_mode=args.exec_mode)
     basicConfig(
         level=args.log_level.upper(),
         format="%(message)s",
@@ -950,15 +951,24 @@ def main():
             """
             return None, tuple()
 
-    m1 = ConfigurableModule(1)
-    m2 = ConfigurableModule(2)
-    assert m1.run() == 1
-    assert m2.run() == 2
+    if args.exec_mode != "gpu":
+        m1 = ConfigurableModule(1)
+        m2 = ConfigurableModule(2)
+        assert m1.run() == 1
+        assert m2.run() == 2
 
     # ==============================================================================
     # 6.
     #
     # Demonstrates how to pass data structure to a kernel function.
+    #
+    # Note: there is a warning generated when using this approach on the GPU,
+    # which is related to a Python bug. The ctypes struct should be converted
+    # manually to a numpy dtype, or the warning should be silenced, or ctypes
+    # structs should not be used by the module. Unfortunately the ctypes
+    # struct is more convenient to instantiate and more natural as a type-hint.
+    #
+    # https://stackoverflow.com/questions/4964101/pep-3118-warning-when-using-ctypes-array-as-numpy-array
     # ==============================================================================
 
     class MyStruct(Structure):
@@ -972,7 +982,7 @@ def main():
         ]
 
     @kernel
-    def takes_struct_arg(arg: MyStruct) -> float:
+    def takes_struct_arg(arg: MyStruct):
         R"""
         struct MyStruct {
             int x;
@@ -983,15 +993,15 @@ def main():
             double d;
         };
 
-        KERNEL double takes_struct_arg(struct MyStruct arg)
+        KERNEL void takes_struct_arg(struct MyStruct arg)
         {
-            return arg.x + arg.y + arg.a + arg.b + arg.c + arg.d;
+            assert(arg.x + arg.y + arg.a + arg.b + arg.c + arg.d == 21.0);
         }
         """
-        return 1, (arg,)
+        return (1,), (arg,)
 
     arg = MyStruct(x=1, y=2, a=3, b=4, c=5, d=6)
-    assert takes_struct_arg(arg) == 21.0
+    takes_struct_arg(arg)
 
 
 if __name__ == "__main__":
