@@ -10,7 +10,7 @@ Author: Jonathan Zrake (2022)
 
 
 # Python standard library imports
-from ctypes import CDLL, POINTER, c_int, c_double
+from ctypes import CDLL, POINTER, c_int, c_double, Structure
 from functools import wraps
 from hashlib import sha256
 from os import listdir
@@ -21,7 +21,7 @@ from logging import getLogger
 
 # Numpy imports
 from numpy.typing import NDArray
-from numpy import ndarray
+from numpy import ndarray, array
 
 logger = getLogger("sailfish")
 
@@ -163,13 +163,18 @@ def configure_kernel_module(
     logger.debug(f"KERNEL_DEFAULT_EXEC_MODE={KERNEL_DEFAULT_EXEC_MODE}")
 
 
+def argtype(t):
+    if issubclass(t, Structure):
+        return t
+    else:
+        return PY_CTYPE_DICT[t]
+
+
 def argtypes(f):
     """
     Return a tuple of ctypes objects derived from a function's type hints.
     """
-    return tuple(
-        PY_CTYPE_DICT[t] for k, t in f.__annotations__.items() if k != "return"
-    )
+    return tuple(argtype(t) for k, t in f.__annotations__.items() if k != "return")
 
 
 def restype(f):
@@ -189,6 +194,16 @@ def to_ctypes(args, signature):
     for arg, t in zip(args, signature):
         if isinstance(arg, ndarray):
             yield arg.ctypes.data_as(t)
+        elif isinstance(arg, Structure):
+            yield arg  # array(arg, dtype=t)
+        else:
+            yield arg
+
+
+def to_cupy_args(args):
+    for arg in args:
+        if isinstance(arg, Structure):
+            yield array(arg, dtype=type(arg))
         else:
             yield arg
 
@@ -385,7 +400,7 @@ def gpu_extension_function(module, stub):
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
 
-        gpu_func(nb, bs, pyargs)
+        gpu_func(nb, bs, tuple(to_cupy_args(pyargs)))
 
     wrapper.__gpu_func__ = gpu_func
     return wrapper
@@ -939,6 +954,44 @@ def main():
     m2 = ConfigurableModule(2)
     assert m1.run() == 1
     assert m2.run() == 2
+
+    # ==============================================================================
+    # 6.
+    #
+    # Demonstrates how to pass data structure to a kernel function.
+    # ==============================================================================
+
+    class MyStruct(Structure):
+        _fields_ = [
+            ("x", c_int),
+            ("y", c_int),
+            ("a", c_double),
+            ("b", c_double),
+            ("c", c_int),
+            ("d", c_double),
+        ]
+
+    @kernel
+    def takes_struct_arg(arg: MyStruct) -> float:
+        R"""
+        struct MyStruct {
+            int x;
+            int y;
+            double a;
+            double b;
+            int c;
+            double d;
+        };
+
+        KERNEL double takes_struct_arg(struct MyStruct arg)
+        {
+            return arg.x + arg.y + arg.a + arg.b + arg.c + arg.d;
+        }
+        """
+        return 1, (arg,)
+
+    arg = MyStruct(x=1, y=2, a=3, b=4, c=5, d=6)
+    assert takes_struct_arg(arg) == 21.0
 
 
 if __name__ == "__main__":
