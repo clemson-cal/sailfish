@@ -114,6 +114,7 @@ def configmodel_rich_table(d, console, options):
         show_edge=True,
         show_lines=False,
         show_header=False,
+        expand=True,
         # min_width=80,
         # box=box.SQUARE,
     )

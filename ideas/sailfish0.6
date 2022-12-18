@@ -512,180 +512,11 @@ def sailfish(config, overrides):
         yield Sailfish(**s), chkpt
 
 
-def argument_parser():
-    """
-    Create an argument parser instance for running from the command line
-    """
-    parser = ArgumentParser(
-        prog="sailfish",
-        usage=SUPPRESS,
-        description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
-    )
-    parser.set_defaults(_command="help")
-
-    subparsers = parser.add_subparsers()
-    sys = subparsers.add_parser("sys", usage=SUPPRESS, help="show platform information")
-    doc = subparsers.add_parser("doc", usage=SUPPRESS, help="read documentation")
-    dep = subparsers.add_parser("dep", usage=SUPPRESS, help="show dependencies")
-    run = subparsers.add_parser("run", usage=SUPPRESS, help="run a simulation")
-
-    sys.set_defaults(_command="sys")
-    doc.set_defaults(_command="doc")
-    dep.set_defaults(_command="dep")
-    run.set_defaults(_command="run")
-
-    run.add_argument(
-        "_configs",
-        metavar="configs",
-        nargs="*",
-        default=[dict()],
-        help="sequence of configuration files, checkpoints, or preset/setup names",
-    )
-    parser.add_argument(
-        "--log-level",
-        dest="_log_level",
-        default="warning",
-        choices=("debug", "info", "warning", "error", "critical"),
-        help="log messages at and above this severity level",
-    )
-    run.add_argument(
-        "--dash",
-        dest="_dash",
-        action="store_true",
-        help="show a dashboard instead of a scrollback",
-    )
-    run.add_argument(
-        "--screen",
-        dest="_screen",
-        action="store_true",
-        help="transient screen in dash mode (better look but disappears after the run)",
-    )
-    run.add_argument(
-        "--plot",
-        dest="_plot",
-        action="store_true",
-        help="show a plot of the solution",
-    )
-    run.add_argument(
-        "--dump-summaries",
-        dest="_dump_summaries",
-        action="store_true",
-        help="dump a JSON object with run summaries",
-    )
-    run.add_argument(
-        "--mode",
-        "--hardware",
-        dest="strategy.hardware",
-        choices=Strategy.type_args("hardware"),
-        help="execution mode",
-    )
-    run.add_argument(
-        "-n",
-        "--num-zones",
-        "--resolution",
-        type=parse_num_zones,
-        dest="domain.num_zones",
-        metavar="N",
-    )
-    run.add_argument(
-        "--patches",
-        type=int,
-        default=None,
-        metavar="P",
-        help=Strategy.describe("num_patches"),
-        dest="strategy.num_patches",
-    )
-    run.add_argument(
-        "--threads",
-        type=int,
-        default=None,
-        metavar="T",
-        help=Strategy.describe("num_threads"),
-        dest="strategy.num_threads",
-    )
-    run.add_argument(
-        "--streams",
-        type=str,
-        choices=Strategy.type_args("gpu_streams"),
-        metavar="S",
-        help=Strategy.describe("gpu_streams"),
-        dest="strategy.gpu_streams",
-    )
-    run.add_argument(
-        "-m",
-        "--time-integration",
-        choices=Scheme.type_args("time_integration"),
-        help=Scheme.describe("time_integration"),
-        dest="scheme.time_integration",
-    )
-    run.add_argument(
-        "-r",
-        "--reconstruction",
-        type=parse_reconstruction,
-        help=Scheme.describe("reconstruction"),
-        dest="scheme.reconstruction",
-        metavar="R",
-    )
-    run.add_argument(
-        "-e",
-        "--tfinal",
-        type=float,
-        help=Driver.describe("tfinal"),
-        dest="driver.tfinal",
-        metavar="T",
-    )
-    run.add_argument(
-        "-f",
-        "--fold",
-        "--report-cadence",
-        type=int,
-        help=Report.describe("cadence"),
-        dest="driver.report.cadence",
-        metavar="F",
-    )
-    run.add_argument(
-        "--checkpoint",
-        "-c",
-        type=float,
-        dest="driver.checkpoint.cadence",
-        metavar="C",
-    )
-    run.add_argument(
-        "--timeseries",
-        "-t",
-        type=float,
-        dest="driver.timeseries.cadence",
-        metavar="T",
-    )
-    run.add_argument(
-        "--data-layout",
-        type=str,
-        choices=Strategy.type_args("data_layout"),
-        help=Strategy.describe("data_layout"),
-        dest="strategy.data_layout",
-    )
-    run.add_argument(
-        "--cache-prim",
-        action="store_true",
-        dest="strategy.cache_prim",
-        default=None,
-    )
-    run.add_argument(
-        "--cache-flux",
-        action="store_true",
-        dest="strategy.cache_flux",
-        default=None,
-    )
-    run.add_argument(
-        "--cache-grad",
-        action="store_true",
-        dest="strategy.cache_grad",
-        default=None,
-    )
-    return parser
-
-
 def run(args, console):
+    """
+    Run a simulation or sequence of simulations
+    """
+
     overrides = unflatten(
         {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
     )
@@ -726,28 +557,66 @@ def run(args, console):
                 dump_json(dump, outf, indent=4)
 
 
-def doc(args, console):
-    from rich.markdown import Markdown
+def doc(args=None, console=None, parser=None):
+    """
+    Display code documentation
+    """
 
-    console.print(Driver())
-    console.print()
-    console.print(Strategy())
-    console.print()
-    console.print(Scheme())
+    from inspect import getsource
+    from textwrap import dedent
+    from kernels import main as kernels_main
+    from rich.markdown import Markdown
+    from rich.syntax import Syntax
+    from rich.text import Text
+    from rich.prompt import Prompt, DefaultType
+
+    console.width = 100
+
+    while True:
+        if (topic := args.topic) is None:
+            choices = ["kernels", "models", "setups", "solver", "physics"]
+
+            topics = "# __Topics__"
+            for choice in choices:
+                topics += f"\n- {choice}"
+            topics += "\n-----------"
+
+            console.print(Markdown(topics))
+            topic = Prompt.ask(
+                "select", choices=choices + ["q", "quit"], show_choices=False
+            )
+            console.print()
+
+        if topic == "models":
+            console.print(Driver())
+            console.rule()
+            console.print(Strategy())
+            console.rule()
+            console.print(Scheme())
+            console.rule()
+        if topic == "kernels":
+            console.print(Syntax(getsource(kernels_main), lexer="python"))
+        if args.topic or topic in ["q", "quit"]:
+            break
 
 
 def dep(args, console):
+    """
+    Display application dependencies
+    """
+
     from importlib import import_module
     from rich.table import Table
+    from rich import box
 
     def have(m):
         try:
             import_module(m)
-            return "[green]yes[/green]"
+            return "[green]yes"
         except ImportError:
-            return "[red]no[/red]"
+            return "[red]no"
 
-    table = Table()
+    table = Table(box=box.MINIMAL)
     table.add_column("module")
     table.add_column("present")
     table.add_column("required for")
@@ -762,7 +631,188 @@ def dep(args, console):
 
 
 def sys(args, console):
+    """
+    Show platform information
+    """
     console.print(system_info())
+
+
+def argument_parser():
+    """
+    Create an argument parser instance for running from the command line
+    """
+    parser = ArgumentParser(
+        prog="sailfish",
+        usage=SUPPRESS,
+        description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
+    )
+    parser.set_defaults(_command="help")
+    parser.add_argument(
+        "--log-level",
+        dest="_log_level",
+        default="warning",
+        choices=("debug", "info", "warning", "error", "critical"),
+        help="log messages at and above this severity level",
+    )
+
+    subparsers = parser.add_subparsers()
+    _sys = subparsers.add_parser("sys", usage=SUPPRESS, help=sys.__doc__)
+    _doc = subparsers.add_parser("doc", usage=SUPPRESS, help=doc.__doc__)
+    _dep = subparsers.add_parser("dep", usage=SUPPRESS, help=dep.__doc__)
+    _run = subparsers.add_parser("run", usage=SUPPRESS, help=run.__doc__)
+
+    _sys.set_defaults(_command="sys")
+    _doc.set_defaults(_command="doc")
+    _dep.set_defaults(_command="dep")
+    _run.set_defaults(_command="run")
+
+    _doc.add_argument(
+        "topic",
+        nargs="?",
+        choices=["kernels", "models", "setups", "solver", "physics"],
+    )
+    _run.add_argument(
+        "_configs",
+        metavar="configs",
+        nargs="*",
+        default=[dict()],
+        help="sequence of configuration files, checkpoints, or preset/setup names",
+    )
+    _run.add_argument(
+        "--dash",
+        dest="_dash",
+        action="store_true",
+        help="show a dashboard instead of a scrollback",
+    )
+    _run.add_argument(
+        "--screen",
+        dest="_screen",
+        action="store_true",
+        help="transient screen in dash mode (better look but disappears after the run)",
+    )
+    _run.add_argument(
+        "--plot",
+        dest="_plot",
+        action="store_true",
+        help="show a plot of the solution",
+    )
+    _run.add_argument(
+        "--dump-summaries",
+        dest="_dump_summaries",
+        action="store_true",
+        help="dump a JSON object with run summaries",
+    )
+    _run.add_argument(
+        "--mode",
+        "--hardware",
+        dest="strategy.hardware",
+        choices=Strategy.type_args("hardware"),
+        help="execution mode",
+    )
+    _run.add_argument(
+        "-n",
+        "--num-zones",
+        "--resolution",
+        type=parse_num_zones,
+        dest="domain.num_zones",
+        metavar="N",
+    )
+    _run.add_argument(
+        "--patches",
+        type=int,
+        default=None,
+        metavar="P",
+        help=Strategy.describe("num_patches"),
+        dest="strategy.num_patches",
+    )
+    _run.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        metavar="T",
+        help=Strategy.describe("num_threads"),
+        dest="strategy.num_threads",
+    )
+    _run.add_argument(
+        "--streams",
+        type=str,
+        choices=Strategy.type_args("gpu_streams"),
+        metavar="S",
+        help=Strategy.describe("gpu_streams"),
+        dest="strategy.gpu_streams",
+    )
+    _run.add_argument(
+        "-m",
+        "--time-integration",
+        choices=Scheme.type_args("time_integration"),
+        help=Scheme.describe("time_integration"),
+        dest="scheme.time_integration",
+    )
+    _run.add_argument(
+        "-r",
+        "--reconstruction",
+        type=parse_reconstruction,
+        help=Scheme.describe("reconstruction"),
+        dest="scheme.reconstruction",
+        metavar="R",
+    )
+    _run.add_argument(
+        "-e",
+        "--tfinal",
+        type=float,
+        help=Driver.describe("tfinal"),
+        dest="driver.tfinal",
+        metavar="T",
+    )
+    _run.add_argument(
+        "-f",
+        "--fold",
+        "--report-cadence",
+        type=int,
+        help=Report.describe("cadence"),
+        dest="driver.report.cadence",
+        metavar="F",
+    )
+    _run.add_argument(
+        "--checkpoint",
+        "-c",
+        type=float,
+        dest="driver.checkpoint.cadence",
+        metavar="C",
+    )
+    _run.add_argument(
+        "--timeseries",
+        "-t",
+        type=float,
+        dest="driver.timeseries.cadence",
+        metavar="T",
+    )
+    _run.add_argument(
+        "--data-layout",
+        type=str,
+        choices=Strategy.type_args("data_layout"),
+        help=Strategy.describe("data_layout"),
+        dest="strategy.data_layout",
+    )
+    _run.add_argument(
+        "--cache-prim",
+        action="store_true",
+        dest="strategy.cache_prim",
+        default=None,
+    )
+    _run.add_argument(
+        "--cache-flux",
+        action="store_true",
+        dest="strategy.cache_flux",
+        default=None,
+    )
+    _run.add_argument(
+        "--cache-grad",
+        action="store_true",
+        dest="strategy.cache_grad",
+        default=None,
+    )
+    return parser
 
 
 def main():

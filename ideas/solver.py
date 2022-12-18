@@ -8,9 +8,9 @@ from dataclasses import replace
 from logging import getLogger
 from math import prod
 from multiprocessing.pool import ThreadPool
-from numpy import array, zeros, logical_not, concatenate
 from typing import NamedTuple, Callable, Iterable
 
+from numpy import array, zeros, logical_not, concatenate
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
@@ -827,7 +827,6 @@ class State:
 class MacroState:
     def __init__(self, states: list[State]):
         self._states = states
-        self._total_zones = sum(s.total_zones for s in self._states)
 
     @property
     def primitive(self):
@@ -839,7 +838,7 @@ class MacroState:
 
     @property
     def total_zones(self):
-        return self._total_zones
+        return sum(s.total_zones for s in self._states)
 
     @property
     def iteration(self):
