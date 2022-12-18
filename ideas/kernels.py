@@ -187,25 +187,32 @@ def restype(f):
         return None
 
 
-def to_ctypes(args, signature):
+def to_cpu_args(args, signature):
     """
-    Return a generator that yields pointers from any ndarray arguments.
+    Return a generator that yields arguments suitable for args to a CPU kernel
     """
-    for arg, t in zip(args, signature):
-        if isinstance(arg, ndarray):
-            yield arg.ctypes.data_as(t)
-        elif isinstance(arg, Structure):
-            yield arg
+    for a, t in zip(args, signature):
+        if isinstance(a, ndarray):
+            yield a.ctypes.data_as(t)
+        elif isinstance(a, Structure):
+            yield a
         else:
-            yield arg
+            yield a
 
 
-def to_cupy_args(args):
-    for arg in args:
-        if isinstance(arg, Structure):
-            yield array(arg)
+def to_gpu_args(args):
+    """
+    Return a generator that yields arguments suitable for args to a GPU kernel
+    """
+    for a in args:
+        if isinstance(a, Structure):
+            # Note: array(a) should work in principle here, but it generates a
+            # warning due to a Python bug. See URL below:
+            #
+            # https://github.com/python/cpython/issues/54953
+            yield array(memoryview(a).tobytes())
         else:
-            yield arg
+            yield a
 
 
 class MissingFunction:
@@ -365,7 +372,7 @@ def cpu_extension_function(module, stub):
     @wraps(stub)
     def wrapper(*args):
         shape, pyargs = stub(*args)
-        cargs = to_ctypes(pyargs, c_func.argtypes)
+        cargs = to_cpu_args(pyargs, c_func.argtypes)
         return c_func(*cargs)
 
     wrapper.__cpu_func__ = c_func
@@ -400,7 +407,7 @@ def gpu_extension_function(module, stub):
             ni, nj, nk = shape
             nb = ((ni + ti - 1) // ti, (nj + tj - 1) // tj, (nk + tk - 1) // tk)
 
-        gpu_func(nb, bs, tuple(to_cupy_args(pyargs)))
+        gpu_func(nb, bs, tuple(to_gpu_args(pyargs)))
 
     wrapper.__gpu_func__ = gpu_func
     return wrapper
@@ -961,14 +968,6 @@ def main():
     # 6.
     #
     # Demonstrates how to pass data structure to a kernel function.
-    #
-    # Note: there is a warning generated when using this approach on the GPU,
-    # which is related to a Python bug. The ctypes struct should be converted
-    # manually to a numpy dtype, or the warning should be silenced, or ctypes
-    # structs should not be used by the module. Unfortunately the ctypes
-    # struct is more convenient to instantiate and more natural as a type-hint.
-    #
-    # https://stackoverflow.com/questions/4964101/pep-3118-warning-when-using-ctypes-array-as-numpy-array
     # ==============================================================================
 
     class MyStruct(Structure):
