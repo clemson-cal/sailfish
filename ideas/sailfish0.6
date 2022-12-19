@@ -680,12 +680,13 @@ def code(args=None, console=None, parser=None):
         )
         runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
 
+        console.width = 100
+
         for config, _ in runs:
             for code in native_code(config):
                 console.print(Syntax(code, "c", line_numbers=args._line_numbers))
                 if Prompt.ask(str()) in ("q", "quit"):
                     break
-                console.rule()
 
 
 def argument_parser():

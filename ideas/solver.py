@@ -101,8 +101,8 @@ class GradientEsimation:
         ii = -1 if self.transpose else 0
         iq = 0 if self.transpose else -1
 
-        if y.shape[iq] != nq or y.shape != g.shape:
-            raise ValueError("array has wrong number of fields")
+        # if y.shape[iq] != nq or y.shape != g.shape:
+        #     raise ValueError("array has wrong number of fields")
 
         return y.shape[ii], (y, g, plm, y.shape[ii])
 
@@ -871,6 +871,24 @@ def linear_shocktube(box):
     return p
 
 
+def cylindrical_shocktube(box):
+    """
+    A cylindrical shocktube setup
+    """
+
+    if box.dimensionality != 2:
+        raise ValueError("setup only works in 2d")
+
+    x, y = cell_centers(box)
+    l = x**2 + y**2 < 0.025
+    r = logical_not(l)
+    p = zeros(x.shape + (4,))
+    p[l] = [1.0, 0.0, 0.0, 1.000]
+    p[r] = [0.1, 0.0, 0.0, 0.125]
+
+    return p
+
+
 def cell_centers(box):
     if box.dimensionality == 1:
         ni = box.num_zones[0]
@@ -1004,7 +1022,7 @@ def patch_solver(
     if hardware == "cpu":
         import numpy as xp
 
-    nz = box.num_zones[0]
+    dim = box.dimensionality
     dx = box.grid_spacing[0]
     dt = dx * 1e-1
     p = xp.array(primitive)
@@ -1065,7 +1083,7 @@ def patch_solver(
     # the conserved data and an array of Godunov fluxes.
     # =========================================================================
     if cache_flux:
-        fh = xp.zeros_like(p)
+        fh = xp.zeros((dim,) + p.shape)
         u1 = xp.zeros_like(p)
         prim_to_cons(p, u1)
     else:
@@ -1087,7 +1105,7 @@ def patch_solver(
     # A buffer for the primitive field gradients if gradients are being cached
     # =========================================================================
     if cache_grad:
-        g1 = xp.zeros_like(p)  # gradients
+        g1 = xp.zeros((dim,) + p.shape)  # gradients
     else:
         g1 = None
 
@@ -1201,7 +1219,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     #         solvers.append(solver)
 
     box = b = config.domain
-    p = linear_shocktube(box)
+    p = cylindrical_shocktube(box)
     t = 0.0
     n = 0
 
