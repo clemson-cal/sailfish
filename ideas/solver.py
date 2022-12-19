@@ -774,18 +774,21 @@ def exchange_guard_zones(us):
         if i > 0:
             u[:+2] = us[i - 1][-4:-2]
         else:
-            u[:+2] = u[+2:+4]
+            u[:+2] = u[+2:+3]
         if i < len(us) - 1:
             u[-2:] = us[i + 1][+2:+4]
         else:
-            u[-2:] = u[-4:-2]
+            u[-2:] = u[-4:-3]
 
+        if len(u.shape) == 3:
+            u[+2:-2, :+2] = u[+2:-2, +2:+3]
+            u[+2:-2, -2:] = u[+2:-2, -4:-3]
 
-def outflow_single_patch(u):
-    u[:+2, +2:-2] = u[+2:+4, +2:-2]
-    u[-2:, +2:-2] = u[-4:-2, +2:-2]
-    u[+2:-2, :+2] = u[+2:-2, +2:+4]
-    u[+2:-2, -2:] = u[+2:-2, -4:-2]
+        if len(u.shape) == 4:
+            u[+2:-2, :+2, +2:-2] = u[+2:-2, +2:+3, +2:-2]
+            u[+2:-2, -2:, +2:-2] = u[+2:-2, -4:-3, +2:-2]
+            u[+2:-2, +2:-2, :+2] = u[+2:-2, +2:-2, +2:+3]
+            u[+2:-2, +2:-2, -2:] = u[+2:-2, +2:-2, -4:-3]
 
 
 class FillGuardZones:
@@ -793,13 +796,17 @@ class FillGuardZones:
         self.array = array
 
 
-class State:
+class PatchState:
     def __init__(self, n, t, u, box, to_user_prim):
         self._n = n
         self._t = t
         self._u = u
         self._box = box
         self._to_user_prim = to_user_prim
+
+    @property
+    def box(self):
+        return self._box
 
     @property
     def iteration(self):
@@ -822,9 +829,14 @@ class State:
         return cell_centers(self._box)
 
 
-class MacroState:
-    def __init__(self, states: list[State]):
+class State:
+    def __init__(self, box: CoordinateBox, states: list[PatchState]):
+        self._box = box
         self._states = states
+
+    @property
+    def box(self):
+        return self._box
 
     @property
     def primitive(self):
@@ -947,25 +959,63 @@ def subdivide(interval: tuple[int, int], num_parts: int):
 
 
 def extend_box(box: CoordinateBox, count: int):
-    ni = box.num_zones[0]
-    dx = box.grid_spacing[0]
-    x0 = box.extent_i[0] - count * dx
-    x1 = box.extent_i[1] + count * dx
-    return replace(box, extent_i=(x0, x1), num_zones=(ni + 2 * count, 1, 1))
+    extent = [box.extent_i, box.extent_j, box.extent_k]
+    num_zones = [1, 1, 1]
 
+    for a in range(3):
+        ni = box.num_zones[a]
+        dx = box.grid_spacing[a]
+        if ni > 1:
+            x0 = extent[a][0] - count * dx
+            x1 = extent[a][1] + count * dx
+            num_zones[a] = ni + 2 * count
+        else:
+            x0 = extent[a][0]
+            x1 = extent[a][1]
+            num_zones[a] = ni
+        extent[a] = (x0, x1)
 
-def extend_array(a: NDArray[float], count: int):
-    b = zeros([a.shape[0] + 2 * count, a.shape[1]])
-    b[count:-count] = a
-    return b
+    return replace(
+        box,
+        extent_i=extent[0],
+        extent_j=extent[1],
+        extent_k=extent[2],
+        num_zones=tuple(num_zones),
+    )
 
 
 def trim_box(box: CoordinateBox, count: int):
-    ni = box.num_zones[0]
-    dx = box.grid_spacing[0]
-    x0 = box.extent_i[0] + count * dx
-    x1 = box.extent_i[1] - count * dx
-    return replace(box, extent_i=(x0, x1), num_zones=(ni - 2 * count, 1, 1))
+    return extend_box(box, -count)
+
+
+def extend_array(a: NDArray[float], count: int):
+    ng = count
+    s = a.shape
+
+    if len(s) == 2:
+        b = zeros([s[0] + 2 * ng, s[1]])
+        b[ng:-ng] = a
+        return b
+    if len(s) == 3:
+        b = zeros([s[0] + 2 * ng, s[1] + 2 * ng, s[2]])
+        b[ng:-ng, ng:-ng] = a
+        return b
+    if len(s) == 4:
+        b = zeros([s[0] + 2 * ng, s[1] + 2 * ng, s[2] + 2 * ng, s[3]])
+        b[ng:-ng, ng:-ng, ng:-ng] = a
+        return b
+
+
+def trim_array(a: NDArray[float], count: int):
+    ng = count
+    s = a.shape
+
+    if len(s) == 2:
+        return a[ng:-ng]
+    if len(s) == 3:
+        return a[ng:-ng, ng:-ng]
+    if len(s) == 4:
+        return a[ng:-ng, ng:-ng, ng:-ng]
 
 
 def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
@@ -977,7 +1027,8 @@ def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
     for i0, i1 in subdivide((0, box.num_zones[0]), num_parts):
         x0 = box.extent_i[0] + dx * i0
         x1 = box.extent_i[0] + dx * i1
-        yield (i0, i1), replace(box, extent_i=(x0, x1), num_zones=(i1 - i0, 1, 1))
+        num_zones = (i1 - i0, *box.num_zones[1:])
+        yield (i0, i1), replace(box, extent_i=(x0, x1), num_zones=num_zones)
 
 
 class SolverKernels(NamedTuple):
@@ -1028,9 +1079,7 @@ def patch_solver(
     p = xp.array(primitive)
     t = time
     n = iteration
-    # interior_box = trim_box(box, 2)
-    # XXX
-    interior_box = box
+    interior_box = trim_box(box, 2)
 
     yield FillGuardZones(p)
 
@@ -1038,10 +1087,28 @@ def patch_solver(
     # Whether the data layout is transposed, i.e. adjacent memory locations are
     # the same field but in adjacent zones.
     # =========================================================================
-    standard_layout_view = lambda a: a.T if transpose else a
+    def standard_layout_view(a):
+        if not transpose:
+            return a
+        elif box.dimensionality == 1:
+            return a.transpose((1, 0))
+        elif box.dimensionality == 2:
+            return a.transpose((2, 0, 1))
+        elif box.dimensionality == 3:
+            return a.transpose((3, 0, 1, 2))
+
+    def transpose_layout_view(a):
+        if not transpose:
+            return a
+        elif box.dimensionality == 1:
+            return a.transpose((0, 1))
+        elif box.dimensionality == 2:
+            return a.transpose((1, 2, 0))
+        elif box.dimensionality == 3:
+            return a.transpose((1, 2, 3, 0))
 
     if transpose:
-        p = xp.ascontiguousarray(p.T)
+        p = xp.ascontiguousarray(transpose_layout_view(p))
 
     def cons_to_user_prim(u):
         """
@@ -1049,11 +1116,11 @@ def patch_solver(
         """
         p = xp.empty_like(u)
         cons_to_prim(u, p)
-        p = standard_layout_view(p)
+        p = trim_array(standard_layout_view(p), 2)
         try:
-            return p[2:-2].get()
+            return p.get()
         except AttributeError:
-            return p[2:-2]
+            return p
 
     # =========================================================================
     # Time integration scheme: fwd and rk1 should produce the same result, but
@@ -1111,7 +1178,7 @@ def patch_solver(
 
     del primitive, p  # p is no longer needed, will free memory if possible
 
-    yield State(n, t, u1, interior_box, cons_to_user_prim)
+    yield PatchState(n, t, u1, interior_box, cons_to_user_prim)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
@@ -1135,7 +1202,7 @@ def patch_solver(
 
         t += dt
         n += 1
-        yield State(n, t, u1, interior_box, cons_to_user_prim)
+        yield PatchState(n, t, u1, interior_box, cons_to_user_prim)
 
 
 def make_solver_kernels(config: Sailfish, native_code: bool = False):
@@ -1200,33 +1267,22 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     streams = list()
     solvers = list()
 
-    # XXX
-    # for (i0, i1), box in decompose(config.domain, num_patches):
-    #     if checkpoint:
-    #         p = checkpoint["primitive"][i0:i1]
-    #         t = checkpoint["time"]
-    #         n = checkpoint["iteration"]
-    #     else:
-    #         p = linear_shocktube(box)
-    #         t = 0.0
-    #         n = 0
-    #     p = extend_array(p, count=2)
-    #     b = extend_box(box, count=2)
+    for (i0, i1), box in decompose(config.domain, num_patches):
+        if checkpoint:
+            p = checkpoint["primitive"][i0:i1]
+            t = checkpoint["time"]
+            n = checkpoint["iteration"]
+        else:
+            p = linear_shocktube(box)
+            t = 0.0
+            n = 0
+        p = extend_array(p, count=2)
+        b = extend_box(box, count=2)
 
-    #     with (stream := make_stream(hardware, gpu_streams)):
-    #         solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
-    #         streams.append(stream)
-    #         solvers.append(solver)
-
-    box = b = config.domain
-    p = cylindrical_shocktube(box)
-    t = 0.0
-    n = 0
-
-    with (stream := make_stream(hardware, gpu_streams)):
-        solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
-        streams.append(stream)
-        solvers.append(solver)
+        with (stream := make_stream(hardware, gpu_streams)):
+            solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
+            streams.append(stream)
+            solvers.append(solver)
 
     def next_with(arg):
         context, gen = arg
@@ -1238,10 +1294,8 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         while True:
             events = list(pool.map(next_with, zip(streams, solvers)))
 
-            if type(events[0]) is State:
-                yield MacroState(events)
+            if type(events[0]) is PatchState:
+                yield State(config.domain, events)
 
             elif type(events[0]) is FillGuardZones:
-                # XXX
-                # exchange_guard_zones([e.array for e in events])
-                outflow_single_patch([e.array for e in events][0])
+                exchange_guard_zones([e.array for e in events])
