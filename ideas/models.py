@@ -211,6 +211,158 @@ class Sailfish:
     scheme: Scheme = Scheme()
 
 
+def parse_num_zones(arg):
+    """
+    Promote an integer or two-tuple to a three-tuple of integers
+
+    This factory function is used by the argparse type parameter to convert
+    user input to a domain.num_zones parameter.
+    """
+    res = tuple(int(i) for i in arg.split(","))
+
+    if len(res) == 1:
+        return res + (1, 1)
+    if len(res) == 2:
+        return res + (1,)
+    if len(res) == 3:
+        return res
+    raise ValueError(f"invalid argument for num_zones {arg}")
+
+
+def parse_reconstruction(arg):
+    """
+    Promote a string to a reconstruction model
+
+    This factory function is used by the argparse type parameter to convert
+    user input to a scheme.reconstruction parameter.
+    """
+    try:
+        mode, theta = arg.split(":")
+        return mode, float(theta)
+    except ValueError:
+        if arg == "plm":
+            return arg, 1.5
+        else:
+            return arg
+
+
+def add_config_arguments(parser: "argparser.ArgumentParser"):
+    """
+    Add arguments to a parser controlling a subset of a Sailfish config struct
+    """
+
+    parser.add_argument(
+        "--mode",
+        "--hardware",
+        dest="strategy.hardware",
+        choices=Strategy.type_args("hardware"),
+        help="execution mode",
+    )
+    parser.add_argument(
+        "-n",
+        "--num-zones",
+        "--resolution",
+        type=parse_num_zones,
+        dest="domain.num_zones",
+        metavar="N",
+    )
+    parser.add_argument(
+        "--patches",
+        type=int,
+        default=None,
+        metavar="P",
+        help=Strategy.describe("num_patches"),
+        dest="strategy.num_patches",
+    )
+    parser.add_argument(
+        "--threads",
+        type=int,
+        default=None,
+        metavar="T",
+        help=Strategy.describe("num_threads"),
+        dest="strategy.num_threads",
+    )
+    parser.add_argument(
+        "--streams",
+        type=str,
+        choices=Strategy.type_args("gpu_streams"),
+        metavar="S",
+        help=Strategy.describe("gpu_streams"),
+        dest="strategy.gpu_streams",
+    )
+    parser.add_argument(
+        "-m",
+        "--time-integration",
+        choices=Scheme.type_args("time_integration"),
+        help=Scheme.describe("time_integration"),
+        dest="scheme.time_integration",
+    )
+    parser.add_argument(
+        "-r",
+        "--reconstruction",
+        type=parse_reconstruction,
+        help=Scheme.describe("reconstruction"),
+        dest="scheme.reconstruction",
+        metavar="R",
+    )
+    parser.add_argument(
+        "-e",
+        "--tfinal",
+        type=float,
+        help=Driver.describe("tfinal"),
+        dest="driver.tfinal",
+        metavar="T",
+    )
+    parser.add_argument(
+        "-f",
+        "--fold",
+        "--report-cadence",
+        type=int,
+        help=Report.describe("cadence"),
+        dest="driver.report.cadence",
+        metavar="F",
+    )
+    parser.add_argument(
+        "--checkpoint",
+        "-c",
+        type=float,
+        dest="driver.checkpoint.cadence",
+        metavar="C",
+    )
+    parser.add_argument(
+        "--timeseries",
+        "-t",
+        type=float,
+        dest="driver.timeseries.cadence",
+        metavar="T",
+    )
+    parser.add_argument(
+        "--data-layout",
+        type=str,
+        choices=Strategy.type_args("data_layout"),
+        help=Strategy.describe("data_layout"),
+        dest="strategy.data_layout",
+    )
+    parser.add_argument(
+        "--cache-prim",
+        action="store_true",
+        dest="strategy.cache_prim",
+        default=None,
+    )
+    parser.add_argument(
+        "--cache-flux",
+        action="store_true",
+        dest="strategy.cache_flux",
+        default=None,
+    )
+    parser.add_argument(
+        "--cache-grad",
+        action="store_true",
+        dest="strategy.cache_grad",
+        default=None,
+    )
+
+
 if __name__ == "__main__":
     from rich.console import Console
     from rich.live import Live

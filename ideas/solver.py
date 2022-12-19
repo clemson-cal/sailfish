@@ -10,7 +10,7 @@ from math import prod
 from multiprocessing.pool import ThreadPool
 from typing import NamedTuple, Callable, Iterable
 
-from numpy import array, zeros, logical_not, concatenate
+from numpy import array, zeros, logical_not, concatenate, linspace, meshgrid, where
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
@@ -44,11 +44,14 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 @kernel_class
 class GradientEsimation:
-    def __init__(self, nfields, transpose, reconstruction):
-        plm_theta = reconstruction[1] if type(reconstruction) is tuple else 0.0
-        self.nfields = nfields
-        self.transpose = transpose
-        self.plm_theta = plm_theta
+    def __init__(self, config: Sailfish):
+        self.nfields = config.domain.dimensionality + 2
+        self.transpose = config.strategy.transpose
+        self.plm_theta = (
+            config.scheme.reconstruction[1]
+            if type(config.scheme.reconstruction) is tuple
+            else 0.0
+        )
 
     @property
     def define_macros(self):
@@ -106,9 +109,9 @@ class GradientEsimation:
 
 @kernel_class
 class Fields:
-    def __init__(self, dim, transpose):
-        self.dim = dim
-        self.transpose = transpose
+    def __init__(self, config: Sailfish):
+        self.dim = config.domain.dimensionality
+        self.transpose = config.strategy.transpose
 
     @property
     def define_macros(self):
@@ -213,45 +216,35 @@ class Scheme:
     Godunov scheme using method-of-lines and many strategy modes
     """
 
-    def __init__(
-        self,
-        dim: int,
-        transpose: bool,
-        reconstruction: Reconstruction,
-        time_integration: str,
-        cache_prim: bool,
-        cache_grad: bool,
-    ):
-        if dim != 1:
-            raise NotImplementedError
-
+    def __init__(self, config: Sailfish):
         device_funcs = list()
         define_macros = dict()
-        define_macros["DIM"] = dim
-        define_macros["TRANSPOSE"] = int(transpose)
-        define_macros["CACHE_PRIM"] = int(cache_prim)
-        define_macros["CACHE_GRAD"] = int(cache_grad)
-        define_macros["USE_RK"] = int(time_integration != "fwd")
+        define_macros["DIM"] = config.domain.dimensionality
+        define_macros["TRANSPOSE"] = int(config.strategy.transpose)
+        define_macros["CACHE_PRIM"] = int(config.strategy.cache_prim)
+        define_macros["CACHE_GRAD"] = int(config.strategy.cache_grad)
+        define_macros["USE_RK"] = int(config.scheme.time_integration != "fwd")
+        r = config.scheme.reconstruction
 
-        if type(reconstruction) is str:
-            mode, plm_theta = reconstruction, 0.0
+        if type(r) is str:
+            mode, plm_theta = r, 0.0
             define_macros["USE_PLM"] = 0
 
-        if type(reconstruction) is tuple:
-            mode, plm_theta = reconstruction
+        if type(r) is tuple:
+            mode, plm_theta = r
             define_macros["USE_PLM"] = 1
-            if not cache_grad:
+            if not config.strategy.cache_grad:
                 device_funcs.append(plm_minmod)
 
-        if not cache_prim:
+        if not config.strategy.cache_prim:
             device_funcs.append(cons_to_prim)
 
         device_funcs.append(riemann_hlle)
         device_funcs.append(self._godunov_fluxes)
 
-        self._dim = dim
+        self._dim = config.domain.dimensionality
         self._plm_theta = plm_theta
-        self._transpose = transpose
+        self._transpose = config.strategy.transpose
         self._define_macros = define_macros
         self._device_funcs = device_funcs
 
@@ -485,7 +478,6 @@ class Scheme:
                 #endif
 
                 #if DIM >= 2
-                double gm[NCONS];
                 _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -494,7 +486,6 @@ class Scheme:
                 #endif
 
                 #if DIM >= 3
-                double hm[NCONS];
                 _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
                 for (int q = 0; q < NCONS; ++q)
                 {
@@ -795,6 +786,10 @@ class FillGuardZones:
         self.array = array
 
 
+# class NativeCode(list):
+#     pass
+
+
 class State:
     def __init__(self, n, t, u, box, to_user_prim):
         self._n = n
@@ -849,27 +844,60 @@ class MacroState:
         return self._states[0].time
 
 
-def linear_shocktube(x):
+def linear_shocktube(box):
     """
     A linear shocktube setup
     """
 
-    l = x < 0.5
-    r = logical_not(l)
-    p = zeros(x.shape + (3,))
-    p[l, :] = [1.0, 0.0, 1.000]
-    p[r, :] = [0.1, 0.0, 0.125]
+    if box.dimensionality == 1:
+        x = cell_centers(box)
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [1.0, 0.0, 1.000]
+        p[r] = [0.1, 0.0, 0.125]
+
+    if box.dimensionality == 2:
+        x, y = cell_centers(box)
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (4,))
+        p[l] = [1.0, 0.0, 0.0, 1.000]
+        p[r] = [1.0, 0.0, 0.0, 1.000]
+
     return p
 
 
-def cell_centers_1d(box):
-    from numpy import linspace
+def cell_centers(box):
+    if box.dimensionality == 1:
+        ni = box.num_zones[0]
+        x0, x1 = box.extent_i
+        xv = linspace(x0, x1, ni + 1)
+        xc = 0.5 * (xv[1:] + xv[:-1])
+        return xc
 
-    ni = box.num_zones[0]
-    x0, x1 = box.extent_i
-    xv = linspace(x0, x1, ni + 1)
-    xc = 0.5 * (xv[1:] + xv[:-1])
-    return xc
+    if box.dimensionality == 2:
+        ni, nj = box.num_zones[0:2]
+        x0, x1 = box.extent_i
+        y0, y1 = box.extent_j
+        xv = linspace(x0, x1, ni + 1)
+        yv = linspace(y0, y1, nj + 1)
+        xc = 0.5 * (xv[1:] + xv[:-1])
+        yc = 0.5 * (yv[1:] + yv[:-1])
+        return meshgrid(xc, yc, indexing="ij")
+
+    if box.dimensionality == 3:
+        ni, nj, nk = box.num_zones
+        x0, x1 = box.extent_i
+        y0, y1 = box.extent_j
+        z0, z1 = box.extent_k
+        xv = linspace(x0, x1, ni + 1)
+        yv = linspace(y0, y1, nj + 1)
+        zv = linspace(z0, z1, nk + 1)
+        xc = 0.5 * (xv[1:] + xv[:-1])
+        yc = 0.5 * (yv[1:] + yv[:-1])
+        zc = 0.5 * (zv[1:] + zv[:-1])
+        return meshgrid(xc, yc, zc, indexing="ij")
 
 
 def partition(elements: int, num_parts: int):
@@ -957,6 +985,7 @@ def patch_solver(
     cache_flux = strategy.cache_flux
     cache_prim = strategy.cache_prim
     cache_grad = strategy.cache_grad
+    time_integration = scheme.time_integration
 
     (
         plm_gradient,
@@ -1005,16 +1034,16 @@ def patch_solver(
 
     # =========================================================================
     # Time integration scheme: fwd and rk1 should produce the same result, but
-    # rk1 can be used to test the expense of the data which is not required for
-    # fwd.
+    # rk1 can be used to test the expense of caching the conserved variables,
+    # which is not required for fwd.
     # =========================================================================
-    if scheme.time_integration == "fwd":
+    if time_integration == "fwd":
         rks = []
-    elif scheme.time_integration == "rk1":
+    elif time_integration == "rk1":
         rks = [0.0]
-    elif scheme.time_integration == "rk2":
+    elif time_integration == "rk2":
         rks = [0.0, 0.5]
-    elif scheme.time_integration == "rk3":
+    elif time_integration == "rk3":
         rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
 
     # =========================================================================
@@ -1026,9 +1055,9 @@ def patch_solver(
         u0 = None
 
     # =========================================================================
-    # Buffers for either read-and-write conserved arrays (if single-step update,
-    # i.e. no cache-flux is used) or buffers for the conserved data and an array
-    # of Godunov fluxes.
+    # Buffers for either read-only and write-only conserved arrays if
+    # single-step update (i.e. no cache-flux is used) or otherwise buffers for
+    # the conserved data and an array of Godunov fluxes.
     # =========================================================================
     if cache_flux:
         fh = xp.zeros_like(p)
@@ -1086,31 +1115,30 @@ def patch_solver(
         yield State(n, t, u1, interior_box, cons_to_user_prim)
 
 
-def make_solver_kernels(
-    transpose: bool,
-    cache_prim: bool,
-    cache_grad: bool,
-    reconstruction: Reconstruction,
-    time_integration: str,
-):
-    grad_est = GradientEsimation(3, transpose, reconstruction)
-    fields = Fields(1, transpose)
-    scheme = Scheme(
-        1,
-        transpose,
-        reconstruction,
-        time_integration,
-        cache_prim,
-        cache_grad,
-    )
-    return SolverKernels(
-        grad_est.plm_gradient,
-        scheme.update_cons,
-        scheme.update_cons_from_fluxes,
-        scheme.godunov_fluxes,
-        fields.prim_to_cons_array,
-        fields.cons_to_prim_array,
-    )
+def make_solver_kernels(config: Sailfish, native_code: bool = False):
+    """
+    Build and return kernels needed by solver, or just the native code
+    """
+    nfields = config.domain.dimensionality + 2
+    grad_est = GradientEsimation(config)
+    fields = Fields(config)
+    scheme = Scheme(config)
+
+    if native_code:
+        return (
+            grad_est.__native_code__,
+            fields.__native_code__,
+            scheme.__native_code__,
+        )
+    else:
+        return SolverKernels(
+            grad_est.plm_gradient,
+            scheme.update_cons,
+            scheme.update_cons_from_fluxes,
+            scheme.godunov_fluxes,
+            fields.prim_to_cons_array,
+            fields.cons_to_prim_array,
+        )
 
 
 def make_stream(hardware: str, gpu_streams: str):
@@ -1125,18 +1153,18 @@ def make_stream(hardware: str, gpu_streams: str):
             return Stream()
 
 
+def native_code(config: Sailfish):
+    """
+    Return a list of native code strings used by kernel classes
+    """
+    return make_solver_kernels(config, native_code=True)
+
+
 def make_solver(config: Sailfish, checkpoint: dict = None):
     """
     Construct the 1d solver from a config instance
     """
-    kernels = make_solver_kernels(
-        config.strategy.transpose,
-        config.strategy.cache_prim,
-        config.strategy.cache_grad,
-        config.scheme.reconstruction,
-        config.scheme.time_integration,
-    )
-    for kernel in kernels:
+    for kernel in (kernels := make_solver_kernels(config)):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
     strategy = config.strategy
@@ -1155,8 +1183,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             t = checkpoint["time"]
             n = checkpoint["iteration"]
         else:
-            x = cell_centers_1d(box)
-            p = linear_shocktube(x)
+            p = linear_shocktube(box)
             t = 0.0
             n = 0
         p = extend_array(p, count=2)
@@ -1166,6 +1193,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
             streams.append(stream)
             solvers.append(solver)
+
 
     def next_with(arg):
         context, gen = arg

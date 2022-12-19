@@ -249,6 +249,10 @@ class MissingModule:
         return MissingFunction(self._error)
 
 
+def define_macros_string(define_macros):
+    return ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
+
+
 def cpu_extension(code, name, define_macros=list()):
     """
     Either build or load a CPU extension module with the given code and name.
@@ -279,7 +283,7 @@ def cpu_extension(code, name, define_macros=list()):
     sha.update(code.encode("utf-8"))
     sha.update(str(define_macros).encode("utf-8"))
     cache_dir = join(dirname(__file__), "__pycache__", sha.hexdigest())
-    define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
+    define_str = define_macros_string(define_macros)
 
     try:
         from cffi import FFI, VerificationError
@@ -338,7 +342,7 @@ def gpu_extension(code, name, define_macros=list()):
 
         code = KERNEL_DEFINE_MACROS_GPU + code
         options = tuple(f"-D {k}={v}" for k, v in define_macros)
-        define_str = ", ".join(f"{k.lower()}={v}" for k, v in define_macros)
+        define_str = define_macros_string(define_macros)
         module = RawModule(code=code, options=options)
         module.compile()
         logger.info(f"compile GPU module {name}[{define_str}]")
@@ -581,7 +585,7 @@ def kernel_function(code: str = None, device_funcs=list(), define_macros=list())
             k.require_compiled()
             return k._func(*args, exec_mode=exec_mode)
 
-        wrapper.__kernel_data = k
+        wrapper.__kernel_data__ = k
         return wrapper
 
     return decorator
@@ -632,8 +636,8 @@ def kernel_class(cls):
         define_macros = list()
 
         for k in dir(self):
-            if hasattr(getattr(self, k), "__kernel_data"):
-                kernel_data = getattr(self, k).__kernel_data
+            if hasattr(getattr(self, k), "__kernel_data__"):
+                kernel_data = getattr(self, k).__kernel_data__
                 kernel_code += kernel_data.kernel_code()
                 device_funcs += kernel_data.device_funcs()
                 define_macros += kernel_data.define_macros()
@@ -645,8 +649,9 @@ def kernel_class(cls):
         if m := getattr(self, "define_macros", None):
             define_macros += m if type(m) is list else list(m.items())
 
-        code = static + collate_source_code(device_funcs) + kernel_code
         name = cls.__name__
+        comment = f"// {name}({define_macros_string(define_macros)})"
+        code = comment + static + collate_source_code(device_funcs) + kernel_code
         cpu_module = cpu_extension(code, name, define_macros)
         gpu_module = gpu_extension(code, name, define_macros)
 
@@ -654,6 +659,8 @@ def kernel_class(cls):
             k = kernel_data.copy()
             k.inject_modules(cpu_module, gpu_module)
             setattr(self, key, wrap_method(self, k))
+
+        self.__native_code__ = code
 
     cls.__init__ = __init__
     return cls

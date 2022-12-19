@@ -14,7 +14,7 @@ from logging import getLogger
 from sys import argv
 from typing import Any
 
-from models import Sailfish, Driver, Report, Strategy, Scheme, Checkpoint
+from models import Sailfish, add_config_arguments
 from system import system_info
 
 
@@ -90,7 +90,7 @@ def timeseries(config, state, timeseries, event_states):
     return f"timeseries {number}"
 
 
-def checkpoint(config, state, timeseries, event_states):
+def checkpoint(config: Sailfish, state, timeseries, event_states):
     if config.driver.checkpoint.format == "none":
         return "skip checkpoint (format=none)"
 
@@ -269,6 +269,9 @@ def summaries_table(summaries: list[run_summary]):
 
 
 def checkpoints_table(checkpoints: list[str]):
+    """
+    Render a table of checkpoint filenames
+    """
     from rich.columns import Columns
     from rich.panel import Panel
 
@@ -280,6 +283,12 @@ def checkpoints_table(checkpoints: list[str]):
 
 
 def dashboard(console, screen=False):
+    """
+    A rich dashboard that displays key run information without scrollback
+
+    NOTE: The dashboard can have a measurable effect on the code performance,
+    so make sure not to use it for recording code perforamance.
+    """
     from rich.live import Live
     from rich.pretty import Pretty
     from rich.progress import Progress
@@ -383,41 +392,6 @@ def plot():
 def no_plot():
     while True:
         yield
-
-
-def parse_num_zones(arg):
-    """
-    Promote an integer or two-tuple to a three-tuple of integers
-
-    This factory function is used by the argparse type parameter to convert
-    user input to a domain.num_zones parameter.
-    """
-    res = tuple(int(i) for i in arg.split(","))
-
-    if len(res) == 1:
-        return res + (1, 1)
-    if len(res) == 2:
-        return res + (1,)
-    if len(res) == 3:
-        return res
-    raise ValueError(f"invalid argument for num_zones {arg}")
-
-
-def parse_reconstruction(arg):
-    """
-    Promote a string to a reconstruction model
-
-    This factory function is used by the argparse type parameter to convert
-    user input to a scheme.reconstruction parameter.
-    """
-    try:
-        mode, theta = arg.split(":")
-        return mode, float(theta)
-    except ValueError:
-        if arg == "plm":
-            return arg, 1.5
-        else:
-            return arg
 
 
 def deep_update(d, u):
@@ -548,159 +522,50 @@ def run(args=None, console=None, parser=None):
             action="store_true",
             help="dump a JSON object with run summaries",
         )
-        parser.add_argument(
-            "--mode",
-            "--hardware",
-            dest="strategy.hardware",
-            choices=Strategy.type_args("hardware"),
-            help="execution mode",
-        )
-        parser.add_argument(
-            "-n",
-            "--num-zones",
-            "--resolution",
-            type=parse_num_zones,
-            dest="domain.num_zones",
-            metavar="N",
-        )
-        parser.add_argument(
-            "--patches",
-            type=int,
-            default=None,
-            metavar="P",
-            help=Strategy.describe("num_patches"),
-            dest="strategy.num_patches",
-        )
-        parser.add_argument(
-            "--threads",
-            type=int,
-            default=None,
-            metavar="T",
-            help=Strategy.describe("num_threads"),
-            dest="strategy.num_threads",
-        )
-        parser.add_argument(
-            "--streams",
-            type=str,
-            choices=Strategy.type_args("gpu_streams"),
-            metavar="S",
-            help=Strategy.describe("gpu_streams"),
-            dest="strategy.gpu_streams",
-        )
-        parser.add_argument(
-            "-m",
-            "--time-integration",
-            choices=Scheme.type_args("time_integration"),
-            help=Scheme.describe("time_integration"),
-            dest="scheme.time_integration",
-        )
-        parser.add_argument(
-            "-r",
-            "--reconstruction",
-            type=parse_reconstruction,
-            help=Scheme.describe("reconstruction"),
-            dest="scheme.reconstruction",
-            metavar="R",
-        )
-        parser.add_argument(
-            "-e",
-            "--tfinal",
-            type=float,
-            help=Driver.describe("tfinal"),
-            dest="driver.tfinal",
-            metavar="T",
-        )
-        parser.add_argument(
-            "-f",
-            "--fold",
-            "--report-cadence",
-            type=int,
-            help=Report.describe("cadence"),
-            dest="driver.report.cadence",
-            metavar="F",
-        )
-        parser.add_argument(
-            "--checkpoint",
-            "-c",
-            type=float,
-            dest="driver.checkpoint.cadence",
-            metavar="C",
-        )
-        parser.add_argument(
-            "--timeseries",
-            "-t",
-            type=float,
-            dest="driver.timeseries.cadence",
-            metavar="T",
-        )
-        parser.add_argument(
-            "--data-layout",
-            type=str,
-            choices=Strategy.type_args("data_layout"),
-            help=Strategy.describe("data_layout"),
-            dest="strategy.data_layout",
-        )
-        parser.add_argument(
-            "--cache-prim",
-            action="store_true",
-            dest="strategy.cache_prim",
-            default=None,
-        )
-        parser.add_argument(
-            "--cache-flux",
-            action="store_true",
-            dest="strategy.cache_flux",
-            default=None,
-        )
-        parser.add_argument(
-            "--cache-grad",
-            action="store_true",
-            dest="strategy.cache_grad",
-            default=None,
-        )
-        return
+        config = parser.add_argument_group("config")
+        add_config_arguments(config)
 
-    # -------------------------------------------------------------------------
-    # Do the run
-    # -------------------------------------------------------------------------
-    overrides = unflatten(
-        {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
-    )
-    runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
-    summaries = list()
+    else:
+        overrides = unflatten(
+            {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
+        )
+        runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
+        summaries = list()
 
-    try:
-        if args._dash:
-            monitor = dashboard(console, args._screen)
-        else:
-            monitor = scrollback(console.print)
-        if args._plot:
-            plotter = plot()
-        else:
-            plotter = no_plot()
+        try:
+            if args._dash:
+                monitor = dashboard(console, args._screen)
+            else:
+                monitor = scrollback(console.print)
+            if args._plot:
+                plotter = plot()
+            else:
+                plotter = no_plot()
 
-        next(monitor)
-        next(plotter)
+            next(monitor)
+            next(plotter)
 
-        for event in drive(runs):
-            monitor.send(event)
-            plotter.send(event)
+            for event in drive(runs):
+                monitor.send(event)
+                plotter.send(event)
 
-            if type(event) is run_summary:
-                summaries.append(asdict(event))
+                if type(event) is run_summary:
+                    summaries.append(asdict(event))
 
-    except Exception:
-        monitor.close()
-        plotter.close()
-        console.print_exception()
+        except Exception:
+            monitor.close()
+            plotter.close()
+            console.print_exception(show_locals=True)
 
-    finally:
-        if args._dump_summaries:
-            fname = datetime.now().strftime("%m-%d-%Y-%H%M.json")
-            dump = dict(cmdline=argv, summaries=summaries, system_info=system_info())
-            with open(fname, "w") as outf:
-                console.print(f"write summaries to {fname}")
-                dump_json(dump, outf, indent=4)
+        finally:
+            if args._dump_summaries:
+                fname = datetime.now().strftime("%m-%d-%Y-%H%M.json")
+                dump = dict(
+                    cmdline=argv, summaries=summaries, system_info=system_info()
+                )
+                with open(fname, "w") as outf:
+                    console.print(f"write summaries to {fname}")
+                    dump_json(dump, outf, indent=4)
 
 
 def doc(args=None, console=None, parser=None):
@@ -711,36 +576,35 @@ def doc(args=None, console=None, parser=None):
 
     if parser:
         parser.add_argument("topic", nargs="?", choices=choices)
-        return
+    else:
+        from inspect import getsource
+        from textwrap import dedent
+        from kernels import main as kernels_main
+        from rich.markdown import Markdown
+        from rich.syntax import Syntax
+        from rich.text import Text
+        from rich.prompt import Prompt, DefaultType
 
-    from inspect import getsource
-    from textwrap import dedent
-    from kernels import main as kernels_main
-    from rich.markdown import Markdown
-    from rich.syntax import Syntax
-    from rich.text import Text
-    from rich.prompt import Prompt, DefaultType
+        console.width = 100
 
-    console.width = 100
+        if (topic := args.topic) is None:
+            topics = "# __Topics__"
+            for choice in choices:
+                topics += f"\n- {choice}"
+            topics += "\n-----------"
 
-    if (topic := args.topic) is None:
-        topics = "# __Topics__"
-        for choice in choices:
-            topics += f"\n- {choice}"
-        topics += "\n-----------"
+            console.print(Markdown(topics))
+            topic = Prompt.ask("select", choices=choices, show_choices=False)
+            console.print("\n\n")
 
-        console.print(Markdown(topics))
-        topic = Prompt.ask("select", choices=choices, show_choices=False)
-        console.print("\n\n")
-
-    if topic == "models":
-        console.print(Driver())
-        console.print("\n\n")
-        console.print(Strategy())
-        console.print("\n\n")
-        console.print(Scheme())
-    if topic == "kernels":
-        console.print(Syntax(getsource(kernels_main), lexer="python"))
+        if topic == "models":
+            console.print(Driver())
+            console.print("\n\n")
+            console.print(Strategy())
+            console.print("\n\n")
+            console.print(Scheme())
+        if topic == "kernels":
+            console.print(Syntax(getsource(kernels_main), lexer="python"))
 
 
 def dep(args=None, console=None, parser=None):
@@ -748,31 +612,33 @@ def dep(args=None, console=None, parser=None):
     Display application dependencies
     """
     if parser:
-        return
+        pass
+    else:
+        from importlib import import_module
+        from rich.table import Table
+        from rich import box
 
-    from importlib import import_module
-    from rich.table import Table
-    from rich import box
+        def have(m):
+            try:
+                import_module(m)
+                return "[green]yes"
+            except ImportError:
+                return "[red]no"
 
-    def have(m):
-        try:
-            import_module(m)
-            return "[green]yes"
-        except ImportError:
-            return "[red]no"
-
-    table = Table(box=box.MINIMAL)
-    table.add_column("module")
-    table.add_column("present")
-    table.add_column("required for")
-    table.add_column("pip3 install --user")
-    table.add_row("[blue]pydantic", have("pydantic"), "everything", "pydantic")
-    table.add_row("[blue]numpy", have("numpy"), "everything", "numpy")
-    table.add_row("[blue]cupy", have("cupy"), "GPU acceleration", "cupy-cuda116")
-    table.add_row("[blue]cffi", have("cffi"), "CPU native code", "cffi")
-    table.add_row("[blue]rich", have("rich"), "formatted output", "rich")
-    table.add_row("[blue]cpuinfo", have("cpuinfo"), "detailed CPU info", "py-cpuinfo")
-    console.print(table)
+        table = Table(box=box.MINIMAL)
+        table.add_column("module")
+        table.add_column("present")
+        table.add_column("required for")
+        table.add_column("pip3 install --user")
+        table.add_row("[blue]pydantic", have("pydantic"), "everything", "pydantic")
+        table.add_row("[blue]numpy", have("numpy"), "everything", "numpy")
+        table.add_row("[blue]cupy", have("cupy"), "GPU acceleration", "cupy-cuda116")
+        table.add_row("[blue]cffi", have("cffi"), "CPU native code", "cffi")
+        table.add_row("[blue]rich", have("rich"), "formatted output", "rich")
+        table.add_row(
+            "[blue]cpuinfo", have("cpuinfo"), "detailed CPU info", "py-cpuinfo"
+        )
+        console.print(table)
 
 
 def sys(args=None, console=None, parser=None):
@@ -780,8 +646,41 @@ def sys(args=None, console=None, parser=None):
     Show platform information
     """
     if parser:
-        return
-    console.print(system_info())
+        pass
+    else:
+        console.print(system_info())
+
+
+def code(args=None, console=None, parser=None):
+    """
+    Display generated native code in use by solver kernels
+    """
+    if parser:
+        parser.add_argument(
+            "_configs",
+            metavar="configs",
+            nargs="*",
+            default=[dict()],
+            help="sequence of configuration files, checkpoints, or preset/setup names",
+        )
+        parser.add_argument("--line-numbers", dest="_line_numbers", action="store_true")
+
+    else:
+        from solver import native_code
+        from rich.syntax import Syntax
+        from rich.prompt import Prompt
+
+        overrides = unflatten(
+            {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
+        )
+        runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
+
+        for config, _ in runs:
+            for code in native_code(config):
+                console.print(Syntax(code, "c", line_numbers=args._line_numbers))
+                if Prompt.ask(str()) in ("q", "quit"):
+                    break
+                console.rule()
 
 
 def argument_parser():
@@ -793,7 +692,7 @@ def argument_parser():
         usage=SUPPRESS,
         description="sailfish is a GPU-accelerated astrophysical gasdynamics code",
     )
-    parser.set_defaults(_command="help")
+    parser.set_defaults(_command=None)
     parser.add_argument(
         "--log-level",
         dest="_log_level",
@@ -807,16 +706,19 @@ def argument_parser():
     _doc = subparsers.add_parser("doc", usage=SUPPRESS, help=doc.__doc__)
     _dep = subparsers.add_parser("dep", usage=SUPPRESS, help=dep.__doc__)
     _run = subparsers.add_parser("run", usage=SUPPRESS, help=run.__doc__)
+    _code = subparsers.add_parser("code", usage=SUPPRESS, help=code.__doc__)
 
     _sys.set_defaults(_command=sys)
     _doc.set_defaults(_command=doc)
     _dep.set_defaults(_command=dep)
     _run.set_defaults(_command=run)
+    _code.set_defaults(_command=code)
 
     sys(parser=_sys)
     doc(parser=_doc)
     dep(parser=_dep)
     run(parser=_run)
+    code(parser=_code)
 
     return parser
 
@@ -828,7 +730,11 @@ def main():
     parser = argument_parser()
     args = parser.parse_args()
     console = init_logging(args._log_level)
-    args._command(args, console)
+
+    if args._command:
+        args._command(args, console)
+    else:
+        parser.print_help()
 
 
 if __name__ == "__main__":
