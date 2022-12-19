@@ -385,7 +385,24 @@ def plot():
         if type(event) is run_summary:
             if plt.get_fignums():
                 ax1 = fig.add_subplot(111)
-                ax1.plot(state.zone_centers, state.primitive[:, 0], "-o", mfc="none")
+                if state.box.dimensionality == 1:
+                    ax1.plot(
+                        state.cell_centers,
+                        state.primitive[:, 0],
+                        "-o",
+                        mfc="none",
+                    )
+                if state.box.dimensionality == 2:
+                    x, y = state.cell_centers
+                    z = state.primitive[:, :, 0]
+                    ax1.pcolormesh(
+                        x[2:-2, 2:-2],
+                        y[2:-2, 2:-2],
+                        z[2:-2, 2:-2],
+                        vmin=None,
+                        vmax=None,
+                    )
+                    ax1.set_aspect("equal")
                 plt.show()
 
 
@@ -555,7 +572,7 @@ def run(args=None, console=None, parser=None):
         except Exception:
             monitor.close()
             plotter.close()
-            console.print_exception(show_locals=True)
+            console.print_exception(show_locals=False)
 
         finally:
             if args._dump_summaries:
@@ -675,12 +692,13 @@ def code(args=None, console=None, parser=None):
         )
         runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
 
+        console.width = 100
+
         for config, _ in runs:
             for code in native_code(config):
                 console.print(Syntax(code, "c", line_numbers=args._line_numbers))
                 if Prompt.ask(str()) in ("q", "quit"):
                     break
-                console.rule()
 
 
 def argument_parser():
