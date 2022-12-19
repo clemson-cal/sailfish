@@ -195,10 +195,6 @@ class Fields:
         """
         nq = self.dim + 2
         iq = 0 if self.transpose else -1
-
-        if p.shape[iq] != nq or p.shape != u.shape:
-            raise ValueError("array has wrong number of fields")
-
         return p.size // nq, (p, u, p.size // nq)
 
 
@@ -1093,7 +1089,7 @@ def patch_solver(
         if not transpose:
             return a
         elif box.dimensionality == 1:
-            return a.transpose((0, 1))
+            return a.transpose((1, 0))
         elif box.dimensionality == 2:
             return a.transpose((1, 2, 0))
         elif box.dimensionality == 3:
