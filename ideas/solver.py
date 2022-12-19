@@ -100,10 +100,6 @@ class GradientEsimation:
         nq = self.nfields
         ii = -1 if self.transpose else 0
         iq = 0 if self.transpose else -1
-
-        # if y.shape[iq] != nq or y.shape != g.shape:
-        #     raise ValueError("array has wrong number of fields")
-
         return y.shape[ii], (y, g, plm, y.shape[ii])
 
 
@@ -159,10 +155,6 @@ class Fields:
         """
         nq = self.dim + 2
         iq = 0 if self.transpose else -1
-
-        if u.shape[iq] != nq or u.shape != p.shape:
-            raise ValueError("array has wrong number of fields")
-
         return u.size // nq, (u, p, u.size // nq)
 
     @kernel
