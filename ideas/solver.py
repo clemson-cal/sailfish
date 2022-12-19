@@ -781,13 +781,16 @@ def exchange_guard_zones(us):
             u[-2:] = u[-4:-2]
 
 
+def outflow_single_patch(u):
+    u[:+2, +2:-2] = u[+2:+4, +2:-2]
+    u[-2:, +2:-2] = u[-4:-2, +2:-2]
+    u[+2:-2, :+2] = u[+2:-2, +2:+4]
+    u[+2:-2, -2:] = u[+2:-2, -4:-2]
+
+
 class FillGuardZones:
     def __init__(self, array):
         self.array = array
-
-
-# class NativeCode(list):
-#     pass
 
 
 class State:
@@ -815,8 +818,8 @@ class State:
         return prod(self._box.num_zones)
 
     @property
-    def zone_centers(self):
-        return cell_centers_1d(self._box)
+    def cell_centers(self):
+        return cell_centers(self._box)
 
 
 class MacroState:
@@ -828,8 +831,8 @@ class MacroState:
         return concatenate([s.primitive for s in self._states])
 
     @property
-    def zone_centers(self):
-        return concatenate([s.zone_centers for s in self._states])
+    def cell_centers(self):
+        return concatenate([s.cell_centers for s in self._states])
 
     @property
     def total_zones(self):
@@ -863,7 +866,7 @@ def linear_shocktube(box):
         r = logical_not(l)
         p = zeros(x.shape + (4,))
         p[l] = [1.0, 0.0, 0.0, 1.000]
-        p[r] = [1.0, 0.0, 0.0, 1.000]
+        p[r] = [0.1, 0.0, 0.0, 0.125]
 
     return p
 
@@ -1007,7 +1010,9 @@ def patch_solver(
     p = xp.array(primitive)
     t = time
     n = iteration
-    interior_box = trim_box(box, 2)
+    # interior_box = trim_box(box, 2)
+    # XXX
+    interior_box = box
 
     yield FillGuardZones(p)
 
@@ -1177,23 +1182,33 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     streams = list()
     solvers = list()
 
-    for (i0, i1), box in decompose(config.domain, num_patches):
-        if checkpoint:
-            p = checkpoint["primitive"][i0:i1]
-            t = checkpoint["time"]
-            n = checkpoint["iteration"]
-        else:
-            p = linear_shocktube(box)
-            t = 0.0
-            n = 0
-        p = extend_array(p, count=2)
-        b = extend_box(box, count=2)
+    # XXX
+    # for (i0, i1), box in decompose(config.domain, num_patches):
+    #     if checkpoint:
+    #         p = checkpoint["primitive"][i0:i1]
+    #         t = checkpoint["time"]
+    #         n = checkpoint["iteration"]
+    #     else:
+    #         p = linear_shocktube(box)
+    #         t = 0.0
+    #         n = 0
+    #     p = extend_array(p, count=2)
+    #     b = extend_box(box, count=2)
 
-        with (stream := make_stream(hardware, gpu_streams)):
-            solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
-            streams.append(stream)
-            solvers.append(solver)
+    #     with (stream := make_stream(hardware, gpu_streams)):
+    #         solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
+    #         streams.append(stream)
+    #         solvers.append(solver)
 
+    box = b = config.domain
+    p = linear_shocktube(box)
+    t = 0.0
+    n = 0
+
+    with (stream := make_stream(hardware, gpu_streams)):
+        solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
+        streams.append(stream)
+        solvers.append(solver)
 
     def next_with(arg):
         context, gen = arg
@@ -1209,4 +1224,6 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
                 yield MacroState(events)
 
             elif type(events[0]) is FillGuardZones:
-                exchange_guard_zones([e.array for e in events])
+                # XXX
+                # exchange_guard_zones([e.array for e in events])
+                outflow_single_patch([e.array for e in events][0])
