@@ -736,7 +736,7 @@ class Scheme:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = spatial_axes_shape(prd, dim, self._transpose)
+        s = spatial_axes_shape(urd, dim, self._transpose)
         return s[:dim], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
 
     @kernel
