@@ -20,7 +20,14 @@ from models import Sailfish, Strategy, Reconstruction, CoordinateBox
 logger = getLogger("sailfish")
 
 
-def array_shape(a: NDArray, dim: int, transpose: bool) -> tuple[int, int, int]:
+def spatial_axes_shape(a: NDArray, dim: int, transpose: bool) -> tuple[int, int, int]:
+    """
+    Return a 3d array shape for a given domain dimensionality and data layout
+
+    For example the domain is 2d (dim=2) and transpose=True, then the input
+    array would have shape (nfields, ni, nj) and the return value would be
+    (ni, nj, 1).
+    """
     if transpose:
         if dim == 1:
             return a.shape[1], 1, 1
@@ -193,7 +200,7 @@ class GradientEsimation:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = array_shape(y, dim, self._transpose)
+        s = spatial_axes_shape(y, dim, self._transpose)
         return s[:dim], (y, g, plm, *s)
 
 
@@ -212,10 +219,15 @@ class Fields:
     def __init__(self, config: Sailfish):
         self.dim = config.domain.dimensionality
         self.transpose = config.strategy.transpose
+        self.gamma_law_index = config.physics.equation_of_state.gamma_law_index
 
     @property
     def define_macros(self):
-        return dict(DIM=self.dim, TRANSPOSE=int(self.transpose))
+        return dict(
+            DIM=self.dim,
+            TRANSPOSE=int(self.transpose),
+            GAMMA_LAW_INDEX=self.gamma_law_index,
+        )
 
     @property
     def device_funcs(self):
@@ -316,6 +328,10 @@ class Scheme:
         define_macros["CACHE_PRIM"] = int(config.strategy.cache_prim)
         define_macros["CACHE_GRAD"] = int(config.strategy.cache_grad)
         define_macros["USE_RK"] = int(config.scheme.time_integration != "fwd")
+        define_macros[
+            "GAMMA_LAW_INDEX"
+        ] = config.physics.equation_of_state.gamma_law_index
+
         r = config.scheme.reconstruction
 
         if type(r) is str:
@@ -573,7 +589,7 @@ class Scheme:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = array_shape(urd, dim, self._transpose)
+        s = spatial_axes_shape(urd, dim, self._transpose)
         return s[:dim], (prd, grd, urd, fwr, plm, *s)
 
     @kernel
@@ -719,7 +735,7 @@ class Scheme:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = array_shape(prd, dim, self._transpose)
+        s = spatial_axes_shape(prd, dim, self._transpose)
         return s[:dim], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
 
     @kernel
@@ -841,7 +857,7 @@ class Scheme:
         }
         """
         dim = self._dim
-        s = array_shape(u, dim, self._transpose)
+        s = spatial_axes_shape(u, dim, self._transpose)
         return s[:dim], (urk, u, f, dt, dx, rk, *s)
 
 

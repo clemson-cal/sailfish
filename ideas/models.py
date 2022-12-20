@@ -52,6 +52,10 @@ class Driver:
 
 @configmodel
 class GammaLawEOS:
+    """
+    Adiabatic EOS with given gamma-law index
+    """
+
     gamma_law_index: float = 5.0 / 3.0
 
 
