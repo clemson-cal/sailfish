@@ -1,5 +1,7 @@
 from typing import Literal, Union
 from schema import schema
+from geometry import CoordinateBox
+from models import InitialData, Shocktube
 
 
 @schema
@@ -85,44 +87,6 @@ class Physics:
     equation_of_state: EquationOfState = GammaLawEOS()
 
 
-@schema
-class CoordinateBox:
-    """
-    Domain with uniformly spaced grid cells
-
-    A coordinate box is a (hyper-)rectangular region in whatever coordinates
-    are used. Examples include cartesian coordinates, and spherical polar
-    coordinates with logarithmic radial grid spacing.
-
-    Fields
-    ------
-
-    extent_i: the extent_i
-    extent_j: the extent_j
-    extent_k: the extent_k
-    """
-
-    extent_i: tuple[float, float] = (0.0, 1.0)
-    extent_j: tuple[float, float] = (0.0, 1.0)
-    extent_k: tuple[float, float] = (0.0, 1.0)
-    num_zones: tuple[int, int, int] = (128, 1, 1)
-
-    @property
-    def dimensionality(self):
-        """
-        number of fleshed-out spatial axes
-        """
-        return sum(n > 1 for n in self.num_zones)
-
-    @property
-    def grid_spacing(self):
-        """
-        spacing between zones on each axis
-        """
-        extent = (self.extent_i, self.extent_j, self.extent_k)
-        return tuple((e[1] - e[0]) / n for e, n in zip(extent, self.num_zones))
-
-
 Reconstruction = Union[Literal["pcm"], tuple[Literal["plm"], float]]
 TimeIntegration = Literal["fwd", "rk1", "rk2", "rk3"]
 
@@ -202,6 +166,7 @@ class Sailfish:
 
     name: str = None
     driver: Driver = Driver()
+    initial_data: InitialData = Shocktube()
     physics: Physics = Physics()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()

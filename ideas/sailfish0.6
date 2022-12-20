@@ -373,8 +373,6 @@ def dashboard(console, screen=False):
 def plot():
     from matplotlib import pyplot as plt
 
-    fig = plt.figure()
-
     while True:
         event = yield
 
@@ -382,30 +380,28 @@ def plot():
             state = event
 
         if type(event) is run_summary:
-            if plt.get_fignums():
-                ax1 = fig.add_subplot(111)
-                if state.box.dimensionality == 1:
-                    ax1.plot(
-                        state.cell_centers,
-                        state.primitive[:, 0],
-                        "-o",
-                        mfc="none",
-                    )
-                if state.box.dimensionality == 2:
-                    x, y = state.cell_centers
-                    z = state.primitive[:, :, 0]
-                    ax1.pcolormesh(
-                        x[2:-2, 2:-2],
-                        y[2:-2, 2:-2],
-                        z[2:-2, 2:-2],
-                        vmin=None,
-                        vmax=None,
-                    )
-                    ax1.set_aspect("equal")
-                plt.show()
+            fig = plt.figure()
+            ax1 = fig.add_subplot(111)
+            if state.box.dimensionality == 1:
+                ax1.plot(
+                    state.cell_centers,
+                    state.primitive[:, 0],
+                    "-o",
+                    mfc="none",
+                )
+            if state.box.dimensionality == 2:
+                x, y = state.cell_centers
+                z = state.primitive[:, :, 0]
+                ax1.pcolormesh(
+                    x[2:-2, 2:-2],
+                    y[2:-2, 2:-2],
+                    z[2:-2, 2:-2],
+                    vmin=None,
+                    vmax=None,
+                )
+                ax1.set_aspect("equal")
+            plt.show()
 
-
-def no_plot():
     while True:
         yield
 

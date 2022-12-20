@@ -10,12 +10,13 @@ from math import prod
 from multiprocessing.pool import ThreadPool
 from typing import NamedTuple, Callable, Iterable
 
-from numpy import array, zeros, logical_not, concatenate, linspace, meshgrid, where
+from numpy import array, zeros, concatenate
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
 from config import Sailfish, Strategy, Reconstruction, CoordinateBox
+from geometry import CoordinateBox
 
 logger = getLogger("sailfish")
 
@@ -918,7 +919,7 @@ class PatchState:
 
     @property
     def cell_centers(self):
-        return cell_centers(self._box)
+        return self._box.cell_centers()
 
 
 class State:
@@ -949,80 +950,6 @@ class State:
     @property
     def time(self):
         return self._states[0].time
-
-
-def linear_shocktube(box):
-    """
-    A linear shocktube setup
-    """
-
-    if box.dimensionality == 1:
-        x = cell_centers(box)
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l] = [1.0, 0.0, 1.000]
-        p[r] = [0.1, 0.0, 0.125]
-
-    if box.dimensionality == 2:
-        x, y = cell_centers(box)
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (4,))
-        p[l] = [1.0, 0.0, 0.0, 1.000]
-        p[r] = [0.1, 0.0, 0.0, 0.125]
-
-    return p
-
-
-def cylindrical_shocktube(box):
-    """
-    A cylindrical shocktube setup
-    """
-
-    if box.dimensionality != 2:
-        raise ValueError("setup only works in 2d")
-
-    x, y = cell_centers(box)
-    l = x**2 + y**2 < 0.025
-    r = logical_not(l)
-    p = zeros(x.shape + (4,))
-    p[l] = [1.0, 0.0, 0.0, 1.000]
-    p[r] = [0.1, 0.0, 0.0, 0.125]
-
-    return p
-
-
-def cell_centers(box):
-    if box.dimensionality == 1:
-        ni = box.num_zones[0]
-        x0, x1 = box.extent_i
-        xv = linspace(x0, x1, ni + 1)
-        xc = 0.5 * (xv[1:] + xv[:-1])
-        return xc
-
-    if box.dimensionality == 2:
-        ni, nj = box.num_zones[0:2]
-        x0, x1 = box.extent_i
-        y0, y1 = box.extent_j
-        xv = linspace(x0, x1, ni + 1)
-        yv = linspace(y0, y1, nj + 1)
-        xc = 0.5 * (xv[1:] + xv[:-1])
-        yc = 0.5 * (yv[1:] + yv[:-1])
-        return meshgrid(xc, yc, indexing="ij")
-
-    if box.dimensionality == 3:
-        ni, nj, nk = box.num_zones
-        x0, x1 = box.extent_i
-        y0, y1 = box.extent_j
-        z0, z1 = box.extent_k
-        xv = linspace(x0, x1, ni + 1)
-        yv = linspace(y0, y1, nj + 1)
-        zv = linspace(z0, z1, nk + 1)
-        xc = 0.5 * (xv[1:] + xv[:-1])
-        yc = 0.5 * (yv[1:] + yv[:-1])
-        zc = 0.5 * (zv[1:] + zv[:-1])
-        return meshgrid(xc, yc, zc, indexing="ij")
 
 
 def partition(elements: int, num_parts: int):
@@ -1367,9 +1294,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         else:
             t = 0.0
             n = 0
-            # p = config.initital_data.primitive(t, box, config.physics)
-            # p = linear_shocktube(box)
-            p = cylindrical_shocktube(box)
+            p = config.initial_data.primitive(box)
         p = extend_array(p, count=2)
         b = extend_box(box, count=2)
 
