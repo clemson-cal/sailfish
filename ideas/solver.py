@@ -15,7 +15,7 @@ from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
-from models import Sailfish, Strategy, Reconstruction, CoordinateBox
+from config import Sailfish, Strategy, Reconstruction, CoordinateBox
 
 logger = getLogger("sailfish")
 
@@ -325,12 +325,12 @@ class Scheme:
         define_macros = dict()
         define_macros["DIM"] = config.domain.dimensionality
         define_macros["TRANSPOSE"] = int(config.strategy.transpose)
-        define_macros["CACHE_PRIM"] = int(config.strategy.cache_prim)
-        define_macros["CACHE_GRAD"] = int(config.strategy.cache_grad)
-        define_macros["USE_RK"] = int(config.scheme.time_integration != "fwd")
         define_macros[
             "GAMMA_LAW_INDEX"
         ] = config.physics.equation_of_state.gamma_law_index
+        define_macros["CACHE_PRIM"] = int(config.strategy.cache_prim)
+        define_macros["CACHE_GRAD"] = int(config.strategy.cache_grad)
+        define_macros["USE_RK"] = int(config.scheme.time_integration != "fwd")
 
         r = config.scheme.reconstruction
 

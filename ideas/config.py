@@ -1,30 +1,30 @@
-from configmodel import configmodel
 from typing import Literal, Union
+from schema import schema
 
 
-@configmodel
+@schema
 class Report:
     cadence: int = 100
 
 
-@configmodel
+@schema
 class Checkpoint:
     cadence: float = 1.0
     format: Literal["none", "pickle"] = "pickle"
 
 
-@configmodel
+@schema
 class Diagnostic:
     name: str
 
 
-@configmodel
+@schema
 class Timeseries:
     cadence: float = 1.0
     diagnostics: list[Diagnostic] = None
 
 
-@configmodel
+@schema
 class Driver:
     """
     Deals with the simulation control flow and input/output
@@ -50,7 +50,7 @@ class Driver:
     cfl_number: Union[float, Literal["auto"]] = "auto"
 
 
-@configmodel
+@schema
 class GammaLawEOS:
     """
     Adiabatic EOS with given gamma-law index
@@ -59,7 +59,7 @@ class GammaLawEOS:
     gamma_law_index: float = 5.0 / 3.0
 
 
-@configmodel
+@schema
 class IsothermalEOS:
     """
     Isothermal EOS with a uniform sound speed
@@ -68,7 +68,7 @@ class IsothermalEOS:
     sound_speed: float = 1.0
 
 
-@configmodel
+@schema
 class LocallyIsothermalEOS:
     """
     Isothermal EOS with a uniform nominal Mach number
@@ -80,12 +80,12 @@ class LocallyIsothermalEOS:
 EquationOfState = Union[GammaLawEOS, IsothermalEOS, LocallyIsothermalEOS]
 
 
-@configmodel
+@schema
 class Physics:
     equation_of_state: EquationOfState = GammaLawEOS()
 
 
-@configmodel
+@schema
 class CoordinateBox:
     """
     Domain with uniformly spaced grid cells
@@ -127,7 +127,7 @@ Reconstruction = Union[Literal["pcm"], tuple[Literal["plm"], float]]
 TimeIntegration = Literal["fwd", "rk1", "rk2", "rk3"]
 
 
-@configmodel
+@schema
 class Scheme:
     """
     Algorithm parameters for the solution scheme
@@ -146,7 +146,7 @@ class Scheme:
     time_integration: TimeIntegration = "fwd"
 
 
-@configmodel
+@schema
 class Strategy:
     """
     Algorithm parameters only affecting performance
@@ -184,7 +184,7 @@ class Strategy:
         return self.data_layout == "fields-first"
 
 
-@configmodel
+@schema
 class Sailfish:
     """
     Top-level application configuration struct
@@ -365,7 +365,7 @@ if __name__ == "__main__":
     from rich.live import Live
 
     console = Console()
-    config = Sailfish(physics=Isothermal())
+    config = Sailfish(physics=Physics(equation_of_state=IsothermalEOS()))
 
     for field in config.__dataclass_fields__:
         value = getattr(config, field)

@@ -12,9 +12,8 @@ from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json, dump as dump_json, dumps as dumps_json
 from logging import getLogger
 from sys import argv
-from typing import Any
 
-from models import Sailfish, Strategy, Scheme, Driver, add_config_arguments
+from config import Sailfish, Strategy, Scheme, Driver, add_config_arguments
 from system import system_info
 
 
@@ -589,7 +588,7 @@ def doc(args=None, console=None, parser=None):
     """
     Display code documentation
     """
-    choices = ("kernels", "models", "setups", "solver", "physics")
+    choices = ("kernels", "config", "setups", "solver", "physics")
 
     if parser:
         parser.add_argument("topic", nargs="?", choices=choices)
@@ -614,7 +613,7 @@ def doc(args=None, console=None, parser=None):
             topic = Prompt.ask("select", choices=choices, show_choices=False)
             console.print("\n\n")
 
-        if topic == "models":
+        if topic == "config":
             console.print(Driver())
             console.print("\n\n")
             console.print(Strategy())
