@@ -20,6 +20,23 @@ from models import Sailfish, Strategy, Reconstruction, CoordinateBox
 logger = getLogger("sailfish")
 
 
+def array_shape(a: NDArray, dim: int, transpose: bool) -> tuple[int, int, int]:
+    if transpose:
+        if dim == 1:
+            return a.shape[1], 1, 1
+        elif dim == 2:
+            return a.shape[1], a.shape[2], 1
+        elif dim == 3:
+            return a.shape[1:4]
+    else:
+        if dim == 1:
+            return a.shape[0], 1, 1
+        elif dim == 2:
+            return a.shape[0], a.shape[1], 1
+        elif dim == 3:
+            return a.shape[0:3]
+
+
 @device
 def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
     R"""
@@ -44,10 +61,15 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 @kernel_class
 class GradientEsimation:
+    """
+    Handles batch-generation of PLM gradient estimation
+    """
+
     def __init__(self, config: Sailfish):
-        self.nfields = config.domain.dimensionality + 2
-        self.transpose = config.strategy.transpose
-        self.plm_theta = (
+        self._dim = dim = config.domain.dimensionality
+        self._nfields = dim + 2
+        self._transpose = config.strategy.transpose
+        self._plm_theta = (
             config.scheme.reconstruction[1]
             if type(config.scheme.reconstruction) is tuple
             else 0.0
@@ -55,7 +77,11 @@ class GradientEsimation:
 
     @property
     def define_macros(self):
-        return dict(NFIELDS=self.nfields, TRANSPOSE=self.transpose)
+        return dict(
+            NFIELDS=self._nfields,
+            DIM=self._dim,
+            TRANSPOSE=int(self._transpose),
+        )
 
     @property
     def device_funcs(self):
@@ -68,43 +94,121 @@ class GradientEsimation:
         g: NDArray[float],
         plm_theta: float = None,
         ni: int = None,
+        nj: int = None,
+        nk: int = None,
     ):
         R"""
-        KERNEL void plm_gradient(double *y, double *g, double plm_theta, int ni)
+        KERNEL void plm_gradient(double *y, double *g, double plm_theta, int ni, int nj, int nk)
         {
+            int nq = NFIELDS;
+            int nd = ni * nj * nk * nq;
+
             #if TRANSPOSE == 0
+            #if DIM == 1
+            int si = nq;
             int sq = 1;
-            int si = NFIELDS;
+            #elif DIM == 2
+            int si = nq * nj;
+            int sj = nq;
+            int sq = 1;
+            #elif DIM == 3
+            int si = nq * nj * nk;
+            int sj = nq * nj;
+            int sk = nq;
+            int sq = 1;
+            #endif
             #elif TRANSPOSE == 1
+            #if DIM == 1
             int sq = ni;
             int si = 1;
+            #elif DIM == 2
+            int sq = nj * ni;
+            int si = nj;
+            int sj = 1;
+            #elif DIM == 3
+            int sq = nk * nj * ni;
+            int si = nk * nj;
+            int sj = nk;
+            int sk = 1;
+            #endif
             #endif
 
+            #if DIM == 1
             FOR_RANGE_1D(1, ni - 1)
+            #elif DIM == 2
+            FOR_RANGE_2D(1, ni - 1, 1, nj - 1)
+            #elif DIM == 3
+            FOR_RANGE_3D(1, ni - 1, 1, nj - 1, 1, nk - 1)
+            #endif
             {
-                int ic = i;
-                int il = i - 1;
-                int ir = i + 1;
+                #if DIM == 1
+                int nccc = (i + 0) * si;
+                int nlcc = (i - 1) * si;
+                int nrcc = (i + 1) * si;
+                #elif DIM == 2
+                int nccc = (i + 0) * si + (j + 0) * sj;
+                int nlcc = (i - 1) * si + (j + 0) * sj;
+                int nrcc = (i + 1) * si + (j + 0) * sj;
+                int nclc = (i + 0) * si + (j - 1) * sj;
+                int ncrc = (i + 0) * si + (j + 1) * sj;
+                #elif DIM == 3
+                int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+                int nlcc = (i - 1) * si + (j + 0) * sj + (k + 0) * sk;
+                int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+                int nclc = (i + 0) * si + (j - 1) * sj + (k + 0) * sk;
+                int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+                int nccl = (i + 0) * si + (j + 0) * sj + (k - 1) * sk;
+                int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+                #endif
 
                 for (int q = 0; q < NFIELDS; ++q)
                 {
-                    double yc = y[ic * si + q * sq];
-                    double yl = y[il * si + q * sq];
-                    double yr = y[ir * si + q * sq];
-                    g[ic * si + q * sq] = plm_minmod(yl, yc, yr, plm_theta);
+                    #if DIM >= 1
+                    {
+                        double yc = y[nccc + q * sq];
+                        double yl = y[nlcc + q * sq];
+                        double yr = y[nrcc + q * sq];
+                        g[0 * nd + nccc + q * sq] = plm_minmod(yl, yc, yr, plm_theta);
+                    }
+                    #endif
+                    #if DIM >= 2
+                    {
+                        double yc = y[nccc + q * sq];
+                        double yl = y[nclc + q * sq];
+                        double yr = y[ncrc + q * sq];
+                        g[1 * nd + nccc + q * sq] = plm_minmod(yl, yc, yr, plm_theta);
+                    }
+                    #endif
+                    #if DIM >= 3
+                    {
+                        double yc = y[nccc + q * sq];
+                        double yl = y[nccl + q * sq];
+                        double yr = y[nccr + q * sq];
+                        g[2 * nd + nccc + q * sq] = plm_minmod(yl, yc, yr, plm_theta);
+                    }
+                    #endif
                 }
             }
         }
         """
-        plm = plm_theta if plm_theta is not None else self.plm_theta
-        nq = self.nfields
-        ii = -1 if self.transpose else 0
-        iq = 0 if self.transpose else -1
-        return y.shape[ii], (y, g, plm, y.shape[ii])
+        plm = plm_theta if plm_theta is not None else self._plm_theta
+        dim = self._dim
+        s = array_shape(y, dim, self._transpose)
+        return s[:dim], (y, g, plm, *s)
 
 
 @kernel_class
 class Fields:
+    """
+    Handles conversion between primitive and conserved hydrodynamic fields
+
+    This kernel class provides cons_to_prim_array and prim_to_cons_array
+    functions which can operate either in fields-last or fields-first
+    (struct-of-arrays, or transposed) data layout. These functions treat the
+    input and output arrays as flattened, so they work for any domain
+    dimensionality. The dim parameter is used to infer the number of fields.
+    """
+
     def __init__(self, config: Sailfish):
         self.dim = config.domain.dimensionality
         self.transpose = config.strategy.transpose
@@ -243,22 +347,6 @@ class Scheme:
     @property
     def device_funcs(self):
         return self._device_funcs
-
-    def array_shape(self, a):
-        if self._transpose:
-            if self._dim == 1:
-                return a.shape[1], 1, 1
-            elif self._dim == 2:
-                return a.shape[1], a.shape[2], 1
-            elif self._dim == 3:
-                return a.shape[1:4]
-        else:
-            if self._dim == 1:
-                return a.shape[0], 1, 1
-            elif self._dim == 2:
-                return a.shape[0], a.shape[1], 1
-            elif self._dim == 3:
-                return a.shape[0:3]
 
     @device
     def _godunov_fluxes(self):
@@ -485,7 +573,7 @@ class Scheme:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = self.array_shape(urd)
+        s = array_shape(urd, dim, self._transpose)
         return s[:dim], (prd, grd, urd, fwr, plm, *s)
 
     @kernel
@@ -631,7 +719,7 @@ class Scheme:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = self.array_shape(urd)
+        s = array_shape(prd, dim, self._transpose)
         return s[:dim], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
 
     @kernel
@@ -753,7 +841,7 @@ class Scheme:
         }
         """
         dim = self._dim
-        s = self.array_shape(u)
+        s = array_shape(u, dim, self._transpose)
         return s[:dim], (urk, u, f, dt, dx, rk, *s)
 
 
@@ -1257,13 +1345,15 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
 
     for (i0, i1), box in decompose(config.domain, num_patches):
         if checkpoint:
-            p = checkpoint["primitive"][i0:i1]
             t = checkpoint["time"]
             n = checkpoint["iteration"]
+            p = checkpoint["primitive"][i0:i1]
         else:
-            p = linear_shocktube(box)
             t = 0.0
             n = 0
+            # p = config.initital_data.primitive(t, box, config.physics)
+            # p = linear_shocktube(box)
+            p = cylindrical_shocktube(box)
         p = extend_array(p, count=2)
         b = extend_box(box, count=2)
 

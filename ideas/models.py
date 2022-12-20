@@ -51,21 +51,12 @@ class Driver:
 
 
 @configmodel
-class Euler:
+class GammaLawEOS:
     gamma_law_index: float = 5.0 / 3.0
 
 
 @configmodel
-class UniformMachNumber:
-    """
-    Isothermal EOS with a uniform nominal Mach number
-    """
-
-    mach_number: float = 10.0
-
-
-@configmodel
-class UniformSoundSpeed:
+class IsothermalEOS:
     """
     Isothermal EOS with a uniform sound speed
     """
@@ -74,18 +65,20 @@ class UniformSoundSpeed:
 
 
 @configmodel
-class Isothermal:
+class LocallyIsothermalEOS:
     """
-    Isothermal gasdynamics equations
-
-    Isothermal gas has a temperature that is prescribed externally, to be
-    either globally uniform or some explicit function of space and time. The
-    fluid total energy density is not evolved.
+    Isothermal EOS with a uniform nominal Mach number
     """
 
-    equation_of_state: Union[UniformSoundSpeed, UniformMachNumber] = UniformSoundSpeed(
-        1.0
-    )
+    mach_number: float = 10.0
+
+
+EquationOfState = Union[GammaLawEOS, IsothermalEOS, LocallyIsothermalEOS]
+
+
+@configmodel
+class Physics:
+    equation_of_state: EquationOfState = GammaLawEOS()
 
 
 @configmodel
@@ -205,7 +198,7 @@ class Sailfish:
 
     name: str = None
     driver: Driver = Driver()
-    physics: Union[Euler, Isothermal] = Euler()
+    physics: Physics = Physics()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()
