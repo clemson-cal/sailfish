@@ -900,26 +900,79 @@ class Scheme:
         return s[:dim], (urk, u, f, dt, dx, rk, *s)
 
 
-def exchange_guard_zones(us):
+def apply_bc(
+    u: NDArray[float],
+    location: str,
+    patches: list[NDArray[float]],
+    kind="outflow",
+):
+    if location == "lower_i":
+        if kind == "outflow":
+            u[:+2, :, :] = u[+2:+3, :, :]
+        if kind == "inflow":
+            raise NotImplementedError("inflow BC not implemented yet")
+        if kind == "periodic":
+            u[:+2, :, :] = u[-1][-4:-2, :, :]
+
+    if location == "upper_i":
+        if kind == "outflow":
+            u[-2:, :, :] = u[-4:-3, :, :]
+        if kind == "inflow":
+            raise NotImplementedError("inflow BC not implemented yet")
+        if kind == "periodic":
+            u[-2:, :, :] = u[0][+2:+4, :, :]
+
+    if location == "lower_j":
+        if kind == "outflow":
+            u[:, :+2, :] = u[:, +2:+3, :]
+        if kind == "inflow":
+            raise NotImplementedError("inflow BC not implemented yet")
+        if kind == "periodic":
+            u[:, :+2, :] = u[-1][:, -4:-2, :]
+
+    if location == "upper_j":
+        if kind == "outflow":
+            u[:, -2:, :] = u[:, -4:-3, :]
+        if kind == "inflow":
+            raise NotImplementedError("inflow BC not implemented yet")
+        if kind == "periodic":
+            u[:, -2:, :] = u[0][:, +2:+4, :]
+
+    if location == "lower_k":
+        if kind == "outflow":
+            u[:, :, :+2] = u[:, :, +2:+3]
+        if kind == "inflow":
+            raise NotImplementedError("inflow BC not implemented yet")
+        if kind == "periodic":
+            u[:, :, :+2] = u[-1][:, :, -4:-2]
+
+    if location == "upper_k":
+        if kind == "outflow":
+            u[:, :, -2:] = u[:, :, -4:-3]
+        if kind == "inflow":
+            raise NotImplementedError("inflow BC not implemented yet")
+        if kind == "periodic":
+            u[:, :, -2:] = u[0][:, :, +2:+4]
+
+
+def fill_guard_zones(us, boundary):
     for i, u in enumerate(us):
+        if u.shape[0] > 1:
+            apply_bc(u, "lower_i", boundary.lower_i)
+            apply_bc(u, "upper_i", boundary.upper_i)
+
+        if u.shape[1] > 1:
+            apply_bc(u, "lower_j", boundary.lower_j)
+            apply_bc(u, "upper_j", boundary.upper_j)
+
+        if u.shape[2] > 1:
+            apply_bc(u, "lower_k", boundary.lower_k)
+            apply_bc(u, "upper_k", boundary.upper_k)
+
         if i > 0:
-            u[:+2] = us[i - 1][-4:-2]
-        else:
-            u[:+2] = u[+2:+3]
+            u[:+2, :, :] = us[i - 1][-4:-2, :, :]
         if i < len(us) - 1:
-            u[-2:] = us[i + 1][+2:+4]
-        else:
-            u[-2:] = u[-4:-3]
-
-        if len(u.shape) == 3:
-            u[+2:-2, :+2] = u[+2:-2, +2:+3]
-            u[+2:-2, -2:] = u[+2:-2, -4:-3]
-
-        if len(u.shape) == 4:
-            u[+2:-2, :+2, +2:-2] = u[+2:-2, +2:+3, +2:-2]
-            u[+2:-2, -2:, +2:-2] = u[+2:-2, -4:-3, +2:-2]
-            u[+2:-2, +2:-2, :+2] = u[+2:-2, +2:-2, +2:+3]
-            u[+2:-2, +2:-2, -2:] = u[+2:-2, +2:-2, -4:-3]
+            u[-2:, :, :] = us[i + 1][+2:+4, :, :]
 
 
 class FillGuardZones:
@@ -1204,12 +1257,18 @@ def patch_solver(
     n = iteration
     interior_box = trim_box(box, 2)
 
-    yield FillGuardZones(p)
-
     # =========================================================================
     # Whether the data layout is transposed, i.e. adjacent memory locations are
     # the same field but in adjacent zones.
     # =========================================================================
+    def three_spatial_dims(a):
+        if len(a.shape) == 2:
+            return a[:, None, None, :]
+        if len(a.shape) == 3:
+            return a[:, :, None, :]
+        if len(a.shape) == 4:
+            return a[:, :, :, :]
+
     def standard_layout_view(a):
         if not transpose:
             return a
@@ -1229,6 +1288,8 @@ def patch_solver(
             return a.transpose((1, 2, 0))
         elif box.dimensionality == 3:
             return a.transpose((1, 2, 3, 0))
+
+    yield FillGuardZones(three_spatial_dims(p))
 
     if transpose:
         p = xp.ascontiguousarray(transpose_layout_view(p))
@@ -1330,7 +1391,7 @@ def patch_solver(
                 update_cons(p1, g1, u0, u1, u2, dt, dx, rk)
                 u1, u2 = u2, u1
 
-            yield FillGuardZones(standard_layout_view(u1))
+            yield FillGuardZones(three_spatial_dims(standard_layout_view(u1)))
 
         t += dt
         n += 1
@@ -1353,6 +1414,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     for kernel in (kernels := make_solver_kernels(config)):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
+    boundary = config.boundary_condition
     strategy = config.strategy
     scheme = config.scheme
     num_patches = strategy.num_patches
@@ -1396,4 +1458,4 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
                 timestep = yield State(config.domain, events)
 
             elif type(events[0]) is FillGuardZones:
-                exchange_guard_zones([e.array for e in events])
+                fill_guard_zones([e.array for e in events], boundary)

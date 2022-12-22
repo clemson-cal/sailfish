@@ -151,6 +151,19 @@ class Strategy:
         return self.data_layout == "fields-first"
 
 
+BoundaryConditionType = Literal["outflow", "inflow", "reflecting", "periodic"]
+
+
+@schema
+class BoundaryCondition:
+    lower_i: BoundaryConditionType = None
+    upper_i: BoundaryConditionType = None
+    lower_j: BoundaryConditionType = None
+    upper_j: BoundaryConditionType = None
+    lower_k: BoundaryConditionType = None
+    upper_k: BoundaryConditionType = None
+
+
 @schema
 class Sailfish:
     """
@@ -159,18 +172,21 @@ class Sailfish:
     Fields
     ------
 
-    name:      a name given to the run
-    driver:    runs the simulation main loop, handles IO
-    physics:   the physics equations to be solved
-    domain:    the physical domain of the problem
-    strategy:  the solution strategy; does not affect the numerical solution
-    scheme:    algorithmic choices which can affect the solution accuracy
+    name:               a name given to the run
+    driver:             runs the simulation main loop, handles IO
+    physics:            the physics equations to be solved
+    initial_data:       initial condition if not a restart (also called a model)
+    boundary_condition: boundary condition to apply at domain edges
+    domain:             the physical domain of the problem
+    strategy:           the solution strategy; does not affect the numerical solution
+    scheme:             algorithmic choices which can affect the solution accuracy
     """
 
     name: str = None
     driver: Driver = Driver()
-    initial_data: InitialData = Shocktube()
     physics: Physics = Physics()
+    initial_data: InitialData = Shocktube()
+    boundary_condition: BoundaryCondition = BoundaryCondition()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()

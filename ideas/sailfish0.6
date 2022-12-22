@@ -430,7 +430,7 @@ def deep_update(d, u):
     """
     for k, v in u.items():
         if isinstance(v, Mapping):
-            d[k] = deep_update(d.get(k, dict()), v)
+            d[k] = deep_update(d.setdefault(k, dict()), v)
         else:
             d[k] = v
     return d
@@ -729,8 +729,12 @@ def todo(args=None, console=None, parser=None):
 
         - [x] maximum wavespeed / timestep calculation
         - [x] control over time-step recalculation cadence
-        - [ ] periodic BC
-        - [ ] reflecting BC
+        - [ ] graceful handling of validation errors
+        - [/] boundary conditions:
+            - [x] outflow
+            - [ ] inflow
+            - [ ] periodic
+            - [ ] reflecting
         - [ ] models:
             - [ ] Kelvin-Helmholtz
             - [ ] Accretion disk

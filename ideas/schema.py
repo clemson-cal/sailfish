@@ -143,6 +143,7 @@ def schema(cls):
 
     class ModelConfig:
         extra = Extra.forbid
+        frozen = True
 
     dataclass(config=ModelConfig)(cls)
 
