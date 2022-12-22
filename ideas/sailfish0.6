@@ -2,21 +2,6 @@
 
 """
 Sailfish main program
-
-TODO:
-
-- [x] maximum wavespeed / timestep calculation
-- [x] control over time-step recalculation cadence
-- [ ] crash detection
-- [ ] crash mitigation
-- [ ] FMR
-- [ ] relativistic solver
-- [ ] relativistic shocktube problems, including with transverse velocity
-- [ ] viscosity
-- [ ] gravitational source terms
-- [ ] outer buffer source terms
-- [ ] reductions needed for orbital evolution
-- [ ] isothermal reset
 """
 
 
@@ -729,6 +714,43 @@ def code(args=None, console=None, parser=None):
                     break
 
 
+def todo(args=None, console=None, parser=None):
+    """
+    Display a list of development todo items
+    """
+    if parser:
+        pass
+    else:
+        from textwrap import dedent
+        from rich.markdown import Markdown
+
+        text = R"""
+        # Todo items
+
+        - [x] maximum wavespeed / timestep calculation
+        - [x] control over time-step recalculation cadence
+        - [ ] periodic BC
+        - [ ] reflecting BC
+        - [ ] models:
+            - [ ] Kelvin-Helmholtz
+            - [ ] Accretion disk
+            - [ ] Shock in wind
+        - [ ] crash detection
+        - [ ] crash mitigation
+        - [ ] FMR
+        - [ ] relativistic solver
+        - [ ] relativistic shocktube problems, including with transverse velocity
+        - [ ] viscosity
+        - [ ] geometric source terms; cell geometry data
+        - [ ] gravitational source terms
+        - [ ] outer buffer source terms
+        - [ ] reductions needed for orbital evolution
+        - [ ] isothermal reset
+        - [ ] MPI parallel
+        """
+        console.print(Markdown(dedent(text)), width=100)
+
+
 def argument_parser():
     """
     Create an argument parser instance for running from the command line
@@ -753,18 +775,21 @@ def argument_parser():
     _dep = subparsers.add_parser("dep", usage=SUPPRESS, help=dep.__doc__)
     _run = subparsers.add_parser("run", usage=SUPPRESS, help=run.__doc__)
     _code = subparsers.add_parser("code", usage=SUPPRESS, help=code.__doc__)
+    _todo = subparsers.add_parser("todo", usage=SUPPRESS, help=todo.__doc__)
 
     _sys.set_defaults(_command=sys)
     _doc.set_defaults(_command=doc)
     _dep.set_defaults(_command=dep)
     _run.set_defaults(_command=run)
     _code.set_defaults(_command=code)
+    _todo.set_defaults(_command=todo)
 
     sys(parser=_sys)
     doc(parser=_doc)
     dep(parser=_dep)
     run(parser=_run)
     code(parser=_code)
+    todo(parser=_todo)
 
     return parser
 
