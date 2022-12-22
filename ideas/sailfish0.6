@@ -1,5 +1,24 @@
 #!/usr/bin/env python3
 
+"""
+Sailfish main program
+
+TODO:
+
+- [x] maximum wavespeed / timestep calculation
+- [x] control over time-step recalculation cadence
+- [ ] crash detection
+- [ ] crash mitigation
+- [ ] FMR
+- [ ] relativistic solver
+- [ ] relativistic shocktube problems, including with transverse velocity
+- [ ] viscosity
+- [ ] gravitational source terms
+- [ ] outer buffer source terms
+- [ ] reductions needed for orbital evolution
+- [ ] isothermal reset
+"""
+
 
 from argparse import ArgumentParser, SUPPRESS
 from collections import deque
@@ -81,7 +100,7 @@ def recurring_event(interval: float, number: int = 0, last_time: float = None):
             is_due = False
 
 
-def timeseries(config, state, timeseries, event_states):
+def timeseries(config: Sailfish, state, timestep, timeseries, event_states):
     number = event_states["timeseries"].number
     time = timeseries.setdefault("time", list())
     time.append(state.time)
@@ -89,7 +108,7 @@ def timeseries(config, state, timeseries, event_states):
     return f"timeseries {number}"
 
 
-def checkpoint(config: Sailfish, state, timeseries, event_states):
+def checkpoint(config: Sailfish, state, timestep, timeseries, event_states):
     if config.driver.checkpoint.format == "none":
         return "skip checkpoint (format=none)"
 
@@ -103,6 +122,7 @@ def checkpoint(config: Sailfish, state, timeseries, event_states):
                 primitive=state.primitive,
                 time=state.time,
                 iteration=state.iteration,
+                timestep=timestep,
                 timeseries=timeseries,
                 event_states={k: asdict(v) for k, v in event_states.items()},
             ),
@@ -139,11 +159,18 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
         driver = config.driver
         fold = driver.report.cadence
         tfinal = driver.tfinal
-        states = make_solver(config, chkpt)
+        cfl_number = driver.cfl_number
+        new_timestep_cadence = driver.new_timestep_cadence
+        solver = make_solver(config, chkpt)
         timeseries_data = dict()
         zps_log = list()
         app_timer = perf_time_sequence(mode)
         fld_timer = perf_time_sequence(mode)
+
+        # =====================================================================
+        # Get initial state from solver, and start the main loop
+        # =====================================================================
+        state = next(solver)
 
         # =====================================================================
         # Set up timeseries and checkpoint task handlers
@@ -151,9 +178,12 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
         if chkpt:
             ts_state = chkpt["event_states"]["timeseries"]
             cp_state = chkpt["event_states"]["checkpoint"]
+            timestep = chkpt["timestep"]
         else:
             ts_state = dict()
             cp_state = dict()
+            timestep = state.timestep(cfl_number)
+
         event_states = dict()
         events = dict(
             timeseries=recurring_event(driver.timeseries.cadence, **ts_state),
@@ -166,23 +196,18 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
         for event in events.values():
             event.send(None)
 
-        # =====================================================================
-        # Get initial state from solver, and start the main loop
-        # =====================================================================
-        state = next(states)
-
         while True:
             for name in events:
                 if e := events[name].send(state.time):
                     event_states[name] = e
                     yield event_funcs[name](
-                        config, state, timeseries_data, event_states
+                        config, state, timestep, timeseries_data, event_states
                     )
 
             if state.time >= tfinal:
                 break
 
-            state = next(states)
+            state = solver.send(timestep)
 
             if state.iteration % fold == 0:
                 sec = next(fld_timer)
@@ -190,6 +215,9 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
                 if state.iteration > 0:
                     zps_log.append(zps)
                 yield iteration_report(state.iteration, state.time, zps)
+
+            if state.iteration % new_timestep_cadence == 0:
+                timestep = state.timestep(cfl_number)
 
         yield state
         yield run_summary(config, next(app_timer), sum(zps_log) / max(1, len(zps_log)))

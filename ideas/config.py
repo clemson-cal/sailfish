@@ -42,6 +42,8 @@ class Driver:
     tfinal: time when the simulation ends
     report: number of iterations between one-line report messages
     timeseries: high-cadence recording of science products
+    cfl_number: safety factor in the Courant-Friedrichs-Lewy condition
+    new_timestep_cadence: iterations between recomputing the Courant-limited timestep
     """
 
     tstart: float = 0.0
@@ -49,7 +51,8 @@ class Driver:
     report: Report = Report()
     checkpoint: Checkpoint = Checkpoint()
     timeseries: Timeseries = Timeseries()
-    cfl_number: Union[float, Literal["auto"]] = "auto"
+    cfl_number: float = 0.1
+    new_timestep_cadence: int = 1
 
 
 @schema
@@ -251,6 +254,19 @@ def add_config_arguments(parser: "argparser.ArgumentParser"):
         metavar="S",
         help=Strategy.describe("gpu_streams"),
         dest="strategy.gpu_streams",
+    )
+    parser.add_argument(
+        "--cfl",
+        "--cfl-number",
+        metavar="C",
+        help=Driver.describe("cfl_number"),
+        dest="driver.cfl_number",
+    )
+    parser.add_argument(
+        "--new-timestep-cadence",
+        help=Driver.describe("new_timestep_cadence"),
+        metavar="N",
+        dest="driver.new_timestep_cadence",
     )
     parser.add_argument(
         "-m",

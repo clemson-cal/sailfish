@@ -14,7 +14,7 @@ from numpy import array, zeros, concatenate
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
-from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle
+from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle, max_wavespeed
 from config import Sailfish, Strategy, Reconstruction, CoordinateBox
 from geometry import CoordinateBox
 
@@ -232,7 +232,7 @@ class Fields:
 
     @property
     def device_funcs(self):
-        return [prim_to_cons, cons_to_prim]
+        return [prim_to_cons, cons_to_prim, max_wavespeed]
 
     @kernel
     def cons_to_prim_array(
@@ -313,6 +313,44 @@ class Fields:
         nq = self.dim + 2
         iq = 0 if self.transpose else -1
         return p.size // nq, (p, u, p.size // nq)
+
+    @kernel
+    def max_wavespeeds_array(
+        self,
+        u: NDArray[float],
+        a: NDArray[float],
+        ni: int = None,
+    ):
+        R"""
+        KERNEL void max_wavespeeds_array(double *u, double *a, int ni)
+        {
+            #if TRANSPOSE == 0
+            int sq = 1;
+            int si = NCONS;
+            #elif TRANSPOSE == 1
+            int sq = ni;
+            int si = 1;
+            #endif
+
+            FOR_EACH_1D(ni)
+            {
+                double u_reg[NCONS];
+                double p_reg[NCONS];
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    u_reg[q] = u[i * si + q * sq];
+                }
+                cons_to_prim(u_reg, p_reg);
+
+                for (int q = 0; q < NCONS; ++q)
+                {
+                    a[i] = max_wavespeed(p_reg);
+                }
+            }
+        }
+        """
+        return a.size, (u, a, a.size)
 
 
 @kernel_class
@@ -890,12 +928,15 @@ class FillGuardZones:
 
 
 class PatchState:
-    def __init__(self, n, t, u, box, to_user_prim):
+    """ """
+
+    def __init__(self, n, t, u, box, to_user_prim, max_wavespeed):
         self._n = n
         self._t = t
         self._u = u
         self._box = box
         self._to_user_prim = to_user_prim
+        self._max_wavespeed = max_wavespeed
 
     @property
     def box(self):
@@ -921,8 +962,19 @@ class PatchState:
     def cell_centers(self):
         return self._box.cell_centers()
 
+    def minimum_zone_size(self):
+        return self._box.grid_spacing[0]  # assume square zones
+
+    def maximum_wavespeed(self):
+        return self._max_wavespeed(self._u)
+
+    def timestep(self, cfl_number):
+        return cfl_number * self.minimum_zone_size() / self.maximum_wavespeed()
+
 
 class State:
+    """ """
+
     def __init__(self, box: CoordinateBox, states: list[PatchState]):
         self._box = box
         self._states = states
@@ -932,24 +984,33 @@ class State:
         return self._box
 
     @property
-    def primitive(self):
-        return concatenate([s.primitive for s in self._states])
-
-    @property
-    def cell_centers(self):
-        return concatenate([s.cell_centers for s in self._states])
-
-    @property
-    def total_zones(self):
-        return sum(s.total_zones for s in self._states)
-
-    @property
     def iteration(self):
         return self._states[0].iteration
 
     @property
     def time(self):
         return self._states[0].time
+
+    @property
+    def primitive(self):
+        return concatenate([s.primitive for s in self._states])
+
+    @property
+    def total_zones(self):
+        return sum(s.total_zones for s in self._states)
+
+    @property
+    def cell_centers(self):
+        return concatenate([s.cell_centers for s in self._states])
+
+    def minimum_zone_size(self):
+        return min(s.minimum_zone_size() for s in self._states)
+
+    def maximum_wavespeed(self):
+        return max(s.maximum_wavespeed() for s in self._states)
+
+    def timestep(self, cfl_number):
+        return cfl_number * self.minimum_zone_size() / self.maximum_wavespeed()
 
 
 def partition(elements: int, num_parts: int):
@@ -1025,15 +1086,15 @@ def extend_array(a: NDArray[float], count: int):
         return b
 
 
-def trim_array(a: NDArray[float], count: int):
+def trim_array(a: NDArray[float], count: int, scalar=False):
     ng = count
     s = a.shape
 
-    if len(s) == 2:
+    if len(s) == 2 - int(scalar):
         return a[ng:-ng]
-    if len(s) == 3:
+    if len(s) == 3 - int(scalar):
         return a[ng:-ng, ng:-ng]
-    if len(s) == 4:
+    if len(s) == 4 - int(scalar):
         return a[ng:-ng, ng:-ng, ng:-ng]
 
 
@@ -1057,6 +1118,49 @@ class SolverKernels(NamedTuple):
     godunov_fluxes: Callable
     prim_to_cons: Callable
     cons_to_prim: Callable
+    max_wavespeeds: Callable
+
+
+def make_solver_kernels(config: Sailfish, native_code: bool = False):
+    """
+    Build and return kernels needed by solver, or just the native code
+    """
+    nfields = config.domain.dimensionality + 2
+    grad_est = GradientEsimation(config)
+    fields = Fields(config)
+    scheme = Scheme(config)
+
+    if native_code:
+        return (
+            grad_est.__native_code__,
+            fields.__native_code__,
+            scheme.__native_code__,
+        )
+    else:
+        return SolverKernels(
+            grad_est.plm_gradient,
+            scheme.update_cons,
+            scheme.update_cons_from_fluxes,
+            scheme.godunov_fluxes,
+            fields.prim_to_cons_array,
+            fields.cons_to_prim_array,
+            fields.max_wavespeeds_array,
+        )
+
+
+def make_stream(hardware: str, gpu_streams: str):
+    """
+    Return a maybe-concurrent execution context
+    """
+    if hardware == "cpu":
+        return nullcontext()
+    if hardware == "gpu":
+        from cupy.cuda import Stream
+
+        if gpu_streams == "per-thread":
+            return Stream.ptds
+        if gpu_streams == "per-patch":
+            return Stream()
 
 
 def patch_solver(
@@ -1085,6 +1189,7 @@ def patch_solver(
         godunov_fluxes,
         prim_to_cons,
         cons_to_prim,
+        max_wavespeeds,
     ) = kernels
 
     if hardware == "gpu":
@@ -1094,7 +1199,6 @@ def patch_solver(
 
     dim = box.dimensionality
     dx = box.grid_spacing[0]
-    dt = dx * 1e-1
     p = xp.array(primitive)
     t = time
     n = iteration
@@ -1140,6 +1244,12 @@ def patch_solver(
             return p.get()
         except AttributeError:
             return p
+
+    wavespeeds_array = xp.zeros(box.num_zones[:dim])
+
+    def compute_max_wavespeed(u):
+        max_wavespeeds(u, wavespeeds_array)
+        return trim_array(wavespeeds_array, count=2, scalar=True).max()
 
     # =========================================================================
     # Time integration scheme: fwd and rk1 should produce the same result, but
@@ -1197,7 +1307,9 @@ def patch_solver(
 
     del primitive, p  # p is no longer needed, will free memory if possible
 
-    yield PatchState(n, t, u1, interior_box, cons_to_user_prim)
+    dt = yield PatchState(
+        n, t, u1, interior_box, cons_to_user_prim, compute_max_wavespeed
+    )
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
@@ -1217,49 +1329,14 @@ def patch_solver(
             else:
                 update_cons(p1, g1, u0, u1, u2, dt, dx, rk)
                 u1, u2 = u2, u1
+
             yield FillGuardZones(standard_layout_view(u1))
 
         t += dt
         n += 1
-        yield PatchState(n, t, u1, interior_box, cons_to_user_prim)
-
-
-def make_solver_kernels(config: Sailfish, native_code: bool = False):
-    """
-    Build and return kernels needed by solver, or just the native code
-    """
-    nfields = config.domain.dimensionality + 2
-    grad_est = GradientEsimation(config)
-    fields = Fields(config)
-    scheme = Scheme(config)
-
-    if native_code:
-        return (
-            grad_est.__native_code__,
-            fields.__native_code__,
-            scheme.__native_code__,
+        dt = yield PatchState(
+            n, t, u1, interior_box, cons_to_user_prim, compute_max_wavespeed
         )
-    else:
-        return SolverKernels(
-            grad_est.plm_gradient,
-            scheme.update_cons,
-            scheme.update_cons_from_fluxes,
-            scheme.godunov_fluxes,
-            fields.prim_to_cons_array,
-            fields.cons_to_prim_array,
-        )
-
-
-def make_stream(hardware: str, gpu_streams: str):
-    if hardware == "cpu":
-        return nullcontext()
-    if hardware == "gpu":
-        from cupy.cuda import Stream
-
-        if gpu_streams == "per-thread":
-            return Stream.ptds
-        if gpu_streams == "per-patch":
-            return Stream()
 
 
 def native_code(config: Sailfish):
@@ -1303,18 +1380,20 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             streams.append(stream)
             solvers.append(solver)
 
+    timestep = None
+
     def next_with(arg):
         context, gen = arg
 
         with context:
-            return next(gen)
+            return gen.send(timestep)
 
     with ThreadPool(num_threads) as pool:
         while True:
             events = list(pool.map(next_with, zip(streams, solvers)))
 
             if type(events[0]) is PatchState:
-                yield State(config.domain, events)
+                timestep = yield State(config.domain, events)
 
             elif type(events[0]) is FillGuardZones:
                 exchange_guard_zones([e.array for e in events])
