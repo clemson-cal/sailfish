@@ -125,118 +125,118 @@ class FuShu33:
 
         return p
 
+
 @schema
 class FuShu34:
     """
-    Lax problem. Run until t=0.3. Adapted from Example 3.4 from
-    G. Fu and C.-W. Shu, "A new trouble-cell indicator for discontinuous Galerkin methods for 
-    hyperbolic conservation laws," Journal of Computational Physics, v347 (2017), pp.305-327.
+    Lax problem
+
+    Run until t=0.3. Adapted from Example 3.4 from G. Fu and C.-W. Shu, "A new
+    trouble-cell indicator for discontinuous Galerkin methods for hyperbolic
+    conservation laws," Journal of Computational Physics, v347 (2017),
+    pp.305-327.
     """
 
     model: Literal["fu-shu-34"] = "fu-shu-34"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality == 1:
-            x = box.cell_centers()
-            l = x < 0.5
-            r = logical_not(l)
-            p = zeros(x.shape + (3,))
-            p[l] = [7.0, -1.0, 0.2]
-            p[r] = [7.0,  1.0, 0.2]
-
-        if box.dimensionality == 2:
-            x, y = box.cell_centers()
-            angle = 0.0
-            a = cos(0.5 * angle * pi)
-            b = sin(0.5 * angle * pi)
-            l = a * x + b * y < 0.5
-            r = logical_not(l)
-            p = zeros(x.shape + (4,))
-            p[l] = [7.0, -1.0, 0.2]
-            p[r] = [7.0,  1.0, 0.2]
-
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [7.0, -1.0, 0.2]
+        p[r] = [7.0, 1.0, 0.2]
         return p
+
 
 @schema
 class FuShu35:
     """
-    LeBlanc problem. Run until t=1.0. Adapted from Example 3.5 from
-    G. Fu and C.-W. Shu, "A new trouble-cell indicator for discontinuous Galerkin methods for 
-    hyperbolic conservation laws," Journal of Computational Physics, v347 (2017), pp.305-327.
+    LeBlanc problem
+
+    Run until t=1.0. Adapted from Example 3.5 from G. Fu and C.-W. Shu, "A new
+    trouble-cell indicator for discontinuous Galerkin methods for hyperbolic
+    conservation laws," Journal of Computational Physics, v347 (2017),
+    pp.305-327.
     """
 
     model: Literal["fu-shu-35"] = "fu-shu-35"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality == 1:
-            x = box.cell_centers()
-            l = x < 1.0 / 3.0
-            r = logical_not(l)
-            p = zeros(x.shape + (3,))
-            p[l] = [1.0, 0.0, 0.2 / 3.0]
-            p[r] = [1e-3,  0.0, 2.0 / 3.0 * 1e-10]
-
-        if box.dimensionality == 2:
-            x, y = box.cell_centers()
-            angle = 0.0
-            a = cos(0.5 * angle * pi)
-            b = sin(0.5 * angle * pi)
-            l = a * x + b * y < 1.0 / 3.0
-            r = logical_not(l)
-            p = zeros(x.shape + (4,))
-            p[l] = [1.0, 0.0, 0.2 / 3.0]
-            p[r] = [1e-3,  0.0, 2.0 / 3.0 * 1e-10]
-
-
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 1.0 / 3.0
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [1.0, 0.0, 0.2 / 3.0]
+        p[r] = [1e-3, 0.0, 2.0 / 3.0 * 1e-10]
         return p
+
 
 @schema
 class FuShu36:
     """
-    Shu-Osher problem. Run until t=0.18. Adapted from Example 3.6 from
-    G. Fu and C.-W. Shu, "A new trouble-cell indicator for discontinuous Galerkin methods for 
-    hyperbolic conservation laws," Journal of Computational Physics, v347 (2017), pp.305-327.
+    Shu-Osher problem
+
+    Run until t=0.18. Adapted from Example 3.6 from G. Fu and C.-W. Shu, "A
+    new trouble-cell indicator for discontinuous Galerkin methods for
+    hyperbolic conservation laws," Journal of Computational Physics, v347
+    (2017), pp.305-327.
     """
 
     model: Literal["fu-shu-36"] = "fu-shu-36"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality == 1:
-            x = box.cell_centers()
-            p = zeros(x.shape + (3,))
-            for i in range(0, len(x)):
-                if x[i] < 0.1:
-                    p[i][0] = 3.857143
-                    p[i][1] = 2.629369
-                    p[i][2] = 10.333333
-                else:
-                    p[i][0] = 1.0 + 0.2 * sin(50.0 * x[i])
-                    p[i][1] = 0.0
-                    p[i][2] = 1.0
-
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        p = zeros(x.shape + (3,))
+        l = (x >= 0.0) * (x < 0.1)
+        r = (x >= 0.1) * (x < 1.0)
+        p[l] = [3.857143, 2.629369, 10.333333]
+        p[r, 0] = 1.0 + 0.2 * sin(50.0 * x[r])
+        p[r, 1] = 0.0
+        p[r, 2] = 1.0
         return p
+
 
 @schema
 class FuShu37:
     """
-    Shu-Osher problem. Run until t=0.38. Adapted from Example 3.7 from
-    G. Fu and C.-W. Shu, "A new trouble-cell indicator for discontinuous Galerkin methods for 
-    hyperbolic conservation laws," Journal of Computational Physics, v347 (2017), pp.305-327.
+    Shu-Osher problem
+
+    Run until t=0.38. Adapted from Example 3.7 from G. Fu and C.-W. Shu, "A
+    new trouble-cell indicator for discontinuous Galerkin methods for
+    hyperbolic conservation laws," Journal of Computational Physics, v347
+    (2017), pp.305-327.
     """
 
     model: Literal["fu-shu-37"] = "fu-shu-37"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality == 1:
-            x = box.cell_centers()
-            l = x <   0.1
-            m = x >= (0.1 and x < 0.9)
-            r = x >=  0.9
-            p = zeros(x.shape + (3,))
-            p[l] = [1.0, 0.0, 1000.0]
-            p[m] = [1.0, 0.0, 0.01]
-            p[r] = [1.0, 0.0, 100.0]
-
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = (x >= 0.0) * (x < 0.1)
+        m = (x >= 0.1) * (x < 0.9)
+        r = (x >= 0.9) * (x < 1.0)
+        p = zeros(x.shape + (3,))
+        p[l] = [1.0, 0.0, 1000.0]
+        p[m] = [1.0, 0.0, 0.01]
+        p[r] = [1.0, 0.0, 100.0]
         return p
 
-InitialData = Union[Shocktube, CylindricalExplosion, CylinderInWind, FuShu33, FuShu34, FuShu35, FuShu36, FuShu37]
+
+InitialData = Union[
+    Shocktube,
+    CylindricalExplosion,
+    CylinderInWind,
+    FuShu33,
+    FuShu34,
+    FuShu35,
+    FuShu36,
+    FuShu37,
+]

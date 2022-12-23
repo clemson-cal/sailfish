@@ -1,0 +1,67 @@
+[
+    {
+        "initial_data": {
+            "model": "fu-shu-33"
+        },
+        "driver": {
+            "tfinal": 0.13
+        },
+        "physics": {
+            "equation_of_state": {
+                "gamma_law_index": 1.6666666666666
+            }
+        }
+    },
+    {
+        "initial_data": {
+            "model": "fu-shu-34"
+        },
+        "driver": {
+            "tfinal": 0.3
+        },
+        "physics": {
+            "equation_of_state": {
+                "gamma_law_index": 1.6666666666666
+            }
+        }
+    },
+    {
+        "initial_data": {
+            "model": "fu-shu-35"
+        },
+        "driver": {
+            "tfinal": 1.0
+        },
+        "physics": {
+            "equation_of_state": {
+                "gamma_law_index": 1.6666666666666
+            }
+        }
+    },
+    {
+        "initial_data": {
+            "model": "fu-shu-36"
+        },
+        "driver": {
+            "tfinal": 0.18
+        },
+        "physics": {
+            "equation_of_state": {
+                "gamma_law_index": 1.4
+            }
+        }
+    },
+    {
+        "initial_data": {
+            "model": "fu-shu-37"
+        },
+        "driver": {
+            "tfinal": 0.38
+        },
+        "physics": {
+            "equation_of_state": {
+                "gamma_law_index": 1.6666666666666
+            }
+        }
+    }
+]
