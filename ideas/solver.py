@@ -526,6 +526,7 @@ class Scheme:
         }
         """
 
+
     @kernel
     def godunov_fluxes(
         self,
@@ -864,7 +865,7 @@ class Scheme:
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    double u1 = uc[q];
+                    double u1 = uc[q * sq];
 
                     #if DIM >= 1
                     double fm = f[0 * nd + nccc + q * sq];
@@ -886,11 +887,11 @@ class Scheme:
                     if (rk != 0.0)
                     {
                         u1 *= (1.0 - rk);
-                        u1 += rk * u0[q];
+                        u1 += rk * u0[q * sq];
                     }
                     #endif
 
-                    uc[q] = u1;
+                    uc[q * sq] = u1;
                 }
             }
         }
