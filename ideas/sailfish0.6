@@ -11,13 +11,17 @@ from collections.abc import Mapping, Iterable
 from contextlib import contextmanager
 from dataclasses import asdict, dataclass
 from datetime import datetime
+from inspect import getsource, isgeneratorfunction
 from itertools import chain, product
-from pickle import load as load_pickle, dump as dump_pickle
 from json import load as load_json, dump as dump_json, dumps as dumps_json
 from logging import getLogger
+from pickle import load as load_pickle, dump as dump_pickle
 from sys import argv
+from textwrap import dedent
 
 from config import Sailfish, Strategy, Scheme, Driver, add_config_arguments
+from models import InitialData
+from preset import preset, get_preset_functions
 from system import system_info
 
 
@@ -465,6 +469,7 @@ def init_logging(level):
     return console
 
 
+@preset
 def scan_strategies():
     d = {
         "driver.checkpoint.format": ("none",),
@@ -474,14 +479,10 @@ def scan_strategies():
         "strategy.cache_grad": (True, False),
     }
     for p in product(*d.values()):
-        yield unflatten(dict(name=str(p), **dict(zip(d.keys(), p))))
+        yield dict(name=str(p), **dict(zip(d.keys(), p)))
 
 
-def sailfish_presets():
-    return {"scan-strategies": scan_strategies()}
-
-
-def sailfish(config, overrides):
+def sailfish(config, overrides, console):
     """
     Yield a sequence of sailfish app structs from a config
 
@@ -489,29 +490,40 @@ def sailfish(config, overrides):
     or sequence of dictionaries, or it may be a path to a json file
     containing a dictionary or a list of dictionaries.
     """
-    presets = sailfish_presets()
+    presets = get_preset_functions()
     chkpt = None
 
     if not config:
         cs = dict()
-    elif config in presets:
-        cs = presets[config]
+    elif "." not in config:
+        # no extension; it might be a preset
+        try:
+            cs = presets[config]()
+        except KeyError as e:
+            console.print(f"No preset named {e}. Available presets:")
+            console.print()
+            console.print("\n".join(presets.keys()))
+            console.print()
+            console.print("for more information run 'sailfish doc presets'")
+            return
     elif config.endswith(".json"):
+        # it's a configuration file
         with open(config) as infile:
             cs = load_json(infile)
     elif config.endswith(".pk"):
+        # it's a checkpoint file
         with open(config, "rb") as infile:
             chkpt = load_pickle(infile)
             cs = chkpt["config"]
     else:
-        raise ValueError("config must be a preset or a json file")
+        raise ValueError("config must be a preset name or a json file")
 
     if type(cs) is dict:
         cs = [cs]
 
     for c in cs:
         s = asdict(Sailfish())
-        deep_update(s, c)
+        deep_update(s, unflatten(c))
         deep_update(s, overrides)
         yield Sailfish(**s), chkpt
 
@@ -559,7 +571,7 @@ def run(args=None, console=None, parser=None):
         overrides = unflatten(
             {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
         )
-        runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
+        runs = chain(*(sailfish(cfg, overrides, console) for cfg in args._configs))
         summaries = list()
 
         try:
@@ -602,13 +614,12 @@ def doc(args=None, console=None, parser=None):
     """
     Display code documentation
     """
-    choices = ("kernels", "config", "setups", "solver", "physics")
+    choices = ("kernels", "config", "solver", "physics", "models", "presets")
 
     if parser:
         parser.add_argument("topic", nargs="?", choices=choices)
+        parser.add_argument("--more", action="store_true", help="show more detail")
     else:
-        from inspect import getsource
-        from textwrap import dedent
         from kernels import main as kernels_main
         from rich.markdown import Markdown
         from rich.syntax import Syntax
@@ -622,19 +633,35 @@ def doc(args=None, console=None, parser=None):
             for choice in choices:
                 topics += f"\n- {choice}"
             topics += "\n-----------"
-
             console.print(Markdown(topics))
             topic = Prompt.ask("select", choices=choices, show_choices=False)
             console.print("\n\n")
-
+        if topic == "kernels":
+            console.print(Syntax(getsource(kernels_main), lexer="python"))
         if topic == "config":
             console.print(Driver())
             console.print("\n\n")
             console.print(Strategy())
             console.print("\n\n")
             console.print(Scheme())
-        if topic == "kernels":
-            console.print(Syntax(getsource(kernels_main), lexer="python"))
+        if topic == "solver":
+            console.print("Not yet documented")
+        if topic == "physics":
+            console.print("Not yet documented")
+        if topic == "models":
+            for cls in InitialData.__args__:
+                console.rule()
+                console.print(Markdown(f"*{cls.__name__}*\n{dedent(cls.__doc__)}"))
+        if topic == "presets":
+            if args.more:
+                for name, func in get_preset_functions().items():
+                    console.print(name)
+                    if isgeneratorfunction(func):
+                        console.print(list(func()))
+                    else:
+                        console.print(func())
+            else:
+                console.print("\n".join(get_preset_functions()))
 
 
 def dep(args=None, console=None, parser=None):
@@ -651,13 +678,13 @@ def dep(args=None, console=None, parser=None):
         def have(m):
             try:
                 import_module(m)
-                return "[green]yes"
+                return f"[green]yes"
             except ImportError:
                 return "[red]no"
 
         table = Table(box=box.MINIMAL)
         table.add_column("module")
-        table.add_column("present")
+        table.add_column("installed?")
         table.add_column("required for")
         table.add_column("pip3 install --user")
         table.add_row("[blue]pydantic", have("pydantic"), "everything", "pydantic")
@@ -665,6 +692,9 @@ def dep(args=None, console=None, parser=None):
         table.add_row("[blue]cupy", have("cupy"), "GPU acceleration", "cupy-cuda116")
         table.add_row("[blue]cffi", have("cffi"), "CPU native code", "cffi")
         table.add_row("[blue]rich", have("rich"), "formatted output", "rich")
+        table.add_row(
+            "[blue]matplotlib", have("matplotlib"), "plotting features", "matplotlib"
+        )
         table.add_row(
             "[blue]cpuinfo", have("cpuinfo"), "detailed CPU info", "py-cpuinfo"
         )
@@ -729,6 +759,8 @@ def todo(args=None, console=None, parser=None):
 
         - [x] maximum wavespeed / timestep calculation
         - [x] control over time-step recalculation cadence
+        - [ ] code glossary
+        - [ ] plotting and animation features
         - [ ] graceful handling of validation errors
         - [/] boundary conditions:
             - [x] outflow
@@ -736,6 +768,7 @@ def todo(args=None, console=None, parser=None):
             - [ ] periodic
             - [ ] reflecting
         - [ ] models:
+            - [x] 1d problems from Fu-Shu (2017)
             - [ ] Kelvin-Helmholtz
             - [ ] Accretion disk
             - [ ] Shock in wind
@@ -750,6 +783,7 @@ def todo(args=None, console=None, parser=None):
         - [ ] outer buffer source terms
         - [ ] reductions needed for orbital evolution
         - [ ] isothermal reset
+        - [ ] angular-momentum conserving 2d solver
         - [ ] MPI parallel
         """
         console.print(Markdown(dedent(text)), width=100)

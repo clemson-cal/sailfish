@@ -12,15 +12,19 @@ discriminating field.
 
 
 from typing import Literal, Union
+from numpy import logical_not, zeros, sqrt, sin, cos, pi
+from preset import preset
 from schema import schema
 from geometry import CoordinateBox
-from numpy import logical_not, zeros, sqrt, sin, cos, pi
 
 
 @schema
 class Shocktube:
     """
-    A linear shocktube setup
+    Classic Sod shocktube initial data
+
+    Note: this model should be specialized to 1d; a version generalized for
+    1d/2d/3d should be added in a new models section.
     """
 
     model: Literal["shocktube"] = "shocktube"
@@ -33,7 +37,6 @@ class Shocktube:
             p = zeros(x.shape + (3,))
             p[l] = [1.0, 0.0, 1.000]
             p[r] = [0.1, 0.0, 0.125]
-
         if box.dimensionality == 2:
             x, y = box.cell_centers()
             angle = 0.0
@@ -44,29 +47,29 @@ class Shocktube:
             p = zeros(x.shape + (4,))
             p[l] = [1.0, 0.0, 0.0, 1.000]
             p[r] = [0.1, 0.0, 0.0, 0.125]
-
         return p
 
 
 @schema
 class CylindricalExplosion:
     """
-    A cylindrical explosion setup
+    Cylindrical explosion initial data
+
+    Initializes a circular region of high pressure and density. A shock wave
+    and contact discontinuity should expand outward with a circular profile.
     """
 
     model: Literal["cylindrical-explosion"] = "cylindrical-explosion"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 2:
-            raise NotImplementedError("setup only works in 2d")
-
+            raise NotImplementedError("model only works in 2d")
         x, y = box.cell_centers()
         l = sqrt(x**2 + y**2) < 0.1
         r = logical_not(l)
         p = zeros(x.shape + (4,))
         p[l] = [1.0, 0.0, 0.0, 1.000]
         p[r] = [0.1, 0.0, 0.0, 0.125]
-
         return p
 
 
@@ -74,67 +77,68 @@ class CylindricalExplosion:
 class CylinderInWind:
     """
     A round cylinder immersed in a dilute wind
+
+    A circular region of high density is immersed in a low-density ambient
+    medium moving from left to right. After some time, the high-density region
+    is disrupted by Kelvin-Helmholtz instabilities.
     """
 
     model: Literal["cylinder-in-wind"] = "cylinder-in-wind"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 2:
-            raise NotImplementedError("setup only works in 2d")
-
+            raise NotImplementedError("model only works in 2d")
         x, y = box.cell_centers()
         l = sqrt(x**2 + y**2) < 0.1
         r = logical_not(l)
         p = zeros(x.shape + (4,))
-
         p[l] = [1e2, 0.0, 0.0, 1.0]
         p[r] = [1.0, 1.0, 0.0, 1.0]
-
         return p
 
 
 @schema
 class FuShu33:
     """
-    Lax problem. Run until t=0.13. Adapted from Example 3.3 from
-    G. Fu and C.-W. Shu, "A new trouble-cell indicator for discontinuous Galerkin methods for 
-    hyperbolic conservation laws," Journal of Computational Physics, v347 (2017), pp.305-327.
+    Lax problem initial data
+
+    Adapted from Example 3.3 from G. Fu and C.-W. Shu, "A new trouble-cell
+    indicator for discontinuous Galerkin methods for hyperbolic conservation
+    laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
 
     model: Literal["fu-shu-33"] = "fu-shu-33"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality == 1:
-            x = box.cell_centers()
-            l = x < 0.5
-            r = logical_not(l)
-            p = zeros(x.shape + (3,))
-            p[l] = [0.445, 0.698, 3.528]
-            p[r] = [0.5, 0.0, 0.571]
-
-        if box.dimensionality == 2:
-            x, y = box.cell_centers()
-            angle = 0.0
-            a = cos(0.5 * angle * pi)
-            b = sin(0.5 * angle * pi)
-            l = a * x + b * y < 0.5
-            r = logical_not(l)
-            p = zeros(x.shape + (4,))
-            p[l] = [0.445, 0.698, 3.528]
-            p[r] = [0.5, 0.0, 0.571]
-
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.0
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [0.445, 0.698, 3.528]
+        p[r] = [0.500, 0.000, 0.571]
         return p
+
+
+@preset
+def fu_shu_33():
+    return {
+        "initial_data.model": "fu-shu-33",
+        "domain.num_zones": [200, 1, 1],
+        "domain.extent_i": [-5.0, 5.0],
+        "driver.tfinal": 1.3,
+    }
 
 
 @schema
 class FuShu34:
     """
-    Lax problem
+    Lax problem: double rarefaction wave
 
-    Run until t=0.3. Adapted from Example 3.4 from G. Fu and C.-W. Shu, "A new
-    trouble-cell indicator for discontinuous Galerkin methods for hyperbolic
-    conservation laws," Journal of Computational Physics, v347 (2017),
-    pp.305-327.
+    Adapted from Example 3.4 from G. Fu and C.-W. Shu, "A new trouble-cell
+    indicator for discontinuous Galerkin methods for hyperbolic conservation
+    laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
 
     model: Literal["fu-shu-34"] = "fu-shu-34"
@@ -143,12 +147,22 @@ class FuShu34:
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
-        l = x < 0.5
+        l = x < 0.0
         r = logical_not(l)
         p = zeros(x.shape + (3,))
         p[l] = [7.0, -1.0, 0.2]
-        p[r] = [7.0, 1.0, 0.2]
+        p[r] = [7.0, +1.0, 0.2]
         return p
+
+
+@preset
+def fu_shu_34():
+    return {
+        "initial_data.model": "fu-shu-34",
+        "domain.num_zones": [200, 1, 1],
+        "domain.extent_i": [-1.0, 1.0],
+        "driver.tfinal": 0.6,
+    }
 
 
 @schema
@@ -156,10 +170,11 @@ class FuShu35:
     """
     LeBlanc problem
 
-    Run until t=1.0. Adapted from Example 3.5 from G. Fu and C.-W. Shu, "A new
-    trouble-cell indicator for discontinuous Galerkin methods for hyperbolic
-    conservation laws," Journal of Computational Physics, v347 (2017),
-    pp.305-327.
+    Adapted from Example 3.5 from G. Fu and C.-W. Shu, "A new trouble-cell
+    indicator for discontinuous Galerkin methods for hyperbolic conservation
+    laws," Journal of Computational Physics, v347 (2017), pp.305-327.
+
+    Note: use log-scaling to plot the mass density profile.
     """
 
     model: Literal["fu-shu-35"] = "fu-shu-35"
@@ -168,12 +183,22 @@ class FuShu35:
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
-        l = x < 1.0 / 3.0
+        l = x < 0.0
         r = logical_not(l)
         p = zeros(x.shape + (3,))
-        p[l] = [1.0, 0.0, 0.2 / 3.0]
+        p[l] = [1.00, 0.0, 2.0 / 3.0 * 1e-1]
         p[r] = [1e-3, 0.0, 2.0 / 3.0 * 1e-10]
         return p
+
+
+@preset
+def fu_shu_35():
+    return {
+        "initial_data.model": "fu-shu-35",
+        "domain.num_zones": [600, 1, 1],
+        "domain.extent_i": [-3.0, 6.0],
+        "driver.tfinal": 6.0,
+    }
 
 
 @schema
@@ -181,10 +206,9 @@ class FuShu36:
     """
     Shu-Osher problem
 
-    Run until t=0.18. Adapted from Example 3.6 from G. Fu and C.-W. Shu, "A
-    new trouble-cell indicator for discontinuous Galerkin methods for
-    hyperbolic conservation laws," Journal of Computational Physics, v347
-    (2017), pp.305-327.
+    Adapted from Example 3.6 from G. Fu and C.-W. Shu, "A new trouble-cell
+    indicator for discontinuous Galerkin methods for hyperbolic conservation
+    laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
 
     model: Literal["fu-shu-36"] = "fu-shu-36"
@@ -194,24 +218,37 @@ class FuShu36:
             raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
         p = zeros(x.shape + (3,))
-        l = (x >= 0.0) * (x < 0.1)
-        r = (x >= 0.1) * (x < 1.0)
+        l = (x >= -5.0) * (x < -4.0)
+        r = (x >= -4.0) * (x < +5.0)
         p[l] = [3.857143, 2.629369, 10.333333]
-        p[r, 0] = 1.0 + 0.2 * sin(50.0 * x[r])
+        p[r, 0] = 1.0 + 0.2 * sin(5.0 * x[r])
         p[r, 1] = 0.0
         p[r, 2] = 1.0
         return p
 
 
+@preset
+def fu_shu_36():
+    return {
+        "initial_data.model": "fu-shu-36",
+        "domain.num_zones": [200, 1, 1],
+        "domain.extent_i": [-5.0, 5.0],
+        "driver.tfinal": 1.8,
+    }
+
+
 @schema
 class FuShu37:
     """
-    Shu-Osher problem
+    Blast wave interaction
 
-    Run until t=0.38. Adapted from Example 3.7 from G. Fu and C.-W. Shu, "A
-    new trouble-cell indicator for discontinuous Galerkin methods for
-    hyperbolic conservation laws," Journal of Computational Physics, v347
-    (2017), pp.305-327.
+    Adapted from Example 3.7 from G. Fu and C.-W. Shu, "A new trouble-cell
+    indicator for discontinuous Galerkin methods for hyperbolic conservation
+    laws," Journal of Computational Physics, v347 (2017), pp.305-327.
+
+    Notes:
+    - this problem should be run with a reflecting BC at each end
+    - use log-scaling to plot the mass density profile
     """
 
     model: Literal["fu-shu-37"] = "fu-shu-37"
@@ -228,6 +265,16 @@ class FuShu37:
         p[m] = [1.0, 0.0, 0.01]
         p[r] = [1.0, 0.0, 100.0]
         return p
+
+
+@preset
+def fu_shu_37():
+    return {
+        "initial_data.model": "fu-shu-37",
+        "domain.num_zones": [400, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 0.038,
+    }
 
 
 InitialData = Union[

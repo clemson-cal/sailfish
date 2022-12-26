@@ -1,4 +1,5 @@
 from typing import Literal, Union
+from inspect import isgeneratorfunction
 from schema import schema
 from geometry import CoordinateBox
 from models import InitialData, Shocktube
