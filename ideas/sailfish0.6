@@ -402,13 +402,13 @@ def plot():
             if state.box.dimensionality == 1:
                 ax1.plot(
                     state.cell_centers,
-                    state.primitive[:, 0],
+                    state.primitive[:, 0, 0, 0],
                     "-o",
                     mfc="none",
                 )
             if state.box.dimensionality == 2:
                 x, y = state.cell_centers
-                z = state.primitive[:, :, 0]
+                z = state.primitive[:, :, 0, 0]
                 ax1.pcolormesh(
                     x[2:-2, 2:-2],
                     y[2:-2, 2:-2],

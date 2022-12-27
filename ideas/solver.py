@@ -10,7 +10,7 @@ from math import prod
 from multiprocessing.pool import ThreadPool
 from typing import NamedTuple, Callable, Iterable
 
-from numpy import array, zeros, concatenate
+from numpy import array, zeros, concatenate, argsort
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
@@ -19,30 +19,6 @@ from config import Sailfish, Strategy, Reconstruction, CoordinateBox
 from geometry import CoordinateBox
 
 logger = getLogger("sailfish")
-
-
-def spatial_axes_shape(a: NDArray, dim: int, transpose: bool) -> tuple[int, int, int]:
-    """
-    Return a 3d array shape for a given domain dimensionality and data layout
-
-    For example the domain is 2d (dim=2) and transpose=True, then the input
-    array would have shape (nfields, ni, nj) and the return value would be
-    (ni, nj, 1).
-    """
-    if transpose:
-        if dim == 1:
-            return a.shape[1], 1, 1
-        elif dim == 2:
-            return a.shape[1], a.shape[2], 1
-        elif dim == 3:
-            return a.shape[1:4]
-    else:
-        if dim == 1:
-            return a.shape[0], 1, 1
-        elif dim == 2:
-            return a.shape[0], a.shape[1], 1
-        elif dim == 3:
-            return a.shape[0:3]
 
 
 @device
@@ -201,7 +177,7 @@ class GradientEsimation:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = spatial_axes_shape(y, dim, self._transpose)
+        s = y.shape[:3]
         return s[:dim], (y, g, plm, *s)
 
 
@@ -526,7 +502,6 @@ class Scheme:
         }
         """
 
-
     @kernel
     def godunov_fluxes(
         self,
@@ -629,7 +604,7 @@ class Scheme:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = spatial_axes_shape(urd, dim, self._transpose)
+        s = urd.shape[:3]
         return s[:dim], (prd, grd, urd, fwr, plm, *s)
 
     @kernel
@@ -775,7 +750,7 @@ class Scheme:
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
-        s = spatial_axes_shape(urd, dim, self._transpose)
+        s = urd.shape[:3]
         return s[:dim], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
 
     @kernel
@@ -897,7 +872,7 @@ class Scheme:
         }
         """
         dim = self._dim
-        s = spatial_axes_shape(u, dim, self._transpose)
+        s = u.shape[:3]
         return s[:dim], (urk, u, f, dt, dx, rk, *s)
 
 
@@ -1123,33 +1098,15 @@ def trim_box(box: CoordinateBox, count: int):
 
 
 def extend_array(a: NDArray[float], count: int):
-    ng = count
-    s = a.shape
-
-    if len(s) == 2:
-        b = zeros([s[0] + 2 * ng, s[1]])
-        b[ng:-ng] = a
-        return b
-    if len(s) == 3:
-        b = zeros([s[0] + 2 * ng, s[1] + 2 * ng, s[2]])
-        b[ng:-ng, ng:-ng] = a
-        return b
-    if len(s) == 4:
-        b = zeros([s[0] + 2 * ng, s[1] + 2 * ng, s[2] + 2 * ng, s[3]])
-        b[ng:-ng, ng:-ng, ng:-ng] = a
-        return b
+    new_shape = list(a.shape)
+    new_shape[:3] = list(n + (2 * count if n > 1 else 0) for n in a.shape[:3])
+    b = zeros(new_shape)
+    b[tuple(slice(count, -count) if n > 1 else slice(0, 1) for n in a.shape[:3])] = a
+    return b
 
 
-def trim_array(a: NDArray[float], count: int, scalar=False):
-    ng = count
-    s = a.shape
-
-    if len(s) == 2 - int(scalar):
-        return a[ng:-ng]
-    if len(s) == 3 - int(scalar):
-        return a[ng:-ng, ng:-ng]
-    if len(s) == 4 - int(scalar):
-        return a[ng:-ng, ng:-ng, ng:-ng]
+def trim_array(a: NDArray[float], count: int):
+    return a[tuple(slice(count, -count) if n > 1 else slice(0, 1) for n in a.shape[:3])]
 
 
 def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
@@ -1163,6 +1120,25 @@ def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
         x1 = box.extent_i[0] + dx * i1
         num_zones = (i1 - i0, *box.num_zones[1:])
         yield (i0, i1), replace(box, extent_i=(x0, x1), num_zones=num_zones)
+
+
+def three_space_axes(a, num_fields_axes=0):
+    """
+    Return an array of rank 4; three spatial axes followed by fields axes
+    """
+    if len(a.shape) == 1 + num_fields_axes:
+        return a[:, None, None]
+    if len(a.shape) == 2 + num_fields_axes:
+        return a[:, :, None]
+    if len(a.shape) == 3 + num_fields_axes:
+        return a[:, :, :]
+
+
+def with_layout(factory, shape, perm, fill=None):
+    result = factory(tuple(shape[p] for p in perm)).transpose(argsort(perm))
+    if fill is not None:
+        result[...] = fill
+    return result
 
 
 class SolverKernels(NamedTuple):
@@ -1251,67 +1227,43 @@ def patch_solver(
     if hardware == "cpu":
         import numpy as xp
 
+    if transpose:
+        axes4 = (3, 0, 1, 2)
+        axes5 = (0, 4, 1, 2, 3)
+    else:
+        axes4 = (0, 1, 2, 3)
+        axes5 = (0, 1, 2, 3, 4)
+
     dim = box.dimensionality
+    nprim = primitive.shape[-1]
+    ncons = nprim
     dx = box.grid_spacing[0]
-    p = xp.array(primitive)
+    p = with_layout(xp.empty, box.num_zones + (nprim,), axes4, primitive)
     t = time
     n = iteration
     interior_box = trim_box(box, 2)
 
-    # =========================================================================
-    # Whether the data layout is transposed, i.e. adjacent memory locations are
-    # the same field but in adjacent zones.
-    # =========================================================================
-    def three_spatial_dims(a):
-        if len(a.shape) == 2:
-            return a[:, None, None, :]
-        if len(a.shape) == 3:
-            return a[:, :, None, :]
-        if len(a.shape) == 4:
-            return a[:, :, :, :]
+    del primitive
 
-    def standard_layout_view(a):
-        if not transpose:
-            return a
-        elif box.dimensionality == 1:
-            return a.transpose((1, 0))
-        elif box.dimensionality == 2:
-            return a.transpose((2, 0, 1))
-        elif box.dimensionality == 3:
-            return a.transpose((3, 0, 1, 2))
-
-    def transpose_layout_view(a):
-        if not transpose:
-            return a
-        elif box.dimensionality == 1:
-            return a.transpose((1, 0))
-        elif box.dimensionality == 2:
-            return a.transpose((1, 2, 0))
-        elif box.dimensionality == 3:
-            return a.transpose((1, 2, 3, 0))
-
-    yield FillGuardZones(three_spatial_dims(p))
-
-    if transpose:
-        p = xp.ascontiguousarray(transpose_layout_view(p))
+    yield FillGuardZones(p)
 
     def cons_to_user_prim(u):
         """
         Return primitives in standard layout host memory and with no guards
         """
-        p = xp.empty_like(u)
+        p = with_layout(xp.zeros, box.num_zones + (nprim,), axes4)
         cons_to_prim(u, p)
-        p = trim_array(standard_layout_view(p), 2)
+        p = trim_array(p, 2)
         try:
             return p.get()
         except AttributeError:
             return p
 
-    wavespeeds_array = xp.zeros(box.num_zones[:dim])
+    wavespeeds_array = xp.zeros(box.num_zones)
 
     def compute_max_wavespeed(u):
         max_wavespeeds(u, wavespeeds_array)
-        return trim_array(wavespeeds_array, count=2, scalar=True).max()
+        return trim_array(wavespeeds_array, 2).max()
 
     # =========================================================================
     # Time integration scheme: fwd and rk1 should produce the same result, but
@@ -1331,7 +1283,7 @@ def patch_solver(
     # A buffer for the array of cached Runge-Kutta conserved fields
     # =========================================================================
     if rks:
-        u0 = xp.zeros_like(p)  # RK cons
+        u0 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)  # RK cons
     else:
         u0 = None
 
@@ -1341,13 +1293,13 @@ def patch_solver(
     # the conserved data and an array of Godunov fluxes.
     # =========================================================================
     if cache_flux:
-        fh = xp.zeros((dim,) + p.shape)
-        u1 = xp.zeros_like(p)
+        fh = with_layout(xp.zeros, (dim,) + box.num_zones + (ncons,), axes5)
+        u1 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)
         prim_to_cons(p, u1)
     else:
         p1 = p if cache_prim else None
-        u1 = xp.zeros_like(p)
-        u2 = xp.zeros_like(p)
+        u1 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)
+        u2 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)
         prim_to_cons(p, u1)
         prim_to_cons(p, u2)
 
@@ -1363,11 +1315,11 @@ def patch_solver(
     # A buffer for the primitive field gradients if gradients are being cached
     # =========================================================================
     if cache_grad:
-        g1 = xp.zeros((dim,) + p.shape)  # gradients
+        g1 = with_layout(xp.zeros, box.num_zones + (nprim,), axes4)  # gradients
     else:
         g1 = None
 
-    del primitive, p  # p is no longer needed, will free memory if possible
+    del p  # p is no longer needed, will free memory if possible
 
     dt = yield PatchState(
         n, t, u1, interior_box, cons_to_user_prim, compute_max_wavespeed
@@ -1392,7 +1344,7 @@ def patch_solver(
                 update_cons(p1, g1, u0, u1, u2, dt, dx, rk)
                 u1, u2 = u2, u1
 
-            yield FillGuardZones(three_spatial_dims(standard_layout_view(u1)))
+            yield FillGuardZones(u1)
 
         t += dt
         n += 1
@@ -1435,6 +1387,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             t = 0.0
             n = 0
             p = config.initial_data.primitive(box)
+            p = three_space_axes(p, num_fields_axes=1)
         p = extend_array(p, count=2)
         b = extend_box(box, count=2)
 
