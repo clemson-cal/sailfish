@@ -4,11 +4,10 @@ A solver is a generator function and a state object
 
 
 from contextlib import nullcontext
-from dataclasses import replace
 from logging import getLogger
 from math import prod
 from multiprocessing.pool import ThreadPool
-from typing import NamedTuple, Callable, Iterable
+from typing import NamedTuple, Callable
 
 from numpy import array, zeros, concatenate, argsort
 from numpy.typing import NDArray
@@ -17,6 +16,7 @@ from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle, max_wavespeed
 from config import Sailfish, Strategy, Reconstruction, CoordinateBox
 from geometry import CoordinateBox
+from index_space import IndexSpace
 
 logger = getLogger("sailfish")
 
@@ -1042,106 +1042,11 @@ class State:
         return cfl_number * self.minimum_zone_size() / self.maximum_wavespeed()
 
 
-def partition(elements: int, num_parts: int):
-    """
-    Equitably divide the given number of elements into `num_parts` partitions.
-
-    The sum of the partitions is `elements`. The number of partitions must be
-    less than or equal to the number of elements.
-    """
-    n = elements // num_parts
-    r = elements % num_parts
-
-    for i in range(num_parts):
-        yield n + (1 if i < r else 0)
-
-
-def subdivide(interval: tuple[int, int], num_parts: int):
-    """
-    Divide an interval into non-overlapping contiguous sub-intervals.
-    """
-    a, b = interval
-
-    for n in partition(b - a, num_parts):
-        yield a, a + n
-        a += n
-
-
-def extend_box(box: CoordinateBox, count: int):
-    extent = [box.extent_i, box.extent_j, box.extent_k]
-    num_zones = [1, 1, 1]
-
-    for a in range(3):
-        ni = box.num_zones[a]
-        dx = box.grid_spacing[a]
-        if ni > 1:
-            x0 = extent[a][0] - count * dx
-            x1 = extent[a][1] + count * dx
-            num_zones[a] = ni + 2 * count
-        else:
-            x0 = extent[a][0]
-            x1 = extent[a][1]
-            num_zones[a] = ni
-        extent[a] = (x0, x1)
-
-    return replace(
-        box,
-        extent_i=extent[0],
-        extent_j=extent[1],
-        extent_k=extent[2],
-        num_zones=tuple(num_zones),
-    )
-
-
-def trim_box(box: CoordinateBox, count: int):
-    return extend_box(box, -count)
-
-
-def extend_array(a: NDArray[float], count: int):
-    new_shape = list(a.shape)
-    new_shape[:3] = list(n + (2 * count if n > 1 else 0) for n in a.shape[:3])
-    b = zeros(new_shape)
-    b[tuple(slice(count, -count) if n > 1 else slice(0, 1) for n in a.shape[:3])] = a
-    return b
-
-
-def trim_array(a: NDArray[float], count: int):
-    return a[tuple(slice(count, -count) if n > 1 else slice(0, 1) for n in a.shape[:3])]
-
-
-def decompose(box: CoordinateBox, num_parts: int) -> Iterable[CoordinateBox]:
-    """
-    Decompose a 1d coordinate box into a sequence of non-overlapping boxes
-    """
-    dx = box.grid_spacing[0]
-
-    for i0, i1 in subdivide((0, box.num_zones[0]), num_parts):
-        x0 = box.extent_i[0] + dx * i0
-        x1 = box.extent_i[0] + dx * i1
-        num_zones = (i1 - i0, *box.num_zones[1:])
-        yield (i0, i1), replace(box, extent_i=(x0, x1), num_zones=num_zones)
-
-
-def three_space_axes(a, num_fields_axes=0):
-    """
-    Return an array of rank 4; three spatial axes followed by fields axes
-    """
-    if len(a.shape) == 1 + num_fields_axes:
-        return a[:, None, None]
-    if len(a.shape) == 2 + num_fields_axes:
-        return a[:, :, None]
-    if len(a.shape) == 3 + num_fields_axes:
-        return a[:, :, :]
-
-
-def with_layout(factory, shape, perm, fill=None):
-    result = factory(tuple(shape[p] for p in perm)).transpose(argsort(perm))
-    if fill is not None:
-        result[...] = fill
-    return result
-
-
 class SolverKernels(NamedTuple):
+    """
+    Collection of kernel functions used by the solver
+    """
+
     plm_gradient: Callable
     update_cons: Callable
     update_cons_from_fluxes: Callable
@@ -1198,6 +1103,7 @@ def patch_solver(
     time: float,
     iteration: int,
     box: CoordinateBox,
+    space: IndexSpace,
     kernels: SolverKernels,
     strategy: Strategy,
     scheme: Scheme,
@@ -1227,43 +1133,37 @@ def patch_solver(
     if hardware == "cpu":
         import numpy as xp
 
-    if transpose:
-        axes4 = (3, 0, 1, 2)
-        axes5 = (0, 4, 1, 2, 3)
-    else:
-        axes4 = (0, 1, 2, 3)
-        axes5 = (0, 1, 2, 3, 4)
-
     dim = box.dimensionality
     nprim = primitive.shape[-1]
     ncons = nprim
     dx = box.grid_spacing[0]
-    p = with_layout(xp.empty, box.num_zones + (nprim,), axes4, primitive)
+    p = xp.array(primitive)
     t = time
     n = iteration
-    interior_box = trim_box(box, 2)
+    a = space.create(xp.zeros)  # wavespeeds array
 
     del primitive
 
     yield FillGuardZones(p)
 
-    def cons_to_user_prim(u):
+    def c2p_user(u):
         """
         Return primitives in standard layout host memory and with no guards
         """
-        p = with_layout(xp.zeros, box.num_zones + (nprim,), axes4)
+        p = space.create(xp.zeros, fields=nprim)
         cons_to_prim(u, p)
-        p = trim_array(p, 2)
+
         try:
-            return p.get()
+            return p[space.interior].get()
         except AttributeError:
-            return p
+            return p[space.interior]
 
-    wavespeeds_array = xp.zeros(box.num_zones)
-
-    def compute_max_wavespeed(u):
-        max_wavespeeds(u, wavespeeds_array)
-        return trim_array(wavespeeds_array, 2).max()
+    def amax(u):
+        """
+        Return the maximum wavespeed on this grid patch (guard zones excluded)
+        """
+        max_wavespeeds(u, a)
+        return a[space.interior].max()
 
     # =========================================================================
     # Time integration scheme: fwd and rk1 should produce the same result, but
@@ -1283,7 +1183,7 @@ def patch_solver(
     # A buffer for the array of cached Runge-Kutta conserved fields
     # =========================================================================
     if rks:
-        u0 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)  # RK cons
+        u0 = space.create(xp.zeros, fields=ncons)  # RK cons
     else:
         u0 = None
 
@@ -1293,13 +1193,13 @@ def patch_solver(
     # the conserved data and an array of Godunov fluxes.
     # =========================================================================
     if cache_flux:
-        fh = with_layout(xp.zeros, (dim,) + box.num_zones + (ncons,), axes5)
-        u1 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)
+        fh = space.create(xp.zeros, fields=ncons, vectors=dim)
+        u1 = space.create(xp.zeros, fields=ncons)
         prim_to_cons(p, u1)
     else:
         p1 = p if cache_prim else None
-        u1 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)
-        u2 = with_layout(xp.zeros, box.num_zones + (ncons,), axes4)
+        u1 = space.create(xp.zeros, fields=ncons)
+        u2 = space.create(xp.zeros, fields=ncons)
         prim_to_cons(p, u1)
         prim_to_cons(p, u2)
 
@@ -1315,15 +1215,13 @@ def patch_solver(
     # A buffer for the primitive field gradients if gradients are being cached
     # =========================================================================
     if cache_grad:
-        g1 = with_layout(xp.zeros, box.num_zones + (nprim,), axes4)  # gradients
+        g1 = space.create(xp.zeros, fields=ncons, vectors=dim)
     else:
         g1 = None
 
     del p  # p is no longer needed, will free memory if possible
 
-    dt = yield PatchState(
-        n, t, u1, interior_box, cons_to_user_prim, compute_max_wavespeed
-    )
+    dt = yield PatchState(n, t, u1, box.trim(2), c2p_user, amax)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
@@ -1348,9 +1246,7 @@ def patch_solver(
 
         t += dt
         n += 1
-        dt = yield PatchState(
-            n, t, u1, interior_box, cons_to_user_prim, compute_max_wavespeed
-        )
+        dt = yield PatchState(n, t, u1, box.trim(2), c2p_user, amax)
 
 
 def native_code(config: Sailfish):
@@ -1367,18 +1263,20 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     for kernel in (kernels := make_solver_kernels(config)):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
+    scheme = config.scheme
     boundary = config.boundary_condition
     strategy = config.strategy
-    scheme = config.scheme
+    hardware = strategy.hardware
     num_patches = strategy.num_patches
     num_threads = strategy.num_threads
-    hardware = strategy.hardware
     gpu_streams = strategy.gpu_streams
 
     streams = list()
     solvers = list()
 
-    for (i0, i1), box in decompose(config.domain, num_patches):
+    for (i0, i1), box in config.domain.decompose(num_patches):
+        space = IndexSpace(box.num_zones, guard=2, layout=strategy.data_layout)
+
         if checkpoint:
             t = checkpoint["time"]
             n = checkpoint["iteration"]
@@ -1387,12 +1285,11 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             t = 0.0
             n = 0
             p = config.initial_data.primitive(box)
-            p = three_space_axes(p, num_fields_axes=1)
-        p = extend_array(p, count=2)
-        b = extend_box(box, count=2)
+            p = space.create(zeros, fields=p.shape[-1], data=p)
+        b = box.extend(2)
 
         with (stream := make_stream(hardware, gpu_streams)):
-            solver = patch_solver(p, t, n, b, kernels, strategy, scheme)
+            solver = patch_solver(p, t, n, b, space, kernels, strategy, scheme)
             streams.append(stream)
             solvers.append(solver)
 

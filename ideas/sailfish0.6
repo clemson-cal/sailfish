@@ -409,13 +409,7 @@ def plot():
             if state.box.dimensionality == 2:
                 x, y = state.cell_centers
                 z = state.primitive[:, :, 0, 0]
-                ax1.pcolormesh(
-                    x[2:-2, 2:-2],
-                    y[2:-2, 2:-2],
-                    z[2:-2, 2:-2],
-                    vmin=None,
-                    vmax=None,
-                )
+                ax1.pcolormesh(x, y, z, vmin=None, vmax=None)
                 ax1.set_aspect("equal")
             plt.show()
 

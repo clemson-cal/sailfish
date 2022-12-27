@@ -30,23 +30,14 @@ class Shocktube:
     model: Literal["shocktube"] = "shocktube"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality == 1:
-            x = box.cell_centers()
-            l = x < 0.5
-            r = logical_not(l)
-            p = zeros(x.shape + (3,))
-            p[l] = [1.0, 0.0, 1.000]
-            p[r] = [0.1, 0.0, 0.125]
-        if box.dimensionality == 2:
-            x, y = box.cell_centers()
-            angle = 0.0
-            a = cos(0.5 * angle * pi)
-            b = sin(0.5 * angle * pi)
-            l = a * x + b * y < 0.5
-            r = logical_not(l)
-            p = zeros(x.shape + (4,))
-            p[l] = [1.0, 0.0, 0.0, 1.000]
-            p[r] = [0.1, 0.0, 0.0, 0.125]
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [1.0, 0.0, 1.000]
+        p[r] = [0.1, 0.0, 0.125]
         return p
 
 
@@ -73,6 +64,17 @@ class CylindricalExplosion:
         return p
 
 
+@preset
+def cylindrical_explosion():
+    return {
+        "initial_data.model": "cylindrical-explosion",
+        "domain.num_zones": [200, 200, 1],
+        "domain.extent_i": [-0.5, 0.5],
+        "domain.extent_j": [-0.5, 0.5],
+        "driver.tfinal": 0.1,
+    }
+
+
 @schema
 class CylinderInWind:
     """
@@ -95,6 +97,17 @@ class CylinderInWind:
         p[l] = [1e2, 0.0, 0.0, 1.0]
         p[r] = [1.0, 1.0, 0.0, 1.0]
         return p
+
+
+@preset
+def cylinder_in_wind():
+    return {
+        "initial_data.model": "cylinder-in-wind",
+        "domain.num_zones": [200, 200, 1],
+        "domain.extent_i": [-0.25, 0.75],
+        "domain.extent_j": [-0.50, 0.50],
+        "driver.tfinal": 1.0,
+    }
 
 
 @schema
