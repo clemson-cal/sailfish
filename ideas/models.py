@@ -290,6 +290,39 @@ def fu_shu_37():
     }
 
 
+@schema
+class DensityWave:
+    """
+    Sinusoidal density wave translating rigidly
+    """
+
+    model: Literal["density-wave"] = "density-wave"
+
+    def primitive(self, box: CoordinateBox):
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        p = zeros(x.shape + (3,))
+        p[..., 0] = 1.0 + 0.2 * sin(2 * pi * x)
+        p[..., 1] = 1.0
+        p[..., 2] = 1.0
+        return p
+
+
+@preset
+def density_wave():
+    return {
+        "initial_data.model": "density-wave",
+        "domain.num_zones": [400, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 0.1,
+        "boundary_condition": {
+            "lower_i": "periodic",
+            "upper_i": "periodic",
+        },
+    }
+
+
 InitialData = Union[
     Shocktube,
     CylindricalExplosion,
@@ -299,4 +332,5 @@ InitialData = Union[
     FuShu35,
     FuShu36,
     FuShu37,
+    DensityWave,
 ]
