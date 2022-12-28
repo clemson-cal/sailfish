@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle, max_wavespeed
-from config import Sailfish, Strategy, Reconstruction, CoordinateBox
+from config import Sailfish, Strategy, Reconstruction, BoundaryCondition
 from geometry import CoordinateBox
 from index_space import IndexSpace
 
@@ -888,7 +888,7 @@ def apply_bc(
         if kind == "inflow":
             raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
-            u[:+2, :, :] = u[-1][-4:-2, :, :]
+            u[:+2, :, :] = patches[-1][-4:-2, :, :]
 
     if location == "upper_i":
         if kind == "outflow":
@@ -896,7 +896,7 @@ def apply_bc(
         if kind == "inflow":
             raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
-            u[-2:, :, :] = u[0][+2:+4, :, :]
+            u[-2:, :, :] = patches[0][+2:+4, :, :]
 
     if location == "lower_j":
         if kind == "outflow":
@@ -904,7 +904,7 @@ def apply_bc(
         if kind == "inflow":
             raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
-            u[:, :+2, :] = u[-1][:, -4:-2, :]
+            u[:, :+2, :] = patches[-1][:, -4:-2, :]
 
     if location == "upper_j":
         if kind == "outflow":
@@ -912,7 +912,7 @@ def apply_bc(
         if kind == "inflow":
             raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
-            u[:, -2:, :] = u[0][:, +2:+4, :]
+            u[:, -2:, :] = patches[0][:, +2:+4, :]
 
     if location == "lower_k":
         if kind == "outflow":
@@ -920,7 +920,7 @@ def apply_bc(
         if kind == "inflow":
             raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
-            u[:, :, :+2] = u[-1][:, :, -4:-2]
+            u[:, :, :+2] = patches[-1][:, :, -4:-2]
 
     if location == "upper_k":
         if kind == "outflow":
@@ -928,22 +928,22 @@ def apply_bc(
         if kind == "inflow":
             raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
-            u[:, :, -2:] = u[0][:, :, +2:+4]
+            u[:, :, -2:] = patches[0][:, :, +2:+4]
 
 
-def fill_guard_zones(us, boundary):
+def fill_guard_zones(us: list[NDArray[float]], boundary: BoundaryCondition):
     for i, u in enumerate(us):
         if u.shape[0] > 1:
-            apply_bc(u, "lower_i", boundary.lower_i)
-            apply_bc(u, "upper_i", boundary.upper_i)
+            apply_bc(u, "lower_i", us, boundary.lower_i)
+            apply_bc(u, "upper_i", us, boundary.upper_i)
 
         if u.shape[1] > 1:
-            apply_bc(u, "lower_j", boundary.lower_j)
-            apply_bc(u, "upper_j", boundary.upper_j)
+            apply_bc(u, "lower_j", us, boundary.lower_j)
+            apply_bc(u, "upper_j", us, boundary.upper_j)
 
         if u.shape[2] > 1:
-            apply_bc(u, "lower_k", boundary.lower_k)
-            apply_bc(u, "upper_k", boundary.upper_k)
+            apply_bc(u, "lower_k", us, boundary.lower_k)
+            apply_bc(u, "upper_k", us, boundary.upper_k)
 
         if i > 0:
             u[:+2, :, :] = us[i - 1][-4:-2, :, :]
