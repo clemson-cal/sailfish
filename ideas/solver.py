@@ -931,27 +931,36 @@ def apply_bc(
             u[:, :, -2:] = patches[0][:, :, +2:+4]
 
 
-def fill_guard_zones(us: list[NDArray[float]], boundary: BoundaryCondition):
-    for i, u in enumerate(us):
-        if u.shape[0] > 1:
-            apply_bc(u, "lower_i", us, boundary.lower_i)
-            apply_bc(u, "upper_i", us, boundary.upper_i)
+def fill_guard_zones(arrays: list[NDArray[float]], boundary: BoundaryCondition):
+    """
+    Set guard zone data for a sequence of patches decomposed along the i-axis
+    """
+    for i, a in enumerate(arrays):
+        if a.shape[0] > 1:
+            if i == 0:
+                apply_bc(a, "lower_i", arrays, boundary.lower_i)
+            if i == len(arrays) - 1:
+                apply_bc(a, "upper_i", arrays, boundary.upper_i)
 
-        if u.shape[1] > 1:
-            apply_bc(u, "lower_j", us, boundary.lower_j)
-            apply_bc(u, "upper_j", us, boundary.upper_j)
+        if a.shape[1] > 1:
+            apply_bc(a, "lower_j", arrays, boundary.lower_j)
+            apply_bc(a, "upper_j", arrays, boundary.upper_j)
 
-        if u.shape[2] > 1:
-            apply_bc(u, "lower_k", us, boundary.lower_k)
-            apply_bc(u, "upper_k", us, boundary.upper_k)
+        if a.shape[2] > 1:
+            apply_bc(a, "lower_k", arrays, boundary.lower_k)
+            apply_bc(a, "upper_k", arrays, boundary.upper_k)
 
         if i > 0:
-            u[:+2, :, :] = us[i - 1][-4:-2, :, :]
-        if i < len(us) - 1:
-            u[-2:, :, :] = us[i + 1][+2:+4, :, :]
+            a[:+2, :, :] = arrays[i - 1][-4:-2, :, :]
+        if i < len(arrays) - 1:
+            a[-2:, :, :] = arrays[i + 1][+2:+4, :, :]
 
 
 class FillGuardZones:
+    """
+    Message class; yielded by patch solvers te request boundary data
+    """
+
     def __init__(self, array):
         self.array = array
 
@@ -1060,7 +1069,16 @@ class MockWorkerPool:
 
 
 def make_worker_pool(num_threads):
-    # return ThreadPool(num_threads)
+    """
+    Return a thread pool if num_threads > 1 or otherwise a mock worker pool
+
+    Use of a mock pool is for performance reasons; the overhead of job
+    submission to a thread pool is not acceptable where concurrent kernel
+    launches are needed, since getting kernels to overlap in time may require
+    very low launch overhead. The overhead also exists for a thread pool with
+    a single worker, so if one thread was requested then we revert to the mock
+    pool.
+    """
     if num_threads == 1:
         return MockWorkerPool()
     else:
@@ -1134,7 +1152,27 @@ def patch_solver(
     scheme: Scheme,
 ) -> State:
     """
-    Solver for the 1d euler equations in many configurations
+    A generator to drive time-integration of the physics state on a grid patch
+
+    This generator yields either `State` objects or a message class:
+    `FillGuardZones` or `CorrectFluxes`. It needs to be sent timestep sizes.
+    Example usage:
+
+    ```python
+    solver = patch_solver(*args)
+    timestep = None
+
+    while True:
+        event = solver.send(timestep)
+
+        if type(event) is FillGuardZones:
+            apply_bc(event.array)
+        elif type(event) is CorrectFluxes:
+            correct_fluxes(event.array)
+        else:
+            state = event
+            timestep = state.timestep(cfl_number)
+    ```
     """
     hardware = strategy.hardware
     transpose = strategy.transpose
@@ -1283,7 +1321,18 @@ def native_code(config: Sailfish):
 
 def make_solver(config: Sailfish, checkpoint: dict = None):
     """
-    Construct the 1d solver from a config instance
+    Construct a solver (generator) from a config instance
+
+    The solver is a generator which yields `State` objects and expects to be
+    sent timestep sizes. Example:
+
+    ```python
+    solver = make_solver(config)
+    timestep = None
+
+    while True:
+        state = solver.send(timestep)
+        timestep = state.timestep(cfl_number)
     """
     for kernel in (kernels := make_solver_kernels(config)):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
