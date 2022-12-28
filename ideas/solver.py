@@ -1042,6 +1042,31 @@ class State:
         return cfl_number * self.minimum_zone_size() / self.maximum_wavespeed()
 
 
+class MockWorkerPool:
+    """
+    A no-overhead alternative to a thread pool
+
+    This class should be used as the context manager rather than ThreadPool if
+    num_threads=1.
+    """
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *excinfo):
+        pass
+
+    map = map
+
+
+def make_worker_pool(num_threads):
+    # return ThreadPool(num_threads)
+    if num_threads == 1:
+        return MockWorkerPool()
+    else:
+        return ThreadPool(num_threads)
+
+
 class SolverKernels(NamedTuple):
     """
     Collection of kernel functions used by the solver
@@ -1141,9 +1166,9 @@ def patch_solver(
     t = time
     n = iteration
     a = space.create(xp.zeros)  # wavespeeds array
+    interior_box = box.trim(2)
 
     del primitive
-
     yield FillGuardZones(p)
 
     def c2p_user(u):
@@ -1221,7 +1246,7 @@ def patch_solver(
 
     del p  # p is no longer needed, will free memory if possible
 
-    dt = yield PatchState(n, t, u1, box.trim(2), c2p_user, amax)
+    dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
@@ -1246,7 +1271,7 @@ def patch_solver(
 
         t += dt
         n += 1
-        dt = yield PatchState(n, t, u1, box.trim(2), c2p_user, amax)
+        dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 
 
 def native_code(config: Sailfish):
@@ -1301,7 +1326,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         with context:
             return gen.send(timestep)
 
-    with ThreadPool(num_threads) as pool:
+    with make_worker_pool(num_threads) as pool:
         while True:
             events = list(pool.map(next_with, zip(streams, solvers)))
 
