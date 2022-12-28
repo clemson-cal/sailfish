@@ -1042,10 +1042,10 @@ class State:
         return concatenate([s.cell_centers for s in self._states])
 
     def minimum_zone_size(self):
-        return min(s.minimum_zone_size() for s in self._states)
+        return float(min(s.minimum_zone_size() for s in self._states))
 
     def maximum_wavespeed(self):
-        return max(s.maximum_wavespeed() for s in self._states)
+        return float(max(s.maximum_wavespeed() for s in self._states))
 
     def timestep(self, cfl_number):
         return cfl_number * self.minimum_zone_size() / self.maximum_wavespeed()
