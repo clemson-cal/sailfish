@@ -110,9 +110,13 @@ class IndexSpace:
         q = self.axes_permutation(fields, vectors, inverse=True)
         arr = factory(tuple(s[a] for a in p)).transpose(q)
         if data is not None:
-            arr[self.interior] = three_space_axes(
-                data, (fields and 1 or 0) + (vectors and 1 or 0)
-            )
+            data = three_space_axes(data, (fields and 1 or 0) + (vectors and 1 or 0))
+            if data.shape == arr[self.interior].shape:
+                arr[self.interior] = data
+            elif data.shape == arr.shape:
+                arr[...] = data
+            else:
+                raise ValueError("if given data must have the interior or total shape")
         return arr
 
     def __getitem__(self, code: str) -> tuple[slice]:
