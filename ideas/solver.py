@@ -1359,13 +1359,14 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             t = 0.0
             n = 0
             p = config.initial_data.primitive(box)
-            p = space.create(zeros, fields=p.shape[-1], data=p)
+
+        p = space.create(zeros, fields=p.shape[-1], data=p)
         b = box.extend(2)
 
-        with (stream := make_stream(hardware, gpu_streams)):
-            solver = patch_solver(p, t, n, b, space, kernels, strategy, scheme)
-            streams.append(stream)
-            solvers.append(solver)
+        stream = make_stream(hardware, gpu_streams)
+        solver = patch_solver(p, t, n, b, space, kernels, strategy, scheme)
+        streams.append(stream)
+        solvers.append(solver)
 
     timestep = None
 
