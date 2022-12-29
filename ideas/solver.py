@@ -615,6 +615,8 @@ class Scheme:
         urk: NDArray[float],
         urd: NDArray[float],
         uwr: NDArray[float],
+        ubf: NDArray[float],
+        rbf: NDArray[float],
         dt: float,
         dx: float,
         rk: float,
@@ -630,6 +632,8 @@ class Scheme:
             double *urk,
             double *urd,
             double *uwr,
+            double *ubf,
+            double *rbf,
             double dt,
             double dx,
             double rk,
@@ -695,15 +699,22 @@ class Scheme:
                 #if DIM == 1
                 int nccc = (i + 0) * si;
                 int nrcc = (i + 1) * si;
+                int mccc = i * si;
                 #elif DIM == 2
                 int nccc = (i + 0) * si + (j + 0) * sj;
                 int nrcc = (i + 1) * si + (j + 0) * sj;
                 int ncrc = (i + 0) * si + (j + 1) * sj;
+                int mccc = i * si + j * sj;
                 #elif DIM == 3
                 int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
                 int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
                 int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
                 int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+                int mccc = i * si + j * sj + k * sk;
+                #endif
+
+                #if TRANSPOSE == 0
+                mccc /= nq;
                 #endif
 
                 #if DIM >= 1
@@ -735,6 +746,11 @@ class Scheme:
                     #endif
 
                     du *= dt / dx;
+
+                    if (ubf && rbf)
+                    {
+                        du -= (urd[nccc + q * sq] - ubf[nccc + q * sq]) * rbf[mccc] * dt;
+                    }
                     uwr[n] = urd[n] + du;
 
                     #if USE_RK == 1
@@ -751,7 +767,7 @@ class Scheme:
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, grd, urk, urd, uwr, dt, dx, rk, plm, *s)
+        return s[:dim], (prd, grd, urk, urd, uwr, ubf, rbf, dt, dx, rk, plm, *s)
 
     @kernel
     def update_cons_from_fluxes(
@@ -885,48 +901,36 @@ def apply_bc(
     if location == "lower_i":
         if kind == "outflow":
             u[:+2, :, :] = u[+2:+3, :, :]
-        if kind == "inflow":
-            raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
             u[:+2, :, :] = patches[-1][-4:-2, :, :]
 
     if location == "upper_i":
         if kind == "outflow":
             u[-2:, :, :] = u[-4:-3, :, :]
-        if kind == "inflow":
-            raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
             u[-2:, :, :] = patches[0][+2:+4, :, :]
 
     if location == "lower_j":
         if kind == "outflow":
             u[:, :+2, :] = u[:, +2:+3, :]
-        if kind == "inflow":
-            raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
             u[:, :+2, :] = patches[-1][:, -4:-2, :]
 
     if location == "upper_j":
         if kind == "outflow":
             u[:, -2:, :] = u[:, -4:-3, :]
-        if kind == "inflow":
-            raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
             u[:, -2:, :] = patches[0][:, +2:+4, :]
 
     if location == "lower_k":
         if kind == "outflow":
             u[:, :, :+2] = u[:, :, +2:+3]
-        if kind == "inflow":
-            raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
             u[:, :, :+2] = patches[-1][:, :, -4:-2]
 
     if location == "upper_k":
         if kind == "outflow":
             u[:, :, -2:] = u[:, :, -4:-3]
-        if kind == "inflow":
-            raise NotImplementedError("inflow BC not implemented yet")
         if kind == "periodic":
             u[:, :, -2:] = patches[0][:, :, +2:+4]
 
@@ -936,6 +940,9 @@ def fill_guard_zones(arrays: list[NDArray[float]], boundary: BoundaryCondition):
     Set guard zone data for a sequence of patches decomposed along the i-axis
     """
     for i, a in enumerate(arrays):
+        # =========================================================================
+        # Apply physical boundary conditions at the domain edges
+        # =========================================================================
         if a.shape[0] > 1:
             if i == 0:
                 apply_bc(a, "lower_i", arrays, boundary.lower_i)
@@ -950,6 +957,9 @@ def fill_guard_zones(arrays: list[NDArray[float]], boundary: BoundaryCondition):
             apply_bc(a, "lower_k", arrays, boundary.lower_k)
             apply_bc(a, "upper_k", arrays, boundary.upper_k)
 
+        # =========================================================================
+        # Copy data between neighboring strips
+        # =========================================================================
         if i > 0:
             a[:+2, :, :] = arrays[i - 1][-4:-2, :, :]
         if i < len(arrays) - 1:
@@ -1148,8 +1158,7 @@ def patch_solver(
     box: CoordinateBox,
     space: IndexSpace,
     kernels: SolverKernels,
-    strategy: Strategy,
-    scheme: Scheme,
+    config: Sailfish,
 ) -> State:
     """
     A generator to drive time-integration of the physics state on a grid patch
@@ -1174,12 +1183,20 @@ def patch_solver(
             timestep = state.timestep(cfl_number)
     ```
     """
+    scheme = config.scheme
+    strategy = config.strategy
     hardware = strategy.hardware
     transpose = strategy.transpose
     cache_flux = strategy.cache_flux
     cache_prim = strategy.cache_prim
     cache_grad = strategy.cache_grad
     time_integration = scheme.time_integration
+    initial_prim = config.initial_data.primitive
+
+    if hardware == "gpu":
+        import cupy as xp
+    if hardware == "cpu":
+        import numpy as xp
 
     (
         plm_gradient,
@@ -1190,11 +1207,6 @@ def patch_solver(
         cons_to_prim,
         max_wavespeeds,
     ) = kernels
-
-    if hardware == "gpu":
-        import cupy as xp
-    if hardware == "cpu":
-        import numpy as xp
 
     dim = box.dimensionality
     nprim = primitive.shape[-1]
@@ -1243,7 +1255,7 @@ def patch_solver(
         rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
 
     # =========================================================================
-    # A buffer for the array of cached Runge-Kutta conserved fields
+    # Array of cached Runge-Kutta conserved fields
     # =========================================================================
     if rks:
         u0 = space.create(xp.zeros, fields=ncons)  # RK cons
@@ -1251,7 +1263,7 @@ def patch_solver(
         u0 = None
 
     # =========================================================================
-    # Buffers for either read-only and write-only conserved arrays if
+    # Arrays for either read-only and write-only conserved arrays if
     # single-step update (i.e. no cache-flux is used) or otherwise buffers for
     # the conserved data and an array of Godunov fluxes.
     # =========================================================================
@@ -1267,22 +1279,45 @@ def patch_solver(
         prim_to_cons(p, u2)
 
     # =========================================================================
-    # A buffer for the primitive fields they or gradients are cached
+    # Array for the primitive fields if primitives or gradients are cached
     # =========================================================================
     if cache_prim or cache_grad:
         p1 = p
     else:
         p1 = None
 
+    del p  # p is no longer needed, will free memory if possible
+
     # =========================================================================
-    # A buffer for the primitive field gradients if gradients are being cached
+    # Array for the primitive field gradients if gradients are being cached
     # =========================================================================
     if cache_grad:
         g1 = space.create(xp.zeros, fields=ncons, vectors=dim)
     else:
         g1 = None
 
-    del p  # p is no longer needed, will free memory if possible
+    # =========================================================================
+    # Arrays for target conserved values (ubf) and the driving rate (rbf)
+    # =========================================================================
+    if (buf := config.buffer) is not None:
+        if strategy.cache_flux:
+            raise NotImplementedError("buffer zone not implemented in godunov_fluxes")
+        if buf.ramp != 0.0:
+            raise NotImplementedError("buffer ramp not implemented")
+        coordinate, inequality, value = buf.where.split()
+        if coordinate != "x":
+            raise NotImplementedError("buffer only implemented for x-direction")
+        if inequality != "<":
+            raise NotImplementedError("buffer only implemented for <")
+        x0 = float(value)
+        pbf = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
+        ubf = space.create(xp.zeros, fields=ncons)
+        rbf = space.create(xp.zeros, data=buf.rate * (box.cell_centers()[0] < x0))
+        prim_to_cons(pbf, ubf)
+        del pbf
+    else:
+        ubf = None
+        rbf = None
 
     dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 
@@ -1302,7 +1337,7 @@ def patch_solver(
                 godunov_fluxes(p1, g1, u1, fh)
                 update_cons_from_fluxes(u0, u1, fh, dt, dx, rk)
             else:
-                update_cons(p1, g1, u0, u1, u2, dt, dx, rk)
+                update_cons(p1, g1, u0, u1, u2, ubf, rbf, dt, dx, rk)
                 u1, u2 = u2, u1
 
             yield FillGuardZones(u1)
@@ -1337,13 +1372,13 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     for kernel in (kernels := make_solver_kernels(config)):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
-    scheme = config.scheme
     boundary = config.boundary_condition
     strategy = config.strategy
     hardware = strategy.hardware
     num_patches = strategy.num_patches
     num_threads = strategy.num_threads
     gpu_streams = strategy.gpu_streams
+    initial_prim = config.initial_data.primitive
 
     streams = list()
     solvers = list()
@@ -1358,13 +1393,13 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         else:
             t = 0.0
             n = 0
-            p = config.initial_data.primitive(box)
+            p = initial_prim(box)
 
         p = space.create(zeros, fields=p.shape[-1], data=p)
         b = box.extend(2)
 
         stream = make_stream(hardware, gpu_streams)
-        solver = patch_solver(p, t, n, b, space, kernels, strategy, scheme)
+        solver = patch_solver(p, t, n, b, space, kernels, config)
         streams.append(stream)
         solvers.append(solver)
 

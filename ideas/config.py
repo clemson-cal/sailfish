@@ -152,7 +152,7 @@ class Strategy:
         return self.data_layout == "fields-first"
 
 
-BoundaryConditionType = Literal["outflow", "inflow", "reflecting", "periodic"]
+BoundaryConditionType = Literal["outflow", "periodic"]
 
 
 @schema
@@ -163,6 +163,40 @@ class BoundaryCondition:
     upper_j: BoundaryConditionType = "outflow"
     lower_k: BoundaryConditionType = "outflow"
     upper_k: BoundaryConditionType = "outflow"
+
+
+@schema
+class BufferZone:
+    """
+    Soft boundary condition, drives fields to some value in a defined region
+
+    rate:   rate at which the solution is driven to the target value
+    ramp:   distance over which the region
+    where:  a string describing the zone in which the buffer is active
+    """
+
+    kind: Literal["buffer-zone"] = "buffer-zone"
+    rate: float = 1.0
+    ramp: float = 0.1
+    where: str = "x < 0.0"
+
+
+@schema
+class SinglePointMass:
+    kind: Literal["single-point-mass"] = "single-point-mass"
+
+
+@schema
+class BinaryPointMasses:
+    kind: Literal["binary-point-masses"] = "binary-point-masses"
+
+
+@schema
+class JetLaunching:
+    kind: Literal["jet-launching"] = "jet-launching"
+
+
+Forcing = Union[SinglePointMass, BinaryPointMasses, JetLaunching]
 
 
 @schema
@@ -181,6 +215,7 @@ class Sailfish:
     domain:             the physical domain of the problem
     strategy:           the solution strategy; does not affect the numerical solution
     scheme:             algorithmic choices which can affect the solution accuracy
+    buffer:             driving of the hydrodynamic fields to implement a soft BC
     """
 
     name: str = None
@@ -191,6 +226,7 @@ class Sailfish:
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()
+    buffer: BufferZone = None
 
 
 def parse_num_zones(arg):
