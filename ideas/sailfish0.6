@@ -422,19 +422,21 @@ def no_plot():
         yield
 
 
-def deep_update(d, u):
+def deep_update(d: dict, u: dict) -> dict:
     """
-    Update a dictionary and any nested dictionaries recursively
+    Update `d` and any nested dictionaries recursively with values from `u`
     """
     for k, v in u.items():
         if isinstance(v, Mapping):
             d[k] = deep_update(d.setdefault(k, dict()), v)
-        else:
+        elif isinstance(d, Mapping):
             d[k] = v
+        else:
+            d = dict()
     return d
 
 
-def unflatten(d):
+def unflatten(d: dict) -> dict:
     """
     Create a nested dict from a flat one with keys like a.b.c
     """
@@ -768,7 +770,7 @@ def todo(args=None, console=None, parser=None):
             - [ ] 2d accretion disk
             - [ ] 1d shock in wind
         - [ ] crash detection
-        - [ ] crash mitigation
+        - [ ] crash recovery (fallback strategies)
         - [ ] FMR
         - [ ] relativistic solver
         - [ ] relativistic shocktube problems, including with transverse velocity
