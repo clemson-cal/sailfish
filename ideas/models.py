@@ -95,7 +95,7 @@ class CylinderInWind:
         r = logical_not(l)
         p = zeros(x.shape + (4,))
         p[l] = [1e2, 0.0, 0.0, 1.0]
-        p[r] = [1.0, 1.0, 0.0, 1.0]
+        p[r] = [1.0, 1.0, 0.0, 0.1]
         return p
 
 

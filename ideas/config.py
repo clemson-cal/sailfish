@@ -180,6 +180,22 @@ class BufferZone:
     ramp: float = 0.1
     where: str = "x < 0.0"
 
+    def rate_array(self, box: CoordinateBox):
+        """
+        Return an array of rates at the zones centers of the given box
+        """
+        if self.ramp != 0.0:
+            raise NotImplementedError("buffer ramp not implemented")
+        coordinate, inequality, value = self.where.split()
+        x, y, z = box.cell_centers(dim=3)
+        R = (x**2 + y**2) ** 0.5
+        s = dict(x=x, y=y, z=z, R=R)[coordinate]
+        test = {
+            "<": lambda a, b: a < b,
+            ">": lambda a, b: a > b,
+        }[inequality]
+        return self.rate * test(s, float(value))
+
 
 @schema
 class SinglePointMass:

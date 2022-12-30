@@ -1302,17 +1302,9 @@ def patch_solver(
     if (buf := config.buffer) is not None:
         if strategy.cache_flux:
             raise NotImplementedError("buffer zone not implemented in godunov_fluxes")
-        if buf.ramp != 0.0:
-            raise NotImplementedError("buffer ramp not implemented")
-        coordinate, inequality, value = buf.where.split()
-        if coordinate != "x":
-            raise NotImplementedError("buffer only implemented for x-direction")
-        if inequality != "<":
-            raise NotImplementedError("buffer only implemented for <")
-        x0 = float(value)
         pbf = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
         ubf = space.create(xp.zeros, fields=ncons)
-        rbf = space.create(xp.zeros, data=buf.rate * (box.cell_centers()[0] < x0))
+        rbf = space.create(xp.zeros, data=buf.rate_array(box))
         prim_to_cons(pbf, ubf)
         del pbf
     else:

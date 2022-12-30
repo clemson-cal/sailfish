@@ -65,18 +65,20 @@ class CoordinateBox:
         extent = (self.extent_i, self.extent_j, self.extent_k)
         return tuple((e[1] - e[0]) / n for e, n in zip(extent, self.num_zones))
 
-    def cell_centers(self):
+    def cell_centers(self, dim=None):
         """
         Return an array or tuple of arrays of the cell-center coordinates
         """
-        if self.dimensionality == 1:
+        dim = dim or self.dimensionality
+
+        if dim == 1:
             ni = self.num_zones[0]
             x0, x1 = self.extent_i
             xv = linspace(x0, x1, ni + 1)
             xc = 0.5 * (xv[1:] + xv[:-1])
             return xc
 
-        if self.dimensionality == 2:
+        if dim == 2:
             ni, nj = self.num_zones[0:2]
             x0, x1 = self.extent_i
             y0, y1 = self.extent_j
@@ -86,7 +88,7 @@ class CoordinateBox:
             yc = 0.5 * (yv[1:] + yv[:-1])
             return meshgrid(xc, yc, indexing="ij")
 
-        if self.dimensionality == 3:
+        if dim == 3:
             ni, nj, nk = self.num_zones
             x0, x1 = self.extent_i
             y0, y1 = self.extent_j
