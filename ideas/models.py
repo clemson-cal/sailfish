@@ -107,11 +107,11 @@ def cylinder_in_wind():
         "domain.extent_i": [-0.25, 0.75],
         "domain.extent_j": [-0.50, 0.50],
         "driver.tfinal": 1.0,
-        "buffer": {
-            "kind": "buffer-zone",
+        "forcing": {
             "rate": 100.0,
             "ramp": 0.0,
             "where": "x < -0.15",
+            "target": "initial-data",
         },
     }
 
@@ -329,7 +329,7 @@ def density_wave():
     }
 
 
-InitialData = Union[
+ModelData = Union[
     Shocktube,
     CylindricalExplosion,
     CylinderInWind,

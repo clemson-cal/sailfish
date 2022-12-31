@@ -20,7 +20,7 @@ from sys import argv
 from textwrap import dedent
 
 from config import Sailfish, Strategy, Scheme, Driver, add_config_arguments
-from models import InitialData
+from models import ModelData
 from preset import preset, get_preset_functions
 from system import system_info
 
@@ -645,7 +645,7 @@ def doc(args=None, console=None, parser=None):
         if topic == "physics":
             console.print("Not yet documented")
         if topic == "models":
-            for cls in InitialData.__args__:
+            for cls in ModelData.__args__:
                 console.rule()
                 console.print(Markdown(f"*{cls.__name__}*\n{dedent(cls.__doc__)}"))
         if topic == "presets":

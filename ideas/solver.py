@@ -1299,7 +1299,7 @@ def patch_solver(
     # =========================================================================
     # Arrays for target conserved values (ubf) and the driving rate (rbf)
     # =========================================================================
-    if (buf := config.buffer) is not None:
+    if (buf := config.forcing) is not None:
         if strategy.cache_flux:
             raise NotImplementedError("buffer zone not implemented in godunov_fluxes")
         pbf = space.create(xp.zeros, fields=nprim, data=initial_prim(box))

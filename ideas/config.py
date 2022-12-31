@@ -2,7 +2,7 @@ from typing import Literal, Union
 from inspect import isgeneratorfunction
 from schema import schema
 from geometry import CoordinateBox
-from models import InitialData, Shocktube
+from models import ModelData, Shocktube
 
 
 @schema
@@ -166,7 +166,7 @@ class BoundaryCondition:
 
 
 @schema
-class BufferZone:
+class Forcing:
     """
     Soft boundary condition, drives fields to some value in a defined region
 
@@ -175,10 +175,10 @@ class BufferZone:
     where:  a string describing the zone in which the buffer is active
     """
 
-    kind: Literal["buffer-zone"] = "buffer-zone"
     rate: float = 1.0
-    ramp: float = 0.1
+    ramp: float = 0.0
     where: str = "x < 0.0"
+    target: Literal["initial-data"] = "initial-data"
 
     def rate_array(self, box: CoordinateBox):
         """
@@ -198,24 +198,6 @@ class BufferZone:
 
 
 @schema
-class SinglePointMass:
-    kind: Literal["single-point-mass"] = "single-point-mass"
-
-
-@schema
-class BinaryPointMasses:
-    kind: Literal["binary-point-masses"] = "binary-point-masses"
-
-
-@schema
-class JetLaunching:
-    kind: Literal["jet-launching"] = "jet-launching"
-
-
-Forcing = Union[SinglePointMass, BinaryPointMasses, JetLaunching]
-
-
-@schema
 class Sailfish:
     """
     Top-level application configuration struct
@@ -231,18 +213,18 @@ class Sailfish:
     domain:             the physical domain of the problem
     strategy:           the solution strategy; does not affect the numerical solution
     scheme:             algorithmic choices which can affect the solution accuracy
-    buffer:             driving of the hydrodynamic fields to implement a soft BC
+    forcing:            driving of the hydrodynamic fields to implement a soft BC
     """
 
     name: str = None
     driver: Driver = Driver()
     physics: Physics = Physics()
-    initial_data: InitialData = Shocktube()
+    initial_data: ModelData = Shocktube()
     boundary_condition: BoundaryCondition = BoundaryCondition()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()
-    buffer: BufferZone = None
+    forcing: Forcing = None
 
 
 def parse_num_zones(arg):
