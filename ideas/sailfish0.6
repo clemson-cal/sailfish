@@ -427,12 +427,13 @@ def deep_update(d: dict, u: dict) -> dict:
     Update `d` and any nested dictionaries recursively with values from `u`
     """
     for k, v in u.items():
+        print(k, v)
         if isinstance(v, Mapping):
             d[k] = deep_update(d.setdefault(k, dict()), v)
         elif isinstance(d, Mapping):
             d[k] = v
-        else:
-            d = dict()
+        elif d is None:
+            d = u
     return d
 
 
