@@ -615,8 +615,7 @@ class Scheme:
         urk: NDArray[float],
         urd: NDArray[float],
         uwr: NDArray[float],
-        ubf: NDArray[float],
-        rbf: NDArray[float],
+        stm: NDArray[float],
         dt: float,
         dx: float,
         rk: float,
@@ -632,8 +631,7 @@ class Scheme:
             double *urk,
             double *urd,
             double *uwr,
-            double *ubf,
-            double *rbf,
+            double *stm,
             double dt,
             double dx,
             double rk,
@@ -699,22 +697,15 @@ class Scheme:
                 #if DIM == 1
                 int nccc = (i + 0) * si;
                 int nrcc = (i + 1) * si;
-                int mccc = i * si;
                 #elif DIM == 2
                 int nccc = (i + 0) * si + (j + 0) * sj;
                 int nrcc = (i + 1) * si + (j + 0) * sj;
                 int ncrc = (i + 0) * si + (j + 1) * sj;
-                int mccc = i * si + j * sj;
                 #elif DIM == 3
                 int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
                 int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
                 int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
                 int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
-                int mccc = i * si + j * sj + k * sk;
-                #endif
-
-                #if TRANSPOSE == 0
-                mccc /= nq;
                 #endif
 
                 #if DIM >= 1
@@ -747,9 +738,9 @@ class Scheme:
 
                     du *= dt / dx;
 
-                    if (ubf && rbf)
+                    if (stm)
                     {
-                        du -= (urd[nccc + q * sq] - ubf[nccc + q * sq]) * rbf[mccc] * dt;
+                        du += stm[n] * dt;
                     }
                     uwr[n] = urd[n] + du;
 
@@ -767,7 +758,7 @@ class Scheme:
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, grd, urk, urd, uwr, ubf, rbf, dt, dx, rk, plm, *s)
+        return s[:dim], (prd, grd, urk, urd, uwr, stm, dt, dx, rk, plm, *s)
 
     @kernel
     def update_cons_from_fluxes(
@@ -1299,17 +1290,19 @@ def patch_solver(
     # =========================================================================
     # Arrays for target conserved values (ubf) and the driving rate (rbf)
     # =========================================================================
-    if (buf := config.forcing) is not None:
+    if (forcing := config.forcing) is not None:
         if strategy.cache_flux:
-            raise NotImplementedError("buffer zone not implemented in godunov_fluxes")
-        pbf = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
-        ubf = space.create(xp.zeros, fields=ncons)
-        rbf = space.create(xp.zeros, data=buf.rate_array(box))
-        prim_to_cons(pbf, ubf)
-        del pbf
+            raise NotImplementedError("forcing not implemented in godunov_fluxes")
+        stm = space.create(xp.zeros, fields=ncons)  # source terms
+        udr = space.create(xp.zeros, fields=ncons)
+        pdr = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
+        rdr = space.create(xp.zeros, fields=1, data=forcing.rate_array(box))
+        prim_to_cons(pdr, udr)
+        del pdr
     else:
-        ubf = None
-        rbf = None
+        stm = None
+        udr = None
+        rdr = None
 
     dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 
@@ -1321,6 +1314,8 @@ def patch_solver(
             u0[...] = u1[...]
 
         for rk in rks or [0.0]:
+            if forcing is not None:
+                stm[...] = (udr - u1) * rdr * dt
             if cache_prim:
                 cons_to_prim(u1, p1)
             if cache_grad:
@@ -1329,7 +1324,7 @@ def patch_solver(
                 godunov_fluxes(p1, g1, u1, fh)
                 update_cons_from_fluxes(u0, u1, fh, dt, dx, rk)
             else:
-                update_cons(p1, g1, u0, u1, u2, ubf, rbf, dt, dx, rk)
+                update_cons(p1, g1, u0, u1, u2, stm, dt, dx, rk)
                 u1, u2 = u2, u1
 
             yield FillGuardZones(u1)

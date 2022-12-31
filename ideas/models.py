@@ -110,7 +110,7 @@ def cylinder_in_wind():
         "forcing": {
             "rate": 100.0,
             "ramp": 0.0,
-            "where": "x < -0.15",
+            "where": "x < 0.1",
             "target": "initial-data",
         },
     }
