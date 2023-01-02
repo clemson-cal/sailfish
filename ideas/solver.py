@@ -766,6 +766,7 @@ class Scheme:
         urk: NDArray[float],
         u: NDArray[float],
         f: NDArray[float],
+        stm: NDArray[float],
         dt: float,
         dx: float,
         rk: float,
@@ -778,6 +779,7 @@ class Scheme:
             double *urk,
             double *u,
             double *f,
+            double *stm,
             double dt,
             double dx,
             double rk,
@@ -865,6 +867,11 @@ class Scheme:
                     u1 -= (hp - hm) * dt / dx;
                     #endif
 
+                    if (stm)
+                    {
+                        u1 += stm[nccc + q * sq] * dt;
+                    }
+
                     #if USE_RK == 1
                     if (rk != 0.0)
                     {
@@ -880,7 +887,7 @@ class Scheme:
         """
         dim = self._dim
         s = u.shape[:3]
-        return s[:dim], (urk, u, f, dt, dx, rk, *s)
+        return s[:dim], (urk, u, f, stm, dt, dx, rk, *s)
 
 
 def apply_bc(
@@ -1288,11 +1295,9 @@ def patch_solver(
         g1 = None
 
     # =========================================================================
-    # Arrays for target conserved values (ubf) and the driving rate (rbf)
+    # Arrays for source terms, including driving fields
     # =========================================================================
     if (forcing := config.forcing) is not None:
-        if strategy.cache_flux:
-            raise NotImplementedError("forcing not implemented in godunov_fluxes")
         stm = space.create(xp.zeros, fields=ncons)  # source terms
         udr = space.create(xp.zeros, fields=ncons)
         pdr = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
@@ -1322,7 +1327,7 @@ def patch_solver(
                 plm_gradient(p1, g1)
             if cache_flux:
                 godunov_fluxes(p1, g1, u1, fh)
-                update_cons_from_fluxes(u0, u1, fh, dt, dx, rk)
+                update_cons_from_fluxes(u0, u1, fh, stm, dt, dx, rk)
             else:
                 update_cons(p1, g1, u0, u1, u2, stm, dt, dx, rk)
                 u1, u2 = u2, u1
