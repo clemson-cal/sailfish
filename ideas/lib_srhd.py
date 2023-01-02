@@ -127,7 +127,7 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
             double a2 = gm * pre / (d * h);
             double g  = b2 * a2 - 1.0;
 
-            f  = d * e * (gm - 1.0) - p;
+            f  = d * e * (gm - 1.0) - pre;
             pre -= f / g;
 
             if (fabs(f) < error_tolerance || iteration == newton_iter_max) {
@@ -138,7 +138,7 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         }
 
         p[RHO] = m / w0;
-        p[VXX] = w0 * u[1] / (tau + m + p);
+        p[VXX] = w0 * u[1] / (tau + m + pre);
         p[PRE] = pre;
 
         #elif DIM == 2
