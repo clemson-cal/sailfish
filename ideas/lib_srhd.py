@@ -60,7 +60,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         double gbx = p[VXX];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx);
-        double h = rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
+        double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
         u[PXX] = m * h * gbx;
@@ -72,7 +72,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         double gby = p[VYY];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby);
-        double h = rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
+        double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
         u[PXX] = m * h * gbx;
@@ -86,7 +86,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         double gbz = p[VZZ];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby + gbz * gbz);
-        double h = rho + pre * (1.0 + 1.0 / (ADIABATIC_GAMMA - 1.0));
+        double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
         u[PXX] = m * h * gbx;
@@ -327,42 +327,6 @@ def sound_speed_squared(p: NDArray[float]) -> float:
     """
 
 
-@device(
-    static=static,
-    device_funcs=[
-        sound_speed_squared,
-        outer_wavespeeds,
-    ],
-)
-def max_wavespeed(p: NDArray[float]) -> float:
-    R"""
-    DEVICE double max_wavespeed(double *p)
-    {
-        #if DIM == 1
-        double ai[2];
-        outer_wavespeeds(p, ai, 1);
-        return max2(fabs(ai[0]), fabs(ai[1]));
-
-        #elif DIM == 2
-        double ai[2];
-        double aj[2];
-        outer_wavespeeds(p, ai, 1);
-        outer_wavespeeds(p, aj, 2);
-        return max2(max2(fabs(ai[0]), fabs(ai[1])), max2(fabs(aj[0]), fabs(aj[1])));
-
-        #elif DIM == 3
-        double ai[2];
-        double aj[2];
-        double ak[2];
-        outer_wavespeeds(p, ai, 1);
-        outer_wavespeeds(p, aj, 2);
-        outer_wavespeeds(p, ak, 3);
-        return max3(max2(fabs(ai[0]), fabs(ai[1])), max2(fabs(aj[0]), fabs(aj[1])), max2(fabs(ak[0]), fabs(ak[1])));
-        #endif
-    }
-    """
-
-
 @device(static=static, device_funcs=[sound_speed_squared])
 def outer_wavespeeds(
     p: NDArray[float],
@@ -414,6 +378,42 @@ def outer_wavespeeds(
 
         wavespeeds[0] = (vn * (1.0 - a2) - k0) / (1.0 - vv * a2);
         wavespeeds[1] = (vn * (1.0 - a2) + k0) / (1.0 - vv * a2);
+    }
+    """
+
+
+@device(
+    static=static,
+    device_funcs=[
+        sound_speed_squared,
+        outer_wavespeeds,
+    ],
+)
+def max_wavespeed(p: NDArray[float]) -> float:
+    R"""
+    DEVICE double max_wavespeed(double *p)
+    {
+        #if DIM == 1
+        double ai[2];
+        outer_wavespeeds(p, ai, 1);
+        return max2(fabs(ai[0]), fabs(ai[1]));
+
+        #elif DIM == 2
+        double ai[2];
+        double aj[2];
+        outer_wavespeeds(p, ai, 1);
+        outer_wavespeeds(p, aj, 2);
+        return max2(max2(fabs(ai[0]), fabs(ai[1])), max2(fabs(aj[0]), fabs(aj[1])));
+
+        #elif DIM == 3
+        double ai[2];
+        double aj[2];
+        double ak[2];
+        outer_wavespeeds(p, ai, 1);
+        outer_wavespeeds(p, aj, 2);
+        outer_wavespeeds(p, ak, 3);
+        return max3(max2(fabs(ai[0]), fabs(ai[1])), max2(fabs(aj[0]), fabs(aj[1])), max2(fabs(ak[0]), fabs(ak[1])));
+        #endif
     }
     """
 
