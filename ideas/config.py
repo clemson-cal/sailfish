@@ -184,17 +184,21 @@ class Forcing:
         """
         Return an array of rates at the zones centers of the given box
         """
-        if self.ramp != 0.0:
-            raise NotImplementedError("buffer ramp not implemented")
+        from math import e
+
         coordinate, inequality, value = self.where.split()
+        s0 = float(value)
         x, y, z = box.cell_centers(dim=3)
         R = (x**2 + y**2) ** 0.5
         s = dict(x=x, y=y, z=z, R=R)[coordinate]
-        test = {
-            "<": lambda a, b: a < b,
-            ">": lambda a, b: a > b,
-        }[inequality]
-        return self.rate * test(s, float(value))
+        sign = {"<": -1.0, ">": +1.0}[inequality]
+
+        if self.ramp == 0.0:
+            step = lambda x: x > 0.0
+        else:
+            step = lambda x: 1.0 / (1.0 + e ** (-x / self.ramp))
+
+        return self.rate * step(sign * (s - s0))
 
 
 @schema

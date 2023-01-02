@@ -108,9 +108,9 @@ def cylinder_in_wind():
         "domain.extent_j": [-0.50, 0.50],
         "driver.tfinal": 1.0,
         "forcing": {
-            "rate": 100.0,
-            "ramp": 0.0,
-            "where": "x < 0.1",
+            "rate": 1e5,
+            "ramp": 0.1,
+            "where": "x < 0.0",
             "target": "initial-data",
         },
     }
