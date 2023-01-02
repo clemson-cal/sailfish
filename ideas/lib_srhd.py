@@ -15,32 +15,32 @@ static = R"""
 #if DIM == 1
 #define NCONS 3
 #define RHO 0
-#define VXX 1
+#define UXX 1
 #define PRE 2
 #define DEN 0
-#define PXX 1
+#define SXX 1
 #define NRG 2
 #elif DIM == 2
 #define NCONS 4
 #define RHO 0
-#define VXX 1
-#define VYY 2
+#define UXX 1
+#define UYY 2
 #define PRE 3
 #define DEN 0
-#define PXX 1
-#define PYY 2
+#define SXX 1
+#define SYY 2
 #define NRG 3
 #elif DIM == 3
 #define NCONS 5
 #define RHO 0
-#define VXX 1
-#define VYY 2
-#define VZZ 3
+#define UXX 1
+#define UYY 2
+#define UZZ 3
 #define PRE 4
 #define DEN 0
-#define PXX 1
-#define PYY 2
-#define PZZ 3
+#define SXX 1
+#define SYY 2
+#define SZZ 3
 #define NRG 4
 #endif
 
@@ -57,41 +57,41 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
     {
         #if DIM == 1
         double rho = p[RHO];
-        double gbx = p[VXX];
+        double gbx = p[UXX];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx);
         double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
-        u[PXX] = m * h * gbx;
+        u[SXX] = m * h * gbx;
         u[NRG] = m * (h * w - 1.0) - pre;
 
         #elif DIM == 2
         double rho = p[RHO];
-        double gbx = p[VXX];
-        double gby = p[VYY];
+        double gbx = p[UXX];
+        double gby = p[UYY];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby);
         double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
-        u[PXX] = m * h * gbx;
-        u[PYY] = m * h * gby;
+        u[SXX] = m * h * gbx;
+        u[SYY] = m * h * gby;
         u[NRG] = m * (h * w - 1.0) - pre;
 
         #elif DIM == 3
         double rho = p[RHO];
-        double gbx = p[VXX];
-        double gby = p[VYY];
-        double gbz = p[VZZ];
+        double gbx = p[UXX];
+        double gby = p[UYY];
+        double gbz = p[UZZ];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby + gbz * gbz);
         double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
-        u[PXX] = m * h * gbx;
-        u[PYY] = m * h * gby;
-        u[PZZ] = m * h * gbz;
+        u[SXX] = m * h * gbx;
+        u[SYY] = m * h * gby;
+        u[SZZ] = m * h * gbz;
         u[NRG] = m * (h * w - 1.0) - pre;
         #endif
     }
@@ -108,7 +108,7 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
 
         #if DIM == 1
         double m = u[DEN];
-        double ss  = u[PXX] * u[PXX];
+        double ss  = u[SXX] * u[SXX];
         double tau = u[NRG];
         double error_tolerance = 1e-12 * (m + tau);
         int iteration = 0;
@@ -138,14 +138,14 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         }
 
         p[RHO] = m / w0;
-        p[VXX] = w0 * u[1] / (tau + m + pre);
+        p[UXX] = w0 * u[1] / (tau + m + pre);
         p[PRE] = pre;
 
         #elif DIM == 2
 
         double m   = u[DEN];
-        double s1  = u[PXX];
-        double s2  = u[PYY];
+        double s1  = u[SXX];
+        double s2  = u[SYY];
         double tau = u[NRG];
         double ss  = s1 * s1 + s2 * s2;
         double error_tolerance = 1e-12 * (m + tau);
@@ -176,16 +176,16 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         }
 
         p[RHO] = m / w0;
-        p[VXX] = w0 * u[1] / (tau + m + pre);
-        p[VYY] = w0 * u[2] / (tau + m + pre);
+        p[UXX] = w0 * u[1] / (tau + m + pre);
+        p[UYY] = w0 * u[2] / (tau + m + pre);
         p[PRE] = pre;
 
         #elif DIM == 3
 
         double m   = u[DEN];
-        double s1  = u[PXX];
-        double s2  = u[PYY];
-        double s3  = u[PZZ];
+        double s1  = u[SXX];
+        double s2  = u[SYY];
+        double s3  = u[SZZ];
         double tau = u[NRG];
         double ss  = s1 * s1 + s2 * s2 + s3 * s3;
         double error_tolerance = 1e-12 * (m + tau);
@@ -216,9 +216,9 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         }
 
         p[RHO] = m / w0;
-        p[VXX] = w0 * u[1] / (tau + m + pre);
-        p[VYY] = w0 * u[2] / (tau + m + pre);
-        p[VZZ] = w0 * u[3] / (tau + m + pre);
+        p[UXX] = w0 * u[1] / (tau + m + pre);
+        p[UYY] = w0 * u[2] / (tau + m + pre);
+        p[UZZ] = w0 * u[3] / (tau + m + pre);
         p[PRE] = pre;
 
         #endif
@@ -260,16 +260,16 @@ def prim_and_cons_to_flux(
         double pre = p[PRE];
 
         #if DIM == 1
-        double gbx = p[VXX];
+        double gbx = p[UXX];
         double w =  sqrt(1.0 + gbx * gbx);
         double vn = gbx / w;
         f[DEN] = vn * u[DEN];
-        f[PXX] = vn * u[PXX] + pre;
+        f[SXX] = vn * u[SXX] + pre;
         f[NRG] = vn * (u[NRG] + pre);
 
         #elif DIM == 2
-        double gbx = p[VXX];
-        double gby = p[VYY];
+        double gbx = p[UXX];
+        double gby = p[UYY];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby);
         switch (direction)
         {
@@ -277,14 +277,14 @@ def prim_and_cons_to_flux(
             case 2: vn = gby / w;
         }
         f[DEN] = vn * u[DEN];
-        f[PXX] = vn * u[PXX] + pre * (direction == 1);
-        f[PYY] = vn * u[PYY] + pre * (direction == 2);
+        f[SXX] = vn * u[SXX] + pre * (direction == 1);
+        f[SYY] = vn * u[SYY] + pre * (direction == 2);
         f[NRG] = vn * (u[NRG] + pre);
 
         #elif DIM == 3
-        double gbx = p[VXX];
-        double gby = p[VYY];
-        double gbz = p[VZZ];
+        double gbx = p[UXX];
+        double gby = p[UYY];
+        double gbz = p[UZZ];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby + gbz * gbz);
         switch (direction)
         {
@@ -293,9 +293,9 @@ def prim_and_cons_to_flux(
             case 3: vn = gbz / w;
         }
         f[DEN] = vn * u[DEN];
-        f[PXX] = vn * u[PXX] + pre * (direction == 1);
-        f[PYY] = vn * u[PYY] + pre * (direction == 2);
-        f[PZZ] = vn * u[PZZ] + pre * (direction == 3);
+        f[SXX] = vn * u[SXX] + pre * (direction == 1);
+        f[SYY] = vn * u[SYY] + pre * (direction == 2);
+        f[SZZ] = vn * u[SZZ] + pre * (direction == 3);
         f[NRG] = vn * (u[NRG] + pre);
         #endif
     }
@@ -342,14 +342,14 @@ def outer_wavespeeds(
         double a2 = sound_speed_squared(p);
 
         #if DIM == 1
-        double gbx = p[VXX];
+        double gbx = p[UXX];
         double uu = gbx * gbx;
         double w =  sqrt(1.0 + uu);
         double vn = gbx / w;
 
         #elif DIM == 2
-        double gbx = p[VXX];
-        double gby = p[VYY];
+        double gbx = p[UXX];
+        double gby = p[UYY];
         double uu = gbx * gbx + gby * gby;
         double w =  sqrt(1.0 + uu);
         switch (direction)
@@ -359,9 +359,9 @@ def outer_wavespeeds(
         }
 
         #elif DIM == 3
-        double gbx = p[VXX];
-        double gby = p[VYY];
-        double gbz = p[VZZ];
+        double gbx = p[UXX];
+        double gby = p[UYY];
+        double gbz = p[UZZ];
         double uu = gbx * gbx + gby * gby + gbz * gbz;
         double w =  sqrt(1.0 + uu);
         switch (direction)
