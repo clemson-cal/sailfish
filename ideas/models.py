@@ -26,6 +26,10 @@ class Sod:
 
     model: Literal["sod"] = "sod"
 
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "pressure"
+
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
@@ -57,6 +61,10 @@ class CylindricalExplosion:
     """
 
     model: Literal["cylindrical-explosion"] = "cylindrical-explosion"
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "y-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 2:
@@ -90,6 +98,10 @@ class CylinderInWind:
     """
 
     model: Literal["cylinder-in-wind"] = "cylinder-in-wind"
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "y-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 2:
@@ -128,7 +140,10 @@ class Ram01:
     """
 
     model: Literal["ram-01"] = "ram-01"
-    primitive_fields = "proper-density", "x-gamma-beta", "pressure"
+
+    @property
+    def primitive_fields(self):
+        return "proper-density", "x-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -162,7 +177,10 @@ class Ram02:
     """
 
     model: Literal["ram-02"] = "ram-02"
-    primitive_fields = "proper-density", "x-gamma-beta", "pressure"
+
+    @property
+    def primitive_fields(self):
+        return "proper-density", "x-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -196,7 +214,10 @@ class Ram03:
     """
 
     model: Literal["ram-03"] = "ram-03"
-    primitive_fields = "proper-density", "x-gamma-beta", "pressure"
+
+    @property
+    def primitive_fields(self):
+        return "proper-density", "x-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -233,7 +254,10 @@ class FuShu33:
     """
 
     model: Literal["fu-shu-33"] = "fu-shu-33"
-    num_primitive_fields = 3
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -270,6 +294,10 @@ class FuShu34:
     model: Literal["fu-shu-34"] = "fu-shu-34"
     num_primitive_fields = 3
 
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "pressure"
+
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
@@ -305,7 +333,10 @@ class FuShu35:
     """
 
     model: Literal["fu-shu-35"] = "fu-shu-35"
-    num_primitive_fields = 3
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -340,7 +371,10 @@ class FuShu36:
     """
 
     model: Literal["fu-shu-36"] = "fu-shu-36"
-    num_primitive_fields = 3
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -382,6 +416,10 @@ class FuShu37:
 
     model: Literal["fu-shu-37"] = "fu-shu-37"
 
+    @property
+    def primitive_fields(self):
+        "density", "x-velocity", "pressure"
+
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
@@ -413,13 +451,18 @@ class DensityWave:
     """
 
     model: Literal["density-wave"] = "density-wave"
+    amplitude: float = 0.2
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
         p = zeros(x.shape + (3,))
-        p[..., 0] = 1.0 + 0.2 * sin(2 * pi * x)
+        p[..., 0] = 1.0 + self.amplitude * sin(2 * pi * x)
         p[..., 1] = 1.0
         p[..., 2] = 1.0
         return p

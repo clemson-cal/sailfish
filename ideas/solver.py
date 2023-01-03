@@ -43,14 +43,14 @@ def plm_minmod(yl: float, yc: float, yr: float, plm_theta: float):
 
 
 @kernel_class
-class GradientEsimation:
+class GradientEstimation:
     """
     Handles batch-generation of PLM gradient estimation
     """
 
     def __init__(self, config: Sailfish):
-        self._dim = dim = config.domain.dimensionality
-        self._nfields = dim + 2
+        self._dim = config.domain.dimensionality
+        self._nfields = len(config.initial_data.primitive_fields)
         self._transpose = config.strategy.transpose
         self._plm_theta = (
             config.scheme.reconstruction[1]
@@ -198,6 +198,7 @@ class Fields:
         if config.physics.metric == "minkowski":
             self.hydro_lib = __import__("lib_srhd")
         self.dim = config.domain.dimensionality
+        self.nprim = len(config.initial_data.primitive_fields)
         self.transpose = config.strategy.transpose
         self.gamma_law_index = config.physics.equation_of_state.gamma_law_index
 
@@ -205,6 +206,7 @@ class Fields:
     def define_macros(self):
         return dict(
             DIM=self.dim,
+            NPRIM=self.nprim,
             TRANSPOSE=int(self.transpose),
             GAMMA_LAW_INDEX=self.gamma_law_index,
         )
@@ -253,7 +255,7 @@ class Fields:
             }
         }
         """
-        nq = self.dim + 2
+        nq = self.nprim
         iq = 0 if self.transpose else -1
         return u.size // nq, (u, p, u.size // nq)
 
@@ -293,7 +295,7 @@ class Fields:
             }
         }
         """
-        nq = self.dim + 2
+        nq = self.nprim
         iq = 0 if self.transpose else -1
         return p.size // nq, (p, u, p.size // nq)
 
@@ -351,6 +353,7 @@ class Scheme:
         device_funcs = list()
         define_macros = dict()
         define_macros["DIM"] = config.domain.dimensionality
+        define_macros["NPRIM"] = len(config.initial_data.primitive_fields)
         define_macros["TRANSPOSE"] = int(config.strategy.transpose)
         define_macros[
             "GAMMA_LAW_INDEX"
@@ -1123,8 +1126,7 @@ def make_solver_kernels(config: Sailfish, native_code: bool = False):
     """
     Build and return kernels needed by solver, or just the native code
     """
-    nfields = config.domain.dimensionality + 2
-    grad_est = GradientEsimation(config)
+    grad_est = GradientEstimation(config)
     fields = Fields(config)
     scheme = Scheme(config)
 
@@ -1373,6 +1375,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         state = solver.send(timestep)
         timestep = state.timestep(cfl_number)
     """
+
     for kernel in (kernels := make_solver_kernels(config)):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
 
@@ -1383,6 +1386,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     num_threads = strategy.num_threads
     gpu_streams = strategy.gpu_streams
     initial_prim = config.initial_data.primitive
+    nprim = len(config.initial_data.primitive_fields)
 
     streams = list()
     solvers = list()
@@ -1398,7 +1402,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             t = 0.0
             n = 0
             p = initial_prim(box)
-        p = space.create(zeros, fields=p.shape[-1], data=p)
+        p = space.create(zeros, fields=nprim, data=p)
         b = box.extend(2)
 
         stream = make_stream(hardware, gpu_streams)

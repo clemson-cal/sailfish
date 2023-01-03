@@ -725,31 +725,31 @@ def code(args=None, console=None, parser=None):
     """
     if parser:
         parser.add_argument(
-            "_configs",
-            metavar="configs",
-            nargs="*",
-            default=[dict()],
-            help="sequence of configuration files, checkpoints, or preset/setup names",
+            "_config",
+            metavar="config",
+            default=["sod"],
+            help="configuration file, checkpoint, or preset/setup name",
         )
         parser.add_argument("--line-numbers", dest="_line_numbers", action="store_true")
+        config = parser.add_argument_group("config")
+        add_config_arguments(config)
 
     else:
         from solver import native_code
         from rich.syntax import Syntax
         from rich.prompt import Prompt
 
+        console.width = 100
+
         overrides = unflatten(
             {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
         )
-        runs = chain(*(sailfish(cfg, overrides, console) for cfg in args._configs))
+        config, chkpt = next(sailfish(args._config, overrides, console))
 
-        console.width = 100
-
-        for config, _ in runs:
-            for code in native_code(config):
-                console.print(Syntax(code, "c", line_numbers=args._line_numbers))
-                if Prompt.ask(str()) in ("q", "quit"):
-                    break
+        for code in native_code(config):
+            console.print(Syntax(code, "c", line_numbers=args._line_numbers))
+            if Prompt.ask(str()) in ("q", "quit"):
+                break
 
 
 def todo(args=None, console=None, parser=None):
@@ -785,14 +785,14 @@ def todo(args=None, console=None, parser=None):
         - [ ] crash detection
         - [ ] crash recovery (fallback strategies)
         - [ ] FMR
-        - [ ] relativistic solver
-        - [ ] relativistic shocktube problems, including with transverse velocity
+        - [x] relativistic solver
+        - [/] relativistic shocktube problems, including with transverse velocity
         - [ ] viscosity
         - [ ] geometric source terms; cell geometry data
         - [ ] gravitational source terms
         - [ ] outer buffer source terms
         - [ ] reductions needed for orbital evolution
-        - [ ] isothermal reset
+        - [ ] isothermal EOS
         - [ ] angular-momentum conserving 2d solver
         - [ ] MPI parallel
         """

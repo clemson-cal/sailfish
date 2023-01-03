@@ -40,9 +40,10 @@ class CoordinateBox:
     Fields
     ------
 
-    extent_i: the extent of the coordinate box on the i-axis
-    extent_j: the extent of the coordinate box on the j-axis
-    extent_k: the extent of the coordinate box on the k-axis
+    extent_i:  extent of the coordinate box on the i-axis
+    extent_j:  extent of the coordinate box on the j-axis
+    extent_k:  extent of the coordinate box on the k-axis
+    num_zones: number of zones on each axis
     """
 
     extent_i: tuple[float, float] = (0.0, 1.0)

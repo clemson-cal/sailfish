@@ -8,20 +8,18 @@ static = R"""
 #define min3(a, b, c) min2(a, min2(b, c))
 #define max3(a, b, c) max2(a, max2(b, c))
 
-#ifndef DIM
-#define DIM 1
-#endif
-
-#if DIM == 1
+#if NPRIM == 3
 #define NCONS 3
+#define NVECS 1
 #define RHO 0
 #define VXX 1
 #define PRE 2
 #define DEN 0
 #define PXX 1
 #define NRG 2
-#elif DIM == 2
+#elif NPRIM == 4
 #define NCONS 4
+#define NVECS 2
 #define RHO 0
 #define VXX 1
 #define VYY 2
@@ -30,8 +28,9 @@ static = R"""
 #define PXX 1
 #define PYY 2
 #define NRG 3
-#elif DIM == 3
+#elif NPRIM == 5
 #define NCONS 5
+#define NVECS 3
 #define RHO 0
 #define VXX 1
 #define VYY 2
@@ -42,6 +41,8 @@ static = R"""
 #define PYY 2
 #define PZZ 3
 #define NRG 4
+#else
+#error("NPRIM must be 3, 4, or 5")
 #endif
 
 #ifndef GAMMA_LAW_INDEX
@@ -55,7 +56,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
     R"""
     DEVICE void prim_to_cons(double *p, double *u)
     {
-        #if DIM == 1
+        #if NVECS == 1
         double rho = p[RHO];
         double vx  = p[VXX];
         double pre = p[PRE];
@@ -64,7 +65,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         u[PXX] = vx * rho;
         u[NRG] = 0.5 * rho * v_squared + pre / (GAMMA_LAW_INDEX - 1.0);
 
-        #elif DIM == 2
+        #elif NVECS == 2
         double rho = p[RHO];
         double vx  = p[VXX];
         double vy  = p[VYY];
@@ -75,7 +76,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         u[PYY] = vy * rho;
         u[NRG] = 0.5 * rho * v_squared + pre / (GAMMA_LAW_INDEX - 1.0);
 
-        #elif DIM == 3
+        #elif NVECS == 3
         double rho = p[RHO];
         double vx  = p[VXX];
         double vy  = p[VYY];
@@ -97,7 +98,7 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
     R"""
     DEVICE void cons_to_prim(double *u, double *p)
     {
-        #if DIM == 1
+        #if NVECS == 1
         double rho = u[DEN];
         double px  = u[PXX];
         double nrg = u[NRG];
@@ -106,7 +107,7 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         p[VXX] = px / rho;
         p[PRE] = (nrg - 0.5 * p_squared / rho) * (GAMMA_LAW_INDEX - 1.0);
 
-        #elif DIM == 2
+        #elif NVECS == 2
         double rho = u[DEN];
         double px  = u[PXX];
         double py  = u[PYY];
@@ -117,7 +118,7 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         p[VYY] = py / rho;
         p[PRE] = (nrg - 0.5 * p_squared / rho) * (GAMMA_LAW_INDEX - 1.0);
 
-        #elif DIM == 3
+        #elif NVECS == 3
         double rho = u[DEN];
         double px  = u[PXX];
         double py  = u[PYY];
@@ -169,18 +170,18 @@ def prim_and_cons_to_flux(
         double nrg = u[NRG];
         double vn = p[direction];
 
-        #if DIM == 1
+        #if NVECS == 1
         f[DEN] = vn * u[DEN];
         f[PXX] = vn * u[PXX] + pre * (direction == 1);
         f[NRG] = vn * (nrg + pre);
 
-        #elif DIM == 2
+        #elif NVECS == 2
         f[DEN] = vn * u[DEN];
         f[PXX] = vn * u[PXX] + pre * (direction == 1);
         f[PYY] = vn * u[PYY] + pre * (direction == 2);
         f[NRG] = vn * (nrg + pre);
 
-        #elif DIM == 3
+        #elif NVECS == 3
         f[DEN] = vn * u[DEN];
         f[PXX] = vn * u[PXX] + pre * (direction == 1);
         f[PYY] = vn * u[PYY] + pre * (direction == 2);
@@ -218,13 +219,13 @@ def max_wavespeed(p: NDArray[float]) -> float:
     R"""
     DEVICE double max_wavespeed(double *p)
     {
-        #if DIM == 1
+        #if NVECS == 1
         double cs = sqrt(sound_speed_squared(p));
         double vx = p[VXX];
         double ax = max2(fabs(vx - cs), fabs(vx + cs));
         return ax;
 
-        #elif DIM == 2
+        #elif NVECS == 2
         double cs = sqrt(sound_speed_squared(p));
         double vx = p[VXX];
         double vy = p[VYY];
@@ -232,7 +233,7 @@ def max_wavespeed(p: NDArray[float]) -> float:
         double ay = max2(fabs(vy - cs), fabs(vy + cs));
         return max2(ax, ay);
 
-        #elif DIM == 3
+        #elif NVECS == 3
         double cs = sqrt(sound_speed_squared(p));
         double vx = p[VXX];
         double vy = p[VYY];
@@ -312,7 +313,9 @@ if __name__ == "__main__":
     from numpy import array, zeros_like, allclose
     from kernels import kernel
 
-    @kernel(device_funcs=[cons_to_prim], define_macros=dict(DIM=2))
+    nprim = 4
+
+    @kernel(device_funcs=[cons_to_prim], define_macros=dict(NPRIM=nprim))
     def kernel_cons_to_prim(u: NDArray[float], p: NDArray[float], ni: int = None):
         R"""
         KERNEL void kernel_cons_to_prim(double *u, double *p, int ni)
@@ -323,9 +326,9 @@ if __name__ == "__main__":
             }
         }
         """
-        return u.size // 4, (u, p, u.size // 4)
+        return u.size // nprim, (u, p, u.size // nprim)
 
-    @kernel(device_funcs=[prim_to_cons], define_macros=dict(DIM=2))
+    @kernel(device_funcs=[prim_to_cons], define_macros=dict(NPRIM=nprim))
     def kernel_prim_to_cons(p: NDArray[float], u: NDArray[float], ni: int = None):
         R"""
         KERNEL void kernel_prim_to_cons(double *p, double *u, int ni)
@@ -336,7 +339,7 @@ if __name__ == "__main__":
             }
         }
         """
-        return p.size // 4, (p, u, p.size // 4)
+        return p.size // nprim, (p, u, p.size // nprim)
 
     p = array([[1.0, 0.1, 0.2, 100.0]])
     u = zeros_like(p)

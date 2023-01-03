@@ -149,7 +149,9 @@ def schema(cls):
 
     short_descr, long_descr, field_descriptions = parse_docstring(cls)
     prop_descriptions = {
-        k: v.__doc__.strip() for k, v in vars(cls).items() if type(v) is property
+        k: v.__doc__.strip()
+        for k, v in vars(cls).items()
+        if type(v) is property and v.__doc__
     }
     fields = cls.__dataclass_fields__
 
