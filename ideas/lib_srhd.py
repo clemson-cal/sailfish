@@ -358,28 +358,23 @@ def outer_wavespeeds(
 
         #if NVECS == 1
         double gbx = p[UXX];
+        double gby = 0.0;
+        double gbz = 0.0;
         double uu = gbx * gbx;
-        double w =  sqrt(1.0 + uu);
-        double vn = gbx / w;
-
         #elif NVECS == 2
         double gbx = p[UXX];
         double gby = p[UYY];
+        double gbz = 0.0;
         double uu = gbx * gbx + gby * gby;
-        double w =  sqrt(1.0 + uu);
-
-        switch (direction)
-        {
-            case 1: vn = gbx / w;
-            case 2: vn = gby / w;
-        }
-
         #elif NVECS == 3
         double gbx = p[UXX];
         double gby = p[UYY];
         double gbz = p[UZZ];
         double uu = gbx * gbx + gby * gby + gbz * gbz;
-        double w =  sqrt(1.0 + uu);
+        #endif
+
+        double w = sqrt(1.0 + uu);
+        double vn = 0.0;
 
         switch (direction)
         {
@@ -387,8 +382,6 @@ def outer_wavespeeds(
             case 2: vn = gby / w;
             case 3: vn = gbz / w;
         }
-        #endif
-
         double vv = uu / (1.0 + uu);
         double v2 = vn * vn;
         double k0 = sqrt(a2 * (1.0 - vv) * (1.0 - vv * a2 - v2 * (1.0 - a2)));
