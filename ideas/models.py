@@ -244,6 +244,43 @@ def ram_03():
 
 
 @schema
+class Ram06:
+    """
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
+    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    """
+
+    model: Literal["ram-06"] = "ram-06"
+
+    @property
+    def primitive_fields(self):
+        return "proper-density", "x-gamma-beta", "y-gamma-beta", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (4,))
+        p[l] = [1.0, 0.0, 0.9, 1000.0]
+        p[r] = [1.0, 0.0, 0.9, 1e-2]
+        return p
+
+
+@preset
+def ram_06():
+    return {
+        "initial_data.model": "ram-06",
+        "domain.num_zones": [400, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 0.6,
+        "physics.equation_of_state.gamma_law_index": 5.0 / 3.0,
+        "physics.metric": "minkowski",
+    }
+
+
+@schema
 class FuShu33:
     """
     Lax problem initial data
@@ -490,6 +527,7 @@ ModelData = Union[
     Ram01,
     Ram02,
     Ram03,
+    Ram06,
     FuShu33,
     FuShu34,
     FuShu35,
