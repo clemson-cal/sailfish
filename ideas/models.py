@@ -121,6 +121,108 @@ def cylinder_in_wind():
 
 
 @schema
+class Ram01:
+    """
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
+    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    """
+
+    model: Literal["ram-01"] = "ram-01"
+    primitive_fields = "proper-density", "x-gamma-beta", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [10.0, 0.0, 13.33]
+        p[r] = [1.0, 0.0, 1e-8]
+        return p
+
+
+@preset
+def ram_01():
+    return {
+        "initial_data.model": "ram-01",
+        "domain.num_zones": [400, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 0.4,
+        "physics.equation_of_state.gamma_law_index": 4.0 / 3.0,
+        "physics.metric": "minkowski",
+    }
+
+
+@schema
+class Ram02:
+    """
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
+    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    """
+
+    model: Literal["ram-02"] = "ram-02"
+    primitive_fields = "proper-density", "x-gamma-beta", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [1.0, 0.0, 1000.0]
+        p[r] = [1.0, 0.0, 1e-2]
+        return p
+
+
+@preset
+def ram_02():
+    return {
+        "initial_data.model": "ram-02",
+        "domain.num_zones": [400, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 0.4,
+        "physics.equation_of_state.gamma_law_index": 4.0 / 3.0,
+        "physics.metric": "minkowski",
+    }
+
+
+@schema
+class Ram03:
+    """
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
+    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    """
+
+    model: Literal["ram-03"] = "ram-03"
+    primitive_fields = "proper-density", "x-gamma-beta", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        p[l] = [1.0, 0.9, 1.0]
+        p[r] = [1.0, 0.0, 10.0]
+        return p
+
+
+@preset
+def ram_03():
+    return {
+        "initial_data.model": "ram-03",
+        "domain.num_zones": [400, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 0.4,
+        "physics.equation_of_state.gamma_law_index": 4.0 / 3.0,
+        "physics.metric": "minkowski",
+    }
+
+
+@schema
 class FuShu33:
     """
     Lax problem initial data
@@ -131,6 +233,7 @@ class FuShu33:
     """
 
     model: Literal["fu-shu-33"] = "fu-shu-33"
+    num_primitive_fields = 3
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -165,6 +268,7 @@ class FuShu34:
     """
 
     model: Literal["fu-shu-34"] = "fu-shu-34"
+    num_primitive_fields = 3
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -201,6 +305,7 @@ class FuShu35:
     """
 
     model: Literal["fu-shu-35"] = "fu-shu-35"
+    num_primitive_fields = 3
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -235,6 +340,7 @@ class FuShu36:
     """
 
     model: Literal["fu-shu-36"] = "fu-shu-36"
+    num_primitive_fields = 3
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -338,6 +444,9 @@ ModelData = Union[
     Sod,
     CylindricalExplosion,
     CylinderInWind,
+    Ram01,
+    Ram02,
+    Ram03,
     FuShu33,
     FuShu34,
     FuShu35,
