@@ -533,7 +533,6 @@ def run(args=None, console=None, parser=None):
             "_configs",
             metavar="configs",
             nargs="*",
-            default=[dict()],
             help="sequence of configuration files, checkpoints, or preset/setup names",
         )
         parser.add_argument(
@@ -564,6 +563,19 @@ def run(args=None, console=None, parser=None):
         add_config_arguments(config)
 
     else:
+        if not args._configs:
+            console.print("Need a configuration file or a preset name, e.g.")
+            console.print()
+            console.print("> sailfish run sod")
+            console.print("> sailfish run my_run.json")
+            console.print()
+            console.print("\n".join(get_preset_functions()))
+            console.print()
+            console.print("For more information:")
+            console.print()
+            console.print("> sailfish doc presets --more")
+            return
+
         overrides = unflatten(
             {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
         )
@@ -806,24 +818,24 @@ def argument_parser():
     )
 
     subparsers = parser.add_subparsers()
+    _run = subparsers.add_parser("run", usage=SUPPRESS, help=run.__doc__)
     _sys = subparsers.add_parser("sys", usage=SUPPRESS, help=sys.__doc__)
     _doc = subparsers.add_parser("doc", usage=SUPPRESS, help=doc.__doc__)
     _dep = subparsers.add_parser("dep", usage=SUPPRESS, help=dep.__doc__)
-    _run = subparsers.add_parser("run", usage=SUPPRESS, help=run.__doc__)
     _code = subparsers.add_parser("code", usage=SUPPRESS, help=code.__doc__)
     _todo = subparsers.add_parser("todo", usage=SUPPRESS, help=todo.__doc__)
 
+    _run.set_defaults(_command=run)
     _sys.set_defaults(_command=sys)
     _doc.set_defaults(_command=doc)
     _dep.set_defaults(_command=dep)
-    _run.set_defaults(_command=run)
     _code.set_defaults(_command=code)
     _todo.set_defaults(_command=todo)
 
+    run(parser=_run)
     sys(parser=_sys)
     doc(parser=_doc)
     dep(parser=_dep)
-    run(parser=_run)
     code(parser=_code)
     todo(parser=_todo)
 
@@ -841,7 +853,21 @@ def main():
     if args._command:
         args._command(args, console)
     else:
+        from rich.syntax import Syntax
+
+        examples = [
+            "> sailfish run sod --plot      # see a standard preset problem",
+            "> sailfish doc models          # print information about model problems",
+            "> sailfish dep                 # see python module dependencies",
+            "> sailfish todo                # see status of development goals",
+            "> sailfish code --line-numbers # print generated solver code",
+        ]
         parser.print_help()
+        console.print()
+        console.print("Examples:")
+        console.print()
+        for example in examples:
+            console.print(Syntax(example, lexer="bash"))
 
 
 if __name__ == "__main__":

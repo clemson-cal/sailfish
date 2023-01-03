@@ -2,7 +2,7 @@ from typing import Literal, Union
 from inspect import isgeneratorfunction
 from schema import schema
 from geometry import CoordinateBox
-from models import ModelData, Shocktube
+from models import ModelData, DefaultModelData
 
 
 @schema
@@ -234,7 +234,7 @@ class Sailfish:
     name: str = None
     driver: Driver = Driver()
     physics: Physics = Physics()
-    initial_data: ModelData = Shocktube()
+    initial_data: ModelData = DefaultModelData()
     boundary_condition: BoundaryCondition = BoundaryCondition()
     domain: CoordinateBox = CoordinateBox()
     strategy: Strategy = Strategy()

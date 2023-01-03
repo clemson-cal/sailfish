@@ -19,15 +19,12 @@ from geometry import CoordinateBox
 
 
 @schema
-class Shocktube:
+class Sod:
     """
     Classic Sod shocktube initial data
-
-    Note: this model should be specialized to 1d; a version generalized for
-    1d/2d/3d should be added in a new models section.
     """
 
-    model: Literal["shocktube"] = "shocktube"
+    model: Literal["sod"] = "sod"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -39,6 +36,15 @@ class Shocktube:
         p[l] = [1.0, 0.0, 1.000]
         p[r] = [0.1, 0.0, 0.125]
         return p
+
+
+@preset
+def sod():
+    return {
+        "initial_data.model": "sod",
+        "domain.num_zones": [200, 1, 1],
+        "driver.tfinal": 0.1,
+    }
 
 
 @schema
@@ -65,12 +71,10 @@ class CylindricalExplosion:
 
 
 @preset
-def cylindrical_explosion():
+def sod():
     return {
-        "initial_data.model": "cylindrical-explosion",
-        "domain.num_zones": [200, 200, 1],
-        "domain.extent_i": [-0.5, 0.5],
-        "domain.extent_j": [-0.5, 0.5],
+        "initial_data.model": "sod",
+        "domain.num_zones": [200, 1, 1],
         "driver.tfinal": 0.1,
     }
 
@@ -329,8 +333,9 @@ def density_wave():
     }
 
 
+DefaultModelData = Sod
 ModelData = Union[
-    Shocktube,
+    Sod,
     CylindricalExplosion,
     CylinderInWind,
     FuShu33,
