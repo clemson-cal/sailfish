@@ -60,7 +60,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         double gbx = p[UXX];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx);
-        double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
+        double h = 1.0 + pre / rho * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
         u[SXX] = m * h * gbx;
@@ -72,7 +72,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         double gby = p[UYY];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby);
-        double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
+        double h = 1.0 + pre / rho * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
         u[SXX] = m * h * gbx;
@@ -86,7 +86,7 @@ def prim_to_cons(p: NDArray[float], u: NDArray[float]):
         double gbz = p[UZZ];
         double pre = p[PRE];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby + gbz * gbz);
-        double h = rho + pre * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
+        double h = 1.0 + pre / rho * (1.0 + 1.0 / (GAMMA_LAW_INDEX - 1.0));
         double m = rho * w;
         u[DEN] = m;
         u[SXX] = m * h * gbx;
