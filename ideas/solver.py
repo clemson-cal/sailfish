@@ -13,7 +13,6 @@ from numpy import array, zeros, concatenate, argsort
 from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
-from lib_euler import prim_to_cons, cons_to_prim, riemann_hlle, max_wavespeed
 from config import Sailfish, Strategy, Reconstruction, BoundaryCondition
 from geometry import CoordinateBox
 from index_space import IndexSpace
@@ -194,6 +193,10 @@ class Fields:
     """
 
     def __init__(self, config: Sailfish):
+        if config.physics.metric == "newtonian":
+            self.hydro_lib = __import__("lib_euler")
+        if config.physics.metric == "minkowski":
+            self.hydro_lib = __import__("lib_srhd")
         self.dim = config.domain.dimensionality
         self.transpose = config.strategy.transpose
         self.gamma_law_index = config.physics.equation_of_state.gamma_law_index
@@ -208,7 +211,11 @@ class Fields:
 
     @property
     def device_funcs(self):
-        return [prim_to_cons, cons_to_prim, max_wavespeed]
+        return [
+            self.hydro_lib.prim_to_cons,
+            self.hydro_lib.cons_to_prim,
+            self.hydro_lib.max_wavespeed,
+        ]
 
     @kernel
     def cons_to_prim_array(
@@ -336,6 +343,11 @@ class Scheme:
     """
 
     def __init__(self, config: Sailfish):
+        if config.physics.metric == "newtonian":
+            hydro_lib = __import__("lib_euler")
+        if config.physics.metric == "minkowski":
+            hydro_lib = __import__("lib_srhd")
+
         device_funcs = list()
         define_macros = dict()
         define_macros["DIM"] = config.domain.dimensionality
@@ -360,9 +372,9 @@ class Scheme:
                 device_funcs.append(plm_minmod)
 
         if not config.strategy.cache_prim:
-            device_funcs.append(cons_to_prim)
+            device_funcs.append(hydro_lib.cons_to_prim)
 
-        device_funcs.append(riemann_hlle)
+        device_funcs.append(hydro_lib.riemann_hlle)
         device_funcs.append(self._godunov_fluxes)
 
         self._dim = config.domain.dimensionality
@@ -1386,7 +1398,6 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             t = 0.0
             n = 0
             p = initial_prim(box)
-
         p = space.create(zeros, fields=p.shape[-1], data=p)
         b = box.extend(2)
 

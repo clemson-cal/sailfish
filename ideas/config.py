@@ -88,7 +88,18 @@ EquationOfState = Union[GammaLawEOS, IsothermalEOS, LocallyIsothermalEOS]
 
 @schema
 class Physics:
+    """
+    Physics equations to be solved
+
+    Fields
+    ------
+
+    equation_of_state: thermodynamic EOS
+    metric:            currently either newtonian or minkowski
+    """
+
     equation_of_state: EquationOfState = GammaLawEOS()
+    metric: Literal["newtonian", "minkowski"] = "newtonian"
 
 
 Reconstruction = Union[Literal["pcm"], tuple[Literal["plm"], float]]
@@ -393,6 +404,13 @@ def add_config_arguments(parser: "argparser.ArgumentParser"):
         action="store_true",
         dest="strategy.cache_grad",
         default=None,
+    )
+    parser.add_argument(
+        "--metric",
+        type=str,
+        choices=Physics.type_args("metric"),
+        help=Physics.describe("metric"),
+        dest="physics.metric",
     )
 
 

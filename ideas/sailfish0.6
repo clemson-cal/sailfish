@@ -427,7 +427,6 @@ def deep_update(d: dict, u: dict) -> dict:
     Update `d` and any nested dictionaries recursively with values from `u`
     """
     for k, v in u.items():
-        print(k, v)
         if isinstance(v, Mapping):
             d[k] = deep_update(d.setdefault(k, dict()), v)
         elif isinstance(d, Mapping):
@@ -730,7 +729,7 @@ def code(args=None, console=None, parser=None):
         overrides = unflatten(
             {k: v for k, v in vars(args).items() if v is not None and k[0] != "_"}
         )
-        runs = chain(*(sailfish(cfg, overrides) for cfg in args._configs))
+        runs = chain(*(sailfish(cfg, overrides, console) for cfg in args._configs))
 
         console.width = 100
 

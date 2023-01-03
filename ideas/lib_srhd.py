@@ -104,7 +104,7 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
     DEVICE void cons_to_prim(double *u, double *p)
     {
         double newton_iter_max = 500;
-        double gm              = GAMMA_LAW_INDEX;
+        double gm = GAMMA_LAW_INDEX;
 
         #if DIM == 1
         double m = u[DEN];
@@ -116,7 +116,8 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         double w0;
         double f;
 
-        while (1) {
+        while (1)
+        {
             double et = tau + pre + m;
             double b2 = min2(ss / et / et, 1.0 - 1e-10);
             double w2 = 1.0 / (1.0 - b2);
@@ -130,7 +131,8 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
             f  = d * e * (gm - 1.0) - pre;
             pre -= f / g;
 
-            if (fabs(f) < error_tolerance || iteration == newton_iter_max) {
+            if (fabs(f) < error_tolerance || iteration == newton_iter_max)
+            {
                 w0 = w;
                 break;
             }
@@ -154,7 +156,8 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         double w0;
         double f;
 
-        while (1) {
+        while (1)
+        {
             double et = tau + pre + m;
             double b2 = min2(ss / et / et, 1.0 - 1e-10);
             double w2 = 1.0 / (1.0 - b2);
@@ -168,7 +171,8 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
             f  = d * e * (gm - 1.0) - pre;
             pre -= f / g;
 
-            if (fabs(f) < error_tolerance || iteration == newton_iter_max) {
+            if (fabs(f) < error_tolerance || iteration == newton_iter_max)
+            {
                 w0 = w;
                 break;
             }
@@ -194,7 +198,8 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         double w0;
         double f;
 
-        while (1) {
+        while (1)
+        {
             double et = tau + pre + m;
             double b2 = min2(ss / et / et, 1.0 - 1e-10);
             double w2 = 1.0 / (1.0 - b2);
@@ -208,7 +213,8 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
             f  = d * e * (gm - 1.0) - pre;
             pre -= f / g;
 
-            if (fabs(f) < error_tolerance || iteration == newton_iter_max) {
+            if (fabs(f) < error_tolerance || iteration == newton_iter_max)
+            {
                 w0 = w;
                 break;
             }
@@ -222,6 +228,12 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
         p[PRE] = pre;
 
         #endif
+
+        if (iteration == newton_iter_max)
+        {
+            printf("c2p failed: %f %f %f\n", u[0], u[1], u[2]);
+            exit(1);
+        }
     }
     """
 
@@ -271,6 +283,7 @@ def prim_and_cons_to_flux(
         double gbx = p[UXX];
         double gby = p[UYY];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby);
+
         switch (direction)
         {
             case 1: vn = gbx / w;
@@ -286,6 +299,7 @@ def prim_and_cons_to_flux(
         double gby = p[UYY];
         double gbz = p[UZZ];
         double w =  sqrt(1.0 + gbx * gbx + gby * gby + gbz * gbz);
+
         switch (direction)
         {
             case 1: vn = gbx / w;
@@ -352,6 +366,7 @@ def outer_wavespeeds(
         double gby = p[UYY];
         double uu = gbx * gbx + gby * gby;
         double w =  sqrt(1.0 + uu);
+
         switch (direction)
         {
             case 1: vn = gbx / w;
@@ -364,6 +379,7 @@ def outer_wavespeeds(
         double gbz = p[UZZ];
         double uu = gbx * gbx + gby * gby + gbz * gbz;
         double w =  sqrt(1.0 + uu);
+
         switch (direction)
         {
             case 1: vn = gbx / w;
