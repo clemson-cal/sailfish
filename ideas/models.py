@@ -237,8 +237,8 @@ class Ram43:
         r = logical_not(l)
         p = zeros(x.shape + (3,))
         beta = 0.9
-        gammabeta = beta / sqrt(1.0 - beta * beta)
-        p[l] = [1.0, gammabeta, 1.0]
+        gamma_beta = beta / sqrt(1.0 - beta * beta)
+        p[l] = [1.0, gamma_beta, 1.0]
         p[r] = [1.0, 0.0, 10.0]
         return p
 
@@ -260,6 +260,8 @@ class Ram44:
     """
     1d Riemann problem (RAM problem 4; Sec 4.4)
 
+    Status: Failing
+
     Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
     Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
     pp. 255-279.
@@ -269,7 +271,7 @@ class Ram44:
 
     @property
     def primitive_fields(self):
-        return "proper-density", "x-gamma-beta", "pressure"
+        return "proper-density", "x-gamma-beta", "y-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
@@ -279,9 +281,9 @@ class Ram44:
         r = logical_not(l)
         p = zeros(x.shape + (4,))
         beta = 0.99
-        gammabeta = beta / sqrt(1.0 - beta * beta)
+        gamma_beta = beta / sqrt(1.0 - beta * beta)
         p[l] = [1.0, 0.0, 0.0, 1000.0]
-        p[r] = [1.0, 0.0, gammabeta, 1e-2]
+        p[r] = [1.0, 0.0, gamma_beta, 1e-2]
         return p
 
 
@@ -302,6 +304,8 @@ class Ram45:
     """
     1d shock heating Riemann problem (RAM problem 5; Sec 4.5)
 
+    Status: Failing
+
     Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
     Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
     pp. 255-279.
@@ -314,7 +318,6 @@ class Ram45:
         return "proper-density", "x-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        raise NotImplementedError("model needs reflecting boundary condition")
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
@@ -322,10 +325,10 @@ class Ram45:
         r = logical_not(l)
         p = zeros(x.shape + (3,))
         beta = 1.0 - 1e-10
-        gammabeta = beta / sqrt(1.0 - beta * beta)
+        gamma_beta = beta / sqrt(1.0 - beta * beta)
         psmall = 1.0 * 0.003 * 1.0 / 3.0
-        p[l] = [1.0, gammabeta, psmall]
-        p[r] = [1.0, gammabeta, psmall]
+        p[l] = [1.0, gamma_beta, psmall]
+        p[r] = [1.0, gamma_beta, psmall]
         return p
 
 
@@ -335,6 +338,8 @@ def ram_45():
         "initial_data.model": "ram-45",
         "domain.num_zones": [100, 1, 1],
         "domain.extent_i": [0.0, 1.0],
+        "boundary_condition.lower_i": "outflow",
+        "boundary_condition.upper_i": "reflecting",
         "driver.tfinal": 2.0,
         "physics.equation_of_state.gamma_law_index": 4.0 / 3.0,
         "physics.metric": "minkowski",
@@ -345,6 +350,8 @@ def ram_45():
 class Ram61:
     """
     1d Riemann problem with transverse velocity: (RAM Hard Test; sec 6.1)
+
+    Status: Failing
 
     Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
     Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
@@ -365,9 +372,9 @@ class Ram61:
         r = logical_not(l)
         p = zeros(x.shape + (4,))
         beta = 0.9
-        gammabeta = beta / sqrt(1.0 - beta * beta)
-        p[l] = [1.0, 0.0, gammabeta, 1000.0]
-        p[r] = [1.0, 0.0, gammabeta, 1e-2]
+        gamma_beta = beta / sqrt(1.0 - beta * beta)
+        p[l] = [1.0, 0.0, gamma_beta, 1000.0]
+        p[r] = [1.0, 0.0, gamma_beta, 1e-2]
         return p
 
 

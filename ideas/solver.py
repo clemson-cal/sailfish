@@ -911,6 +911,9 @@ def apply_bc(
     patches: list[NDArray[float]],
     kind="outflow",
 ):
+    if kind == "reflecing":
+        raise NotImplementedError("reflecing BC")
+
     if location == "lower_i":
         if kind == "outflow":
             u[:+2, :, :] = u[+2:+3, :, :]

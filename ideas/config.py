@@ -163,7 +163,7 @@ class Strategy:
         return self.data_layout == "fields-first"
 
 
-BoundaryConditionType = Literal["outflow", "periodic"]
+BoundaryConditionType = Literal["outflow", "periodic", "reflecting"]
 
 
 @schema

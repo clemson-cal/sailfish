@@ -116,7 +116,9 @@ class IndexSpace:
             elif data.shape == arr.shape:
                 arr[...] = data
             else:
-                raise ValueError("if given data must have the interior or total shape")
+                raise ValueError(
+                    f"given data must have the interior or total shape, got {data.shape}"
+                )
         return arr
 
     def __getitem__(self, code: str) -> tuple[slice]:
