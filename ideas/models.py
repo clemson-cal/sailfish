@@ -16,7 +16,14 @@ from numpy import logical_not, zeros, sqrt, sin, cos, pi
 from preset import preset
 from schema import schema
 from geometry import CoordinateBox
-from math import sqrt
+
+
+def two_state(region_a, state_a, state_b):
+    region_b = logical_not(region_a)
+    p = zeros(region_a.shape + (len(state_a),))
+    p[region_a] = state_a
+    p[region_b] = state_b
+    return p
 
 
 @schema
@@ -34,13 +41,13 @@ class Sod:
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 1:
             raise NotImplementedError("model only works in 1d")
+
         x = box.cell_centers()
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l] = [1.0, 0.0, 1.000]
-        p[r] = [0.1, 0.0, 0.125]
-        return p
+        return two_state(
+            x < 0.5,
+            [1.0, 0.0, 1.000],
+            [0.1, 0.0, 0.125],
+        )
 
 
 @preset
@@ -70,20 +77,22 @@ class CylindricalExplosion:
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 2:
             raise NotImplementedError("model only works in 2d")
+
         x, y = box.cell_centers()
-        l = sqrt(x**2 + y**2) < 0.1
-        r = logical_not(l)
-        p = zeros(x.shape + (4,))
-        p[l] = [1.0, 0.0, 0.0, 1.000]
-        p[r] = [0.1, 0.0, 0.0, 0.125]
-        return p
+        return two_state(
+            sqrt(x**2 + y**2) < 0.1,
+            [1.0, 0.0, 0.0, 1.000],
+            [0.1, 0.0, 0.0, 0.125],
+        )
 
 
 @preset
-def sod():
+def cylindrical_explosion():
     return {
-        "initial_data.model": "sod",
-        "domain.num_zones": [200, 1, 1],
+        "initial_data.model": "cylindrical-explosion",
+        "domain.num_zones": [200, 200, 1],
+        "domain.extent_i": [-0.50, 0.50],
+        "domain.extent_j": [-0.50, 0.50],
         "driver.tfinal": 0.1,
     }
 
@@ -107,13 +116,13 @@ class CylinderInWind:
     def primitive(self, box: CoordinateBox):
         if box.dimensionality != 2:
             raise NotImplementedError("model only works in 2d")
+
         x, y = box.cell_centers()
-        l = sqrt(x**2 + y**2) < 0.1
-        r = logical_not(l)
-        p = zeros(x.shape + (4,))
-        p[l] = [1e2, 0.0, 0.0, 1.0]
-        p[r] = [1.0, 1.0, 0.0, 0.1]
-        return p
+        return two_state(
+            sqrt(x**2 + y**2) < 0.1,
+            [1e2, 0.0, 0.0, 1.0],
+            [1.0, 1.0, 0.0, 0.1],
+        )
 
 
 @preset
@@ -146,19 +155,15 @@ class Ram41:
     model: Literal["ram-41"] = "ram-41"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
-        x = box.cell_centers()
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l] = [10.0, 0.0, 13.33]
-        p[r] = [1.0, 0.0, 1e-8]
-        return p
+        return two_state(box.cell_centers() < 0.5, [10.0, 0.0, 13.33], [1.0, 0.0, 1e-8])
 
 
 @preset
@@ -189,16 +194,12 @@ class Ram42:
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "pressure"
 
+    @property
+    def dimensionality(self):
+        return 1
+
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
-        x = box.cell_centers()
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l] = [1.0, 0.0, 1000.0]
-        p[r] = [1.0, 0.0, 1e-2]
-        return p
+        return two_state(box.cell_centers() < 0.5, [1.0, 0.0, 1000.0], [1.0, 0.0, 1e-2])
 
 
 @preset
@@ -226,21 +227,18 @@ class Ram43:
     model: Literal["ram-43"] = "ram-43"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
+        v = 0.9
+        u = v / sqrt(1.0 - v * v)
         x = box.cell_centers()
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        beta = 0.9
-        gamma_beta = beta / sqrt(1.0 - beta * beta)
-        p[l] = [1.0, gamma_beta, 1.0]
-        p[r] = [1.0, 0.0, 10.0]
-        return p
+        return two_state(x < 0.5, [1.0, u, 1.0], [1.0, 0.0, 10.0])
 
 
 @preset
@@ -270,21 +268,18 @@ class Ram44:
     model: Literal["ram-44"] = "ram-44"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "y-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
+        v = 0.99
+        u = v / sqrt(1.0 - v * v)
         x = box.cell_centers()
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (4,))
-        beta = 0.99
-        gamma_beta = beta / sqrt(1.0 - beta * beta)
-        p[l] = [1.0, 0.0, 0.0, 1000.0]
-        p[r] = [1.0, 0.0, gamma_beta, 1e-2]
-        return p
+        return two_state(x < 0.5, [1.0, 0.0, 0.0, 1e3], [1.0, 0.0, u, 1e-2])
 
 
 @preset
@@ -314,21 +309,18 @@ class Ram45:
     model: Literal["ram-45"] = "ram-45"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
-        x = box.cell_centers()
-        l = x < 1.0
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        beta = 1.0 - 1e-10
-        gamma_beta = beta / sqrt(1.0 - beta * beta)
-        psmall = 1.0 * 0.003 * 1.0 / 3.0
-        p[l] = [1.0, gamma_beta, psmall]
-        p[r] = [1.0, gamma_beta, psmall]
+        v = 1.0 - 1e-10
+        u = v / sqrt(1.0 - v * v)
+        pre_small = 1e-3
+        p[...] = [1.0, u, pre_small]
         return p
 
 
@@ -361,21 +353,18 @@ class Ram61:
     model: Literal["ram-61"] = "ram-61"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "y-gamma-beta", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
+        v = 0.9
+        u = v / sqrt(1.0 - v * v)
         x = box.cell_centers()
-        l = x < 0.5
-        r = logical_not(l)
-        p = zeros(x.shape + (4,))
-        beta = 0.9
-        gamma_beta = beta / sqrt(1.0 - beta * beta)
-        p[l] = [1.0, 0.0, gamma_beta, 1000.0]
-        p[r] = [1.0, 0.0, gamma_beta, 1e-2]
-        return p
+        return two_state(x < 0.5, [1.0, 0.0, u, 1e3], [1.0, 0.0, u, 1e-2])
 
 
 @preset
@@ -403,19 +392,19 @@ class FuShu33:
     model: Literal["fu-shu-33"] = "fu-shu-33"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
-        x = box.cell_centers()
-        l = x < 0.0
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l] = [0.445, 0.698, 3.528]
-        p[r] = [0.500, 0.000, 0.571]
-        return p
+        return two_state(
+            box.cell_centers() < 0.0,
+            [0.445, 0.698, 3.528],
+            [0.500, 0.000, 0.571],
+        )
 
 
 @preset
@@ -439,22 +428,21 @@ class FuShu34:
     """
 
     model: Literal["fu-shu-34"] = "fu-shu-34"
-    num_primitive_fields = 3
+
+    @property
+    def dimensionality(self):
+        return 1
 
     @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
-        x = box.cell_centers()
-        l = x < 0.0
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l] = [7.0, -1.0, 0.2]
-        p[r] = [7.0, +1.0, 0.2]
-        return p
+        return two_state(
+            box.cell_centers() < 0.0,
+            [7.0, -1.0, 0.2],
+            [7.0, +1.0, 0.2],
+        )
 
 
 @preset
@@ -482,19 +470,19 @@ class FuShu35:
     model: Literal["fu-shu-35"] = "fu-shu-35"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
-        x = box.cell_centers()
-        l = x < 0.0
-        r = logical_not(l)
-        p = zeros(x.shape + (3,))
-        p[l] = [1.00, 0.0, 2.0 / 3.0 * 1e-1]
-        p[r] = [1e-3, 0.0, 2.0 / 3.0 * 1e-10]
-        return p
+        return two_state(
+            box.cell_centers() < 0.0,
+            [1.00, 0.0, 2.0 / 3.0 * 1e-1],
+            [1e-3, 0.0, 2.0 / 3.0 * 1e-10],
+        )
 
 
 @preset
@@ -520,12 +508,14 @@ class FuShu36:
     model: Literal["fu-shu-36"] = "fu-shu-36"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
         p = zeros(x.shape + (3,))
         l = (x >= -5.0) * (x < -4.0)
@@ -562,6 +552,10 @@ class FuShu37:
     """
 
     model: Literal["fu-shu-37"] = "fu-shu-37"
+
+    @property
+    def dimensionality(self):
+        return 1
 
     @property
     def primitive_fields(self):
@@ -601,12 +595,14 @@ class DensityWave:
     amplitude: float = 0.2
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
         p = zeros(x.shape + (3,))
         p[..., 0] = 1.0 + self.amplitude * sin(2 * pi * x)
