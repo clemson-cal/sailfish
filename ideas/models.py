@@ -16,6 +16,7 @@ from numpy import logical_not, zeros, sqrt, sin, cos, pi
 from preset import preset
 from schema import schema
 from geometry import CoordinateBox
+from math import sqrt
 
 
 @schema
@@ -133,13 +134,14 @@ def cylinder_in_wind():
 
 
 @schema
-class Ram01:
+class Ram41:
     """
     Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
     The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    One-Dimensional Riemann Problem 1 (sec 4.1)
     """
 
-    model: Literal["ram-01"] = "ram-01"
+    model: Literal["ram-41"] = "ram-41"
 
     @property
     def primitive_fields(self):
@@ -158,25 +160,26 @@ class Ram01:
 
 
 @preset
-def ram_01():
+def ram_41():
     return {
-        "initial_data.model": "ram-01",
+        "initial_data.model": "ram-41",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.4,
-        "physics.equation_of_state.gamma_law_index": 4.0 / 3.0,
+        "physics.equation_of_state.gamma_law_index": 5.0 / 3.0,
         "physics.metric": "minkowski",
     }
 
 
 @schema
-class Ram02:
+class Ram42:
     """
     Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
     The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    One-Dimensional Riemann Problem 2 (sec 4.2)
     """
 
-    model: Literal["ram-02"] = "ram-02"
+    model: Literal["ram-42"] = "ram-42"
 
     @property
     def primitive_fields(self):
@@ -195,25 +198,26 @@ class Ram02:
 
 
 @preset
-def ram_02():
+def ram_42():
     return {
-        "initial_data.model": "ram-02",
+        "initial_data.model": "ram-42",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.4,
-        "physics.equation_of_state.gamma_law_index": 4.0 / 3.0,
+        "physics.equation_of_state.gamma_law_index": 5.0 / 3.0,
         "physics.metric": "minkowski",
     }
 
 
 @schema
-class Ram03:
+class Ram43:
     """
     Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
     The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    One-Dimensional Riemann Problem 3 (sec 4.3)
     """
 
-    model: Literal["ram-03"] = "ram-03"
+    model: Literal["ram-43"] = "ram-43"
 
     @property
     def primitive_fields(self):
@@ -226,15 +230,17 @@ class Ram03:
         l = x < 0.5
         r = logical_not(l)
         p = zeros(x.shape + (3,))
-        p[l] = [1.0, 0.9, 1.0]
+        beta = 0.9
+        gammabeta = beta / sqrt(1.0 - beta * beta)
+        p[l] = [1.0, gammabeta, 1.0]
         p[r] = [1.0, 0.0, 10.0]
         return p
 
 
 @preset
-def ram_03():
+def ram_43():
     return {
-        "initial_data.model": "ram-03",
+        "initial_data.model": "ram-43",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.4,
@@ -244,13 +250,96 @@ def ram_03():
 
 
 @schema
-class Ram06:
+class Ram44:
     """
     Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
     The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    One-Dimensional Riemann Problem 4 (sec 4.4)
     """
 
-    model: Literal["ram-06"] = "ram-06"
+    model: Literal["ram-44"] = "ram-44"
+
+    @property
+    def primitive_fields(self):
+        return "proper-density", "x-gamma-beta", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 0.5
+        r = logical_not(l)
+        p = zeros(x.shape + (4,))
+        beta = 0.99
+        gammabeta = beta / sqrt(1.0 - beta * beta)
+        p[l] = [1.0, 0.0, 0.0, 1000.0]
+        p[r] = [1.0, 0.0, gammabeta, 1e-2]
+        return p
+
+
+@preset
+def ram_44():
+    return {
+        "initial_data.model": "ram-44",
+        "domain.num_zones": [400, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 0.4,
+        "physics.equation_of_state.gamma_law_index": 5.0 / 3.0,
+        "physics.metric": "minkowski",
+    }
+
+
+@schema
+class Ram45:
+    """
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
+    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    One-Dimensional Shock Heating Riemann Problem 5 (sec 4.5)
+    """
+
+    model: Literal["ram-45"] = "ram-45"
+
+    @property
+    def primitive_fields(self):
+        return "proper-density", "x-gamma-beta", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        raise NotImplementedError("model needs reflecting boundary condition")
+        if box.dimensionality != 1:
+            raise NotImplementedError("model only works in 1d")
+        x = box.cell_centers()
+        l = x < 1.0
+        r = logical_not(l)
+        p = zeros(x.shape + (3,))
+        beta = 1.0 - 1e-10
+        gammabeta = beta / sqrt(1.0 - beta * beta)
+        psmall = 1.0 * 0.003 * 1.0 / 3.0
+        p[l] = [1.0, gammabeta, psmall]
+        p[r] = [1.0, gammabeta, psmall]
+        return p
+
+
+@preset
+def ram_45():
+    return {
+        "initial_data.model": "ram-45",
+        "domain.num_zones": [100, 1, 1],
+        "domain.extent_i": [0.0, 1.0],
+        "driver.tfinal": 2.0,
+        "physics.equation_of_state.gamma_law_index": 4.0 / 3.0,
+        "physics.metric": "minkowski",
+    }
+
+
+@schema
+class Ram61:
+    """
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
+    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
+    One-Dimensional Riemann Problem With Transverse Velocity: Hard Test (sec 6.1)
+    """
+
+    model: Literal["ram-61"] = "ram-61"
 
     @property
     def primitive_fields(self):
@@ -263,15 +352,17 @@ class Ram06:
         l = x < 0.5
         r = logical_not(l)
         p = zeros(x.shape + (4,))
-        p[l] = [1.0, 0.0, 0.9, 1000.0]
-        p[r] = [1.0, 0.0, 0.9, 1e-2]
+        beta = 0.9
+        gammabeta = beta / sqrt(1.0 - beta * beta)
+        p[l] = [1.0, 0.0, gammabeta, 1000.0]
+        p[r] = [1.0, 0.0, gammabeta, 1e-2]
         return p
 
 
 @preset
-def ram_06():
+def ram_61():
     return {
-        "initial_data.model": "ram-06",
+        "initial_data.model": "ram-61",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.6,
@@ -524,10 +615,12 @@ ModelData = Union[
     Sod,
     CylindricalExplosion,
     CylinderInWind,
-    Ram01,
-    Ram02,
-    Ram03,
-    Ram06,
+    Ram41,
+    Ram42,
+    Ram43,
+    Ram44,
+    Ram45,
+    Ram46,
     FuShu33,
     FuShu34,
     FuShu35,
