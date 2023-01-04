@@ -521,9 +521,10 @@ class Scheme:
     def godunov_fluxes(
         self,
         prd: NDArray[float],
+        urd: NDArray[float],  # conserved densities (not used if cached primitives)
         grd: NDArray[float],
-        urd: NDArray[float],
         fwr: NDArray[float],
+        face_areas: NDArray[float],
         plm_theta: float = None,
         ni: int = None,
         nj: int = None,
@@ -532,9 +533,10 @@ class Scheme:
         R"""
         KERNEL void godunov_fluxes(
             double *prd,
-            double *grd,
             double *urd,
+            double *grd,
             double *fwr,
+            double *face_areas,
             double plm_theta,
             int ni,
             int nj,
@@ -591,27 +593,35 @@ class Scheme:
                 int nc = i * si + j * sj + k * sk;
                 #endif
 
+                int mc = nc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
+
                 #if DIM >= 1
+                double da = face_areas[0 * nd + mc];
+
                 _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    fwr[0 * nd + nc + q * sq] = fm[q];
+                    fwr[0 * nd + nc + q * sq] = fm[q] * da;
                 }
                 #endif
 
                 #if DIM >= 2
+                double da = face_areas[1 * nd + mc];
+
                 _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    fwr[1 * nd + nc + q * sq] = fm[q];
+                    fwr[1 * nd + nc + q * sq] = fm[q] * da;
                 }
                 #endif
 
                 #if DIM >= 3
+                double da = face_areas[2 * nd + mc];
+
                 _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    fwr[2 * nd + nc + q * sq] = fm[q];
+                    fwr[2 * nd + nc + q * sq] = fm[q] * da;
                 }
                 #endif
             }
@@ -620,16 +630,17 @@ class Scheme:
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, grd, urd, fwr, plm, *s)
+        return s[:dim], (prd, urd, grd, fwr, face_areas, plm, *s)
 
     @kernel
     def update_cons(
         self,
         prd: NDArray[float],
+        urd: NDArray[float],  # conserved densities (not used if cached primitives)
         grd: NDArray[float],
-        urk: NDArray[float],
-        urd: NDArray[float],
-        uwr: NDArray[float],
+        qrk: NDArray[float],
+        qrd: NDArray[float],
+        qwr: NDArray[float],
         stm: NDArray[float],
         dt: float,
         dx: float,
@@ -642,10 +653,11 @@ class Scheme:
         R"""
         KERNEL void update_cons(
             double *prd,
-            double *grd,
-            double *urk,
             double *urd,
-            double *uwr,
+            double *grd,
+            double *qrk,
+            double *qrd,
+            double *qwr,
             double *stm,
             double dt,
             double dx,
@@ -739,31 +751,31 @@ class Scheme:
                 for (int q = 0; q < NCONS; ++q)
                 {
                     int n = nccc + q * sq;
-                    double du = 0.0;
+                    double dq = 0.0;
 
                     #if DIM >= 1
-                    du -= fp[q] - fm[q];
+                    dq -= fp[q] - fm[q];
                     #endif
                     #if DIM >= 2
-                    du -= gp[q] - gm[q];
+                    dq -= gp[q] - gm[q];
                     #endif
                     #if DIM >= 3
-                    du -= hp[q] - hm[q];
+                    dq -= hp[q] - hm[q];
                     #endif
 
-                    du *= dt / dx;
+                    dq *= dt;
 
                     if (stm)
                     {
-                        du += stm[n] * dt;
+                        dq += stm[n] * dt;
                     }
-                    uwr[n] = urd[n] + du;
+                    qwr[n] = qrd[n] + dq;
 
                     #if USE_RK == 1
                     if (rk != 0.0)
                     {
-                        uwr[n] *= (1.0 - rk);
-                        uwr[n] += rk * urk[n];
+                        qwr[n] *= (1.0 - rk);
+                        qwr[n] += rk * qrk[n];
                     }
                     #endif
                 }
@@ -773,17 +785,16 @@ class Scheme:
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, grd, urk, urd, uwr, stm, dt, dx, rk, plm, *s)
+        return s[:dim], (prd, urd, grd, qrk, qrd, qwr, stm, dt, dx, rk, plm, *s)
 
     @kernel
     def update_cons_from_fluxes(
         self,
-        urk: NDArray[float],
-        u: NDArray[float],
-        f: NDArray[float],
-        stm: NDArray[float],
+        qrk: NDArray[float],  # conserved masses (cached at time level n)
+        q: NDArray[float],  # conserved masses at RK sub-step
+        f: NDArray[float],  # intercell fluxes, already multiplied by face area
+        stm: NDArray[float],  # source terms (masses, not densities)
         dt: float,
-        dx: float,
         rk: float,
         ni: int = None,
         nj: int = None,
@@ -791,12 +802,11 @@ class Scheme:
     ):
         R"""
         KERNEL void update_cons_from_fluxes(
-            double *urk,
-            double *u,
+            double *qrk,
+            double *q,
             double *f,
             double *stm,
             double dt,
-            double dx,
             double rk,
             int ni,
             int nj,
@@ -857,52 +867,52 @@ class Scheme:
                 int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
                 #endif
 
-                double *uc = &u[nccc];
+                double *qc = &q[nccc];
                 #if USE_RK == 1
-                double *u0 = &urk[nccc];
+                double *q0 = &qrk[nccc];
                 #endif
 
                 for (int q = 0; q < NCONS; ++q)
                 {
-                    double u1 = uc[q * sq];
+                    double q1 = qc[q * sq];
 
                     #if DIM >= 1
                     double fm = f[0 * nd + nccc + q * sq];
                     double fp = f[0 * nd + nrcc + q * sq];
-                    u1 -= (fp - fm) * dt / dx;
+                    q1 -= (fp - fm) * dt;
                     #endif
                     #if DIM >= 2
                     double gm = f[1 * nd + nccc + q * sq];
                     double gp = f[1 * nd + ncrc + q * sq];
-                    u1 -= (gp - gm) * dt / dx;
+                    q1 -= (gp - gm) * dt;
                     #endif
                     #if DIM >= 3
                     double hm = f[2 * nd + nccc + q * sq];
                     double hp = f[2 * nd + nccr + q * sq];
-                    u1 -= (hp - hm) * dt / dx;
+                    q1 -= (hp - hm) * dt;
                     #endif
 
                     if (stm)
                     {
-                        u1 += stm[nccc + q * sq] * dt;
+                        q1 += stm[nccc + q * sq] * dt;
                     }
 
                     #if USE_RK == 1
                     if (rk != 0.0)
                     {
-                        u1 *= (1.0 - rk);
-                        u1 += rk * u0[q * sq];
+                        q1 *= (1.0 - rk);
+                        q1 += rk * q0[q * sq];
                     }
                     #endif
 
-                    uc[q * sq] = u1;
+                    qc[q * sq] = q1;
                 }
             }
         }
         """
         dim = self._dim
-        s = u.shape[:3]
-        return s[:dim], (urk, u, f, stm, dt, dx, rk, *s)
+        s = q.shape[:3]
+        return s[:dim], (qrk, q, f, stm, dt, rk, *s)
 
 
 def apply_bc(
@@ -1236,11 +1246,12 @@ def patch_solver(
     del primitive
     yield FillGuardZones(p)
 
-    def c2p_user(u):
+    def c2p_user(q):
         """
         Return primitives in standard layout host memory and with no guards
         """
         p = space.create(xp.zeros, fields=nprim)
+        u = q / dv
         cons_to_prim(u, p)
 
         try:
@@ -1248,10 +1259,11 @@ def patch_solver(
         except AttributeError:
             return p[space.interior]
 
-    def amax(u):
+    def amax(q):
         """
         Return the maximum wavespeed on this grid patch (guard zones excluded)
         """
+        u = q / dv
         max_wavespeeds(u, a)
         return a[space.interior].max()
 
@@ -1270,12 +1282,18 @@ def patch_solver(
         rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
 
     # =========================================================================
+    # Arrays for grid geometry (TODO: these work only in 1d and cartesian geom)
+    # =========================================================================
+    da = space.create(xp.ones, fields=1, vectors=dim)
+    dv = space.create(xp.ones, fields=1) * dx
+
+    # =========================================================================
     # Array of cached Runge-Kutta conserved fields
     # =========================================================================
     if rks:
-        u0 = space.create(xp.zeros, fields=ncons)  # RK cons
+        q0 = space.create(xp.zeros, fields=ncons)  # RK cons
     else:
-        u0 = None
+        q0 = None
 
     # =========================================================================
     # Arrays for either read-only and write-only conserved arrays if
@@ -1284,14 +1302,17 @@ def patch_solver(
     # =========================================================================
     if cache_flux:
         fh = space.create(xp.zeros, fields=ncons, vectors=dim)
-        u1 = space.create(xp.zeros, fields=ncons)
-        prim_to_cons(p, u1)
+        q1 = space.create(xp.zeros, fields=ncons)
+        prim_to_cons(p, q1)
+        q1 *= dv
     else:
         p1 = p if cache_prim else None
-        u1 = space.create(xp.zeros, fields=ncons)
-        u2 = space.create(xp.zeros, fields=ncons)
-        prim_to_cons(p, u1)
-        prim_to_cons(p, u2)
+        q1 = space.create(xp.zeros, fields=ncons)
+        q2 = space.create(xp.zeros, fields=ncons)
+        prim_to_cons(p, q1)
+        prim_to_cons(p, q2)
+        q1 *= dv
+        q2 *= dv
 
     # =========================================================================
     # Array for the primitive fields if primitives or gradients are cached
@@ -1316,44 +1337,47 @@ def patch_solver(
     # =========================================================================
     if (forcing := config.forcing) is not None:
         stm = space.create(xp.zeros, fields=ncons)  # source terms
-        udr = space.create(xp.zeros, fields=ncons)
+        qdr = space.create(xp.zeros, fields=ncons)
         pdr = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
         rdr = space.create(xp.zeros, fields=1, data=forcing.rate_array(box))
-        prim_to_cons(pdr, udr)
+        prim_to_cons(pdr, qdr)
+        qdr *= dv
         del pdr
     else:
         stm = None
-        udr = None
+        qdr = None
         rdr = None
 
-    dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
+    dt = yield PatchState(n, t, q1, interior_box, c2p_user, amax)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
     # =========================================================================
     while True:
         if rks:
-            u0[...] = u1[...]
+            q0[...] = q1[...]
 
         for rk in rks or [0.0]:
+            u1 = q1 / dv
+
             if forcing is not None:
-                stm[...] = (udr - u1) * rdr * dt
+                stm[...] = (qdr - q1) * rdr * dt
             if cache_prim:
                 cons_to_prim(u1, p1)
             if cache_grad:
                 plm_gradient(p1, g1)
             if cache_flux:
-                godunov_fluxes(p1, g1, u1, fh)
-                update_cons_from_fluxes(u0, u1, fh, stm, dt, dx, rk)
+                godunov_fluxes(p1, u1, g1, fh, da)
+                update_cons_from_fluxes(q0, q1, fh, stm, dt, rk)
             else:
-                update_cons(p1, g1, u0, u1, u2, stm, dt, dx, rk)
-                u1, u2 = u2, u1
+                update_cons(p1, u1, g1, q0, q1, q2, stm, dt, dx, rk)
+                q1, q2 = q2, q1
 
-            yield FillGuardZones(u1)
+            yield FillGuardZones(q1)
 
         t += dt
         n += 1
-        dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
+        dt = yield PatchState(n, t, q1, interior_box, c2p_user, amax)
 
 
 def native_code(config: Sailfish):

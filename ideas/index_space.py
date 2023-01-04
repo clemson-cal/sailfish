@@ -109,6 +109,7 @@ class IndexSpace:
         p = self.axes_permutation(fields, vectors)
         q = self.axes_permutation(fields, vectors, inverse=True)
         arr = factory(tuple(s[a] for a in p)).transpose(q)
+
         if data is not None:
             data = three_space_axes(data, (fields and 1 or 0) + (vectors and 1 or 0))
             if data.shape == arr[self.interior].shape:
