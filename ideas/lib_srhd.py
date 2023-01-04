@@ -293,9 +293,9 @@ def prim_and_cons_to_flux(
 
         switch (direction)
         {
-            case 1: vn = gbx / w;
-            case 2: vn = gby / w;
-            case 3: vn = gbz / w;
+            case 1: vn = gbx / w; break;
+            case 2: vn = gby / w; break;
+            case 3: vn = gbz / w; break;
         }
 
         f[DEN] = vn * u[DEN];
@@ -374,9 +374,9 @@ def outer_wavespeeds(
 
         switch (direction)
         {
-            case 1: vn = gbx / w;
-            case 2: vn = gby / w;
-            case 3: vn = gbz / w;
+            case 1: vn = gbx / w; break;
+            case 2: vn = gby / w; break;
+            case 3: vn = gbz / w; break;
         }
         double vv = uu / (1.0 + uu);
         double v2 = vn * vn;
