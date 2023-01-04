@@ -136,9 +136,11 @@ def cylinder_in_wind():
 @schema
 class Ram41:
     """
-    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
-    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
-    One-Dimensional Riemann Problem 1 (sec 4.1)
+    1d Riemann problem (RAM problem 1; Sec 4.1)
+
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
+    Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
+    pp. 255-279.
     """
 
     model: Literal["ram-41"] = "ram-41"
@@ -174,9 +176,11 @@ def ram_41():
 @schema
 class Ram42:
     """
-    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
-    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
-    One-Dimensional Riemann Problem 2 (sec 4.2)
+    1d Riemann problem (RAM problem 2; Sec 4.2)
+
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
+    Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
+    pp. 255-279.
     """
 
     model: Literal["ram-42"] = "ram-42"
@@ -212,9 +216,11 @@ def ram_42():
 @schema
 class Ram43:
     """
-    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
-    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
-    One-Dimensional Riemann Problem 3 (sec 4.3)
+    1d Riemann problem (RAM problem 3; Sec 4.3)
+
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
+    Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
+    pp. 255-279.
     """
 
     model: Literal["ram-43"] = "ram-43"
@@ -252,9 +258,11 @@ def ram_43():
 @schema
 class Ram44:
     """
-    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
-    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
-    One-Dimensional Riemann Problem 4 (sec 4.4)
+    1d Riemann problem (RAM problem 4; Sec 4.4)
+
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
+    Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
+    pp. 255-279.
     """
 
     model: Literal["ram-44"] = "ram-44"
@@ -292,9 +300,11 @@ def ram_44():
 @schema
 class Ram45:
     """
-    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
-    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
-    One-Dimensional Shock Heating Riemann Problem 5 (sec 4.5)
+    1d shock heating Riemann problem (RAM problem 5; Sec 4.5)
+
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
+    Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
+    pp. 255-279.
     """
 
     model: Literal["ram-45"] = "ram-45"
@@ -334,9 +344,11 @@ def ram_45():
 @schema
 class Ram61:
     """
-    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics Code"
-    The Astrophysical Journal Supplement Series, Volume 164, Issue 1, pp. 255-279.
-    One-Dimensional Riemann Problem With Transverse Velocity: Hard Test (sec 6.1)
+    1d Riemann problem with transverse velocity: (RAM Hard Test; sec 6.1)
+
+    Adapted from "RAM: A Relativistic Adaptive Mesh Refinement Hydrodynamics
+    Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
+    pp. 255-279.
     """
 
     model: Literal["ram-61"] = "ram-61"
@@ -620,6 +632,7 @@ ModelData = Union[
     Ram43,
     Ram44,
     Ram45,
+    Ram61,
     FuShu33,
     FuShu34,
     FuShu35,
