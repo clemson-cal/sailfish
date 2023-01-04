@@ -620,7 +620,6 @@ ModelData = Union[
     Ram43,
     Ram44,
     Ram45,
-    Ram46,
     FuShu33,
     FuShu34,
     FuShu35,
