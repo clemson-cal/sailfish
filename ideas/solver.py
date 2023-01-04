@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from config import Sailfish, Strategy, Reconstruction, BoundaryCondition
-from geometry import CoordinateBox
+from geometry import CoordinateBox, CartesianCoordinates
 from index_space import IndexSpace
 
 logger = getLogger("sailfish")
@@ -593,10 +593,11 @@ class Scheme:
                 int nc = i * si + j * sj + k * sk;
                 #endif
 
+                double da;
                 int mc = nc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
 
                 #if DIM >= 1
-                double da = face_areas[0 * nd + mc];
+                da = face_areas[0 * nd + mc];
 
                 _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
                 for (int q = 0; q < NCONS; ++q)
@@ -606,7 +607,7 @@ class Scheme:
                 #endif
 
                 #if DIM >= 2
-                double da = face_areas[1 * nd + mc];
+                da = face_areas[1 * nd + mc];
 
                 _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
                 for (int q = 0; q < NCONS; ++q)
@@ -616,7 +617,7 @@ class Scheme:
                 #endif
 
                 #if DIM >= 3
-                double da = face_areas[2 * nd + mc];
+                da = face_areas[2 * nd + mc];
 
                 _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
                 for (int q = 0; q < NCONS; ++q)
@@ -754,7 +755,7 @@ class Scheme:
                     double dq = 0.0;
 
                     #if DIM >= 1
-                    dq -= fp[q] - fm[q];
+                    dq -= fp[q] - fm[q]; // TODO: multiply by face area
                     #endif
                     #if DIM >= 2
                     dq -= gp[q] - gm[q];
@@ -1284,8 +1285,9 @@ def patch_solver(
     # =========================================================================
     # Arrays for grid geometry (TODO: these work only in 1d and cartesian geom)
     # =========================================================================
-    da = space.create(xp.ones, fields=1, vectors=dim)
-    dv = space.create(xp.ones, fields=1) * dx
+    coords = CartesianCoordinates()
+    dv = space.create(xp.zeros, fields=1, data=coords.cell_volumes(box))
+    da = space.create(xp.ones, vectors=dim, data=coords.face_areas(box))
 
     # =========================================================================
     # Array of cached Runge-Kutta conserved fields

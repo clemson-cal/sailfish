@@ -103,8 +103,6 @@ class IndexSpace:
         If `data` is not `None` then it must be an array with same logical
         shape as the interior of the created array.
         """
-        v = (vectors,) if vectors is not None else tuple()
-        f = (fields,) if fields is not None else tuple()
         s = self.shape_with_guard(fields, vectors)
         p = self.axes_permutation(fields, vectors)
         q = self.axes_permutation(fields, vectors, inverse=True)

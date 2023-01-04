@@ -1,6 +1,7 @@
 from dataclasses import replace
 from schema import schema
-from numpy import linspace, meshgrid
+from numpy import array, linspace, meshgrid, sqrt, sin, cos, pi
+from numpy.typing import NDArray
 
 
 def partition(elements: int, num_parts: int):
@@ -66,45 +67,68 @@ class CoordinateBox:
         extent = (self.extent_i, self.extent_j, self.extent_k)
         return tuple((e[1] - e[0]) / n for e, n in zip(extent, self.num_zones))
 
-    def cell_centers(self, dim=None):
+    def extent(self, axis: int) -> tuple[float, float]:
+        if axis == 0:
+            return self.extent_i
+        if axis == 1:
+            return self.extent_j
+        if axis == 2:
+            return self.extent_k
+
+    def _vertices(self, axis: int) -> NDArray[float]:
+        nc = self.num_zones[axis]
+        x0, x1 = self.extent(axis)
+        return linspace(x0, x1, nc + 1)
+
+    def _centers(self, axis: int) -> NDArray[float]:
+        xv = self._vertices(axis)
+        return 0.5 * (xv[1:] + xv[:-1])
+
+    def cell_centers(self, dim: int = None) -> NDArray[float]:
         """
         Return an array or tuple of arrays of the cell-center coordinates
         """
         dim = dim or self.dimensionality
 
         if dim == 1:
-            ni = self.num_zones[0]
-            x0, x1 = self.extent_i
-            xv = linspace(x0, x1, ni + 1)
-            xc = 0.5 * (xv[1:] + xv[:-1])
-            return xc
+            return self._centers(axis=0)
 
         if dim == 2:
-            ni, nj = self.num_zones[0:2]
-            x0, x1 = self.extent_i
-            y0, y1 = self.extent_j
-            xv = linspace(x0, x1, ni + 1)
-            yv = linspace(y0, y1, nj + 1)
-            xc = 0.5 * (xv[1:] + xv[:-1])
-            yc = 0.5 * (yv[1:] + yv[:-1])
+            xc = self._centers(axis=0)
+            yc = self._centers(axis=1)
             return meshgrid(xc, yc, indexing="ij")
 
         if dim == 3:
-            ni, nj, nk = self.num_zones
-            x0, x1 = self.extent_i
-            y0, y1 = self.extent_j
-            z0, z1 = self.extent_k
-            xv = linspace(x0, x1, ni + 1)
-            yv = linspace(y0, y1, nj + 1)
-            zv = linspace(z0, z1, nk + 1)
-            xc = 0.5 * (xv[1:] + xv[:-1])
-            yc = 0.5 * (yv[1:] + yv[:-1])
-            zc = 0.5 * (zv[1:] + zv[:-1])
+            xc = self._centers(axis=0)
+            yc = self._centers(axis=1)
+            zc = self._centers(axis=2)
             return meshgrid(xc, yc, zc, indexing="ij")
+
+    def cell_vertices(self, dim: int = None) -> NDArray[float]:
+        """
+        Return an array or tuple of arrays of the coordinates of cell vertices
+        """
+        dim = dim or self.dimensionality
+
+        if dim == 1:
+            return self._vertices(axis=0)
+
+        if dim == 2:
+            xv = self._vertices(axis=0)
+            yv = self._vertices(axis=1)
+            return meshgrid(xv, yv, indexing="ij")
+
+        if dim == 3:
+            xv = self._vertices(axis=0)
+            yv = self._vertices(axis=1)
+            zv = self._vertices(axis=2)
+            return meshgrid(xv, yv, zv, indexing="ij")
 
     def decompose(self, num_parts: int):
         """
         Decompose a 1d coordinate box into a sequence of non-overlapping boxes
+
+        The decomposition is done on the box's i-axis.
         """
         dx = self.grid_spacing[0]
 
@@ -147,3 +171,90 @@ class CoordinateBox:
         Return a coordinate box trimmed on both sides of all non-unit axes
         """
         return self.extend(-count)
+
+
+class CartesianCoordinates:
+    def face_areas(self, box: CoordinateBox) -> NDArray[float]:
+        """
+        Return an array of the face areas for the given box
+
+        The shape of the returned array is (ni, nj, nk, dim) where dim is the
+        box dimensionality.
+        """
+        x, y, z = box.cell_vertices(dim=3)
+        dx = x[+1:, :-1, :-1] - x[:-1, :-1, :-1]
+        dy = y[:-1, +1:, :-1] - y[:-1, :-1, :-1]
+        dz = z[:-1, :-1, +1:] - z[:-1, :-1, :-1]
+
+        tr = lambda arr: arr.transpose(1, 2, 3, 0)
+
+        if box.dimensionality == 1:
+            return tr(array([dy * dz]))
+        if box.dimensionality == 2:
+            return tr(array([dy * dz, dz * dx]))
+        if box.dimensionality == 3:
+            return tr(array([dy * dz, dz * dx, dx * dy]))
+
+    def cell_volumes(self, box: CoordinateBox) -> NDArray[float]:
+        """
+        Return an array of the cell volume data for the given coordinate box
+
+        The shape of the returned array is (ni, nj, nk).
+        """
+        x, y, z = box.cell_vertices(dim=3)
+        dx = x[+1:, :-1, :-1] - x[:-1, :-1, :-1]
+        dy = y[:-1, +1:, :-1] - y[:-1, :-1, :-1]
+        dz = z[:-1, :-1, +1:] - z[:-1, :-1, :-1]
+        return dx * dy * dz
+
+
+class SphericalPolarCoordinates:
+    def _face_areas(self, r0, r1, q0, q1):
+        R0 = r0 * sin(q0)
+        R1 = r1 * sin(q1)
+        z0 = r0 * cos(q0)
+        z1 = r1 * cos(q1)
+        dR = R1 - R0
+        dz = z1 - z0
+        return pi * (R0 + R1) * sqrt(dR * dR + dz * dz)
+
+    def face_areas(self, box: CoordinateBox) -> NDArray[float]:
+        """
+        Return an array of the face areas for the given box
+
+        The shape of the returned array is (ni, nj, nk, dim) where dim is the
+        box dimensionality.
+        """
+        tr = lambda arr: arr.transpose(1, 2, 3, 0)
+        r, q, f = box.cell_vertices(dim=3)
+        r0 = r[:-1, :-1, :-1]
+        r1 = r[+1:, :-1, :-1]
+        q0 = q[:-1, :-1, :-1]
+        q1 = q[:-1, +1:, :-1]
+
+        if box.dimensionality == 1:
+            da_i = self._face_areas(r0, r0, q0, q1)
+            return tr(array([da_i]))
+        if box.dimensionality == 2:
+            da_i = self._face_areas(r0, r0, q0, q1)
+            da_j = self._face_areas(r0, r1, q0, q0)
+            return tr(array([da_i, da_j]))
+        else:
+            raise NotImplementedError
+
+    def cell_volumes(self, box: CoordinateBox) -> NDArray[float]:
+        """
+        Return an array of the cell volume data for the given coordinate box
+
+        The shape of the returned array is (ni, nj, nk).
+        """
+        if box.dimensionality == 3:
+            raise NotImplementedError
+
+        r, q, f = box.cell_vertices(dim=3)
+        r0 = r[:-1, :-1, :-1]
+        r1 = r[+1:, :-1, :-1]
+        q0 = q[:-1, :-1, :-1]
+        q1 = q[:-1, +1:, :-1]
+
+        return -(r1**3 - r0**3) * (cos(q1) - cos(q0)) * 2.0 * pi / 3.0
