@@ -270,36 +270,26 @@ def prim_and_cons_to_flux(
     R"""
     DEVICE void prim_and_cons_to_flux(double *p, double *u, double *f, int direction)
     {
-        double pre = p[PRE];
-
         #if NVECS == 1
         double gbx = p[UXX];
-        double w =  sqrt(1.0 + gbx * gbx);
-        double vn = gbx / w;
-        f[DEN] = vn * u[DEN];
-        f[SXX] = vn * u[SXX] + pre;
-        f[NRG] = vn * (u[NRG] + pre);
-
+        double gby = 0.0;
+        double gbz = 0.0;
+        double uu = gbx * gbx;
         #elif NVECS == 2
         double gbx = p[UXX];
         double gby = p[UYY];
-        double w =  sqrt(1.0 + gbx * gbx + gby * gby);
-
-        switch (direction)
-        {
-            case 1: vn = gbx / w;
-            case 2: vn = gby / w;
-        }
-        f[DEN] = vn * u[DEN];
-        f[SXX] = vn * u[SXX] + pre * (direction == 1);
-        f[SYY] = vn * u[SYY] + pre * (direction == 2);
-        f[NRG] = vn * (u[NRG] + pre);
-
+        double gbz = 0.0;
+        double uu = gbx * gbx + gby * gby;
         #elif NVECS == 3
         double gbx = p[UXX];
         double gby = p[UYY];
         double gbz = p[UZZ];
-        double w =  sqrt(1.0 + gbx * gbx + gby * gby + gbz * gbz);
+        double uu = gbx * gbx + gby * gby + gbz * gbz;
+        #endif
+
+        double pre = p[PRE];
+        double vn = 0.0;
+        double w = sqrt(1.0 + uu);
 
         switch (direction)
         {
@@ -307,11 +297,18 @@ def prim_and_cons_to_flux(
             case 2: vn = gby / w;
             case 3: vn = gbz / w;
         }
+
         f[DEN] = vn * u[DEN];
-        f[SXX] = vn * u[SXX] + pre * (direction == 1);
-        f[SYY] = vn * u[SYY] + pre * (direction == 2);
-        f[SZZ] = vn * u[SZZ] + pre * (direction == 3);
         f[NRG] = vn * (u[NRG] + pre);
+
+        #if NVECS >= 1
+        f[SXX] = vn * u[SXX] + pre * (direction == 1);
+        #endif
+        #if NVECS >= 2
+        f[SYY] = vn * u[SYY] + pre * (direction == 2);
+        #endif
+        #if NVECS >= 3
+        f[SZZ] = vn * u[SZZ] + pre * (direction == 3);
         #endif
     }
     """
@@ -354,8 +351,6 @@ def outer_wavespeeds(
         double *wavespeeds,
         int direction)
     {
-        double a2 = sound_speed_squared(p);
-
         #if NVECS == 1
         double gbx = p[UXX];
         double gby = 0.0;
@@ -375,6 +370,7 @@ def outer_wavespeeds(
 
         double w = sqrt(1.0 + uu);
         double vn = 0.0;
+        double a2 = sound_speed_squared(p);
 
         switch (direction)
         {
