@@ -104,137 +104,64 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
     R"""
     DEVICE void cons_to_prim(double *u, double *p)
     {
-        double newton_iter_max = 500;
+        int iteration = 0;
+        int newton_iter_max = 50;
+
         double gm = GAMMA_LAW_INDEX;
+        double m = u[DEN];
+        double tau = u[NRG];
+        double pre = p[PRE];
+        double error_tolerance = 1e-12;// * (m + tau);
+        double w0;
 
         #if NVECS == 1
-        double m = u[DEN];
-        double ss  = u[SXX] * u[SXX];
-        double tau = u[NRG];
-        double error_tolerance = 1e-12 * (m + tau);
-        int iteration = 0;
-        double pre = p[PRE];
-        double w0;
-        double f;
-
-        while (1)
-        {
-            double et = tau + pre + m;
-            double b2 = min2(ss / et / et, 1.0 - 1e-10);
-            double w2 = 1.0 / (1.0 - b2);
-            double w  = sqrt(w2);
-            double e  = (tau + m * (1.0 - w) + pre * (1.0 - w2)) / (m * w);
-            double d  = m / w;
-            double h  = 1.0 + e + pre / d;
-            double a2 = gm * pre / (d * h);
-            double g  = b2 * a2 - 1.0;
-
-            f  = d * e * (gm - 1.0) - pre;
-            pre -= f / g;
-
-            if (fabs(f) < error_tolerance || iteration == newton_iter_max)
-            {
-                w0 = w;
-                break;
-            }
-            iteration += 1;
-        }
-
-        p[RHO] = m / w0;
-        p[UXX] = w0 * u[1] / (tau + m + pre);
-        p[PRE] = pre;
-
+        double ss = u[SXX] * u[SXX];
         #elif NVECS == 2
-
-        double m   = u[DEN];
-        double s1  = u[SXX];
-        double s2  = u[SYY];
-        double tau = u[NRG];
-        double ss  = s1 * s1 + s2 * s2;
-        double error_tolerance = 1e-12 * (m + tau);
-        int iteration = 0;
-        double pre = p[PRE];
-        double w0;
-        double f;
-
-        while (1)
-        {
-            double et = tau + pre + m;
-            double b2 = min2(ss / et / et, 1.0 - 1e-10);
-            double w2 = 1.0 / (1.0 - b2);
-            double w  = sqrt(w2);
-            double e  = (tau + m * (1.0 - w) + pre * (1.0 - w2)) / (m * w);
-            double d  = m / w;
-            double h  = 1.0 + e + pre / d;
-            double a2 = gm * pre / (d * h);
-            double g  = b2 * a2 - 1.0;
-
-            f  = d * e * (gm - 1.0) - pre;
-            pre -= f / g;
-
-            if (fabs(f) < error_tolerance || iteration == newton_iter_max)
-            {
-                w0 = w;
-                break;
-            }
-            iteration += 1;
-        }
-
-        p[RHO] = m / w0;
-        p[UXX] = w0 * u[1] / (tau + m + pre);
-        p[UYY] = w0 * u[2] / (tau + m + pre);
-        p[PRE] = pre;
-
+        double ss = u[SXX] * u[SXX] + u[SYY] * u[SYY];
         #elif NVECS == 3
-
-        double m   = u[DEN];
-        double s1  = u[SXX];
-        double s2  = u[SYY];
-        double s3  = u[SZZ];
-        double tau = u[NRG];
-        double ss  = s1 * s1 + s2 * s2 + s3 * s3;
-        double error_tolerance = 1e-12 * (m + tau);
-        int iteration = 0;
-        double pre = p[PRE];
-        double w0;
-        double f;
-
-        while (1)
-        {
-            double et = tau + pre + m;
-            double b2 = min2(ss / et / et, 1.0 - 1e-10);
-            double w2 = 1.0 / (1.0 - b2);
-            double w  = sqrt(w2);
-            double e  = (tau + m * (1.0 - w) + pre * (1.0 - w2)) / (m * w);
-            double d  = m / w;
-            double h  = 1.0 + e + pre / d;
-            double a2 = gm * pre / (d * h);
-            double g  = b2 * a2 - 1.0;
-
-            f  = d * e * (gm - 1.0) - pre;
-            pre -= f / g;
-
-            if (fabs(f) < error_tolerance || iteration == newton_iter_max)
-            {
-                w0 = w;
-                break;
-            }
-            iteration += 1;
-        }
-
-        p[RHO] = m / w0;
-        p[UXX] = w0 * u[1] / (tau + m + pre);
-        p[UYY] = w0 * u[2] / (tau + m + pre);
-        p[UZZ] = w0 * u[3] / (tau + m + pre);
-        p[PRE] = pre;
-
+        double ss = u[SXX] * u[SXX] + u[SYY] * u[SYY] + u[SZZ] * u[SZZ];
         #endif
 
-        if (iteration == newton_iter_max)
+        while (1)
         {
-            printf("c2p failed: %f %f %f\n", u[0], u[1], u[2]);
-            exit(1);
+            double et  = tau + pre + m;
+            double b2  = min2(ss / et / et, 1.0 - 1e-10);
+            double w2  = 1.0 / (1.0 - b2);
+            double w   = sqrt(w2);
+            double e   = (tau + m * (1.0 - w) + pre * (1.0 - w2)) / (m * w);
+            double rho = m / w;
+            double h   = 1.0 + e + pre / rho;
+            double a2  = gm * pre / (rho * h);
+            double f   = rho * e * (gm - 1.0) - pre;
+            double g   = b2 * a2 - 1.0;
+
+            pre -= f / g;
+
+            if (fabs(f) < error_tolerance)
+            {
+                w0 = w;
+                break;
+            }
+            if (iteration == newton_iter_max)
+            {
+                printf("c2p failed: %f %f %f\n", u[0], u[1], u[2]);
+                exit(1);
+            }
+            iteration += 1;
         }
+
+        p[RHO] = m / w0;
+        p[PRE] = pre;
+
+        #if NVECS >= 1
+        p[UXX] = w0 * u[1] / (tau + m + pre);
+        #endif
+        #if NVECS >= 2
+        p[UYY] = w0 * u[2] / (tau + m + pre);
+        #endif
+        #if NVECS >= 3
+        p[UZZ] = w0 * u[3] / (tau + m + pre);
+        #endif
     }
     """
 
@@ -299,7 +226,7 @@ def prim_and_cons_to_flux(
         }
 
         f[DEN] = vn * u[DEN];
-        f[NRG] = vn * (u[NRG] + pre);
+        f[NRG] = vn * u[NRG] + pre * vn;
 
         #if NVECS >= 1
         f[SXX] = vn * u[SXX] + pre * (direction == 1);
@@ -470,7 +397,7 @@ if __name__ == "__main__":
     from numpy import array, zeros_like, allclose
     from kernels import kernel
 
-    nprim = 4
+    nprim = 5
 
     @kernel(device_funcs=[cons_to_prim], define_macros=dict(NPRIM=nprim))
     def kernel_cons_to_prim(u: NDArray[float], p: NDArray[float], ni: int = None):
@@ -498,7 +425,13 @@ if __name__ == "__main__":
         """
         return p.size // nprim, (p, u, p.size // nprim)
 
-    p = array([[1.0, 0.1, 0.2, 100.0]])
+    if nprim == 3:
+        p = array([[1.0, 5.0, 0.01]])
+    if nprim == 4:
+        p = array([[1.0, 2.0, 5.0, 0.01]])
+    if nprim == 5:
+        p = array([[1.0, 2.0, 5.0, 1.0, 0.01]])
+
     u = zeros_like(p)
     q = zeros_like(p)
     kernel_prim_to_cons(p, u)
