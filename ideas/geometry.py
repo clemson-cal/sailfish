@@ -75,10 +75,13 @@ class CoordinateBox:
         if axis == 2:
             return self.extent_k
 
-    def _vertices(self, axis: int) -> NDArray[float]:
+    def _vertices(self, axis: int, drop_final=False) -> NDArray[float]:
         nc = self.num_zones[axis]
         x0, x1 = self.extent(axis)
-        return linspace(x0, x1, nc + 1)
+        if drop_final:
+            return linspace(x0, x1, nc + 1)[:-1]
+        else:
+            return linspace(x0, x1, nc + 1)
 
     def _centers(self, axis: int) -> NDArray[float]:
         xv = self._vertices(axis)
@@ -104,24 +107,28 @@ class CoordinateBox:
             zc = self._centers(axis=2)
             return meshgrid(xc, yc, zc, indexing="ij")
 
-    def cell_vertices(self, dim: int = None) -> NDArray[float]:
+    def cell_vertices(self, dim: int = None, drop_final=False) -> NDArray[float]:
         """
         Return an array or tuple of arrays of the coordinates of cell vertices
+
+        If `drop_final` is `True` then the resulting arrays have the same
+        shape as the result of `cell_centers` and the coordinates correspond
+        to the lower-left corners of the zones.
         """
         dim = dim or self.dimensionality
 
         if dim == 1:
-            return self._vertices(axis=0)
+            return self._vertices(0, drop_final)
 
         if dim == 2:
-            xv = self._vertices(axis=0)
-            yv = self._vertices(axis=1)
+            xv = self._vertices(0, drop_final)
+            yv = self._vertices(1, drop_final)
             return meshgrid(xv, yv, indexing="ij")
 
         if dim == 3:
-            xv = self._vertices(axis=0)
-            yv = self._vertices(axis=1)
-            zv = self._vertices(axis=2)
+            xv = self._vertices(0, drop_final)
+            yv = self._vertices(1, drop_final)
+            zv = self._vertices(2, drop_final)
             return meshgrid(xv, yv, zv, indexing="ij")
 
     def decompose(self, num_parts: int):
@@ -174,6 +181,8 @@ class CoordinateBox:
 
 
 class CartesianCoordinates:
+    needs_geometrical_source_terms = False
+
     def face_areas(self, box: CoordinateBox) -> NDArray[float]:
         """
         Return an array of the face areas for the given box
@@ -207,8 +216,21 @@ class CartesianCoordinates:
         dz = z[:-1, :-1, +1:] - z[:-1, :-1, :-1]
         return dx * dy * dz
 
+    def cell_vertices(self, box: CoordinateBox) -> NDArray[float]:
+        tr = lambda arr: arr.transpose(1, 2, 3, 0)
+        x, y, z = box.cell_vertices(dim=3, drop_final=True)
+
+        if box.dimensionality == 1:
+            return tr(array([x]))
+        if box.dimensionality == 2:
+            return tr(array([x, y]))
+        if box.dimensionality == 3:
+            return tr(array([x, y, z]))
+
 
 class SphericalPolarCoordinates:
+    needs_geometrical_source_terms = True
+
     def _meridian(self, r0, r1, q0, q1):
         R0 = r0 * sin(q0)
         R1 = r1 * sin(q1)
@@ -258,3 +280,14 @@ class SphericalPolarCoordinates:
         q1 = q[:-1, +1:, :-1]
 
         return -(r1**3 - r0**3) * (cos(q1) - cos(q0)) * 2.0 * pi / 3.0
+
+    def cell_vertices(self, box: CoordinateBox) -> NDArray[float]:
+        tr = lambda arr: arr.transpose(1, 2, 3, 0)
+        r, q, f = box.cell_vertices(dim=3, drop_final=True)
+
+        if box.dimensionality == 1:
+            return tr(array([r]))
+        if box.dimensionality == 2:
+            return tr(array([r, q]))
+        if box.dimensionality == 3:
+            return tr(array([r, q, f]))

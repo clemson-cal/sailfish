@@ -35,13 +35,14 @@ class Sod:
     model: Literal["sod"] = "sod"
 
     @property
+    def dimensionality(self):
+        return 1
+
+    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
-
         x = box.cell_centers()
         return two_state(
             x < 0.5,
@@ -60,6 +61,42 @@ def sod():
 
 
 @schema
+class Star:
+    """
+    Tests for 1d spherical polar coordinates
+    """
+
+    model: Literal["star"] = "star"
+
+    @property
+    def dimensionality(self):
+        return 1
+
+    @property
+    def primitive_fields(self):
+        return "density", "r-velocity", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        x = box.cell_centers()
+        p = zeros(x.shape + (3,))
+        p[...] = [1.0, 0.0, 1.000]
+        return p
+
+
+@preset
+def star():
+    return {
+        "initial_data.model": "star",
+        "domain.num_zones": [200, 1, 1],
+        "domain.extent_i": [1.0, 10.0],
+        "domain.extent_j": [0.5 * pi - 0.1, 0.5 * pi + 0.1],
+        "domain.extent_k": [0.0, 2.0 * pi],
+        "coordinates": "spherical-polar",
+        "driver.tfinal": 0.1,
+    }
+
+
+@schema
 class CylindricalExplosion:
     """
     Cylindrical explosion initial data
@@ -71,13 +108,14 @@ class CylindricalExplosion:
     model: Literal["cylindrical-explosion"] = "cylindrical-explosion"
 
     @property
+    def dimensionality(self):
+        return 2
+
+    @property
     def primitive_fields(self):
         return "density", "x-velocity", "y-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 2:
-            raise NotImplementedError("model only works in 2d")
-
         x, y = box.cell_centers()
         return two_state(
             sqrt(x**2 + y**2) < 0.1,
@@ -110,13 +148,14 @@ class CylinderInWind:
     model: Literal["cylinder-in-wind"] = "cylinder-in-wind"
 
     @property
+    def dimensionality(self):
+        return 2
+
+    @property
     def primitive_fields(self):
         return "density", "x-velocity", "y-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 2:
-            raise NotImplementedError("model only works in 2d")
-
         x, y = box.cell_centers()
         return two_state(
             sqrt(x**2 + y**2) < 0.1,
@@ -562,8 +601,6 @@ class FuShu37:
         "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        if box.dimensionality != 1:
-            raise NotImplementedError("model only works in 1d")
         x = box.cell_centers()
         l = (x >= 0.0) * (x < 0.1)
         m = (x >= 0.1) * (x < 0.9)
@@ -628,6 +665,7 @@ def density_wave():
 DefaultModelData = Sod
 ModelData = Union[
     Sod,
+    Star,
     CylindricalExplosion,
     CylinderInWind,
     Ram41,

@@ -237,6 +237,7 @@ class Sailfish:
     initial_data: ModelData = DefaultModelData()
     boundary_condition: BoundaryCondition = BoundaryCondition()
     domain: CoordinateBox = CoordinateBox()
+    coordinates: Literal["cartesian", "spherical-polar"] = "cartesian"
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()
     forcing: Forcing = None

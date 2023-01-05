@@ -309,6 +309,70 @@ def riemann_hlle(
     """
 
 
+@device(static=static)
+def source_terms_spherical_polar():
+    R"""
+    DEVICE void source_terms_spherical_polar(double r0, double r1, double q0, double q1, const double *prim, double *source)
+    {
+        // Forumulas below are A8 and A9 from Zhang & MacFadyen (2006), integrated
+        // over the cell volume with finite radial and polar extent, and taking
+        // the Newonian limit h -> 1 and W -> 1.
+        //
+        // https://iopscience.iop.org/article/10.1086/500792/pdf
+
+        #if NVECS == 1
+        double dcosq = cos(q1) - cos(q0);
+        double dr2 = r1 * r1 - r0 * r0;
+
+        double pg = prim[2];
+        double srdot = -M_PI * dr2 * dcosq * 2 * pg;
+
+        source[0] = 0.0;
+        source[1] = srdot;
+        source[2] = 0.0;
+
+        #elif NVECS == 2
+        double dcosq = cos(q1) - cos(q0);
+        double dsinq = sin(q1) - sin(q0);
+        double dr2 = r1 * r1 - r0 * r0;
+
+        double rho = prim[0];
+        double ur = prim[1];
+        double uq = prim[2];
+        double pg = prim[3];
+        double srdot = -M_PI * dr2 * dcosq * (rho * uq * uq + 2 * pg);
+        double sqdot = +M_PI * dr2 * (dcosq * rho * ur * uq + dsinq * (pg + rho));
+
+        source[0] = 0.0;
+        source[1] = srdot;
+        source[2] = sqdot;
+        source[3] = 0.0;
+
+        #elif NVECS == 3
+        double dcosq = cos(q1) - cos(q0);
+        double dsinq = sin(q1) - sin(q0);
+        double dr2 = r1 * r1 - r0 * r0;
+
+        double rho = prim[0];
+        double ur = prim[1];
+        double uq = prim[2];
+        double up = prim[3];
+        double pg = prim[4];
+        double srdot = -M_PI * dr2 * dcosq * (rho * (uq * uq + up * up) + 2 * pg);
+        double sqdot = +M_PI * dr2 * (dcosq * rho * ur * uq + dsinq * (pg + rho * up * up));
+
+        source[0] = 0.0;
+        source[1] = srdot;
+        source[2] = sqdot;
+        source[3] = 0.0; // TODO
+        source[4] = 0.0;
+
+        #error("not implemented")
+        #endif
+    }
+    """
+
+
 if __name__ == "__main__":
     from numpy import array, zeros_like, allclose
     from kernels import kernel

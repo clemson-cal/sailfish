@@ -14,7 +14,7 @@ from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from config import Sailfish, Strategy, Reconstruction, BoundaryCondition
-from geometry import CoordinateBox, CartesianCoordinates
+from geometry import CoordinateBox, CartesianCoordinates, SphericalPolarCoordinates
 from index_space import IndexSpace
 
 
@@ -337,6 +337,127 @@ class Fields:
 
 
 @kernel_class
+class SourceTerms:
+    """
+    Handles the calculation of geometric and driving source terms
+    """
+
+    def __init__(self, config: Sailfish):
+        self._dim = config.domain.dimensionality
+        self._nprim = len(config.initial_data.primitive_fields)
+        self._transpose = config.strategy.transpose
+
+    @property
+    def define_macros(self):
+        return dict(
+            DIM=self._dim,
+            NPRIM=self._nprim,
+            TRANSPOSE=int(self._transpose),
+        )
+
+    @property
+    def device_funcs(self):
+        from lib_euler import source_terms_spherical_polar
+
+        return [source_terms_spherical_polar]
+
+    @kernel
+    def geometric_source_terms(
+        self,
+        p: NDArray[float],
+        x: NDArray[float],
+        s: NDArray[float],
+        ni: int = None,
+        nj: int = None,
+        nk: int = None,
+    ):
+        R"""
+        KERNEL void geometric_source_terms(double *p, double *x, double *s, int ni, int nj, int nk)
+        {
+            int nq = NCONS;
+            int nd = ni * nj * nk * nq;
+
+            #if TRANSPOSE == 0
+            #if DIM == 1
+            int si = nq;
+            int sq = 1;
+            #elif DIM == 2
+            int si = nq * nj;
+            int sj = nq;
+            int sq = 1;
+            #elif DIM == 3
+            int si = nq * nj * nk;
+            int sj = nq * nj;
+            int sk = nq;
+            int sq = 1;
+            #endif
+            #elif TRANSPOSE == 1
+            #if DIM == 1
+            int sq = ni;
+            int si = 1;
+            #elif DIM == 2
+            int sq = nj * ni;
+            int si = nj;
+            int sj = 1;
+            #elif DIM == 3
+            int sq = nk * nj * ni;
+            int si = nk * nj;
+            int sj = nk;
+            int sk = 1;
+            #endif
+            #endif
+            int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
+
+            #if DIM == 1
+            FOR_RANGE_1D(2, ni - 2)
+            #elif DIM == 2
+            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
+            #elif DIM == 3
+            FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
+            #endif
+            {
+                #if DIM == 1
+                int nccc = (i + 0) * si;
+                int nrcc = (i + 1) * si;
+                double x0 = x[(0 * nd + nccc) / sf];
+                double x1 = x[(0 * nd + nrcc) / sf];
+
+                #elif DIM == 2
+                #error("not implemented")
+                int nccc = (i + 0) * si + (j + 0) * sj;
+                int nrcc = (i + 1) * si + (j + 0) * sj;
+                int ncrc = (i + 0) * si + (j + 1) * sj;
+
+                #elif DIM == 3
+                #error("not implemented")
+                int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+                int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+                int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+                int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+                #endif
+
+                double pc[NPRIM];
+                double sc[NCONS];
+
+                for (int q = 0; q < NPRIM; ++q)
+                {
+                    pc[q] = p[nccc + q * sq];
+                }
+                source_terms_spherical_polar(x0, x1, 0.5 * M_PI - 0.1, 0.5 * M_PI + 0.1, pc, sc); // TODO: polar extent
+
+                for (int q = 0; q < NPRIM; ++q)
+                {
+                    s[nccc + q * sq] += sc[q];
+                }
+            }
+        }
+        """
+        dim = self._dim
+        shape = s.shape[:3]
+        return shape[:dim], (p, x, s, *shape)
+
+
+@kernel_class
 class Scheme:
     """
     Godunov scheme using method-of-lines and many strategy modes
@@ -560,6 +681,7 @@ class Scheme:
         #endif
         #endif
 
+        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
         double fm[NCONS];
 
         #if DIM == 1
@@ -579,10 +701,9 @@ class Scheme:
             #endif
 
             double da;
-            int mc = nc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
 
             #if DIM >= 1
-            da = face_areas[0 * nd + mc];
+            da = face_areas[(0 * nd + nc) / sf];
 
             _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
             for (int q = 0; q < NCONS; ++q)
@@ -592,7 +713,7 @@ class Scheme:
             #endif
 
             #if DIM >= 2
-            da = face_areas[1 * nd + mc];
+            da = face_areas[(1 * nd + nc) / sf];
 
             _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
             for (int q = 0; q < NCONS; ++q)
@@ -602,7 +723,7 @@ class Scheme:
             #endif
 
             #if DIM >= 3
-            da = face_areas[2 * nd + mc];
+            da = face_areas[(2 * nd + nc) / sf];
 
             _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
             for (int q = 0; q < NCONS; ++q)
@@ -750,6 +871,7 @@ class Scheme:
         int sk = 1;
         #endif
         #endif
+        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
 
         #if DIM >= 1
         double fm[NCONS];
@@ -786,8 +908,6 @@ class Scheme:
             int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
             #endif
 
-            int mccc = nccc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
-
             #if DIM >= 1
             _godunov_fluxes(prd + nccc, grd + 0 * nd + nccc, urd + nccc, fm, plm_theta, 1, si, sq);
             _godunov_fluxes(prd + nrcc, grd + 0 * nd + nrcc, urd + nrcc, fp, plm_theta, 1, si, sq);
@@ -807,15 +927,15 @@ class Scheme:
                 double dq = 0.0;
                 double da;
                 #if DIM >= 1
-                da = face_areas[0 * nd + mccc];
+                da = face_areas[(0 * nd + nccc) / sf];
                 dq -= (fp[q] - fm[q]) * da;
                 #endif
                 #if DIM >= 2
-                da = face_areas[1 * nd + mccc];
+                da = face_areas[(1 * nd + nccc) / sf];
                 dq -= (gp[q] - gm[q]) * da;
                 #endif
                 #if DIM >= 3
-                da = face_areas[2 * nd + mccc];
+                da = face_areas[(2 * nd + nccc) / sf];
                 dq -= (hp[q] - hm[q]) * da;
                 #endif
 
@@ -1381,6 +1501,7 @@ class SolverKernels(NamedTuple):
     prim_to_cons: Callable
     cons_to_prim: Callable
     max_wavespeeds: Callable
+    geometric_source_terms: Callable
 
 
 def make_solver_kernels(config: Sailfish, native_code: bool = False):
@@ -1390,12 +1511,14 @@ def make_solver_kernels(config: Sailfish, native_code: bool = False):
     grad_est = GradientEstimation(config)
     fields = Fields(config)
     scheme = Scheme(config)
+    source_terms = SourceTerms(config)
 
     if native_code:
         return (
             grad_est.__native_code__,
             fields.__native_code__,
             scheme.__native_code__,
+            source_terms.__native_code__,
         )
     else:
         return SolverKernels(
@@ -1406,6 +1529,7 @@ def make_solver_kernels(config: Sailfish, native_code: bool = False):
             fields.prim_to_cons_array,
             fields.cons_to_prim_array,
             fields.max_wavespeeds_array,
+            source_terms.geometric_source_terms,
         )
 
 
@@ -1479,6 +1603,7 @@ def patch_solver(
         prim_to_cons,
         cons_to_prim,
         max_wavespeeds,
+        geometric_source_terms,
     ) = kernels
 
     dim = box.dimensionality
@@ -1532,9 +1657,14 @@ def patch_solver(
     # =========================================================================
     # Arrays for grid geometry (TODO: don't compute these if trivial grid geometry)
     # =========================================================================
-    coords = CartesianCoordinates()
+    if config.coordinates == "cartesian":
+        coords = CartesianCoordinates()
+    if config.coordinates == "spherical-polar":
+        coords = SphericalPolarCoordinates()
+
     dv = space.create(xp.zeros, fields=1, data=coords.cell_volumes(box))
-    da = space.create(xp.ones, vectors=dim, data=coords.face_areas(box))
+    da = space.create(xp.zeros, vectors=dim, data=coords.face_areas(box))
+    xv = space.create(xp.zeros, vectors=dim, data=coords.cell_vertices(box))
 
     # =========================================================================
     # Array of cached Runge-Kutta conserved fields
@@ -1584,18 +1714,18 @@ def patch_solver(
     # =========================================================================
     # Arrays for source terms, including driving fields
     # =========================================================================
+    if config.forcing is not None or coords.needs_geometrical_source_terms:
+        stm = space.create(xp.zeros, fields=ncons)
+    else:
+        stm = None
+
     if (forcing := config.forcing) is not None:
-        stm = space.create(xp.zeros, fields=ncons)  # source terms
         qdr = space.create(xp.zeros, fields=ncons)
         pdr = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
         rdr = space.create(xp.zeros, fields=1, data=forcing.rate_array(box))
         prim_to_cons(pdr, qdr)
         qdr *= dv
         del pdr
-    else:
-        stm = None
-        qdr = None
-        rdr = None
 
     dt = yield PatchState(n, t, q1, interior_box, c2p_user, amax)
 
@@ -1610,10 +1740,21 @@ def patch_solver(
 
             u1 = q1 / dv
 
-            if forcing is not None:
-                stm[...] = (qdr - q1) * rdr * dt
+            if stm is not None:
+                stm[...] = 0.0
+
             if cache_prim:
                 cons_to_prim(u1, p1)
+
+            if forcing is not None:
+                stm += (qdr - q1) * rdr
+
+            if coords.needs_geometrical_source_terms:
+                assert p1 is not None
+                # print("before", stm)
+                geometric_source_terms(p1, xv, stm)
+                # print("after", stm)
+
             if cache_grad:
                 plm_gradient(p1, g1)
             if cache_flux:
