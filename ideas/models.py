@@ -79,7 +79,7 @@ class Star:
     def primitive(self, box: CoordinateBox):
         x = box.cell_centers()
         p = zeros(x.shape + (3,))
-        p[...] = [1.0, 0.0, 1.000]
+        p[...] = [1.0, 0.0, 1.0]
         return p
 
 

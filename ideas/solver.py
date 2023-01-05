@@ -925,26 +925,31 @@ class Scheme:
             {
                 int n = nccc + q * sq;
                 double dq = 0.0;
-                double da;
+                double am;
+                double ap;
+
                 #if DIM >= 1
-                da = face_areas[(0 * nd + nccc) / sf];
-                dq -= (fp[q] - fm[q]) * da;
+                am = face_areas[(0 * nd + nccc) / sf];
+                ap = face_areas[(0 * nd + nrcc) / sf];
+                dq -= fp[q] * ap - fm[q] * am;
                 #endif
                 #if DIM >= 2
-                da = face_areas[(1 * nd + nccc) / sf];
-                dq -= (gp[q] - gm[q]) * da;
+                am = face_areas[(1 * nd + nccc) / sf];
+                ap = face_areas[(1 * nd + ncrc) / sf];
+                dq -= gp[q] * ap - gm[q] * am;
                 #endif
                 #if DIM >= 3
-                da = face_areas[(2 * nd + nccc) / sf];
-                dq -= (hp[q] - hm[q]) * da;
+                am = face_areas[(2 * nd + nccc) / sf];
+                ap = face_areas[(2 * nd + nccr) / sf];
+                dq -= hp[q] * ap - hm[q] * am;
                 #endif
-
-                dq *= dt;
 
                 if (stm)
                 {
-                    dq += stm[n] * dt;
+                    dq += stm[n];
                 }
+
+                dq *= dt;
                 qwr[n] = qrd[n] + dq;
 
                 #if USE_RK == 1
@@ -1168,28 +1173,31 @@ class Scheme:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                double q1 = qc[q * sq];
+                double dq = 0.0;
 
                 #if DIM >= 1
                 double fm = f[0 * nd + nccc + q * sq];
                 double fp = f[0 * nd + nrcc + q * sq];
-                q1 -= (fp - fm) * dt;
+                dq -= fp - fm;
                 #endif
                 #if DIM >= 2
                 double gm = f[1 * nd + nccc + q * sq];
                 double gp = f[1 * nd + ncrc + q * sq];
-                q1 -= (gp - gm) * dt;
+                dq -= gp - gm;
                 #endif
                 #if DIM >= 3
                 double hm = f[2 * nd + nccc + q * sq];
                 double hp = f[2 * nd + nccr + q * sq];
-                q1 -= (hp - hm) * dt;
+                dq -= hp - hm;
                 #endif
 
                 if (stm)
                 {
-                    q1 += stm[nccc + q * sq] * dt;
+                    dq += stm[nccc + q * sq];
                 }
+
+                dq *= dt;
+                double q1 = qc[q * sq] + dq;
 
                 #if USE_RK == 1
                 if (rk != 0.0)
@@ -1737,7 +1745,6 @@ def patch_solver(
             q0[...] = q1[...]
 
         for rk in rks or [0.0]:
-
             u1 = q1 / dv
 
             if stm is not None:
@@ -1751,9 +1758,7 @@ def patch_solver(
 
             if coords.needs_geometrical_source_terms:
                 assert p1 is not None
-                # print("before", stm)
                 geometric_source_terms(p1, xv, stm)
-                # print("after", stm)
 
             if cache_grad:
                 plm_gradient(p1, g1)
@@ -1834,9 +1839,10 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         else:
             t = 0.0
             n = 0
-            p = initial_prim(box)
-        p = space.create(zeros, fields=nprim, data=p)
+            # p = initial_prim(box)
         b = box.extend(2)
+        p = initial_prim(b)
+        p = space.create(zeros, fields=nprim, data=p)
 
         stream = make_stream(hardware, gpu_streams)
         solver = patch_solver(p, t, n, b, space, kernels, config)
@@ -1858,5 +1864,5 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             if type(events[0]) is PatchState:
                 timestep = yield State(config.domain, events)
 
-            elif type(events[0]) is FillGuardZones:
-                fill_guard_zones([e.array for e in events], boundary)
+            # elif type(events[0]) is FillGuardZones:
+            #    fill_guard_zones([e.array for e in events], boundary)
