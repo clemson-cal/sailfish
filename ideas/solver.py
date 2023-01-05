@@ -633,25 +633,10 @@ class Scheme:
         s = urd.shape[:3]
         return s[:dim], (prd, urd, grd, fwr, face_areas, plm, *s)
 
-    @kernel
-    def update_cons(
-        self,
-        prd: NDArray[float],
-        urd: NDArray[float],  # conserved densities (not used if cached primitives)
-        grd: NDArray[float],
-        qrk: NDArray[float],
-        qrd: NDArray[float],
-        qwr: NDArray[float],
-        stm: NDArray[float],
-        face_areas: NDArray[float],
-        dt: float,
-        rk: float,
-        plm_theta: float = None,
-        ni: int = None,
-        nj: int = None,
-        nk: int = None,
-    ):
-        R"""
+    """
+    Native implementation of the update_cons kernel
+    """
+    update_cons_code = R"""
         KERNEL void update_cons(
             double *prd,
             double *urd,
@@ -787,6 +772,135 @@ class Scheme:
                 }
             }
         }
+        """
+
+    @kernel(code=update_cons_code)
+    def update_cons(
+        self,
+        prd: NDArray[float],
+        urd: NDArray[float],
+        grd: NDArray[float],
+        qrk: NDArray[float],
+        qrd: NDArray[float],
+        qwr: NDArray[float],
+        stm: NDArray[float],
+        face_areas: NDArray[float],
+        dt: float,
+        rk: float,
+        plm_theta: float = None,
+        ni: int = None,
+        nj: int = None,
+        nk: int = None,
+    ):
+        """
+        Update conserved quantities without cached Godunov fluxes
+
+        Parameters
+        ----------
+
+        prd : `ndarray[(ni, nj, nk, nprim), float64]`
+
+            Read-only primitive variable array.
+
+            May be `None` if `cache_prim` is `False`. Strides must be `(ni,
+            nj, nk, nprim)` if `data_layout == "fields-last"` or `(nprim, ni,
+            nj, nk)` if `data_layout == "fields-first".
+
+            If given, must be valid in all zones including guard zones.
+
+        urd : `ndarray[(ni, nj, nk, ncons), float64]`
+
+            Read-only array of conserved variable densities at RK sub-step.
+
+            [NOW]: required. [SOON; implement trivial grid geometry]: May be
+            `None` if `cache_prim is True` and the grid has a trivial geometry
+            (uniform cell volumes dv).
+
+            If given, must be valid in all zones including guard zones.
+
+            Strides must be `(ni, nj, nk, ncons)` if `data_layout ==
+            "fields-last"` or `(ncons, ni, nj, nk)` if `data_layout ==
+            "fields-first".
+
+        grd : `ndarray[(dim, ni, nj, nk, ncons), float64]`
+
+            Read-only array of primitive variable scaled gradients.
+
+            May be `None` if `cache_grad` is `False` or `reconstruction ==
+            "pcm"`.
+
+            If given, may be invalid in one layer of guard zones on each
+            non-trivial array axis.
+
+            Gradient data must be scaled by the local grid spacing in the
+            respective direction. The dimensions are the same as the
+            respective primitive variable field (see `GradientEstimation`
+            class).
+
+            Strides must be `(dim, ni, nj, nk, nprim)` if `data_layout ==
+            "fields-last"` or `(dim, nprim, ni, nj, nk)` if `data_layout ==
+            "fields-first".
+
+        qrk : `ndarray[(ni, nj, nk, ncons), float64]`
+
+            Read-only array of conserved variable charges, cached at the most
+            recent integer time level. May be `None` if `time_integration ==
+            "fwd"`. Same layout policy as `urd`.
+
+            May be invalid in two layers of guard zones on each non-trivial
+            array axis.
+
+        qrd : `ndarray[(ni, nj, nk, ncons), float64]`
+
+            Read-only array of conserved variable charges at the RK sub-step.
+
+            Required. If `urd` is given, then it must be `urd = qrd / dv`
+            where `dv` is an array of local cell volumes. Same layout policy
+            as `urd`.
+
+            May be invalid in two layers of guard zones on each non-trivial
+            array axis.
+
+        qwr : `ndarray[(ni, nj, nk, ncons), float64]`
+
+            Write-only array of conserved variable charges, updated by `dt`.
+            Same layout policy as `urd`.
+
+            Will be invalid in two layers of guard zones on each non-trivial
+            array axis.
+
+        stm : `ndarray[(ni, nj, nk, ncons), float64]`
+
+            Read-only array of source terms.
+
+            May be `None`. Source terms must be volume-integrated and per unit
+            time (rate-of-charge). Same data layou ras `urd`.
+
+            May be invalid in two layers of guard zones on each non-trivial
+            array axis.
+
+        face_areas : `ndarray[(dim, ni, nj, nk), float64]`
+
+            Read-only array of face areas.
+
+            Data layout must be `(dim, ni, nj, nk)`.
+
+            May be invalid in two layers of guard zones on the left and one
+            layer of guard zones at the right of each non-trivial array axis.
+
+        dt : `float64`
+
+           Time step size.
+
+        rk : `float64`
+
+           Runge-Kutta parameter.
+
+           Unused if `time_integration == "fwd"`. The formula used is:
+
+           `qwr = qrk * rk + (qwr + dq) * (1 - rk)`
+
+           where `dq` is the time-difference of the conserved charge.
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
