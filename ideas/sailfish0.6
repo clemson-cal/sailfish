@@ -626,15 +626,18 @@ def doc(args=None, console=None, parser=None):
 
     if parser:
         parser.add_argument("topic", nargs="?", choices=choices)
+        parser.add_argument("subtopic", nargs="?")
         parser.add_argument("--more", action="store_true", help="show more detail")
     else:
-        from kernels import main as kernels_main
         from rich.markdown import Markdown
         from rich.syntax import Syntax
         from rich.text import Text
         from rich.prompt import Prompt, DefaultType
 
-        console.width = 100
+        from kernels import main as kernels_main
+        from solver import doc as solver_doc
+
+        console.width = 80
 
         if (topic := args.topic) is None:
             topics = "# __Topics__"
@@ -653,7 +656,17 @@ def doc(args=None, console=None, parser=None):
             console.print("\n\n")
             console.print(Scheme())
         if topic == "solver":
-            console.print("Not yet documented")
+            try:
+                doc = solver_doc()
+                console.print(Markdown(doc[args.subtopic], inline_code_lexer="python"))
+            except KeyError:
+                console.print(f"Provide the name of a documented method, e.g.")
+                console.print()
+                console.print("> sailfish doc solver update_cons")
+                console.print()
+                console.print("sub-topics are:")
+                console.print()
+                console.print("\n".join(doc))
         if topic == "physics":
             console.print("Not yet documented")
         if topic == "models":
@@ -726,8 +739,9 @@ def code(args=None, console=None, parser=None):
     if parser:
         parser.add_argument(
             "_config",
+            nargs="?",
             metavar="config",
-            default=["sod"],
+            default="sod",
             help="configuration file, checkpoint, or preset/setup name",
         )
         parser.add_argument("--line-numbers", dest="_line_numbers", action="store_true")

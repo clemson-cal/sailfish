@@ -1,12 +1,12 @@
 """
-A solver is a generator function and a state object
+Multi-dimensional 2nd order Godunov solver using the method of lines
 """
-
 
 from contextlib import nullcontext
 from logging import getLogger
 from math import prod
 from multiprocessing.pool import ThreadPool
+from textwrap import dedent
 from typing import NamedTuple, Callable
 
 from numpy import array, zeros, concatenate, argsort
@@ -16,8 +16,6 @@ from kernels import kernel, kernel_class, device, kernel_metadata
 from config import Sailfish, Strategy, Reconstruction, BoundaryCondition
 from geometry import CoordinateBox, CartesianCoordinates
 from index_space import IndexSpace
-
-logger = getLogger("sailfish")
 
 
 @device
@@ -517,11 +515,110 @@ class Scheme:
         }
         """
 
-    @kernel
+    godunov_fluxes_code = R"""
+    KERNEL void godunov_fluxes(
+        double *prd,
+        double *urd,
+        double *grd,
+        double *fwr,
+        double *face_areas,
+        double plm_theta,
+        int ni,
+        int nj,
+        int nk)
+    {
+        int nq = NCONS;
+        int nd = ni * nj * nk * nq;
+
+        #if TRANSPOSE == 0
+        #if DIM == 1
+        int si = nq;
+        int sq = 1;
+        #elif DIM == 2
+        int si = nq * nj;
+        int sj = nq;
+        int sq = 1;
+        #elif DIM == 3
+        int si = nq * nj * nk;
+        int sj = nq * nj;
+        int sk = nq;
+        int sq = 1;
+        #endif
+        #elif TRANSPOSE == 1
+        #if DIM == 1
+        int sq = ni;
+        int si = 1;
+        #elif DIM == 2
+        int sq = nj * ni;
+        int si = nj;
+        int sj = 1;
+        #elif DIM == 3
+        int sq = nk * nj * ni;
+        int si = nk * nj;
+        int sj = nk;
+        int sk = 1;
+        #endif
+        #endif
+
+        double fm[NCONS];
+
+        #if DIM == 1
+        FOR_RANGE_1D(2, ni - 1)
+        #elif DIM == 2
+        FOR_RANGE_2D(2, ni - 1, 2, nj - 1)
+        #elif DIM == 3
+        FOR_RANGE_3D(2, ni - 1, 2, nj - 2, 2, nk - 1)
+        #endif
+        {
+            #if DIM == 1
+            int nc = i * si;
+            #elif DIM == 2
+            int nc = i * si + j * sj;
+            #elif DIM == 3
+            int nc = i * si + j * sj + k * sk;
+            #endif
+
+            double da;
+            int mc = nc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
+
+            #if DIM >= 1
+            da = face_areas[0 * nd + mc];
+
+            _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
+            for (int q = 0; q < NCONS; ++q)
+            {
+                fwr[0 * nd + nc + q * sq] = fm[q] * da;
+            }
+            #endif
+
+            #if DIM >= 2
+            da = face_areas[1 * nd + mc];
+
+            _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
+            for (int q = 0; q < NCONS; ++q)
+            {
+                fwr[1 * nd + nc + q * sq] = fm[q] * da;
+            }
+            #endif
+
+            #if DIM >= 3
+            da = face_areas[2 * nd + mc];
+
+            _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
+            for (int q = 0; q < NCONS; ++q)
+            {
+                fwr[2 * nd + nc + q * sq] = fm[q] * da;
+            }
+            #endif
+        }
+    }
+    """
+
+    @kernel(code=godunov_fluxes_code)
     def godunov_fluxes(
         self,
         prd: NDArray[float],
-        urd: NDArray[float],  # conserved densities (not used if cached primitives)
+        urd: NDArray[float],
         grd: NDArray[float],
         fwr: NDArray[float],
         face_areas: NDArray[float],
@@ -530,103 +627,71 @@ class Scheme:
         nj: int = None,
         nk: int = None,
     ):
-        R"""
-        KERNEL void godunov_fluxes(
-            double *prd,
-            double *urd,
-            double *grd,
-            double *fwr,
-            double *face_areas,
-            double plm_theta,
-            int ni,
-            int nj,
-            int nk)
-        {
-            int nq = NCONS;
-            int nd = ni * nj * nk * nq;
+        """
+        Compute Godunov fluxes
 
-            #if TRANSPOSE == 0
-            #if DIM == 1
-            int si = nq;
-            int sq = 1;
-            #elif DIM == 2
-            int si = nq * nj;
-            int sj = nq;
-            int sq = 1;
-            #elif DIM == 3
-            int si = nq * nj * nk;
-            int sj = nq * nj;
-            int sk = nq;
-            int sq = 1;
-            #endif
-            #elif TRANSPOSE == 1
-            #if DIM == 1
-            int sq = ni;
-            int si = 1;
-            #elif DIM == 2
-            int sq = nj * ni;
-            int si = nj;
-            int sj = 1;
-            #elif DIM == 3
-            int sq = nk * nj * ni;
-            int si = nk * nj;
-            int sj = nk;
-            int sk = 1;
-            #endif
-            #endif
+        Parameters
+        ----------
 
-            double fm[NCONS];
+        prd : `ndarray[(ni, nj, nk, nprim), float64]`
 
-            #if DIM == 1
-            FOR_RANGE_1D(2, ni - 1)
-            #elif DIM == 2
-            FOR_RANGE_2D(2, ni - 1, 2, nj - 1)
-            #elif DIM == 3
-            FOR_RANGE_3D(2, ni - 1, 2, nj - 2, 2, nk - 1)
-            #endif
-            {
-                #if DIM == 1
-                int nc = i * si;
-                #elif DIM == 2
-                int nc = i * si + j * sj;
-                #elif DIM == 3
-                int nc = i * si + j * sj + k * sk;
-                #endif
+            Read-only primitive variable array.
 
-                double da;
-                int mc = nc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
+            May be `None` if `cache_prim` is `False`. Strides must be `(ni,
+            nj, nk, nprim)` if `data_layout == "fields-last"` or `(nprim, ni,
+            nj, nk)` if `data_layout == "fields-first"`.
 
-                #if DIM >= 1
-                da = face_areas[0 * nd + mc];
+            If given, must be valid in all zones including guard zones.
 
-                _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    fwr[0 * nd + nc + q * sq] = fm[q] * da;
-                }
-                #endif
+        urd : `ndarray[(ni, nj, nk, ncons), float64]`
 
-                #if DIM >= 2
-                da = face_areas[1 * nd + mc];
+            Read-only array of conserved variable densities at RK sub-step.
 
-                _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    fwr[1 * nd + nc + q * sq] = fm[q] * da;
-                }
-                #endif
+            NOW: required. SOON (implement trivial grid geometry): May be
+            `None` if `cache_prim is True` and the grid has a trivial geometry
+            (uniform cell volumes dv).
 
-                #if DIM >= 3
-                da = face_areas[2 * nd + mc];
+            If given, must be valid in all zones including guard zones.
 
-                _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    fwr[2 * nd + nc + q * sq] = fm[q] * da;
-                }
-                #endif
-            }
-        }
+            Strides must be `(ni, nj, nk, ncons)` if `data_layout ==
+            "fields-last"` or `(ncons, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
+
+        grd : `ndarray[(ni, nj, nk, dim, ncons), float64]`
+
+            Read-only array of primitive variable scaled gradients.
+
+            May be `None` if `cache_grad` is `False` or `reconstruction ==
+            "pcm"`.
+
+            If given, may be invalid in one layer of guard zones on each
+            non-trivial array axis.
+
+            Gradient data must be scaled by the local grid spacing in the
+            respective direction. The dimensions are the same as the
+            respective primitive variable field (see `GradientEstimation`
+            class).
+
+            Strides must be `(dim, ni, nj, nk, nprim)` if `data_layout ==
+            "fields-last"` or `(dim, nprim, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
+
+        fwr : `ndarray[(ni, nj, nk, dim, ncons), float64]`
+
+            Write-only array of conserved variable charges, updated by `dt`.
+            Same layout policy as `urd`.
+
+            Will be invalid in two layers of guard zones on the left and one
+            layer of guard zones at the right of each non-trivial array axis.
+
+        face_areas : `ndarray[(dim, ni, nj, nk), float64]`
+
+            Read-only array of face areas.
+
+            Data layout must be `(dim, ni, nj, nk)`.
+
+            May be invalid in two layers of guard zones on the left and one
+            layer of guard zones at the right of each non-trivial array axis.
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
@@ -637,142 +702,142 @@ class Scheme:
     Native implementation of the update_cons kernel
     """
     update_cons_code = R"""
-        KERNEL void update_cons(
-            double *prd,
-            double *urd,
-            double *grd,
-            double *qrk,
-            double *qrd,
-            double *qwr,
-            double *stm,
-            double *face_areas,
-            double dt,
-            double rk,
-            double plm_theta,
-            int ni,
-            int nj,
-            int nk)
-        {
-            int nq = NCONS;
-            int nd = ni * nj * nk * nq;
+    KERNEL void update_cons(
+        double *prd,
+        double *urd,
+        double *grd,
+        double *qrk,
+        double *qrd,
+        double *qwr,
+        double *stm,
+        double *face_areas,
+        double dt,
+        double rk,
+        double plm_theta,
+        int ni,
+        int nj,
+        int nk)
+    {
+        int nq = NCONS;
+        int nd = ni * nj * nk * nq;
 
-            #if TRANSPOSE == 0
+        #if TRANSPOSE == 0
+        #if DIM == 1
+        int si = nq;
+        int sq = 1;
+        #elif DIM == 2
+        int si = nq * nj;
+        int sj = nq;
+        int sq = 1;
+        #elif DIM == 3
+        int si = nq * nj * nk;
+        int sj = nq * nj;
+        int sk = nq;
+        int sq = 1;
+        #endif
+        #elif TRANSPOSE == 1
+        #if DIM == 1
+        int sq = ni;
+        int si = 1;
+        #elif DIM == 2
+        int sq = nj * ni;
+        int si = nj;
+        int sj = 1;
+        #elif DIM == 3
+        int sq = nk * nj * ni;
+        int si = nk * nj;
+        int sj = nk;
+        int sk = 1;
+        #endif
+        #endif
+
+        #if DIM >= 1
+        double fm[NCONS];
+        double fp[NCONS];
+        #endif
+        #if DIM >= 2
+        double gm[NCONS];
+        double gp[NCONS];
+        #endif
+        #if DIM >= 3
+        double hm[NCONS];
+        double hp[NCONS];
+        #endif
+
+        #if DIM == 1
+        FOR_RANGE_1D(2, ni - 2)
+        #elif DIM == 2
+        FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
+        #elif DIM == 3
+        FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
+        #endif
+        {
             #if DIM == 1
-            int si = nq;
-            int sq = 1;
+            int nccc = (i + 0) * si;
+            int nrcc = (i + 1) * si;
             #elif DIM == 2
-            int si = nq * nj;
-            int sj = nq;
-            int sq = 1;
+            int nccc = (i + 0) * si + (j + 0) * sj;
+            int nrcc = (i + 1) * si + (j + 0) * sj;
+            int ncrc = (i + 0) * si + (j + 1) * sj;
             #elif DIM == 3
-            int si = nq * nj * nk;
-            int sj = nq * nj;
-            int sk = nq;
-            int sq = 1;
+            int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+            int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+            int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+            int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
             #endif
-            #elif TRANSPOSE == 1
-            #if DIM == 1
-            int sq = ni;
-            int si = 1;
-            #elif DIM == 2
-            int sq = nj * ni;
-            int si = nj;
-            int sj = 1;
-            #elif DIM == 3
-            int sq = nk * nj * ni;
-            int si = nk * nj;
-            int sj = nk;
-            int sk = 1;
-            #endif
-            #endif
+
+            int mccc = nccc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
 
             #if DIM >= 1
-            double fm[NCONS];
-            double fp[NCONS];
+            _godunov_fluxes(prd + nccc, grd + 0 * nd + nccc, urd + nccc, fm, plm_theta, 1, si, sq);
+            _godunov_fluxes(prd + nrcc, grd + 0 * nd + nrcc, urd + nrcc, fp, plm_theta, 1, si, sq);
             #endif
             #if DIM >= 2
-            double gm[NCONS];
-            double gp[NCONS];
+            _godunov_fluxes(prd + nccc, grd + 1 * nd + nccc, urd + nccc, gm, plm_theta, 2, sj, sq);
+            _godunov_fluxes(prd + ncrc, grd + 1 * nd + ncrc, urd + ncrc, gp, plm_theta, 2, sj, sq);
             #endif
             #if DIM >= 3
-            double hm[NCONS];
-            double hp[NCONS];
+            _godunov_fluxes(prd + nccc, grd + 2 * nd + nccc, urd + nccc, hm, plm_theta, 3, sk, sq);
+            _godunov_fluxes(prd + nccr, grd + 2 * nd + nccr, urd + nccr, hp, plm_theta, 3, sk, sq);
             #endif
 
-            #if DIM == 1
-            FOR_RANGE_1D(2, ni - 2)
-            #elif DIM == 2
-            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
-            #elif DIM == 3
-            FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
-            #endif
+            for (int q = 0; q < NCONS; ++q)
             {
-                #if DIM == 1
-                int nccc = (i + 0) * si;
-                int nrcc = (i + 1) * si;
-                #elif DIM == 2
-                int nccc = (i + 0) * si + (j + 0) * sj;
-                int nrcc = (i + 1) * si + (j + 0) * sj;
-                int ncrc = (i + 0) * si + (j + 1) * sj;
-                #elif DIM == 3
-                int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
-                int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
-                int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
-                int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
-                #endif
-
-                int mccc = nccc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
-
+                int n = nccc + q * sq;
+                double dq = 0.0;
+                double da;
                 #if DIM >= 1
-                _godunov_fluxes(prd + nccc, grd + 0 * nd + nccc, urd + nccc, fm, plm_theta, 1, si, sq);
-                _godunov_fluxes(prd + nrcc, grd + 0 * nd + nrcc, urd + nrcc, fp, plm_theta, 1, si, sq);
+                da = face_areas[0 * nd + mccc];
+                dq -= (fp[q] - fm[q]) * da;
                 #endif
                 #if DIM >= 2
-                _godunov_fluxes(prd + nccc, grd + 1 * nd + nccc, urd + nccc, gm, plm_theta, 2, sj, sq);
-                _godunov_fluxes(prd + ncrc, grd + 1 * nd + ncrc, urd + ncrc, gp, plm_theta, 2, sj, sq);
+                da = face_areas[1 * nd + mccc];
+                dq -= (gp[q] - gm[q]) * da;
                 #endif
                 #if DIM >= 3
-                _godunov_fluxes(prd + nccc, grd + 2 * nd + nccc, urd + nccc, hm, plm_theta, 3, sk, sq);
-                _godunov_fluxes(prd + nccr, grd + 2 * nd + nccr, urd + nccr, hp, plm_theta, 3, sk, sq);
+                da = face_areas[2 * nd + mccc];
+                dq -= (hp[q] - hm[q]) * da;
                 #endif
 
-                for (int q = 0; q < NCONS; ++q)
+                dq *= dt;
+
+                if (stm)
                 {
-                    int n = nccc + q * sq;
-                    double dq = 0.0;
-                    double da;
-                    #if DIM >= 1
-                    da = face_areas[0 * nd + mccc];
-                    dq -= (fp[q] - fm[q]) * da;
-                    #endif
-                    #if DIM >= 2
-                    da = face_areas[1 * nd + mccc];
-                    dq -= (gp[q] - gm[q]) * da;
-                    #endif
-                    #if DIM >= 3
-                    da = face_areas[2 * nd + mccc];
-                    dq -= (hp[q] - hm[q]) * da;
-                    #endif
-
-                    dq *= dt;
-
-                    if (stm)
-                    {
-                        dq += stm[n] * dt;
-                    }
-                    qwr[n] = qrd[n] + dq;
-
-                    #if USE_RK == 1
-                    if (rk != 0.0)
-                    {
-                        qwr[n] *= (1.0 - rk);
-                        qwr[n] += rk * qrk[n];
-                    }
-                    #endif
+                    dq += stm[n] * dt;
                 }
+                qwr[n] = qrd[n] + dq;
+
+                #if USE_RK == 1
+                if (rk != 0.0)
+                {
+                    qwr[n] *= (1.0 - rk);
+                    qwr[n] += rk * qrk[n];
+                }
+                #endif
             }
         }
-        """
+    }
+    """
 
     @kernel(code=update_cons_code)
     def update_cons(
@@ -793,7 +858,7 @@ class Scheme:
         nk: int = None,
     ):
         """
-        Update conserved quantities without cached Godunov fluxes
+        Update conserved quantities without pre-computed Godunov fluxes
 
         Parameters
         ----------
@@ -804,7 +869,7 @@ class Scheme:
 
             May be `None` if `cache_prim` is `False`. Strides must be `(ni,
             nj, nk, nprim)` if `data_layout == "fields-last"` or `(nprim, ni,
-            nj, nk)` if `data_layout == "fields-first".
+            nj, nk)` if `data_layout == "fields-first"`.
 
             If given, must be valid in all zones including guard zones.
 
@@ -812,7 +877,7 @@ class Scheme:
 
             Read-only array of conserved variable densities at RK sub-step.
 
-            [NOW]: required. [SOON; implement trivial grid geometry]: May be
+            NOW: required. SOON (implement trivial grid geometry): May be
             `None` if `cache_prim is True` and the grid has a trivial geometry
             (uniform cell volumes dv).
 
@@ -820,9 +885,9 @@ class Scheme:
 
             Strides must be `(ni, nj, nk, ncons)` if `data_layout ==
             "fields-last"` or `(ncons, ni, nj, nk)` if `data_layout ==
-            "fields-first".
+            "fields-first"`.
 
-        grd : `ndarray[(dim, ni, nj, nk, ncons), float64]`
+        grd : `ndarray[(ni, nj, nk, dim, ncons), float64]`
 
             Read-only array of primitive variable scaled gradients.
 
@@ -839,7 +904,7 @@ class Scheme:
 
             Strides must be `(dim, ni, nj, nk, nprim)` if `data_layout ==
             "fields-last"` or `(dim, nprim, ni, nj, nk)` if `data_layout ==
-            "fields-first".
+            "fields-first"`.
 
         qrk : `ndarray[(ni, nj, nk, ncons), float64]`
 
@@ -853,6 +918,7 @@ class Scheme:
         qrd : `ndarray[(ni, nj, nk, ncons), float64]`
 
             Read-only array of conserved variable charges at the RK sub-step.
+            Same layout policy as `urd`.
 
             Required. If `urd` is given, then it must be `urd = qrd / dv`
             where `dv` is an array of local cell volumes. Same layout policy
@@ -879,7 +945,7 @@ class Scheme:
             May be invalid in two layers of guard zones on each non-trivial
             array axis.
 
-        face_areas : `ndarray[(dim, ni, nj, nk), float64]`
+        face_areas : `ndarray[(ni, nj, nk, dim), float64]`
 
             Read-only array of face areas.
 
@@ -896,139 +962,201 @@ class Scheme:
 
            Runge-Kutta parameter.
 
-           Unused if `time_integration == "fwd"`. The formula used is:
-
-           `qwr = qrk * rk + (qwr + dq) * (1 - rk)`
-
-           where `dq` is the time-difference of the conserved charge.
+           Unused if `time_integration == "fwd"`. The formula used is: `qwr =
+           qrk * rk + (qwr + dq) * (1 - rk)` where `dq` is the time-difference
+           of the conserved charge.
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
         return s[:dim], (prd, urd, grd, qrk, qrd, qwr, stm, face_areas, dt, rk, plm, *s)
 
-    @kernel
+    """
+    Native implementation of the update_cons_from_fluxes_code kernel
+    """
+    update_cons_from_fluxes_code = R"""
+    KERNEL void update_cons_from_fluxes(
+        double *qrk,
+        double *q,
+        double *f,
+        double *stm,
+        double dt,
+        double rk,
+        int ni,
+        int nj,
+        int nk)
+    {
+        int nq = NCONS;
+        int nd = ni * nj * nk * nq;
+
+        #if TRANSPOSE == 0
+        #if DIM == 1
+        int si = nq;
+        int sq = 1;
+        #elif DIM == 2
+        int si = nq * nj;
+        int sj = nq;
+        int sq = 1;
+        #elif DIM == 3
+        int si = nq * nj * nk;
+        int sj = nq * nj;
+        int sk = nq;
+        int sq = 1;
+        #endif
+        #elif TRANSPOSE == 1
+        #if DIM == 1
+        int sq = ni;
+        int si = 1;
+        #elif DIM == 2
+        int sq = nj * ni;
+        int si = nj;
+        int sj = 1;
+        #elif DIM == 3
+        int sq = nk * nj * ni;
+        int si = nk * nj;
+        int sj = nk;
+        int sk = 1;
+        #endif
+        #endif
+
+        #if DIM == 1
+        FOR_RANGE_1D(2, ni - 2)
+        #elif DIM == 2
+        FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
+        #elif DIM == 3
+        FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
+        #endif
+        {
+            #if DIM == 1
+            int nccc = (i + 0) * si;
+            int nrcc = (i + 1) * si;
+            #elif DIM == 2
+            int nccc = (i + 0) * si + (j + 0) * sj;
+            int nrcc = (i + 1) * si + (j + 0) * sj;
+            int ncrc = (i + 0) * si + (j + 1) * sj;
+            #elif DIM == 3
+            int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+            int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+            int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+            int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+            #endif
+
+            double *qc = &q[nccc];
+            #if USE_RK == 1
+            double *q0 = &qrk[nccc];
+            #endif
+
+            for (int q = 0; q < NCONS; ++q)
+            {
+                double q1 = qc[q * sq];
+
+                #if DIM >= 1
+                double fm = f[0 * nd + nccc + q * sq];
+                double fp = f[0 * nd + nrcc + q * sq];
+                q1 -= (fp - fm) * dt;
+                #endif
+                #if DIM >= 2
+                double gm = f[1 * nd + nccc + q * sq];
+                double gp = f[1 * nd + ncrc + q * sq];
+                q1 -= (gp - gm) * dt;
+                #endif
+                #if DIM >= 3
+                double hm = f[2 * nd + nccc + q * sq];
+                double hp = f[2 * nd + nccr + q * sq];
+                q1 -= (hp - hm) * dt;
+                #endif
+
+                if (stm)
+                {
+                    q1 += stm[nccc + q * sq] * dt;
+                }
+
+                #if USE_RK == 1
+                if (rk != 0.0)
+                {
+                    q1 *= (1.0 - rk);
+                    q1 += rk * q0[q * sq];
+                }
+                #endif
+
+                qc[q * sq] = q1;
+            }
+        }
+    }
+    """
+
+    @kernel(code=update_cons_from_fluxes_code)
     def update_cons_from_fluxes(
         self,
-        qrk: NDArray[float],  # conserved masses (cached at time level n)
-        q: NDArray[float],  # conserved masses at RK sub-step
-        f: NDArray[float],  # intercell fluxes, already multiplied by face area
-        stm: NDArray[float],  # source terms (masses, not densities)
+        qrk: NDArray[float],
+        q: NDArray[float],
+        f: NDArray[float],
+        stm: NDArray[float],
         dt: float,
         rk: float,
         ni: int = None,
         nj: int = None,
         nk: int = None,
     ):
-        R"""
-        KERNEL void update_cons_from_fluxes(
-            double *qrk,
-            double *q,
-            double *f,
-            double *stm,
-            double dt,
-            double rk,
-            int ni,
-            int nj,
-            int nk)
-        {
-            int nq = NCONS;
-            int nd = ni * nj * nk * nq;
+        """
+        Update conserved quantities using pre-computed Godunov fluxes
 
-            #if TRANSPOSE == 0
-            #if DIM == 1
-            int si = nq;
-            int sq = 1;
-            #elif DIM == 2
-            int si = nq * nj;
-            int sj = nq;
-            int sq = 1;
-            #elif DIM == 3
-            int si = nq * nj * nk;
-            int sj = nq * nj;
-            int sk = nq;
-            int sq = 1;
-            #endif
-            #elif TRANSPOSE == 1
-            #if DIM == 1
-            int sq = ni;
-            int si = 1;
-            #elif DIM == 2
-            int sq = nj * ni;
-            int si = nj;
-            int sj = 1;
-            #elif DIM == 3
-            int sq = nk * nj * ni;
-            int si = nk * nj;
-            int sj = nk;
-            int sk = 1;
-            #endif
-            #endif
+        Parameters
+        ----------
 
-            #if DIM == 1
-            FOR_RANGE_1D(2, ni - 2)
-            #elif DIM == 2
-            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
-            #elif DIM == 3
-            FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
-            #endif
-            {
-                #if DIM == 1
-                int nccc = (i + 0) * si;
-                int nrcc = (i + 1) * si;
-                #elif DIM == 2
-                int nccc = (i + 0) * si + (j + 0) * sj;
-                int nrcc = (i + 1) * si + (j + 0) * sj;
-                int ncrc = (i + 0) * si + (j + 1) * sj;
-                #elif DIM == 3
-                int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
-                int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
-                int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
-                int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
-                #endif
+        qrk : `ndarray[(ni, nj, nk, ncons), float64]`
 
-                double *qc = &q[nccc];
-                #if USE_RK == 1
-                double *q0 = &qrk[nccc];
-                #endif
+            Read-only array of conserved variable charges, cached at the most
+            recent integer time level. May be `None` if `time_integration ==
+            "fwd"`.
 
-                for (int q = 0; q < NCONS; ++q)
-                {
-                    double q1 = qc[q * sq];
+            Strides must be `(ni, nj, nk, ncons)` if `data_layout ==
+            "fields-last"` or `(ncons, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
 
-                    #if DIM >= 1
-                    double fm = f[0 * nd + nccc + q * sq];
-                    double fp = f[0 * nd + nrcc + q * sq];
-                    q1 -= (fp - fm) * dt;
-                    #endif
-                    #if DIM >= 2
-                    double gm = f[1 * nd + nccc + q * sq];
-                    double gp = f[1 * nd + ncrc + q * sq];
-                    q1 -= (gp - gm) * dt;
-                    #endif
-                    #if DIM >= 3
-                    double hm = f[2 * nd + nccc + q * sq];
-                    double hp = f[2 * nd + nccr + q * sq];
-                    q1 -= (hp - hm) * dt;
-                    #endif
+            May be invalid in two layers of guard zones on each non-trivial
+            array axis.
 
-                    if (stm)
-                    {
-                        q1 += stm[nccc + q * sq] * dt;
-                    }
+        q : `ndarray[(ni, nj, nk, ncons), float64]`
 
-                    #if USE_RK == 1
-                    if (rk != 0.0)
-                    {
-                        q1 *= (1.0 - rk);
-                        q1 += rk * q0[q * sq];
-                    }
-                    #endif
+            Read-write array of conserved variable charges at the RK sub-step.
 
-                    qc[q * sq] = q1;
-                }
-            }
-        }
+            On input, must be valid in all zones including guard zones. On
+            output, will be invalid in two layers of guard zones on each
+            non-trivial array axis. Same layout policy as `qrk`.
+
+        f : `ndarray[(ni, nj, nk, dim, ncons), float64]`
+
+            Read-only array of Godunov fluxes, multiplied by face areas.
+
+            Strides must be `(dim, ni, nj, nk, ncons)` if `data_layout ==
+            "fields-last"` or `(dim, ncons, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
+
+            May be invalid in two layers of guard zones on the left and one
+            layer of guard zones at the right of each non-trivial array axis.
+
+        stm : `ndarray[(ni, nj, nk, ncons), float64]`
+
+            Read-only array of source terms.
+
+            May be `None`. Source terms must be volume-integrated and per unit
+            time (rate-of-charge). Same data layou ras `urd`.
+
+            May be invalid in two layers of guard zones on each non-trivial
+            array axis.
+
+        dt : `float64`
+
+           Time step size.
+
+        rk : `float64`
+
+           Runge-Kutta parameter.
+
+           Unused if `time_integration == "fwd"`. The formula used is: `qwr =
+           qrk * rk + (qwr + dq) * (1 - rk)` where `dq` is the time-difference
+           of the conserved charge.
         """
         dim = self._dim
         s = q.shape[:3]
@@ -1502,6 +1630,19 @@ def patch_solver(
         dt = yield PatchState(n, t, q1, interior_box, c2p_user, amax)
 
 
+def doc():
+    """
+    Return a dictionary of documented methods
+    """
+    return dict(
+        godunov_fluxes=Scheme.godunov_fluxes.__doc__,
+        update_cons=Scheme.update_cons.__doc__,
+        update_cons_from_fluxes=Scheme.update_cons_from_fluxes.__doc__,
+        patch_solver=dedent(patch_solver.__doc__),
+        make_solver=dedent(make_solver.__doc__),
+    )
+
+
 def native_code(config: Sailfish):
     """
     Return a list of native code strings used by kernel classes
@@ -1523,7 +1664,9 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     while True:
         state = solver.send(timestep)
         timestep = state.timestep(cfl_number)
+    ```
     """
+    logger = getLogger("sailfish")
 
     for kernel in (kernels := make_solver_kernels(config)):
         logger.info(f"using kernel {kernel_metadata(kernel)}")
