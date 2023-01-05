@@ -209,7 +209,7 @@ class CartesianCoordinates:
 
 
 class SphericalPolarCoordinates:
-    def _face_areas(self, r0, r1, q0, q1):
+    def _meridian(self, r0, r1, q0, q1):
         R0 = r0 * sin(q0)
         R1 = r1 * sin(q1)
         z0 = r0 * cos(q0)
@@ -233,13 +233,13 @@ class SphericalPolarCoordinates:
         q1 = q[:-1, +1:, :-1]
 
         if box.dimensionality == 1:
-            da_i = self._face_areas(r0, r0, q0, q1)
+            da_i = self._meridian(r0, r0, q0, q1)
             return tr(array([da_i]))
         if box.dimensionality == 2:
-            da_i = self._face_areas(r0, r0, q0, q1)
-            da_j = self._face_areas(r0, r1, q0, q0)
+            da_i = self._meridian(r0, r0, q0, q1)
+            da_j = self._meridian(r0, r1, q0, q0)
             return tr(array([da_i, da_j]))
-        else:
+        if box.dimensionality == 3:
             raise NotImplementedError
 
     def cell_volumes(self, box: CoordinateBox) -> NDArray[float]:

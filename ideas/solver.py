@@ -643,8 +643,8 @@ class Scheme:
         qrd: NDArray[float],
         qwr: NDArray[float],
         stm: NDArray[float],
+        face_areas: NDArray[float],
         dt: float,
-        dx: float,
         rk: float,
         plm_theta: float = None,
         ni: int = None,
@@ -660,8 +660,8 @@ class Scheme:
             double *qrd,
             double *qwr,
             double *stm,
+            double *face_areas,
             double dt,
-            double dx,
             double rk,
             double plm_theta,
             int ni,
@@ -736,6 +736,8 @@ class Scheme:
                 int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
                 #endif
 
+                int mccc = nccc / (TRANSPOSE ? 1 : nq); // index to face_areas (no fields)
+
                 #if DIM >= 1
                 _godunov_fluxes(prd + nccc, grd + 0 * nd + nccc, urd + nccc, fm, plm_theta, 1, si, sq);
                 _godunov_fluxes(prd + nrcc, grd + 0 * nd + nrcc, urd + nrcc, fp, plm_theta, 1, si, sq);
@@ -753,15 +755,18 @@ class Scheme:
                 {
                     int n = nccc + q * sq;
                     double dq = 0.0;
-
+                    double da;
                     #if DIM >= 1
-                    dq -= fp[q] - fm[q]; // TODO: multiply by face area
+                    da = face_areas[0 * nd + mccc];
+                    dq -= (fp[q] - fm[q]) * da;
                     #endif
                     #if DIM >= 2
-                    dq -= gp[q] - gm[q];
+                    da = face_areas[1 * nd + mccc];
+                    dq -= (gp[q] - gm[q]) * da;
                     #endif
                     #if DIM >= 3
-                    dq -= hp[q] - hm[q];
+                    da = face_areas[2 * nd + mccc];
+                    dq -= (hp[q] - hm[q]) * da;
                     #endif
 
                     dq *= dt;
@@ -786,7 +791,7 @@ class Scheme:
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, urd, grd, qrk, qrd, qwr, stm, dt, dx, rk, plm, *s)
+        return s[:dim], (prd, urd, grd, qrk, qrd, qwr, stm, face_areas, dt, rk, plm, *s)
 
     @kernel
     def update_cons_from_fluxes(
@@ -1283,7 +1288,7 @@ def patch_solver(
         rks = [0.0, 3.0 / 4.0, 1.0 / 3.0]
 
     # =========================================================================
-    # Arrays for grid geometry (TODO: these work only in 1d and cartesian geom)
+    # Arrays for grid geometry (TODO: don't compute these if trivial grid geometry)
     # =========================================================================
     coords = CartesianCoordinates()
     dv = space.create(xp.zeros, fields=1, data=coords.cell_volumes(box))
@@ -1360,6 +1365,7 @@ def patch_solver(
             q0[...] = q1[...]
 
         for rk in rks or [0.0]:
+
             u1 = q1 / dv
 
             if forcing is not None:
@@ -1372,7 +1378,7 @@ def patch_solver(
                 godunov_fluxes(p1, u1, g1, fh, da)
                 update_cons_from_fluxes(q0, q1, fh, stm, dt, rk)
             else:
-                update_cons(p1, u1, g1, q0, q1, q2, stm, dt, dx, rk)
+                update_cons(p1, u1, g1, q0, q1, q2, stm, da, dt, rk)
                 q1, q2 = q2, q1
 
             yield FillGuardZones(q1)
