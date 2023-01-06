@@ -242,6 +242,15 @@ class Sailfish:
     scheme: Scheme = Scheme()
     forcing: Forcing = None
 
+    def validate(self):
+        """ """
+        if (mdim := self.initial_data.dimensionality) != (
+            ddim := self.domain.dimensionality
+        ):
+            raise ValueError(
+                "domain and model dimensionality must match ({ddim} vs {mdim})"
+            )
+
 
 def parse_num_zones(arg):
     """
