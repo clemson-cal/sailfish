@@ -1270,6 +1270,15 @@ class Scheme:
             May be invalid in two layers of guard zones on each non-trivial
             array axis.
 
+        dv : `ndarray[(ni, nj, nk), float64]`
+
+            Read-only array of cell volumes.
+
+            Data layout must be `(ni, nj, nk)`.
+
+            May be invalid in two layers of guard zones on the left and the
+            right of each non-trivial array axis.
+
         dt : `float64`
 
            Time step size.
