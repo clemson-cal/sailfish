@@ -642,7 +642,7 @@ class Scheme:
         double *urd,
         double *grd,
         double *fwr,
-        double *face_areas,
+        double *da,
         double plm_theta,
         int ni,
         int nj,
@@ -700,35 +700,35 @@ class Scheme:
             int nc = i * si + j * sj + k * sk;
             #endif
 
-            double da;
+            double am;
 
             #if DIM >= 1
-            da = face_areas[(0 * nd + nc) / sf];
+            am = da[(0 * nd + nc) / sf];
 
             _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
             for (int q = 0; q < NCONS; ++q)
             {
-                fwr[0 * nd + nc + q * sq] = fm[q] * da;
+                fwr[0 * nd + nc + q * sq] = fm[q] * am;
             }
             #endif
 
             #if DIM >= 2
-            da = face_areas[(1 * nd + nc) / sf];
+            am = da[(1 * nd + nc) / sf];
 
             _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
             for (int q = 0; q < NCONS; ++q)
             {
-                fwr[1 * nd + nc + q * sq] = fm[q] * da;
+                fwr[1 * nd + nc + q * sq] = fm[q] * am;
             }
             #endif
 
             #if DIM >= 3
-            da = face_areas[(2 * nd + nc) / sf];
+            am = da[(2 * nd + nc) / sf];
 
             _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
             for (int q = 0; q < NCONS; ++q)
             {
-                fwr[2 * nd + nc + q * sq] = fm[q] * da;
+                fwr[2 * nd + nc + q * sq] = fm[q] * am;
             }
             #endif
         }
@@ -742,7 +742,7 @@ class Scheme:
         urd: NDArray[float],
         grd: NDArray[float],
         fwr: NDArray[float],
-        face_areas: NDArray[float],
+        da: NDArray[float],
         plm_theta: float = None,
         ni: int = None,
         nj: int = None,
@@ -768,9 +768,7 @@ class Scheme:
 
             Read-only array of conserved variable densities at RK sub-step.
 
-            NOW: required. SOON (implement trivial grid geometry): May be
-            `None` if `cache_prim is True` and the grid has a trivial geometry
-            (uniform cell volumes dv).
+            May be `None` if `cache_prim is True`.
 
             If given, must be valid in all zones including guard zones.
 
@@ -805,7 +803,7 @@ class Scheme:
             Will be invalid in two layers of guard zones on the left and one
             layer of guard zones at the right of each non-trivial array axis.
 
-        face_areas : `ndarray[(dim, ni, nj, nk), float64]`
+        da : `ndarray[(dim, ni, nj, nk), float64]`
 
             Read-only array of face areas.
 
@@ -817,7 +815,7 @@ class Scheme:
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, urd, grd, fwr, face_areas, plm, *s)
+        return s[:dim], (prd, urd, grd, fwr, da, plm, *s)
 
     """
     Native implementation of the update_cons kernel
@@ -825,13 +823,13 @@ class Scheme:
     update_cons_code = R"""
     KERNEL void update_cons(
         double *prd,
-        double *urd,
         double *grd,
-        double *qrk,
-        double *qrd,
-        double *qwr,
+        double *urk,
+        double *urd,
+        double *uwr,
         double *stm,
-        double *face_areas,
+        double *da,
+        double *dv,
         double dt,
         double rk,
         double plm_theta,
@@ -924,39 +922,39 @@ class Scheme:
             for (int q = 0; q < NCONS; ++q)
             {
                 int n = nccc + q * sq;
-                double dq = 0.0;
+                double du = 0.0;
                 double am;
                 double ap;
 
                 #if DIM >= 1
-                am = face_areas[(0 * nd + nccc) / sf];
-                ap = face_areas[(0 * nd + nrcc) / sf];
-                dq -= fp[q] * ap - fm[q] * am;
+                am = da[(0 * nd + nccc) / sf];
+                ap = da[(0 * nd + nrcc) / sf];
+                du -= fp[q] * ap - fm[q] * am;
                 #endif
                 #if DIM >= 2
-                am = face_areas[(1 * nd + nccc) / sf];
-                ap = face_areas[(1 * nd + ncrc) / sf];
-                dq -= gp[q] * ap - gm[q] * am;
+                am = da[(1 * nd + nccc) / sf];
+                ap = da[(1 * nd + ncrc) / sf];
+                du -= gp[q] * ap - gm[q] * am;
                 #endif
                 #if DIM >= 3
-                am = face_areas[(2 * nd + nccc) / sf];
-                ap = face_areas[(2 * nd + nccr) / sf];
-                dq -= hp[q] * ap - hm[q] * am;
+                am = da[(2 * nd + nccc) / sf];
+                ap = da[(2 * nd + nccr) / sf];
+                du -= hp[q] * ap - hm[q] * am;
                 #endif
 
                 if (stm)
                 {
-                    dq += stm[n];
+                    du += stm[n];
                 }
 
-                dq *= dt;
-                qwr[n] = qrd[n] + dq;
+                du *= dt / dv[n / sf];
+                uwr[n] = urd[n] + du;
 
                 #if USE_RK == 1
                 if (rk != 0.0)
                 {
-                    qwr[n] *= (1.0 - rk);
-                    qwr[n] += rk * qrk[n];
+                    uwr[n] *= (1.0 - rk);
+                    uwr[n] += rk * urk[n];
                 }
                 #endif
             }
@@ -968,13 +966,13 @@ class Scheme:
     def update_cons(
         self,
         prd: NDArray[float],
-        urd: NDArray[float],
         grd: NDArray[float],
-        qrk: NDArray[float],
-        qrd: NDArray[float],
-        qwr: NDArray[float],
+        urk: NDArray[float],
+        urd: NDArray[float],
+        uwr: NDArray[float],
         stm: NDArray[float],
-        face_areas: NDArray[float],
+        da: NDArray[float],
+        dv: NDArray[float],
         dt: float,
         rk: float,
         plm_theta: float = None,
@@ -998,20 +996,6 @@ class Scheme:
 
             If given, must be valid in all zones including guard zones.
 
-        urd : `ndarray[(ni, nj, nk, ncons), float64]`
-
-            Read-only array of conserved variable densities at RK sub-step.
-
-            NOW: required. SOON (implement trivial grid geometry): May be
-            `None` if `cache_prim is True` and the grid has a trivial geometry
-            (uniform cell volumes dv).
-
-            If given, must be valid in all zones including guard zones.
-
-            Strides must be `(ni, nj, nk, ncons)` if `data_layout ==
-            "fields-last"` or `(ncons, ni, nj, nk)` if `data_layout ==
-            "fields-first"`.
-
         grd : `ndarray[(ni, nj, nk, dim, ncons), float64]`
 
             Read-only array of primitive variable scaled gradients.
@@ -1031,30 +1015,30 @@ class Scheme:
             "fields-last"` or `(dim, nprim, ni, nj, nk)` if `data_layout ==
             "fields-first"`.
 
-        qrk : `ndarray[(ni, nj, nk, ncons), float64]`
+        urk : `ndarray[(ni, nj, nk, ncons), float64]`
 
-            Read-only array of conserved variable charges, cached at the most
-            recent integer time level. May be `None` if `time_integration ==
-            "fwd"`. Same layout policy as `urd`.
+            Read-only array of conserved variable densities, cached at the
+            most recent integer time level. May be `None` if `time_integration
+            == "fwd"`. Same layout policy as `urd`.
 
             May be invalid in two layers of guard zones on each non-trivial
             array axis.
 
-        qrd : `ndarray[(ni, nj, nk, ncons), float64]`
+        urd : `ndarray[(ni, nj, nk, ncons), float64]`
 
-            Read-only array of conserved variable charges at the RK sub-step.
-            Same layout policy as `urd`.
+            Read-only array of conserved variable densities at the RK
+            sub-step. Same layout policy as `urd`.
 
-            Required. If `urd` is given, then it must be `urd = qrd / dv`
+            Required. If `urd` is given, then it must be `urd = urd / dv`
             where `dv` is an array of local cell volumes. Same layout policy
             as `urd`.
 
             May be invalid in two layers of guard zones on each non-trivial
             array axis.
 
-        qwr : `ndarray[(ni, nj, nk, ncons), float64]`
+        uwr : `ndarray[(ni, nj, nk, ncons), float64]`
 
-            Write-only array of conserved variable charges, updated by `dt`.
+            Write-only array of conserved variable densities, updated by `dt`.
             Same layout policy as `urd`.
 
             Will be invalid in two layers of guard zones on each non-trivial
@@ -1065,12 +1049,12 @@ class Scheme:
             Read-only array of source terms.
 
             May be `None`. Source terms must be volume-integrated and per unit
-            time (rate-of-charge). Same data layou ras `urd`.
+            time (rate-of-charge). Same data layout as `urd`.
 
             May be invalid in two layers of guard zones on each non-trivial
             array axis.
 
-        face_areas : `ndarray[(ni, nj, nk, dim), float64]`
+        da : `ndarray[(ni, nj, nk, dim), float64]`
 
             Read-only array of face areas.
 
@@ -1078,6 +1062,15 @@ class Scheme:
 
             May be invalid in two layers of guard zones on the left and one
             layer of guard zones at the right of each non-trivial array axis.
+
+        dv : `ndarray[(ni, nj, nk), float64]`
+
+            Read-only array of cell volumes.
+
+            Data layout must be `(ni, nj, nk)`.
+
+            May be invalid in two layers of guard zones on the left and the
+            right of each non-trivial array axis.
 
         dt : `float64`
 
@@ -1087,24 +1080,25 @@ class Scheme:
 
            Runge-Kutta parameter.
 
-           Unused if `time_integration == "fwd"`. The formula used is: `qwr =
-           qrk * rk + (qwr + dq) * (1 - rk)` where `dq` is the time-difference
-           of the conserved charge.
+           Unused if `time_integration == "fwd"`. The formula used is: `uwr =
+           urk * rk + (uwr + du) * (1 - rk)` where `du` is the time-difference
+           of the conserved density.
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, urd, grd, qrk, qrd, qwr, stm, face_areas, dt, rk, plm, *s)
+        return s[:dim], (prd, grd, urk, urd, uwr, stm, da, dv, dt, rk, plm, *s)
 
     """
     Native implementation of the update_cons_from_fluxes_code kernel
     """
     update_cons_from_fluxes_code = R"""
     KERNEL void update_cons_from_fluxes(
-        double *qrk,
+        double *urk,
         double *q,
         double *f,
         double *stm,
+        double *dv,
         double dt,
         double rk,
         int ni,
@@ -1143,6 +1137,7 @@ class Scheme:
         int sk = 1;
         #endif
         #endif
+        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
 
         #if DIM == 1
         FOR_RANGE_1D(2, ni - 2)
@@ -1166,48 +1161,48 @@ class Scheme:
             int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
             #endif
 
-            double *qc = &q[nccc];
+            double *uc = &q[nccc];
             #if USE_RK == 1
-            double *q0 = &qrk[nccc];
+            double *u0 = &urk[nccc];
             #endif
 
             for (int q = 0; q < NCONS; ++q)
             {
-                double dq = 0.0;
+                double du = 0.0;
 
                 #if DIM >= 1
                 double fm = f[0 * nd + nccc + q * sq];
                 double fp = f[0 * nd + nrcc + q * sq];
-                dq -= fp - fm;
+                du -= fp - fm;
                 #endif
                 #if DIM >= 2
                 double gm = f[1 * nd + nccc + q * sq];
                 double gp = f[1 * nd + ncrc + q * sq];
-                dq -= gp - gm;
+                du -= gp - gm;
                 #endif
                 #if DIM >= 3
                 double hm = f[2 * nd + nccc + q * sq];
                 double hp = f[2 * nd + nccr + q * sq];
-                dq -= hp - hm;
+                du -= hp - hm;
                 #endif
 
                 if (stm)
                 {
-                    dq += stm[nccc + q * sq];
+                    du += stm[nccc + q * sq];
                 }
 
-                dq *= dt;
-                double q1 = qc[q * sq] + dq;
+                du *= dt / dv[nccc / sf];
+                double u1 = uc[q * sq] + du;
 
                 #if USE_RK == 1
                 if (rk != 0.0)
                 {
-                    q1 *= (1.0 - rk);
-                    q1 += rk * q0[q * sq];
+                    u1 *= (1.0 - rk);
+                    u1 += rk * u0[q * sq];
                 }
                 #endif
 
-                qc[q * sq] = q1;
+                uc[q * sq] = u1;
             }
         }
     }
@@ -1216,10 +1211,11 @@ class Scheme:
     @kernel(code=update_cons_from_fluxes_code)
     def update_cons_from_fluxes(
         self,
-        qrk: NDArray[float],
+        urk: NDArray[float],
         q: NDArray[float],
         f: NDArray[float],
         stm: NDArray[float],
+        dv: NDArray[float],
         dt: float,
         rk: float,
         ni: int = None,
@@ -1232,7 +1228,7 @@ class Scheme:
         Parameters
         ----------
 
-        qrk : `ndarray[(ni, nj, nk, ncons), float64]`
+        urk : `ndarray[(ni, nj, nk, ncons), float64]`
 
             Read-only array of conserved variable charges, cached at the most
             recent integer time level. May be `None` if `time_integration ==
@@ -1251,7 +1247,7 @@ class Scheme:
 
             On input, must be valid in all zones including guard zones. On
             output, will be invalid in two layers of guard zones on each
-            non-trivial array axis. Same layout policy as `qrk`.
+            non-trivial array axis. Same layout policy as `urk`.
 
         f : `ndarray[(ni, nj, nk, dim, ncons), float64]`
 
@@ -1282,13 +1278,13 @@ class Scheme:
 
            Runge-Kutta parameter.
 
-           Unused if `time_integration == "fwd"`. The formula used is: `qwr =
-           qrk * rk + (qwr + dq) * (1 - rk)` where `dq` is the time-difference
+           Unused if `time_integration == "fwd"`. The formula used is: `uwr =
+           urk * rk + (uwr + du) * (1 - rk)` where `du` is the time-difference
            of the conserved charge.
         """
         dim = self._dim
         s = q.shape[:3]
-        return s[:dim], (qrk, q, f, stm, dt, rk, *s)
+        return s[:dim], (urk, q, f, stm, dv, dt, rk, *s)
 
 
 def apply_bc(
@@ -1627,12 +1623,11 @@ def patch_solver(
     del primitive
     yield FillGuardZones(p)
 
-    def c2p_user(q):
+    def c2p_user(u):
         """
         Return primitives in standard layout host memory and with no guards
         """
         p = space.create(xp.zeros, fields=nprim)
-        u = q / dv
         cons_to_prim(u, p)
 
         try:
@@ -1640,11 +1635,10 @@ def patch_solver(
         except AttributeError:
             return p[space.interior]
 
-    def amax(q):
+    def amax(u):
         """
         Return the maximum wavespeed on this grid patch (guard zones excluded)
         """
-        u = q / dv
         max_wavespeeds(u, a)
         return a[space.interior].max()
 
@@ -1678,9 +1672,9 @@ def patch_solver(
     # Array of cached Runge-Kutta conserved fields
     # =========================================================================
     if rks:
-        q0 = space.create(xp.zeros, fields=ncons)  # RK cons
+        u0 = space.create(xp.zeros, fields=ncons)  # RK cons
     else:
-        q0 = None
+        u0 = None
 
     # =========================================================================
     # Arrays for either read-only and write-only conserved arrays if
@@ -1689,17 +1683,14 @@ def patch_solver(
     # =========================================================================
     if cache_flux:
         fh = space.create(xp.zeros, fields=ncons, vectors=dim)
-        q1 = space.create(xp.zeros, fields=ncons)
-        prim_to_cons(p, q1)
-        q1 *= dv
+        u1 = space.create(xp.zeros, fields=ncons)
+        prim_to_cons(p, u1)
     else:
         p1 = p if cache_prim else None
-        q1 = space.create(xp.zeros, fields=ncons)
-        q2 = space.create(xp.zeros, fields=ncons)
-        prim_to_cons(p, q1)
-        prim_to_cons(p, q2)
-        q1 *= dv
-        q2 *= dv
+        u1 = space.create(xp.zeros, fields=ncons)
+        u2 = space.create(xp.zeros, fields=ncons)
+        prim_to_cons(p, u1)
+        prim_to_cons(p, u2)
 
     # =========================================================================
     # Array for the primitive fields if primitives or gradients are cached
@@ -1728,25 +1719,22 @@ def patch_solver(
         stm = None
 
     if (forcing := config.forcing) is not None:
-        qdr = space.create(xp.zeros, fields=ncons)
+        udr = space.create(xp.zeros, fields=ncons)
         pdr = space.create(xp.zeros, fields=nprim, data=initial_prim(box))
         rdr = space.create(xp.zeros, fields=1, data=forcing.rate_array(box))
-        prim_to_cons(pdr, qdr)
-        qdr *= dv
+        prim_to_cons(pdr, udr)
         del pdr
 
-    dt = yield PatchState(n, t, q1, interior_box, c2p_user, amax)
+    dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 
     # =========================================================================
     # Main loop: yield states until the caller stops calling next
     # =========================================================================
     while True:
         if rks:
-            q0[...] = q1[...]
+            u0[...] = u1[...]
 
         for rk in rks or [0.0]:
-            u1 = q1 / dv
-
             if stm is not None:
                 stm[...] = 0.0
 
@@ -1754,26 +1742,29 @@ def patch_solver(
                 cons_to_prim(u1, p1)
 
             if forcing is not None:
-                stm += (qdr - q1) * rdr
+                stm += (udr - u1) * rdr * dv
 
             if coords.needs_geometrical_source_terms:
-                assert p1 is not None
+                if p1 is None:
+                    raise ValueError(
+                        "need --cache-prim if geometric source terms (for now)"
+                    )
                 geometric_source_terms(p1, xv, stm)
 
             if cache_grad:
                 plm_gradient(p1, g1)
             if cache_flux:
                 godunov_fluxes(p1, u1, g1, fh, da)
-                update_cons_from_fluxes(q0, q1, fh, stm, dt, rk)
+                update_cons_from_fluxes(u0, u1, fh, stm, dv, dt, rk)
             else:
-                update_cons(p1, u1, g1, q0, q1, q2, stm, da, dt, rk)
-                q1, q2 = q2, q1
+                update_cons(p1, g1, u0, u1, u2, stm, da, dv, dt, rk)
+                u1, u2 = u2, u1
 
-            yield FillGuardZones(q1)
+            yield FillGuardZones(u1)
 
         t += dt
         n += 1
-        dt = yield PatchState(n, t, q1, interior_box, c2p_user, amax)
+        dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 
 
 def doc():
