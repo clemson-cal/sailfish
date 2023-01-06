@@ -346,6 +346,20 @@ class SourceTerms:
         self._dim = config.domain.dimensionality
         self._nprim = len(config.initial_data.primitive_fields)
         self._transpose = config.strategy.transpose
+        self._cache_prim = config.strategy.cache_prim
+
+        if config.physics.metric == "newtonian":
+            hydro_lib = __import__("lib_euler")
+        if config.physics.metric == "minkowski":
+            hydro_lib = __import__("lib_srhd")
+
+        device_funcs = list()
+        device_funcs.append(hydro_lib.source_terms_spherical_polar)
+
+        if not self._cache_prim:
+            device_funcs.append(hydro_lib.cons_to_prim)
+
+        self._device_funcs = device_funcs
 
     @property
     def define_macros(self):
@@ -353,18 +367,18 @@ class SourceTerms:
             DIM=self._dim,
             NPRIM=self._nprim,
             TRANSPOSE=int(self._transpose),
+            CACHE_PRIM=int(self._cache_prim),
         )
 
     @property
     def device_funcs(self):
-        from lib_euler import source_terms_spherical_polar
-
-        return [source_terms_spherical_polar]
+        return self._device_funcs
 
     @kernel
     def geometric_source_terms(
         self,
         p: NDArray[float],
+        u: NDArray[float],
         x: NDArray[float],
         s: NDArray[float],
         ni: int = None,
@@ -372,7 +386,7 @@ class SourceTerms:
         nk: int = None,
     ):
         R"""
-        KERNEL void geometric_source_terms(double *p, double *x, double *s, int ni, int nj, int nk)
+        KERNEL void geometric_source_terms(double *p, double *u, double *x, double *s, int ni, int nj, int nk)
         {
             int nq = NCONS;
             int nd = ni * nj * nk * nq;
@@ -439,10 +453,24 @@ class SourceTerms:
                 double pc[NPRIM];
                 double sc[NCONS];
 
+                #if CACHE_PRIM == 1
+
                 for (int q = 0; q < NPRIM; ++q)
                 {
                     pc[q] = p[nccc + q * sq];
                 }
+
+                #elif CACHE_PRIM == 0
+
+                double uc[NPRIM];
+
+                for (int q = 0; q < NPRIM; ++q)
+                {
+                    uc[q] = u[nccc + q * sq];
+                }
+                cons_to_prim(uc, pc);
+                #endif
+
                 source_terms_spherical_polar(x0, x1, 0.0, 0.0, pc, sc);
 
                 for (int q = 0; q < NPRIM; ++q)
@@ -454,7 +482,7 @@ class SourceTerms:
         """
         dim = self._dim
         shape = s.shape[:3]
-        return shape[:dim], (p, x, s, *shape)
+        return shape[:dim], (p, u, x, s, *shape)
 
 
 @kernel_class
@@ -1754,11 +1782,7 @@ def patch_solver(
                 stm += (udr - u1) * rdr * dv
 
             if coords.needs_geometrical_source_terms:
-                if p1 is None:
-                    raise ValueError(
-                        "need --cache-prim if geometric source terms (for now)"
-                    )
-                geometric_source_terms(p1, xv, stm)
+                geometric_source_terms(p1, u1, xv, stm)
 
             if cache_grad:
                 plm_gradient(p1, g1)
