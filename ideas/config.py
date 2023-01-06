@@ -168,12 +168,12 @@ BoundaryConditionType = Literal["outflow", "periodic", "reflecting"]
 
 @schema
 class BoundaryCondition:
-    lower_i: BoundaryConditionType = "outflow"
-    upper_i: BoundaryConditionType = "outflow"
-    lower_j: BoundaryConditionType = "outflow"
-    upper_j: BoundaryConditionType = "outflow"
-    lower_k: BoundaryConditionType = "outflow"
-    upper_k: BoundaryConditionType = "outflow"
+    lower_i: BoundaryConditionType = None
+    upper_i: BoundaryConditionType = None
+    lower_j: BoundaryConditionType = None
+    upper_j: BoundaryConditionType = None
+    lower_k: BoundaryConditionType = None
+    upper_k: BoundaryConditionType = None
 
 
 @schema

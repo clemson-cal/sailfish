@@ -1822,6 +1822,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
 
     for (i0, i1), box in config.domain.decompose(num_patches):
         space = IndexSpace(box.num_zones, guard=2, layout=strategy.data_layout)
+        extended_box = box.extend(2)
 
         if checkpoint:
             t = checkpoint["time"]
@@ -1830,13 +1831,11 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         else:
             t = 0.0
             n = 0
-            # p = initial_prim(box)
-        b = box.extend(2)
-        p = initial_prim(b)
-        p = space.create(zeros, fields=nprim, data=p)
+            p = initial_prim(extended_box)
 
+        p = space.create(zeros, fields=nprim, data=p)
         stream = make_stream(hardware, gpu_streams)
-        solver = patch_solver(p, t, n, b, space, kernels, config)
+        solver = patch_solver(p, t, n, extended_box, space, kernels, config)
         streams.append(stream)
         solvers.append(solver)
 
@@ -1855,5 +1854,5 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
             if type(events[0]) is PatchState:
                 timestep = yield State(config.domain, events)
 
-            # elif type(events[0]) is FillGuardZones:
-            #    fill_guard_zones([e.array for e in events], boundary)
+            elif type(events[0]) is FillGuardZones:
+                fill_guard_zones([e.array for e in events], boundary)
