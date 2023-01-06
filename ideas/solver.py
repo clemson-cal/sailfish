@@ -443,7 +443,7 @@ class SourceTerms:
                 {
                     pc[q] = p[nccc + q * sq];
                 }
-                source_terms_spherical_polar(x0, x1, 0.5 * M_PI - 0.1, 0.5 * M_PI + 0.1, pc, sc); // TODO: polar extent
+                source_terms_spherical_polar(x0, x1, 0.5 * M_PI - 1e-6, 0.5 * M_PI + 1e-6, pc, sc); // TODO: polar extent
 
                 for (int q = 0; q < NPRIM; ++q)
                 {
