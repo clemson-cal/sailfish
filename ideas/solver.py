@@ -14,7 +14,12 @@ from numpy.typing import NDArray
 
 from kernels import kernel, kernel_class, device, kernel_metadata
 from config import Sailfish, Strategy, Reconstruction, BoundaryCondition
-from geometry import CoordinateBox, CartesianCoordinates, SphericalPolarCoordinates
+from geometry import (
+    CoordinateBox,
+    CartesianCoordinates,
+    SphericalPolarCoordinates,
+    CylindricalPolarCoordinates,
+)
 from index_space import IndexSpace
 
 
@@ -354,7 +359,12 @@ class SourceTerms:
             hydro_lib = __import__("lib_srhd")
 
         device_funcs = list()
-        device_funcs.append(hydro_lib.source_terms_spherical_polar)
+        if config.coordinates == "spherical-polar":
+            self._coords = 1
+            device_funcs.append(hydro_lib.source_terms_spherical_polar)
+        if config.coordinates == "cylindrical-polar":
+            self._coords = 2
+            device_funcs.append(hydro_lib.source_terms_cylindrical_polar)
 
         if not self._cache_prim:
             device_funcs.append(hydro_lib.cons_to_prim)
@@ -368,6 +378,7 @@ class SourceTerms:
             NPRIM=self._nprim,
             TRANSPOSE=int(self._transpose),
             CACHE_PRIM=int(self._cache_prim),
+            COORDS=self._coords,
         )
 
     @property
@@ -425,6 +436,21 @@ class SourceTerms:
             #if DIM == 1
             int nccc = (i + 0) * si;
             int nrcc = (i + 1) * si;
+
+            #elif DIM == 2
+            int nccc = (i + 0) * si + (j + 0) * sj;
+            int nrcc = (i + 1) * si + (j + 0) * sj;
+            int ncrc = (i + 0) * si + (j + 1) * sj;
+
+            #elif DIM == 3
+            int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+            int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+            int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+            int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+            #endif
+
+            #if COORDS == 1 // spherical polar
+            #if DIM == 1
             double x0 = x[(0 * nd + nccc) / sf];
             double x1 = x[(0 * nd + nrcc) / sf];
             double y0 = 0.0;
@@ -433,9 +459,6 @@ class SourceTerms:
             double z1 = 2.0 * M_PI;
 
             #elif DIM == 2
-            int nccc = (i + 0) * si + (j + 0) * sj;
-            int nrcc = (i + 1) * si + (j + 0) * sj;
-            int ncrc = (i + 0) * si + (j + 1) * sj;
             double x0 = x[(0 * nd + nccc) / sf];
             double x1 = x[(0 * nd + nrcc) / sf];
             double y0 = x[(1 * nd + nccc) / sf];
@@ -444,10 +467,6 @@ class SourceTerms:
             double z1 = 2.0 * M_PI;
 
             #elif DIM == 3
-            int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
-            int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
-            int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
-            int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
             double x0 = x[(0 * nd + nccc) / sf];
             double x1 = x[(0 * nd + nrcc) / sf];
             double y0 = x[(1 * nd + nccc) / sf];
@@ -455,6 +474,35 @@ class SourceTerms:
             double z0 = x[(2 * nd + nccc) / sf];
             double z1 = x[(2 * nd + nccr) / sf];
             #endif
+
+            #elif COORDS == 2 // cylindrical polar
+            #if DIM == 1
+            double x0 = x[(0 * nd + nccc) / sf];
+            double x1 = x[(0 * nd + nrcc) / sf];
+            double y0 = 0.0;
+            double y1 = 2.0 * M_PI;
+            double z0 = 0.0;
+            double z1 = 1.0;
+
+            #elif DIM == 2
+            double x0 = x[(0 * nd + nccc) / sf];
+            double x1 = x[(0 * nd + nrcc) / sf];
+            double y0 = 0.0;
+            double y1 = 2.0 * M_PI;
+            double z0 = x[(1 * nd + nccc) / sf];
+            double z1 = x[(1 * nd + ncrc) / sf];
+
+            #elif DIM == 3
+            double x0 = x[(0 * nd + nccc) / sf];
+            double x1 = x[(0 * nd + nrcc) / sf];
+            double y0 = x[(1 * nd + nccc) / sf];
+            double y1 = x[(1 * nd + ncrc) / sf];
+            double z0 = x[(2 * nd + nccc) / sf];
+            double z1 = x[(2 * nd + nccr) / sf];
+            #endif
+            #else
+            #error("COORDS must be either 1 (spherical) or 2 (cylindrical)")
+            #endif // COORDS
 
             double pc[NPRIM];
             double sc[NCONS];
@@ -476,7 +524,11 @@ class SourceTerms:
             cons_to_prim(uc, pc);
             #endif
 
+            #if COORDS == 1
             source_terms_spherical_polar(x0, x1, y0, y1, z0, z1, pc, sc);
+            #elif COORDS == 2
+            source_terms_cylindrical_polar(x0, x1, y0, y1, z0, z1, pc, sc);
+            #endif
 
             for (int q = 0; q < NPRIM; ++q)
             {
@@ -1779,6 +1831,8 @@ def patch_solver(
         coords = CartesianCoordinates()
     if config.coordinates == "spherical-polar":
         coords = SphericalPolarCoordinates()
+    if config.coordinates == "cylindrical-polar":
+        coords = CylindricalPolarCoordinates()
 
     dv = space.create(xp.zeros, fields=1, data=coords.cell_volumes(box))
     da = space.create(xp.zeros, vectors=dim, data=coords.face_areas(box))

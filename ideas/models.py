@@ -105,7 +105,7 @@ def uniform1d():
         "initial_data.dimensionality": 1,
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
-        "coordinates": "spherical-polar",
+        "coordinates": "cylindrical-polar",
         "driver.tfinal": 0.1,
     }
 

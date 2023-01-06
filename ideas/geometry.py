@@ -309,3 +309,88 @@ class SphericalPolarCoordinates:
             return tr(array([r, q]))
         if box.dimensionality == 3:
             return tr(array([r, q, f]))
+
+
+class CylindricalPolarCoordinates:
+    """
+    Cylindrical-polar curvilinear coordinates
+
+    Geometry formulas are provided for:
+
+    - 1d in the cylindrical radius (r) (num_zones = [ni, 1, 1])
+    - 2d in the r-z plane (num_zones = [ni, 1, nk])
+    - 3d in r-f-z (num_zones = [ni, nj, nk])
+
+    Support for 2d cylindrical coordinates in the r-f plane may be added in
+    the future.
+    """
+
+    needs_geometrical_source_terms = True
+
+    def _check_box(self, box: CoordinateBox):
+        if box.dimensionality == 2 and box.num_zones[1] != 0:
+            raise ValueError("2d cylindrical-polar coordinates only supports r-z")
+
+    def face_areas(self, box: CoordinateBox) -> NDArray[float]:
+        """
+        Return an array of the face areas for the given box
+
+        The shape of the returned array is (ni, nj, nk, dim) where dim is the
+        box dimensionality.
+        """
+        self._check_box(box)
+
+        tr = lambda arr: arr.transpose(1, 2, 3, 0)
+        r, f, z = box.cell_vertices(dim=3)
+        r0 = r[:-1, :-1, :-1]
+        r1 = r[+1:, :-1, :-1]
+        f0 = f[:-1, :-1, :-1]
+        f1 = f[:-1, +1:, :-1]
+        z0 = z[:-1, :-1, :-1]
+        z1 = z[:-1, :-1, +1:]
+
+        if box.dimensionality == 1:
+            da_i = 2.0 * pi * r0
+            return tr(array([da_i]))
+        if box.dimensionality == 2:
+            da_i = 2.0 * pi * r0 * (z1 - z0)
+            da_j = pi * (r1**2 - r0**2)
+            return tr(array([da_i, da_j]))
+        if box.dimensionality == 3:
+            raise NotImplementedError
+
+    def cell_volumes(self, box: CoordinateBox) -> NDArray[float]:
+        """
+        Return an array of the cell volume data for the given coordinate box
+
+        The shape of the returned array is (ni, nj, nk).
+        """
+        self._check_box(box)
+
+        r, f, z = box.cell_vertices(dim=3)
+        r0 = r[:-1, :-1, :-1]
+        r1 = r[+1:, :-1, :-1]
+        f0 = f[:-1, :-1, :-1]
+        f1 = f[:-1, +1:, :-1]
+        z0 = z[:-1, :-1, :-1]
+        z1 = z[:-1, :-1, +1:]
+
+        if box.dimensionality == 1:
+            return (r1**2 - r0**2) * pi
+        if box.dimensionality == 2:
+            return (r1**2 - r0**2) * (z1 - z0) * pi
+        if box.dimensionality == 3:
+            return (r1**2 - r0**2) * (z1 - z0) * 0.5 * (f1 - f0)
+
+    def cell_vertices(self, box: CoordinateBox) -> NDArray[float]:
+        self._check_box(box)
+
+        tr = lambda arr: arr.transpose(1, 2, 3, 0)
+        r, f, z = box.cell_vertices(dim=3, drop_final=True)
+
+        if box.dimensionality == 1:
+            return tr(array([r]))
+        if box.dimensionality == 2:
+            return tr(array([r, z]))
+        if box.dimensionality == 3:
+            return tr(array([r, f, z]))

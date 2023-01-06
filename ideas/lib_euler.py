@@ -325,39 +325,38 @@ def source_terms_spherical_polar():
         //
         // https://iopscience.iop.org/article/10.1086/500792/pdf
 
-        double dcosq = cos(q1) - cos(q0);
-        double dsinq = sin(q1) - sin(q0);
         double dr2 = r1 * r1 - r0 * r0;
         double df = f1 - f0;
 
         #if NVECS == 1
+        double dcosq = cos(q1) - cos(q0);
         double dg = prim[0];
-        double ur = prim[1];
         double uq = 0.0;
         double uf = 0.0;
         double pg = prim[2];
         double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
-
         source[0] = 0.0;
         source[1] = srdot;
         source[2] = 0.0;
 
         #elif NVECS == 2
+        double dcosq = cos(q1) - cos(q0);
+        double dsinq = sin(q1) - sin(q0);
         double dg = prim[0];
         double ur = prim[1];
         double uq = prim[2];
         double uf = 0.0;
         double pg = prim[3];
-
         double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
         double sqdot = +0.5 * df * dr2 * (dcosq * dg * ur * uq + dsinq * (pg + dg * uf * uf));
-
         source[0] = 0.0;
         source[1] = srdot;
         source[2] = sqdot;
         source[3] = 0.0;
 
         #elif NVECS == 3
+        double dcosq = cos(q1) - cos(q0);
+        double dsinq = sin(q1) - sin(q0);
         double dg = prim[0];
         double ur = prim[1];
         double uq = prim[2];
@@ -366,7 +365,6 @@ def source_terms_spherical_polar():
         double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
         double sqdot = +0.5 * df * dr2 * (dcosq * dg * ur * uq + dsinq * (pg + dg * uf * uf));
         double sfdot = -0.5 * df * dr2 * dg * uf * (uq * dsinq - ur * dcosq);
-
         source[0] = 0.0;
         source[1] = srdot;
         source[2] = sqdot;
@@ -393,51 +391,40 @@ def source_terms_cylindrical_polar():
         //
         // https://iopscience.iop.org/article/10.1086/500792/pdf
 
-        // UNFINISHED!
-
         #if NVECS == 1
-        // assumes 2 pi azimuth and unit z-extent
-        // ------------------------------------------------------
         double dg = prim[0];
+        double uf = 0.0;
         double pg = prim[2];
-        double srdot = -2.0 * M_PI * (r1 - r0) * (p + dg * uf * uf);
-
+        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
         source[0] = 0.0;
         source[1] = srdot;
         source[2] = 0.0;
 
         #elif NVECS == 2
-        // assumes 2 pi azimuth (r-z plane)
-        // ------------------------------------------------------
         double dg = prim[0];
         double ur = prim[1];
         double uf = prim[2];
         double pg = prim[3];
-        double srdot = +2.0 * M_PI * (r1 - r0) * (z1 - z0) * (p + dg * uf * uf);
-        double sfdot = -2.0 * M_PI * (r1 - r0) * (z1 - z0) * ur * uf;
-
+        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
+        double sfdot = -(f1 - f0) * (r1 - r0) * (z1 - z0) * ur * uf;
         source[0] = 0.0;
         source[1] = srdot;
-        source[2] = sfdot;
+        source[2] = sqdot;
         source[3] = 0.0;
 
         #elif NVECS == 3
-        // all coordinates are used
-        // ------------------------------------------------------
         double dg = prim[0];
         double ur = prim[1];
         double uf = prim[2];
         double pg = prim[4];
-
-        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (p + dg * uf * uf);
+        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
         double sfdot = -(f1 - f0) * (r1 - r0) * (z1 - z0) * ur * uf;
-
+        double szdot = 0.0;
         source[0] = 0.0;
         source[1] = srdot;
-        source[2] = sfdot;
-        source[3] = 0.0;
+        source[2] = sqdot;
+        source[3] = szdot;
         source[4] = 0.0;
-
         #endif
     }
     """
