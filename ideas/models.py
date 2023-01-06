@@ -67,19 +67,24 @@ class Star:
     """
 
     model: Literal["star"] = "star"
-
-    @property
-    def dimensionality(self):
-        return 1
+    dimensionality: int = 1
 
     @property
     def primitive_fields(self):
-        return "density", "r-velocity", "pressure"
+        if self.dimensionality == 1:
+            return "density", "r-velocity", "pressure"
+        if self.dimensionality == 2:
+            return "density", "r-velocity", "q-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        x = box.cell_centers()
-        p = zeros(x.shape + (3,))
-        p[...] = [1.0, 0.0, 1.0]
+        if self.dimensionality == 1:
+            r = box.cell_centers()
+            p = zeros(r.shape + (3,))
+            p[...] = [1.0, 0.0, 1.0]
+        if self.dimensionality == 2:
+            r, q = box.cell_centers()
+            p = zeros(r.shape + (4,))
+            p[...] = [1.0, 0.0, 0.0, 1.0]
         return p
 
 
@@ -87,8 +92,22 @@ class Star:
 def star():
     return {
         "initial_data.model": "star",
+        "initial_data.dimensionality": 1,
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
+        "coordinates": "spherical-polar",
+        "driver.tfinal": 0.1,
+    }
+
+
+@preset
+def star2d():
+    return {
+        "initial_data.model": "star",
+        "initial_data.dimensionality": 2,
+        "domain.num_zones": [200, 200, 1],
+        "domain.extent_i": [1.0, 10.0],
+        "domain.extent_j": [0.0, pi],
         "coordinates": "spherical-polar",
         "driver.tfinal": 0.1,
     }

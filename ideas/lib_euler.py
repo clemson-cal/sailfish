@@ -350,7 +350,7 @@ def source_terms_spherical_polar():
         double uq = prim[2];
         double pg = prim[3];
         double srdot = -M_PI * dr2 * dcosq * (rho * uq * uq + 2 * pg);
-        double sqdot = +M_PI * dr2 * (dcosq * rho * ur * uq + dsinq * (pg + rho));
+        double sqdot = +M_PI * dr2 * (dcosq * rho * ur * uq + dsinq * pg);
 
         source[0] = 0.0;
         source[1] = srdot;

@@ -248,7 +248,7 @@ class Sailfish:
 
         if mdim != ddim:
             raise ValueError(
-                "model and domain dimensionality do not match: ({mdim} vs {ddim})"
+                f"model and domain dimensionality do not match: ({mdim} vs {ddim})"
             )
 
 

@@ -270,9 +270,6 @@ class SphericalPolarCoordinates:
 
         The shape of the returned array is (ni, nj, nk).
         """
-        if box.dimensionality == 3:
-            raise NotImplementedError
-
         r, q, f = box.cell_vertices(dim=3)
         r0 = r[:-1, :-1, :-1]
         r1 = r[+1:, :-1, :-1]

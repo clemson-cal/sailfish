@@ -435,19 +435,33 @@ class SourceTerms:
                 int nrcc = (i + 1) * si;
                 double x0 = x[(0 * nd + nccc) / sf];
                 double x1 = x[(0 * nd + nrcc) / sf];
+                double y0 = 0.0;
+                double y1 = 0.0;
+                double z0 = 0.0;
+                double z1 = 0.0;
 
                 #elif DIM == 2
-                #error("not implemented")
                 int nccc = (i + 0) * si + (j + 0) * sj;
                 int nrcc = (i + 1) * si + (j + 0) * sj;
                 int ncrc = (i + 0) * si + (j + 1) * sj;
+                double x0 = x[(0 * nd + nccc) / sf];
+                double x1 = x[(0 * nd + nrcc) / sf];
+                double y0 = x[(1 * nd + nccc) / sf];
+                double y1 = x[(1 * nd + ncrc) / sf];
+                double z0 = 0.0;
+                double z1 = 0.0;
 
                 #elif DIM == 3
-                #error("not implemented")
                 int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
                 int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
                 int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
                 int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+                double x0 = x[(0 * nd + nccc) / sf];
+                double x1 = x[(0 * nd + nrcc) / sf];
+                double y0 = x[(1 * nd + nccc) / sf];
+                double y1 = x[(1 * nd + ncrc) / sf];
+                double z0 = x[(2 * nd + nccc) / sf];
+                double z1 = x[(2 * nd + nccr) / sf];
                 #endif
 
                 double pc[NPRIM];
@@ -461,7 +475,6 @@ class SourceTerms:
                 }
 
                 #elif CACHE_PRIM == 0
-
                 double uc[NPRIM];
 
                 for (int q = 0; q < NPRIM; ++q)
@@ -471,7 +484,7 @@ class SourceTerms:
                 cons_to_prim(uc, pc);
                 #endif
 
-                source_terms_spherical_polar(x0, x1, 0.0, 0.0, 0.0, 0.0, pc, sc);
+                source_terms_spherical_polar(x0, x1, y0, y1, z0, z1, pc, sc);
 
                 for (int q = 0; q < NPRIM; ++q)
                 {
