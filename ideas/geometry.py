@@ -278,8 +278,15 @@ class SphericalPolarCoordinates:
         r1 = r[+1:, :-1, :-1]
         q0 = q[:-1, :-1, :-1]
         q1 = q[:-1, +1:, :-1]
+        f0 = q[:-1, :-1, :-1]
+        f1 = q[:-1, :-1, +1:]
 
-        return -(r1**3 - r0**3) * (cos(q1) - cos(q0)) * 2.0 * pi / 3.0
+        if box.dimensionality == 1:
+            return (r1**3 - r0**3) * 4.0 * pi / 3.0
+        if box.dimensionality == 2:
+            return (r1**3 - r0**3) * (cos(q1) - cos(q0)) * (-2.0 * pi) / 3.0
+        if box.dimensionality == 3:
+            return (r1**3 - r0**3) * (cos(q1) - cos(q0)) * (f0 - f1) / 3.0
 
     def cell_vertices(self, box: CoordinateBox) -> NDArray[float]:
         tr = lambda arr: arr.transpose(1, 2, 3, 0)

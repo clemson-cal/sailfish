@@ -471,7 +471,7 @@ class SourceTerms:
                 cons_to_prim(uc, pc);
                 #endif
 
-                source_terms_spherical_polar(x0, x1, 0.0, 0.0, pc, sc);
+                source_terms_spherical_polar(x0, x1, 0.0, 0.0, 0.0, 0.0, pc, sc);
 
                 for (int q = 0; q < NPRIM; ++q)
                 {
