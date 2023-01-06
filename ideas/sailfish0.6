@@ -521,8 +521,12 @@ def sailfish(config, overrides, console):
         s = asdict(Sailfish())
         deep_update(s, unflatten(c))
         deep_update(s, overrides)
-        config = Sailfish(**s)
-        config.validate()
+        try:
+            config = Sailfish(**s)
+            config.validate()
+        except Exception as e:
+            console.print(e)
+            return
         yield config, chkpt
 
 
@@ -798,7 +802,6 @@ def todo(args=None, console=None, parser=None):
             - [ ] 2d accretion disk
             - [ ] 1d shock in wind
             - [ ] 2d accretion disk
-        - [x] buffer zone
         - [ ] crash detection
         - [ ] crash recovery (fallback strategies)
         - [ ] FMR
@@ -807,7 +810,7 @@ def todo(args=None, console=None, parser=None):
         - [ ] viscosity
         - [/] geometric source terms; cell geometry data
         - [ ] gravitational source terms
-        - [ ] outer buffer source terms
+        - [x] driving source terms (implements outer buffer)
         - [ ] reductions needed for orbital evolution
         - [ ] isothermal EOS
         - [ ] angular-momentum conserving 2d solver

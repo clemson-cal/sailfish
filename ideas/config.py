@@ -1,5 +1,5 @@
+from math import pi
 from typing import Literal, Union
-from inspect import isgeneratorfunction
 from schema import schema
 from geometry import CoordinateBox
 from models import ModelData, DefaultModelData
@@ -243,12 +243,12 @@ class Sailfish:
     forcing: Forcing = None
 
     def validate(self):
-        """ """
-        if (mdim := self.initial_data.dimensionality) != (
-            ddim := self.domain.dimensionality
-        ):
+        mdim = self.initial_data.dimensionality
+        ddim = self.domain.dimensionality
+
+        if mdim != ddim:
             raise ValueError(
-                "domain and model dimensionality must match ({ddim} vs {mdim})"
+                "model and domain dimensionality do not match: ({mdim} vs {ddim})"
             )
 
 

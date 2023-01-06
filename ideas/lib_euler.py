@@ -321,7 +321,7 @@ def source_terms_spherical_polar():
         // https://iopscience.iop.org/article/10.1086/500792/pdf
 
         #if NVECS == 1
-        double dcosq = cos(q1) - cos(q0);
+        double dcosq = -2.0; // ignore q0 and q1; require pole-to-pole
         double dr2 = r1 * r1 - r0 * r0;
 
         double pg = prim[2];

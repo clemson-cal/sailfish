@@ -443,7 +443,7 @@ class SourceTerms:
                 {
                     pc[q] = p[nccc + q * sq];
                 }
-                source_terms_spherical_polar(x0, x1, 0.5 * M_PI - 1e-6, 0.5 * M_PI + 1e-6, pc, sc); // TODO: polar extent
+                source_terms_spherical_polar(x0, x1, 0.0, 0.0, pc, sc);
 
                 for (int q = 0; q < NPRIM; ++q)
                 {
@@ -1832,17 +1832,16 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     for (i0, i1), box in config.domain.decompose(num_patches):
         space = IndexSpace(box.num_zones, guard=2, layout=strategy.data_layout)
         extended_box = box.extend(2)
+        p = space.create(zeros, fields=nprim, data=initial_prim(extended_box))
 
         if checkpoint:
             t = checkpoint["time"]
             n = checkpoint["iteration"]
-            p = checkpoint["primitive"][i0:i1]
+            p[space.interior] = checkpoint["primitive"][i0:i1]
         else:
             t = 0.0
             n = 0
-            p = initial_prim(extended_box)
 
-        p = space.create(zeros, fields=nprim, data=p)
         stream = make_stream(hardware, gpu_streams)
         solver = patch_solver(p, t, n, extended_box, space, kernels, config)
         streams.append(stream)

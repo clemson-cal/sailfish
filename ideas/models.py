@@ -89,10 +89,6 @@ def star():
         "initial_data.model": "star",
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
-        "domain.extent_j": [0.5 * pi - 1e-6, 0.5 * pi + 1e-6],
-        "domain.extent_k": [0.0, 2.0 * pi],
-        "boundary_condition.lower_i": None,
-        "boundary_condition.upper_i": None,
         "coordinates": "spherical-polar",
         "driver.tfinal": 0.1,
     }

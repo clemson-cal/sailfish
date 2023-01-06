@@ -255,7 +255,7 @@ class SphericalPolarCoordinates:
         q1 = q[:-1, +1:, :-1]
 
         if box.dimensionality == 1:
-            da_i = self._meridian(r0, r0, q0, q1)
+            da_i = 4.0 * pi * r0**2
             return tr(array([da_i]))
         if box.dimensionality == 2:
             da_i = self._meridian(r0, r0, q0, q1)
