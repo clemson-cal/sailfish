@@ -61,20 +61,21 @@ def sod():
 
 
 @schema
-class Star:
+class Uniform:
     """
     Tests for 1d spherical polar coordinates
     """
 
-    model: Literal["star"] = "star"
+    model: Literal["uniform"] = "uniform"
     dimensionality: int = 1
+    coordinates: str = "cartesian"
 
     @property
     def primitive_fields(self):
         if self.dimensionality == 1:
-            return "density", "r-velocity", "pressure"
+            return "density", "i-velocity", "pressure"
         if self.dimensionality == 2:
-            return "density", "r-velocity", "q-velocity", "pressure"
+            return "density", "i-velocity", "j-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         if self.dimensionality == 1:
@@ -89,9 +90,9 @@ class Star:
 
 
 @preset
-def star():
+def uniform1d():
     return {
-        "initial_data.model": "star",
+        "initial_data.model": "uniform",
         "initial_data.dimensionality": 1,
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
@@ -101,9 +102,9 @@ def star():
 
 
 @preset
-def star2d():
+def uniform2d():
     return {
-        "initial_data.model": "star",
+        "initial_data.model": "uniform",
         "initial_data.dimensionality": 2,
         "domain.num_zones": [200, 200, 1],
         "domain.extent_i": [1.0, 10.0],
@@ -189,12 +190,7 @@ def cylinder_in_wind():
         "domain.extent_i": [-0.25, 0.75],
         "domain.extent_j": [-0.50, 0.50],
         "driver.tfinal": 1.0,
-        "forcing": {
-            "rate": 1e5,
-            "ramp": 0.1,
-            "where": "x < 0.0",
-            "target": "initial-data",
-        },
+        "boundary_condition.upper_i": "outflow",
     }
 
 
@@ -682,7 +678,7 @@ def density_wave():
 DefaultModelData = Sod
 ModelData = Union[
     Sod,
-    Star,
+    Uniform,
     CylindricalExplosion,
     CylinderInWind,
     Ram41,

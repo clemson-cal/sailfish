@@ -18,8 +18,15 @@ from logging import getLogger
 from pickle import load as load_pickle, dump as dump_pickle
 from sys import argv
 from textwrap import dedent
+from pydantic import ValidationError
 
-from config import Sailfish, Strategy, Scheme, Driver, add_config_arguments
+from config import (
+    Sailfish,
+    Strategy,
+    Scheme,
+    Driver,
+    add_config_arguments,
+)
 from models import ModelData
 from preset import preset, get_preset_functions
 from system import system_info
@@ -97,12 +104,20 @@ def timeseries(config: Sailfish, state, timestep, timeseries, event_states):
     return f"timeseries {number}"
 
 
-def checkpoint(config: Sailfish, state, timestep, timeseries, event_states):
+def checkpoint(
+    config: Sailfish,
+    state,
+    timestep,
+    timeseries,
+    event_states,
+    filename: str = None,
+):
     if config.driver.checkpoint.format == "none":
         return "skip checkpoint (format=none)"
 
-    number = event_states["checkpoint"].number
-    filename = f"chkpt.{number:04d}.pk"
+    if filename is None:
+        number = event_states["checkpoint"].number
+        filename = f"chkpt.{number:04d}.pk"
 
     with open(filename, "wb") as outf:
         dump_pickle(
@@ -208,6 +223,9 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
             if state.iteration % new_timestep_cadence == 0:
                 timestep = state.timestep(cfl_number)
 
+        checkpoint(
+            config, state, timestep, timeseries_data, event_states, "chkpt.final.pk"
+        )
         yield state
         yield run_summary(config, next(app_timer), sum(zps_log) / max(1, len(zps_log)))
 
@@ -524,8 +542,11 @@ def sailfish(config, overrides, console):
         try:
             config = Sailfish(**s)
             config.validate()
-        except Exception as e:
-            console.print(e)
+        except ValidationError as e:
+            print(e)
+            return
+        except ValueError as e:
+            console.print("[red]configuration error[red]:", e)
             return
         yield config, chkpt
 
@@ -789,10 +810,10 @@ def todo(args=None, console=None, parser=None):
         - [x] control over time-step recalculation cadence
         - [ ] code glossary
         - [ ] plotting and animation features
-        - [ ] graceful handling of validation errors
+        - [x] graceful handling of validation errors
         - [/] boundary conditions:
             - [x] outflow
-            - [-] inflow (use a buffer zone)
+            - [x] inflow
             - [x] periodic
             - [ ] reflecting
         - [ ] models:

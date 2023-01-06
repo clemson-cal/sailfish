@@ -1,5 +1,6 @@
 from math import pi
 from typing import Literal, Union
+from pydantic import Field
 from schema import schema
 from geometry import CoordinateBox
 from models import ModelData, DefaultModelData
@@ -234,7 +235,7 @@ class Sailfish:
     name: str = None
     driver: Driver = Driver()
     physics: Physics = Physics()
-    initial_data: ModelData = DefaultModelData()
+    initial_data: ModelData = Field(DefaultModelData(), discriminator="model")
     boundary_condition: BoundaryCondition = BoundaryCondition()
     domain: CoordinateBox = CoordinateBox()
     coordinates: Literal["cartesian", "spherical-polar"] = "cartesian"
@@ -248,7 +249,7 @@ class Sailfish:
 
         if mdim != ddim:
             raise ValueError(
-                f"model and domain dimensionality do not match: ({mdim} vs {ddim})"
+                f"model dimensionality is {mdim} whereas domain dimensionality is {ddim}"
             )
 
 
@@ -285,6 +286,19 @@ def parse_reconstruction(arg):
             return arg, 1.5
         else:
             return arg
+
+
+def parse_checkpoint(arg):
+    """
+    Promote a string to a checkpoint model
+
+    This factory function is used by the argparse type parameter to convert
+    user input to a driver.checkpoint parameter.
+    """
+    if ":" in arg:
+        return Checkpoint(*arg.split(":"))
+    else:
+        return Checkpoint(arg)
 
 
 def add_config_arguments(parser: "argparser.ArgumentParser"):
@@ -357,7 +371,7 @@ def add_config_arguments(parser: "argparser.ArgumentParser"):
         type=parse_reconstruction,
         help=Scheme.describe("reconstruction"),
         dest="scheme.reconstruction",
-        metavar="R",
+        metavar="R:P",
     )
     parser.add_argument(
         "-e",
@@ -379,9 +393,9 @@ def add_config_arguments(parser: "argparser.ArgumentParser"):
     parser.add_argument(
         "--checkpoint",
         "-c",
-        type=float,
-        dest="driver.checkpoint.cadence",
-        metavar="C",
+        type=parse_checkpoint,
+        dest="driver.checkpoint",
+        metavar="C:F",
     )
     parser.add_argument(
         "--timeseries",
