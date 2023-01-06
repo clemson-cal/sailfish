@@ -319,38 +319,38 @@ def source_terms_spherical_polar():
         double *prim,
         double *source)
     {
-        // Forumulas below are A8 and A9 from Zhang & MacFadyen (2006), integrated
+        // Forumulas below are A8 - A10 from Zhang & MacFadyen (2006), integrated
         // over the cell volume with finite radial and polar extent, and taking
         // the Newonian limit h -> 1 and W -> 1.
         //
         // https://iopscience.iop.org/article/10.1086/500792/pdf
 
-        #if NVECS == 1
-        // assumes 2 pi azimuth and pole-to-pole (ignore q and f)
-        // ------------------------------------------------------
-        double dcosq = -2.0;
+        double dcosq = cos(q1) - cos(q0);
+        double dsinq = sin(q1) - sin(q0);
         double dr2 = r1 * r1 - r0 * r0;
+        double df = f1 - f0;
 
+        #if NVECS == 1
+        double dg = prim[0];
+        double ur = prim[1];
+        double uq = 0.0;
+        double uf = 0.0;
         double pg = prim[2];
-        double srdot = -M_PI * dr2 * dcosq * 2 * pg;
+        double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
 
         source[0] = 0.0;
         source[1] = srdot;
         source[2] = 0.0;
 
         #elif NVECS == 2
-        // assumes 2 pi azimuth (ignore f)
-        // ------------------------------------------------------
-        double dcosq = cos(q1) - cos(q0);
-        double dsinq = sin(q1) - sin(q0);
-        double dr2 = r1 * r1 - r0 * r0;
-
-        double rho = prim[0];
+        double dg = prim[0];
         double ur = prim[1];
         double uq = prim[2];
+        double uf = 0.0;
         double pg = prim[3];
-        double srdot = -M_PI * dr2 * dcosq * (rho * uq * uq + 2 * pg);
-        double sqdot = +M_PI * dr2 * (dcosq * rho * ur * uq + dsinq * pg);
+
+        double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
+        double sqdot = +0.5 * df * dr2 * (dcosq * dg * ur * uq + dsinq * (pg + dg * uf * uf));
 
         source[0] = 0.0;
         source[1] = srdot;
@@ -358,26 +358,84 @@ def source_terms_spherical_polar():
         source[3] = 0.0;
 
         #elif NVECS == 3
-        // all coordinates are used
-        // ------------------------------------------------------
-        double dcosq = cos(q1) - cos(q0);
-        double dsinq = sin(q1) - sin(q0);
-        double dr2 = r1 * r1 - r0 * r0;
-        double df = f1 - f0;
-
-        double rho = prim[0];
+        double dg = prim[0];
         double ur = prim[1];
         double uq = prim[2];
         double uf = prim[3];
         double pg = prim[4];
-        double srdot = -0.5 * df * dr2 * dcosq * (rho * (uq * uq + up * up) + 2 * pg);
-        double sqdot = +0.5 * df * dr2 * (dcosq * rho * ur * uq + dsinq * (pg + rho * up * up));
-        double sfdot = -0.5 * df * dr2 * rho * uf * (uq * dsinq - ur * dcosq);
+        double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
+        double sqdot = +0.5 * df * dr2 * (dcosq * dg * ur * uq + dsinq * (pg + dg * uf * uf));
+        double sfdot = -0.5 * df * dr2 * dg * uf * (uq * dsinq - ur * dcosq);
 
         source[0] = 0.0;
         source[1] = srdot;
         source[2] = sqdot;
-        source[3] = sfdot; // UNTESTED
+        source[3] = sfdot;
+        source[4] = 0.0;
+        #endif
+    }
+    """
+
+
+@device(static=static)
+def source_terms_cylindrical_polar():
+    R"""
+    DEVICE void source_terms_cylindrical_polar(
+        double r0, double r1,
+        double f0, double f1,
+        double z0, double z1,
+        double *prim,
+        double *source)
+    {
+        // Forumulas below are A2 - A4 from Zhang & MacFadyen (2006), integrated
+        // over the cell volume with finite radial and polar extent, and taking
+        // the Newonian limit h -> 1 and W -> 1.
+        //
+        // https://iopscience.iop.org/article/10.1086/500792/pdf
+
+        // UNFINISHED!
+
+        #if NVECS == 1
+        // assumes 2 pi azimuth and unit z-extent
+        // ------------------------------------------------------
+        double dg = prim[0];
+        double pg = prim[2];
+        double srdot = -2.0 * M_PI * (r1 - r0) * (p + dg * uf * uf);
+
+        source[0] = 0.0;
+        source[1] = srdot;
+        source[2] = 0.0;
+
+        #elif NVECS == 2
+        // assumes 2 pi azimuth (r-z plane)
+        // ------------------------------------------------------
+        double dg = prim[0];
+        double ur = prim[1];
+        double uf = prim[2];
+        double pg = prim[3];
+        double srdot = +2.0 * M_PI * (r1 - r0) * (z1 - z0) * (p + dg * uf * uf);
+        double sfdot = -2.0 * M_PI * (r1 - r0) * (z1 - z0) * ur * uf;
+
+        source[0] = 0.0;
+        source[1] = srdot;
+        source[2] = sfdot;
+        source[3] = 0.0;
+
+        #elif NVECS == 3
+        // all coordinates are used
+        // ------------------------------------------------------
+        double dg = prim[0];
+        double ur = prim[1];
+        double uf = prim[2];
+        double pg = prim[4];
+
+        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (p + dg * uf * uf);
+        double sfdot = -(f1 - f0) * (r1 - r0) * (z1 - z0) * ur * uf;
+
+        source[0] = 0.0;
+        source[1] = srdot;
+        source[2] = sfdot;
+        source[3] = 0.0;
         source[4] = 0.0;
 
         #endif

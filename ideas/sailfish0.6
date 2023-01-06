@@ -822,6 +822,7 @@ def todo(args=None, console=None, parser=None):
             - [ ] 2d kelvin-helmholtz
             - [ ] 2d accretion disk
             - [ ] 1d shock in wind
+            - [ ] 1d accretion disk (need cylindrical-polar coordinates and viscosity)
             - [ ] 2d accretion disk
         - [ ] crash detection
         - [ ] crash recovery (fallback strategies)
@@ -830,11 +831,18 @@ def todo(args=None, console=None, parser=None):
         - [x] relativistic shocktube problems, including with transverse velocity
         - [ ] viscosity
         - [x] geometric source terms; cell geometry data
+        - [x] spherical polar coordinate system
+        - [ ] cylindrical polar coordinates
+        - [ ] expanding homologous mesh option
         - [ ] gravitational source terms
-        - [x] driving source terms (implements outer buffer)
+            - [ ] single-point-mass gravity
+            - [ ] binary-point-mass gravity
+        - [ ] point mass sink models
         - [ ] reductions needed for orbital evolution
+        - [x] driving source terms (implements outer buffer)
         - [ ] isothermal EOS
         - [ ] angular-momentum conserving 2d solver
+        - [ ] multi-GPU support
         - [ ] MPI parallel
         """
         console.print(Markdown(dedent(text)), width=100)

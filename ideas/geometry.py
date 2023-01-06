@@ -229,7 +229,21 @@ class CartesianCoordinates:
 
 
 class SphericalPolarCoordinates:
+    """
+    Spherical-polar curvilinear coordinates
+
+    Geometry formulas are provided for:
+
+    - 1d in the spherical radius (r) (num_zones = [ni, 1, 1])
+    - 2d in the r-q (meridional) plane (num_zones = [ni, nj, 1])
+    - 3d in r-q-f (num_zones = [ni, nj, nk])
+    """
+
     needs_geometrical_source_terms = True
+
+    def _check_box(self, box: CoordinateBox):
+        if box.dimensionality == 2 and box.num_zones[2] != 0:
+            raise ValueError("2d spherical-polar coordinates only works in r-theta")
 
     def _meridian(self, r0, r1, q0, q1):
         R0 = r0 * sin(q0)

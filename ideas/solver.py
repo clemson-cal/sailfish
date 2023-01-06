@@ -428,9 +428,9 @@ class SourceTerms:
             double x0 = x[(0 * nd + nccc) / sf];
             double x1 = x[(0 * nd + nrcc) / sf];
             double y0 = 0.0;
-            double y1 = 0.0;
+            double y1 = M_PI;
             double z0 = 0.0;
-            double z1 = 0.0;
+            double z1 = 2.0 * M_PI;
 
             #elif DIM == 2
             int nccc = (i + 0) * si + (j + 0) * sj;
@@ -441,7 +441,7 @@ class SourceTerms:
             double y0 = x[(1 * nd + nccc) / sf];
             double y1 = x[(1 * nd + ncrc) / sf];
             double z0 = 0.0;
-            double z1 = 0.0;
+            double z1 = 2.0 * M_PI;
 
             #elif DIM == 3
             int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
