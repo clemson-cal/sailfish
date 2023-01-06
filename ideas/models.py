@@ -63,7 +63,10 @@ def sod():
 @schema
 class Uniform:
     """
-    Tests for 1d spherical polar coordinates
+    Uniform initial data
+
+    This model data could be useful for things like testing the correctness of
+    boundary conditions or geometrical source terms, see example presets below.
     """
 
     model: Literal["uniform"] = "uniform"
@@ -91,6 +94,12 @@ class Uniform:
 
 @preset
 def uniform1d():
+    """
+    Uniform initial data in 1d spherical symmetry; tests source terms
+
+    The solution should not evolve away from the initial value, either to
+    machine precision or at least to a very good accuracy.
+    """
     return {
         "initial_data.model": "uniform",
         "initial_data.dimensionality": 1,
@@ -103,6 +112,12 @@ def uniform1d():
 
 @preset
 def uniform2d():
+    """
+    Uniform initial data in 2d spherical-polar coordinates; tests source terms
+
+    The solution should not evolve away from the initial value, either to machine
+    precision or at least to a very good accuracy.
+    """
     return {
         "initial_data.model": "uniform",
         "initial_data.dimensionality": 2,

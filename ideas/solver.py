@@ -374,7 +374,119 @@ class SourceTerms:
     def device_funcs(self):
         return self._device_funcs
 
-    @kernel
+    """
+    Native implementation of source terms kernel
+    """
+    geometric_source_terms_code = R"""
+    KERNEL void geometric_source_terms(double *p, double *u, double *x, double *s, int ni, int nj, int nk)
+    {
+        int nq = NCONS;
+        int nd = ni * nj * nk * nq;
+
+        #if TRANSPOSE == 0
+        #if DIM == 1
+        int si = nq;
+        int sq = 1;
+        #elif DIM == 2
+        int si = nq * nj;
+        int sj = nq;
+        int sq = 1;
+        #elif DIM == 3
+        int si = nq * nj * nk;
+        int sj = nq * nj;
+        int sk = nq;
+        int sq = 1;
+        #endif
+        #elif TRANSPOSE == 1
+        #if DIM == 1
+        int sq = ni;
+        int si = 1;
+        #elif DIM == 2
+        int sq = nj * ni;
+        int si = nj;
+        int sj = 1;
+        #elif DIM == 3
+        int sq = nk * nj * ni;
+        int si = nk * nj;
+        int sj = nk;
+        int sk = 1;
+        #endif
+        #endif
+        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
+
+        #if DIM == 1
+        FOR_RANGE_1D(2, ni - 2)
+        #elif DIM == 2
+        FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
+        #elif DIM == 3
+        FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
+        #endif
+        {
+            #if DIM == 1
+            int nccc = (i + 0) * si;
+            int nrcc = (i + 1) * si;
+            double x0 = x[(0 * nd + nccc) / sf];
+            double x1 = x[(0 * nd + nrcc) / sf];
+            double y0 = 0.0;
+            double y1 = 0.0;
+            double z0 = 0.0;
+            double z1 = 0.0;
+
+            #elif DIM == 2
+            int nccc = (i + 0) * si + (j + 0) * sj;
+            int nrcc = (i + 1) * si + (j + 0) * sj;
+            int ncrc = (i + 0) * si + (j + 1) * sj;
+            double x0 = x[(0 * nd + nccc) / sf];
+            double x1 = x[(0 * nd + nrcc) / sf];
+            double y0 = x[(1 * nd + nccc) / sf];
+            double y1 = x[(1 * nd + ncrc) / sf];
+            double z0 = 0.0;
+            double z1 = 0.0;
+
+            #elif DIM == 3
+            int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
+            int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
+            int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
+            int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
+            double x0 = x[(0 * nd + nccc) / sf];
+            double x1 = x[(0 * nd + nrcc) / sf];
+            double y0 = x[(1 * nd + nccc) / sf];
+            double y1 = x[(1 * nd + ncrc) / sf];
+            double z0 = x[(2 * nd + nccc) / sf];
+            double z1 = x[(2 * nd + nccr) / sf];
+            #endif
+
+            double pc[NPRIM];
+            double sc[NCONS];
+
+            #if CACHE_PRIM == 1
+
+            for (int q = 0; q < NPRIM; ++q)
+            {
+                pc[q] = p[nccc + q * sq];
+            }
+
+            #elif CACHE_PRIM == 0
+            double uc[NPRIM];
+
+            for (int q = 0; q < NPRIM; ++q)
+            {
+                uc[q] = u[nccc + q * sq];
+            }
+            cons_to_prim(uc, pc);
+            #endif
+
+            source_terms_spherical_polar(x0, x1, y0, y1, z0, z1, pc, sc);
+
+            for (int q = 0; q < NPRIM; ++q)
+            {
+                s[nccc + q * sq] = sc[q];
+            }
+        }
+    }
+    """
+
+    @kernel(code=geometric_source_terms_code)
     def geometric_source_terms(
         self,
         p: NDArray[float],
@@ -385,113 +497,67 @@ class SourceTerms:
         nj: int = None,
         nk: int = None,
     ):
-        R"""
-        KERNEL void geometric_source_terms(double *p, double *u, double *x, double *s, int ni, int nj, int nk)
-        {
-            int nq = NCONS;
-            int nd = ni * nj * nk * nq;
+        """
+        Append geometric source terms
 
-            #if TRANSPOSE == 0
-            #if DIM == 1
-            int si = nq;
-            int sq = 1;
-            #elif DIM == 2
-            int si = nq * nj;
-            int sj = nq;
-            int sq = 1;
-            #elif DIM == 3
-            int si = nq * nj * nk;
-            int sj = nq * nj;
-            int sk = nq;
-            int sq = 1;
-            #endif
-            #elif TRANSPOSE == 1
-            #if DIM == 1
-            int sq = ni;
-            int si = 1;
-            #elif DIM == 2
-            int sq = nj * ni;
-            int si = nj;
-            int sj = 1;
-            #elif DIM == 3
-            int sq = nk * nj * ni;
-            int si = nk * nj;
-            int sj = nk;
-            int sk = 1;
-            #endif
-            #endif
-            int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
+        Parameters
+        ----------
 
-            #if DIM == 1
-            FOR_RANGE_1D(2, ni - 2)
-            #elif DIM == 2
-            FOR_RANGE_2D(2, ni - 2, 2, nj - 2)
-            #elif DIM == 3
-            FOR_RANGE_3D(2, ni - 2, 2, nj - 2, 2, nk - 2)
-            #endif
-            {
-                #if DIM == 1
-                int nccc = (i + 0) * si;
-                int nrcc = (i + 1) * si;
-                double x0 = x[(0 * nd + nccc) / sf];
-                double x1 = x[(0 * nd + nrcc) / sf];
-                double y0 = 0.0;
-                double y1 = 0.0;
-                double z0 = 0.0;
-                double z1 = 0.0;
+        p : `ndarray[(ni, nj, nk, nprim), float64]`
 
-                #elif DIM == 2
-                int nccc = (i + 0) * si + (j + 0) * sj;
-                int nrcc = (i + 1) * si + (j + 0) * sj;
-                int ncrc = (i + 0) * si + (j + 1) * sj;
-                double x0 = x[(0 * nd + nccc) / sf];
-                double x1 = x[(0 * nd + nrcc) / sf];
-                double y0 = x[(1 * nd + nccc) / sf];
-                double y1 = x[(1 * nd + ncrc) / sf];
-                double z0 = 0.0;
-                double z1 = 0.0;
+            Read-only primitive variable array.
 
-                #elif DIM == 3
-                int nccc = (i + 0) * si + (j + 0) * sj + (k + 0) * sk;
-                int nrcc = (i + 1) * si + (j + 0) * sj + (k + 0) * sk;
-                int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
-                int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
-                double x0 = x[(0 * nd + nccc) / sf];
-                double x1 = x[(0 * nd + nrcc) / sf];
-                double y0 = x[(1 * nd + nccc) / sf];
-                double y1 = x[(1 * nd + ncrc) / sf];
-                double z0 = x[(2 * nd + nccc) / sf];
-                double z1 = x[(2 * nd + nccr) / sf];
-                #endif
+            May be `None` if `cache_prim` is `False` but must be given if
+            `cache_prim` is `True`.
 
-                double pc[NPRIM];
-                double sc[NCONS];
+            If given, may be invalid in two layers of guard zones on each
+            non-trivial array axis.
 
-                #if CACHE_PRIM == 1
+            Strides must be `(ni, nj, nk, nprim)` if `data_layout ==
+            "fields-last"` or `(nprim, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
 
-                for (int q = 0; q < NPRIM; ++q)
-                {
-                    pc[q] = p[nccc + q * sq];
-                }
+        u : `ndarray[(ni, nj, nk, ncons), float64]`
 
-                #elif CACHE_PRIM == 0
-                double uc[NPRIM];
+            Read-only array of conserved variable densities.
 
-                for (int q = 0; q < NPRIM; ++q)
-                {
-                    uc[q] = u[nccc + q * sq];
-                }
-                cons_to_prim(uc, pc);
-                #endif
+            May be `None` if `cache_prim` is `False`, but must be given if
+            `cache_prim` is `False`.
 
-                source_terms_spherical_polar(x0, x1, y0, y1, z0, z1, pc, sc);
+            If given, may be invalid in two layers of guard zones on each
+            non-trivial array axis.
 
-                for (int q = 0; q < NPRIM; ++q)
-                {
-                    s[nccc + q * sq] += sc[q];
-                }
-            }
-        }
+            Strides must be `(ni, nj, nk, ncons)` if `data_layout ==
+            "fields-last"` or `(ncons, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
+
+        x : `ndarray[(ni, nj, nk, dim), float64]`
+
+            Read-only array of cell vertex coordinates.
+
+            Each element corresponds to the respective coordinate of the
+            lower-left corner of the respective zone.
+
+            May be invalid in two layers of guard zones on the left and one
+            layer of guard zones at the right of each non-trivial array axis.
+
+            Strides must be `(dim, ni, nj, nk, nprim)` if `data_layout ==
+            "fields-last"` or `(dim, nprim, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
+
+        s : `ndarray[(ni, nj, nk, ncons), float64]`
+
+            Write-only array of source terms.
+
+            The source terms are rates of conserved charges; they are
+            volume-integrated over each zone.
+
+            Will be invalid in two layers of guard zones on each non-trivial
+            array axis.
+
+            Strides must be `(ni, nj, nk, ncons)` if `data_layout ==
+            "fields-last"` or `(ncons, ni, nj, nk)` if `data_layout ==
+            "fields-first"`.
         """
         dim = self._dim
         shape = s.shape[:3]
@@ -1791,11 +1857,11 @@ def patch_solver(
             if cache_prim:
                 cons_to_prim(u1, p1)
 
-            if forcing is not None:
-                stm += (udr - u1) * rdr * dv
-
             if coords.needs_geometrical_source_terms:
                 geometric_source_terms(p1, u1, xv, stm)
+
+            if forcing is not None:
+                stm += (udr - u1) * rdr * dv
 
             if cache_grad:
                 plm_gradient(p1, g1)
@@ -1821,6 +1887,7 @@ def doc():
         godunov_fluxes=Scheme.godunov_fluxes.__doc__,
         update_cons=Scheme.update_cons.__doc__,
         update_cons_from_fluxes=Scheme.update_cons_from_fluxes.__doc__,
+        geometric_source_terms=SourceTerms.geometric_source_terms.__doc__,
         patch_solver=dedent(patch_solver.__doc__),
         make_solver=dedent(make_solver.__doc__),
     )
