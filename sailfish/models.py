@@ -111,7 +111,7 @@ def uniform1d():
         "initial_data.dimensionality": 1,
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
-        "coordinates": "cylindrical-polar",
+        "coordinates": "spherical-polar",
         "driver.tfinal": 0.1,
     }
 
@@ -156,12 +156,11 @@ class IsothermalVortex:
     def primitive(self, box: CoordinateBox):
         r = box.cell_centers()
         p = zeros(box.num_zones + (5,))
+        omega0 = 1.0
         r0 = 1.0  # radius of vortex core
-        cs = 1.0  # nominal sound speed
-        omega0 = self.mach_number * cs / r0
+        cs = r0 * omega0 / self.mach_number  # nominal sound speed
         omega = omega0 * exp(-0.5 * r**2 / r0**2)
-        rho0 = 1.0
-        rho = rho0 * exp(-0.5 * self.mach_number**2 * exp(-(r**2 / r0**2)))
+        rho = exp(-0.5 * self.mach_number**2 * exp(-((r / r0) ** 2)))
         p[:, 0, 0, 0] = rho
         p[:, 0, 0, 1] = 0.0
         p[:, 0, 0, 2] = 0.0
@@ -174,6 +173,7 @@ class IsothermalVortex:
 def isothermal_vortex():
     return {
         "initial_data.model": "isothermal-vortex",
+        "initial_data.mach_number": 1.5,
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
         "coordinates": "cylindrical-polar",

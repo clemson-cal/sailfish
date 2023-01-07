@@ -112,7 +112,7 @@ def source_terms_cylindrical_polar():
 
         #elif NVECS == 2
         double dg = prim[0];
-        double uf = prim[2];
+        double uf = 0.0;
         double pg = prim[3];
         double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (rhoh * uf * uf + pg);
         double szdot = 0.0;
@@ -124,7 +124,7 @@ def source_terms_cylindrical_polar():
         #elif NVECS == 3
         double dg = prim[0];
         double ur = prim[1];
-        double uf = prim[2];
+        double uf = prim[3];
         double pg = prim[4];
         double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (rhoh * uf * uf + pg);
         double szdot = 0.0;
