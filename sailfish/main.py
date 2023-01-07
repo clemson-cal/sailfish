@@ -221,7 +221,7 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
             if state.iteration % new_timestep_cadence == 0:
                 timestep = state.timestep(cfl_number)
 
-        checkpoint(
+        yield checkpoint(
             config, state, timestep, timeseries_data, event_states, "chkpt.final.pk"
         )
         yield state

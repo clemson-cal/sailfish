@@ -12,7 +12,7 @@ discriminating field.
 
 
 from typing import Literal, Union
-from numpy import logical_not, zeros, sqrt, sin, cos, pi
+from numpy import logical_not, zeros, sqrt, exp, sin, cos, pi
 from .preset import preset
 from .schema import schema
 from .geometry import CoordinateBox
@@ -121,8 +121,53 @@ def uniform2d():
         "initial_data.dimensionality": 2,
         "domain.num_zones": [200, 200, 1],
         "domain.extent_i": [1.0, 10.0],
-        # "domain.extent_j": [0.0, pi],
-        "domain.extent_j": [0.0, 9.0],
+        "domain.extent_j": [0.0, pi],
+        # "domain.extent_j": [0.0, 9.0],
+        "coordinates": "spherical-polar",
+        "driver.tfinal": 0.1,
+    }
+
+
+@schema
+class IsothermalVortex:
+    """
+    An isothermal vortex
+    """
+
+    model: Literal["isothermal-vortex"] = "isothermal-vortex"
+    mach_number: float = 1.0
+
+    @property
+    def dimensionality(self):
+        return 1
+
+    @property
+    def primitive_fields(self):
+        return "density", "r-velocity", "z-velocity", "f-velocity", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        r = box.cell_centers()
+        p = zeros(box.num_zones + (5,))
+        r0 = 1.0  # radius of vortex core
+        cs = 1.0  # nominal sound speed
+        omega0 = self.mach_number * cs / r0
+        omega = omega0 * exp(-0.5 * r**2 / r0**2)
+        rho0 = 1.0
+        rho = rho0 * exp(-0.5 * self.mach_number**2 * exp(-(r**2 / r0**2)))
+        p[:, 0, 0, 0] = rho
+        p[:, 0, 0, 1] = 0.0
+        p[:, 0, 0, 2] = 0.0
+        p[:, 0, 0, 3] = omega * r
+        p[:, 0, 0, 4] = rho * cs**2
+        return p
+
+
+@preset
+def isothermal_vortex():
+    return {
+        "initial_data.model": "isothermal-vortex",
+        "domain.num_zones": [200, 1, 1],
+        "domain.extent_i": [1.0, 10.0],
         "coordinates": "cylindrical-polar",
         "driver.tfinal": 0.1,
     }
@@ -693,6 +738,7 @@ DefaultModelData = Sod
 ModelData = Union[
     Sod,
     Uniform,
+    IsothermalVortex,
     CylindricalExplosion,
     CylinderInWind,
     Ram41,

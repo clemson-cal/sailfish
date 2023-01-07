@@ -253,12 +253,7 @@ class Sailfish:
                 f"model dimensionality is {mdim} whereas domain dimensionality is {ddim}"
             )
 
-        if (
-            self.domain.dimensionality == 1
-            and (self.domain.num_zones[2] > 1 or self.domain.num_zones[1] > 1)
-            or self.domain.dimensionality == 2
-            and (self.domain.num_zones[2] > 1)
-        ):
+        if self.domain.num_zones.index(1) < ddim:
             raise ValueError(
                 f"domain.num_zones = {self.domain.num_zones}; "
                 f"squeezed axes must be at the end"
