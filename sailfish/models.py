@@ -26,7 +26,15 @@ def two_state(region_a, state_a, state_b):
     return p
 
 
-@schema
+MODEL_DATA_CLASSES = list()
+
+
+def modeldata(f):
+    MODEL_DATA_CLASSES.append(f)
+    return schema(f)
+
+
+@modeldata
 class Sod:
     """
     Classic Sod shocktube initial data
@@ -60,7 +68,7 @@ def sod():
     }
 
 
-@schema
+@modeldata
 class Uniform:
     """
     Uniform initial data
@@ -128,7 +136,7 @@ def uniform2d():
     }
 
 
-@schema
+@modeldata
 class IsothermalVortex:
     """
     An isothermal vortex
@@ -173,7 +181,7 @@ def isothermal_vortex():
     }
 
 
-@schema
+@modeldata
 class CylindricalExplosion:
     """
     Cylindrical explosion initial data
@@ -212,7 +220,7 @@ def cylindrical_explosion():
     }
 
 
-@schema
+@modeldata
 class CylinderInWind:
     """
     A round cylinder immersed in a dilute wind
@@ -253,7 +261,7 @@ def cylinder_in_wind():
     }
 
 
-@schema
+@modeldata
 class Ram41:
     """
     1d Riemann problem (RAM problem 1; Sec 4.1)
@@ -289,7 +297,7 @@ def ram_41():
     }
 
 
-@schema
+@modeldata
 class Ram42:
     """
     1d Riemann problem (RAM problem 2; Sec 4.2)
@@ -325,7 +333,7 @@ def ram_42():
     }
 
 
-@schema
+@modeldata
 class Ram43:
     """
     1d Riemann problem (RAM problem 3; Sec 4.3)
@@ -364,7 +372,7 @@ def ram_43():
     }
 
 
-@schema
+@modeldata
 class Ram44:
     """
     1d Riemann problem (RAM problem 4; Sec 4.4)
@@ -405,7 +413,7 @@ def ram_44():
     }
 
 
-@schema
+@modeldata
 class Ram45:
     """
     1d shock heating Riemann problem (RAM problem 5; Sec 4.5)
@@ -449,7 +457,7 @@ def ram_45():
     }
 
 
-@schema
+@modeldata
 class Ram61:
     """
     1d Riemann problem with transverse velocity: (RAM Hard Test; sec 6.1)
@@ -490,7 +498,7 @@ def ram_61():
     }
 
 
-@schema
+@modeldata
 class FuShu33:
     """
     Lax problem initial data
@@ -528,7 +536,7 @@ def fu_shu_33():
     }
 
 
-@schema
+@modeldata
 class FuShu34:
     """
     Lax problem: double rarefaction wave
@@ -566,7 +574,7 @@ def fu_shu_34():
     }
 
 
-@schema
+@modeldata
 class FuShu35:
     """
     LeBlanc problem
@@ -606,7 +614,7 @@ def fu_shu_35():
     }
 
 
-@schema
+@modeldata
 class FuShu36:
     """
     Shu-Osher problem
@@ -648,7 +656,7 @@ def fu_shu_36():
     }
 
 
-@schema
+@modeldata
 class FuShu37:
     """
     Blast wave interaction
@@ -694,7 +702,7 @@ def fu_shu_37():
     }
 
 
-@schema
+@modeldata
 class DensityWave:
     """
     Sinusoidal density wave translating rigidly
@@ -735,22 +743,4 @@ def density_wave():
 
 
 DefaultModelData = Sod
-ModelData = Union[
-    Sod,
-    Uniform,
-    IsothermalVortex,
-    CylindricalExplosion,
-    CylinderInWind,
-    Ram41,
-    Ram42,
-    Ram43,
-    Ram44,
-    Ram45,
-    Ram61,
-    FuShu33,
-    FuShu34,
-    FuShu35,
-    FuShu36,
-    FuShu37,
-    DensityWave,
-]
+ModelData = Union[tuple(MODEL_DATA_CLASSES)]
