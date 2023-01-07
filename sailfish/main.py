@@ -679,11 +679,11 @@ def doc(args=None, console=None, parser=None):
         if topic == "kernels":
             console.print(Syntax(getsource(kernels_main), lexer="python"))
         if topic == "config":
-            console.print(Driver())
+            console.print(next(Driver().rich_table(console, None)))
             console.print("\n\n")
-            console.print(Strategy())
+            console.print(next(Strategy().rich_table(console, None)))
             console.print("\n\n")
-            console.print(Scheme())
+            console.print(next(Scheme().rich_table(console, None)))
         if topic == "solver":
             try:
                 doc = solver_doc()

@@ -115,8 +115,6 @@ def configmodel_rich_table(d, console, options):
         show_lines=False,
         show_header=False,
         expand=True,
-        # min_width=80,
-        # box=box.SQUARE,
     )
     table.add_column("property", style="cyan")
     table.add_column("value", style="green")
@@ -169,6 +167,7 @@ def schema(cls):
     #
     # cls.__rich_console__ = configmodel_rich_table
 
+    cls.rich_table = configmodel_rich_table
     cls.__configmodel__ = dict(
         short_descr=short_descr,
         long_descr=long_descr,
