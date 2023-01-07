@@ -48,6 +48,8 @@ static = R"""
 #ifndef GAMMA_LAW_INDEX
 #define GAMMA_LAW_INDEX (5.0 / 3.0)
 #endif
+
+#define RELATIVISTIC 1
 """
 
 

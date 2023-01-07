@@ -48,6 +48,8 @@ static = R"""
 #ifndef GAMMA_LAW_INDEX
 #define GAMMA_LAW_INDEX (5.0 / 3.0)
 #endif
+
+#define RELATIVISTIC 0
 """
 
 
@@ -305,126 +307,6 @@ def riemann_hlle(
         {
             flux[q] = (fl[q] * ap - fr[q] * am - (ul[q] - ur[q]) * ap * am) / (ap - am);
         }
-    }
-    """
-
-
-@device(static=static)
-def source_terms_spherical_polar():
-    R"""
-    DEVICE void source_terms_spherical_polar(
-        double r0, double r1,
-        double q0, double q1,
-        double f0, double f1,
-        double *prim,
-        double *source)
-    {
-        // Forumulas below are A8 - A10 from Zhang & MacFadyen (2006), integrated
-        // over the cell volume with finite radial and polar extent, and taking
-        // the Newonian limit h -> 1 and W -> 1.
-        //
-        // https://iopscience.iop.org/article/10.1086/500792/pdf
-
-        double dr2 = r1 * r1 - r0 * r0;
-        double df = f1 - f0;
-
-        #if NVECS == 1
-        double dcosq = cos(q1) - cos(q0);
-        double dg = prim[0];
-        double uq = 0.0;
-        double uf = 0.0;
-        double pg = prim[2];
-        double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
-        source[0] = 0.0;
-        source[1] = srdot;
-        source[2] = 0.0;
-
-        #elif NVECS == 2
-        double dcosq = cos(q1) - cos(q0);
-        double dsinq = sin(q1) - sin(q0);
-        double dg = prim[0];
-        double ur = prim[1];
-        double uq = prim[2];
-        double uf = 0.0;
-        double pg = prim[3];
-        double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
-        double sqdot = +0.5 * df * dr2 * (dcosq * dg * ur * uq + dsinq * (pg + dg * uf * uf));
-        source[0] = 0.0;
-        source[1] = srdot;
-        source[2] = sqdot;
-        source[3] = 0.0;
-
-        #elif NVECS == 3
-        double dcosq = cos(q1) - cos(q0);
-        double dsinq = sin(q1) - sin(q0);
-        double dg = prim[0];
-        double ur = prim[1];
-        double uq = prim[2];
-        double uf = prim[3];
-        double pg = prim[4];
-        double srdot = -0.5 * df * dr2 * dcosq * (dg * (uq * uq + uf * uf) + 2 * pg);
-        double sqdot = +0.5 * df * dr2 * (dcosq * dg * ur * uq + dsinq * (pg + dg * uf * uf));
-        double sfdot = -0.5 * df * dr2 * dg * uf * (uq * dsinq - ur * dcosq);
-        source[0] = 0.0;
-        source[1] = srdot;
-        source[2] = sqdot;
-        source[3] = sfdot;
-        source[4] = 0.0;
-        #endif
-    }
-    """
-
-
-@device(static=static)
-def source_terms_cylindrical_polar():
-    R"""
-    DEVICE void source_terms_cylindrical_polar(
-        double r0, double r1,
-        double z0, double z1,
-        double f0, double f1,
-        double *prim,
-        double *source)
-    {
-        // Forumulas below are A2 - A4 from Zhang & MacFadyen (2006), integrated
-        // over the cell volume with finite radial and polar extent, and taking
-        // the Newonian limit h -> 1 and W -> 1.
-        //
-        // https://iopscience.iop.org/article/10.1086/500792/pdf
-
-        #if NVECS == 1
-        double dg = prim[0];
-        double uf = 0.0;
-        double pg = prim[2];
-        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
-        source[0] = 0.0;
-        source[1] = srdot;
-        source[2] = 0.0;
-
-        #elif NVECS == 2
-        double dg = prim[0];
-        double uf = prim[2];
-        double pg = prim[3];
-        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
-        double szdot = 0.0;
-        source[0] = 0.0;
-        source[1] = srdot;
-        source[2] = szdot;
-        source[3] = 0.0;
-
-        #elif NVECS == 3
-        double dg = prim[0];
-        double ur = prim[1];
-        double uf = prim[2];
-        double pg = prim[4];
-        double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
-        double szdot = 0.0;
-        double sfdot = -(f1 - f0) * (r1 - r0) * (z1 - z0) * ur * uf;
-        source[0] = 0.0;
-        source[1] = srdot;
-        source[2] = szdot;
-        source[3] = sfdot;
-        source[4] = 0.0;
-        #endif
     }
     """
 

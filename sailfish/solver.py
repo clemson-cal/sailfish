@@ -355,23 +355,27 @@ class SourceTerms:
         self._transpose = config.strategy.transpose
         self._cache_prim = config.strategy.cache_prim
 
-        if config.physics.metric == "newtonian":
-            from . import lib_euler as hydro_lib
-        if config.physics.metric == "minkowski":
-            from . import lib_srhd as hydro_lib
-
         device_funcs = list()
+
         if config.coordinates == "cartesian":
             self._coords = 0
-        if config.coordinates == "spherical-polar":
-            self._coords = 1
-            device_funcs.append(hydro_lib.source_terms_spherical_polar)
-        if config.coordinates == "cylindrical-polar":
-            self._coords = 2
-            device_funcs.append(hydro_lib.source_terms_cylindrical_polar)
+        else:
+            if config.physics.metric == "newtonian":
+                from . import lib_geom
+                from . import lib_euler as hydro_lib
+            elif config.physics.metric == "minkowski":
+                from . import lib_geom
+                from . import lib_srhd as hydro_lib
 
-        if not self._cache_prim and config.coordinates != "cartesian":
-            device_funcs.append(hydro_lib.cons_to_prim)
+            if config.coordinates == "spherical-polar":
+                self._coords = 1
+                device_funcs.append(lib_geom.source_terms_spherical_polar)
+            elif config.coordinates == "cylindrical-polar":
+                self._coords = 2
+                device_funcs.append(lib_geom.source_terms_cylindrical_polar)
+
+            if not self._cache_prim:
+                device_funcs.append(hydro_lib.cons_to_prim)
 
         self._device_funcs = device_funcs
 

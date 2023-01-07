@@ -264,11 +264,6 @@ class Sailfish:
                 f"squeezed axes must be at the end"
             )
 
-        if self.coordinates != "cartesian" and self.physics.metric != "newtonian":
-            raise ValueError(
-                f"curvilinear coordinates only implemented for newtonian hydro"
-            )
-
 
 def parse_num_zones(arg):
     """
