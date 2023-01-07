@@ -82,12 +82,10 @@ class Uniform:
 
     def primitive(self, box: CoordinateBox):
         if self.dimensionality == 1:
-            r = box.cell_centers()
-            p = zeros(r.shape + (3,))
+            p = zeros(box.num_zones + (3,))
             p[...] = [1.0, 0.0, 1.0]
         if self.dimensionality == 2:
-            r, q = box.cell_centers()
-            p = zeros(r.shape + (4,))
+            p = zeros(box.num_zones + (4,))
             p[...] = [1.0, 0.0, 0.0, 1.0]
         return p
 
@@ -123,8 +121,9 @@ def uniform2d():
         "initial_data.dimensionality": 2,
         "domain.num_zones": [200, 200, 1],
         "domain.extent_i": [1.0, 10.0],
-        "domain.extent_j": [0.0, pi],
-        "coordinates": "spherical-polar",
+        # "domain.extent_j": [0.0, pi],
+        "domain.extent_j": [0.0, 9.0],
+        "coordinates": "cylindrical-polar",
         "driver.tfinal": 0.1,
     }
 

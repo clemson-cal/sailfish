@@ -216,16 +216,19 @@ class CartesianCoordinates:
         dz = z[:-1, :-1, +1:] - z[:-1, :-1, :-1]
         return dx * dy * dz
 
-    def cell_vertices(self, box: CoordinateBox) -> NDArray[float]:
-        tr = lambda arr: arr.transpose(1, 2, 3, 0)
-        x, y, z = box.cell_vertices(dim=3, drop_final=True)
+    def cell_vertices(self, box: CoordinateBox, mesh=False) -> NDArray[float]:
+        if mesh:
+            return box.cell_vertices(dim=2, drop_final=False)
+        else:
+            tr = lambda arr: arr.transpose(1, 2, 3, 0)
+            x, y, z = box.cell_vertices(dim=3, drop_final=True)
 
-        if box.dimensionality == 1:
-            return tr(array([x]))
-        if box.dimensionality == 2:
-            return tr(array([x, y]))
-        if box.dimensionality == 3:
-            return tr(array([x, y, z]))
+            if box.dimensionality == 1:
+                return tr(array([x]))
+            if box.dimensionality == 2:
+                return tr(array([x, y]))
+            if box.dimensionality == 3:
+                return tr(array([x, y, z]))
 
 
 class SphericalPolarCoordinates:
@@ -240,10 +243,6 @@ class SphericalPolarCoordinates:
     """
 
     needs_geometrical_source_terms = True
-
-    def _check_box(self, box: CoordinateBox):
-        if box.dimensionality == 2 and box.num_zones[2] != 0:
-            raise ValueError("2d spherical-polar coordinates only works in r-theta")
 
     def _meridian(self, r0, r1, q0, q1):
         R0 = r0 * sin(q0)
@@ -299,16 +298,21 @@ class SphericalPolarCoordinates:
         if box.dimensionality == 3:
             return (r1**3 - r0**3) * (cos(q1) - cos(q0)) * (f0 - f1) / 3.0
 
-    def cell_vertices(self, box: CoordinateBox) -> NDArray[float]:
-        tr = lambda arr: arr.transpose(1, 2, 3, 0)
-        r, q, f = box.cell_vertices(dim=3, drop_final=True)
-
-        if box.dimensionality == 1:
-            return tr(array([r]))
-        if box.dimensionality == 2:
-            return tr(array([r, q]))
-        if box.dimensionality == 3:
-            return tr(array([r, q, f]))
+    def cell_vertices(self, box: CoordinateBox, mesh=False) -> NDArray[float]:
+        if mesh:
+            r, q = box.cell_vertices(dim=2, drop_final=False)
+            x = r * sin(q)
+            z = r * cos(q)
+            return x, z
+        else:
+            r, q, f = box.cell_vertices(dim=3, drop_final=True)
+            tr = lambda arr: arr.transpose(1, 2, 3, 0)
+            if box.dimensionality == 1:
+                return tr(array([r]))
+            if box.dimensionality == 2:
+                return tr(array([r, q]))
+            if box.dimensionality == 3:
+                return tr(array([r, q, f]))
 
 
 class CylindricalPolarCoordinates:
@@ -318,18 +322,14 @@ class CylindricalPolarCoordinates:
     Geometry formulas are provided for:
 
     - 1d in the cylindrical radius (r) (num_zones = [ni, 1, 1])
-    - 2d in the r-z plane (num_zones = [ni, 1, nk])
-    - 3d in r-f-z (num_zones = [ni, nj, nk])
+    - 2d in the r-z plane (num_zones = [ni, nj, 1])
+    - 3d in r-z-f (num_zones = [ni, nj, nk])
 
     Support for 2d cylindrical coordinates in the r-f plane may be added in
     the future.
     """
 
     needs_geometrical_source_terms = True
-
-    def _check_box(self, box: CoordinateBox):
-        if box.dimensionality == 2 and box.num_zones[1] != 0:
-            raise ValueError("2d cylindrical-polar coordinates only supports r-z")
 
     def face_areas(self, box: CoordinateBox) -> NDArray[float]:
         """
@@ -338,25 +338,26 @@ class CylindricalPolarCoordinates:
         The shape of the returned array is (ni, nj, nk, dim) where dim is the
         box dimensionality.
         """
-        self._check_box(box)
-
         tr = lambda arr: arr.transpose(1, 2, 3, 0)
-        r, f, z = box.cell_vertices(dim=3)
+        r, z, f = box.cell_vertices(dim=3)
         r0 = r[:-1, :-1, :-1]
         r1 = r[+1:, :-1, :-1]
-        f0 = f[:-1, :-1, :-1]
-        f1 = f[:-1, +1:, :-1]
         z0 = z[:-1, :-1, :-1]
-        z1 = z[:-1, :-1, +1:]
+        z1 = z[:-1, +1:, :-1]
+        f0 = f[:-1, :-1, :-1]
+        f1 = f[:-1, :-1, +1:]
 
         if box.dimensionality == 1:
+            # r
             da_i = 2.0 * pi * r0
             return tr(array([da_i]))
         if box.dimensionality == 2:
+            # r-z
             da_i = 2.0 * pi * r0 * (z1 - z0)
             da_j = pi * (r1**2 - r0**2)
             return tr(array([da_i, da_j]))
         if box.dimensionality == 3:
+            # r-z-f
             raise NotImplementedError
 
     def cell_volumes(self, box: CoordinateBox) -> NDArray[float]:
@@ -365,15 +366,13 @@ class CylindricalPolarCoordinates:
 
         The shape of the returned array is (ni, nj, nk).
         """
-        self._check_box(box)
-
-        r, f, z = box.cell_vertices(dim=3)
+        r, z, f = box.cell_vertices(dim=3)
         r0 = r[:-1, :-1, :-1]
         r1 = r[+1:, :-1, :-1]
-        f0 = f[:-1, :-1, :-1]
-        f1 = f[:-1, +1:, :-1]
         z0 = z[:-1, :-1, :-1]
-        z1 = z[:-1, :-1, +1:]
+        z1 = z[:-1, +1:, :-1]
+        f0 = f[:-1, :-1, :-1]
+        f1 = f[:-1, :-1, +1:]
 
         if box.dimensionality == 1:
             return (r1**2 - r0**2) * pi
@@ -382,15 +381,16 @@ class CylindricalPolarCoordinates:
         if box.dimensionality == 3:
             return (r1**2 - r0**2) * (z1 - z0) * 0.5 * (f1 - f0)
 
-    def cell_vertices(self, box: CoordinateBox) -> NDArray[float]:
-        self._check_box(box)
+    def cell_vertices(self, box: CoordinateBox, mesh=False) -> NDArray[float]:
+        if mesh:
+            return box.cell_vertices(dim=2, drop_final=False)
+        else:
+            r, z, f = box.cell_vertices(dim=3, drop_final=True)
+            tr = lambda arr: arr.transpose(1, 2, 3, 0)
 
-        tr = lambda arr: arr.transpose(1, 2, 3, 0)
-        r, f, z = box.cell_vertices(dim=3, drop_final=True)
-
-        if box.dimensionality == 1:
-            return tr(array([r]))
-        if box.dimensionality == 2:
-            return tr(array([r, z]))
-        if box.dimensionality == 3:
-            return tr(array([r, f, z]))
+            if box.dimensionality == 1:
+                return tr(array([r]))
+            if box.dimensionality == 2:
+                return tr(array([r, z]))
+            if box.dimensionality == 3:
+                return tr(array([r, z, f]))

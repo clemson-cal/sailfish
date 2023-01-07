@@ -380,8 +380,8 @@ def source_terms_cylindrical_polar():
     R"""
     DEVICE void source_terms_cylindrical_polar(
         double r0, double r1,
-        double f0, double f1,
         double z0, double z1,
+        double f0, double f1,
         double *prim,
         double *source)
     {
@@ -402,14 +402,13 @@ def source_terms_cylindrical_polar():
 
         #elif NVECS == 2
         double dg = prim[0];
-        double ur = prim[1];
         double uf = prim[2];
         double pg = prim[3];
         double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
-        double sfdot = -(f1 - f0) * (r1 - r0) * (z1 - z0) * ur * uf;
+        double szdot = 0.0;
         source[0] = 0.0;
         source[1] = srdot;
-        source[2] = sqdot;
+        source[2] = szdot;
         source[3] = 0.0;
 
         #elif NVECS == 3
@@ -418,12 +417,12 @@ def source_terms_cylindrical_polar():
         double uf = prim[2];
         double pg = prim[4];
         double srdot = +(f1 - f0) * (r1 - r0) * (z1 - z0) * (pg + dg * uf * uf);
-        double sfdot = -(f1 - f0) * (r1 - r0) * (z1 - z0) * ur * uf;
         double szdot = 0.0;
+        double sfdot = -(f1 - f0) * (r1 - r0) * (z1 - z0) * ur * uf;
         source[0] = 0.0;
         source[1] = srdot;
-        source[2] = sqdot;
-        source[3] = szdot;
+        source[2] = szdot;
+        source[3] = sfdot;
         source[4] = 0.0;
         #endif
     }

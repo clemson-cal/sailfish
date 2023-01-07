@@ -486,17 +486,17 @@ class SourceTerms:
             double x0 = x[(0 * nd + nccc) / sf];
             double x1 = x[(0 * nd + nrcc) / sf];
             double y0 = 0.0;
-            double y1 = 2.0 * M_PI;
+            double y1 = 1.0;
             double z0 = 0.0;
-            double z1 = 1.0;
+            double z1 = 2.0 * M_PI;
 
             #elif DIM == 2
             double x0 = x[(0 * nd + nccc) / sf];
             double x1 = x[(0 * nd + nrcc) / sf];
-            double y0 = 0.0;
-            double y1 = 2.0 * M_PI;
-            double z0 = x[(1 * nd + nccc) / sf];
-            double z1 = x[(1 * nd + ncrc) / sf];
+            double y0 = x[(1 * nd + nccc) / sf];
+            double y1 = x[(1 * nd + ncrc) / sf];
+            double z0 = 0.0;
+            double z1 = 2.0 * M_PI;
 
             #elif DIM == 3
             double x0 = x[(0 * nd + nccc) / sf];
@@ -1841,7 +1841,7 @@ def patch_solver(
     if config.coordinates == "cylindrical-polar":
         coords = CylindricalPolarCoordinates()
 
-    dv = space.create(xp.zeros, fields=1, data=coords.cell_volumes(box))
+    dv = space.create(xp.zeros, data=coords.cell_volumes(box))
     da = space.create(xp.zeros, vectors=dim, data=coords.face_areas(box))
     xv = space.create(xp.zeros, vectors=dim, data=coords.cell_vertices(box))
 
@@ -1922,6 +1922,7 @@ def patch_solver(
                 geometric_source_terms(p1, u1, xv, stm)
 
             if forcing is not None:
+                # THIS MIGHT FAIL DUE TO BROADCASTING dv
                 stm += (udr - u1) * rdr * dv
 
             if cache_grad:
