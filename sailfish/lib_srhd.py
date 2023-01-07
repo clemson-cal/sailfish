@@ -1,5 +1,5 @@
 from numpy.typing import NDArray
-from kernels import device
+from .kernels import device
 
 
 static = R"""

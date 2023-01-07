@@ -13,9 +13,9 @@ discriminating field.
 
 from typing import Literal, Union
 from numpy import logical_not, zeros, sqrt, sin, cos, pi
-from preset import preset
-from schema import schema
-from geometry import CoordinateBox
+from .preset import preset
+from .schema import schema
+from .geometry import CoordinateBox
 
 
 def two_state(region_a, state_a, state_b):

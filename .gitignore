@@ -1,5 +1,5 @@
 *.pk
 __pycache__
 /data
-/doc/source/_autosummary
-/doc/build
+/legacy/doc/source/_autosummary
+/legacy/doc/build

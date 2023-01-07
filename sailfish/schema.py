@@ -164,7 +164,11 @@ def schema(cls):
     def type_args(self, key):
         return self.__dataclass_fields__[key].type.__args__
 
-    cls.__rich_console__ = configmodel_rich_table
+    # uncomment the line below to use the table as the default way to format
+    # schema-decorated classes for rich printing:
+    #
+    # cls.__rich_console__ = configmodel_rich_table
+
     cls.__configmodel__ = dict(
         short_descr=short_descr,
         long_descr=long_descr,

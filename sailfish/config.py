@@ -1,9 +1,9 @@
 from math import pi
 from typing import Literal, Union
 from pydantic import Field
-from schema import schema
-from geometry import CoordinateBox
-from models import ModelData, DefaultModelData
+from .schema import schema
+from .geometry import CoordinateBox
+from .models import ModelData, DefaultModelData
 
 
 @schema

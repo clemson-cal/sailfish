@@ -12,15 +12,15 @@ from typing import NamedTuple, Callable
 from numpy import array, zeros, concatenate, argsort
 from numpy.typing import NDArray
 
-from kernels import kernel, kernel_class, device, kernel_metadata
-from config import Sailfish, Strategy, Reconstruction, BoundaryCondition
-from geometry import (
+from .kernels import kernel, kernel_class, device, kernel_metadata
+from .config import Sailfish, Strategy, Reconstruction, BoundaryCondition
+from .geometry import (
     CoordinateBox,
     CartesianCoordinates,
     SphericalPolarCoordinates,
     CylindricalPolarCoordinates,
 )
-from index_space import IndexSpace
+from .index_space import IndexSpace
 
 
 @device
@@ -197,9 +197,11 @@ class Fields:
 
     def __init__(self, config: Sailfish):
         if config.physics.metric == "newtonian":
-            self.hydro_lib = __import__("lib_euler")
+            from . import lib_euler as hydro_lib
         if config.physics.metric == "minkowski":
-            self.hydro_lib = __import__("lib_srhd")
+            from . import lib_srhd as hydro_lib
+
+        self.hydro_lib = hydro_lib
         self.dim = config.domain.dimensionality
         self.nprim = len(config.initial_data.primitive_fields)
         self.transpose = config.strategy.transpose
@@ -354,11 +356,13 @@ class SourceTerms:
         self._cache_prim = config.strategy.cache_prim
 
         if config.physics.metric == "newtonian":
-            hydro_lib = __import__("lib_euler")
+            from . import lib_euler as hydro_lib
         if config.physics.metric == "minkowski":
-            hydro_lib = __import__("lib_srhd")
+            from . import lib_srhd as hydro_lib
 
         device_funcs = list()
+        if config.coordinates == "cartesian":
+            self._coords = 0
         if config.coordinates == "spherical-polar":
             self._coords = 1
             device_funcs.append(hydro_lib.source_terms_spherical_polar)
@@ -366,7 +370,7 @@ class SourceTerms:
             self._coords = 2
             device_funcs.append(hydro_lib.source_terms_cylindrical_polar)
 
-        if not self._cache_prim:
+        if not self._cache_prim and config.coordinates != "cartesian":
             device_funcs.append(hydro_lib.cons_to_prim)
 
         self._device_funcs = device_funcs
@@ -391,6 +395,8 @@ class SourceTerms:
     geometric_source_terms_code = R"""
     KERNEL void geometric_source_terms(double *p, double *u, double *x, double *s, int ni, int nj, int nk)
     {
+        #if COORDS != 0 // cartesian
+
         int nq = NCONS;
         int nd = ni * nj * nk * nq;
 
@@ -448,7 +454,7 @@ class SourceTerms:
             int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
             int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
             #endif
-
+            
             #if COORDS == 1 // spherical polar
             #if DIM == 1
             double x0 = x[(0 * nd + nccc) / sf];
@@ -535,6 +541,7 @@ class SourceTerms:
                 s[nccc + q * sq] = sc[q];
             }
         }
+        #endif
     }
     """
 
@@ -624,9 +631,9 @@ class Scheme:
 
     def __init__(self, config: Sailfish):
         if config.physics.metric == "newtonian":
-            hydro_lib = __import__("lib_euler")
+            from . import lib_euler as hydro_lib
         if config.physics.metric == "minkowski":
-            hydro_lib = __import__("lib_srhd")
+            from . import lib_srhd as hydro_lib
 
         device_funcs = list()
         define_macros = dict()

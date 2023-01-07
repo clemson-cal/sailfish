@@ -1,7 +1,7 @@
 from dataclasses import replace
-from schema import schema
 from numpy import array, linspace, meshgrid, sqrt, sin, cos, pi
 from numpy.typing import NDArray
+from .schema import schema
 
 
 def partition(elements: int, num_parts: int):

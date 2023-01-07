@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 """
 Sailfish main program
 """
@@ -20,16 +18,16 @@ from sys import argv
 from textwrap import dedent
 from pydantic import ValidationError
 
-from config import (
+from .config import (
     Sailfish,
     Strategy,
     Scheme,
     Driver,
     add_config_arguments,
 )
-from models import ModelData
-from preset import preset, get_preset_functions
-from system import system_info
+from .models import ModelData
+from .preset import preset, get_preset_functions
+from .system import system_info
 
 
 @dataclass
@@ -151,8 +149,8 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
     This function does handle checkpointing and the collection of time series
     data from the solver.
     """
-    from kernels import perf_time_sequence, configure_kernel_module
-    from solver import make_solver
+    from .kernels import perf_time_sequence, configure_kernel_module
+    from .solver import make_solver
 
     for config, chkpt in setups:
         yield config
@@ -244,10 +242,13 @@ def scrollback(print):
             print(config)
 
         elif type(event) is run_summary:
-            summary = event
-            print()
-            print(summary)
-            print()
+            pass
+            # summary = event
+            # print()
+            # printing of run summary is currently disabled
+            #
+            # print(summary)
+            # print()
 
         elif type(event) is iteration_report:
             report = event
@@ -662,8 +663,8 @@ def doc(args=None, console=None, parser=None):
         from rich.text import Text
         from rich.prompt import Prompt, DefaultType
 
-        from kernels import main as kernels_main
-        from solver import doc as solver_doc
+        from .kernels import main as kernels_main
+        from .solver import doc as solver_doc
 
         console.width = 80
 
@@ -777,9 +778,9 @@ def code(args=None, console=None, parser=None):
         add_config_arguments(config)
 
     else:
-        from solver import native_code
         from rich.syntax import Syntax
         from rich.prompt import Prompt
+        from .solver import native_code
 
         console.width = 100
 
@@ -804,7 +805,7 @@ def todo(args=None, console=None, parser=None):
         from textwrap import dedent
         from rich.markdown import Markdown
 
-        text = R"""
+        text = """
         # Todo items
 
         - [x] maximum wavespeed / timestep calculation
@@ -902,33 +903,30 @@ def main():
     """
     Main sailfish entry point and command line interface
     """
-    parser = argument_parser()
-    args = parser.parse_args()
-    console = init_logging(args._log_level)
-
-    if args._command:
-        args._command(args, console)
-    else:
-        from rich.syntax import Syntax
-
-        examples = [
-            "> sailfish run sod --plot      # see a standard preset problem",
-            "> sailfish doc models          # print information about model problems",
-            "> sailfish dep                 # see python module dependencies",
-            "> sailfish todo                # see status of development goals",
-            "> sailfish code --line-numbers # print generated solver code",
-        ]
-        parser.print_help()
-        console.print()
-        console.print("Examples:")
-        console.print()
-        for example in examples:
-            console.print(Syntax(example, lexer="bash"))
-
-
-if __name__ == "__main__":
     try:
-        main()
+        parser = argument_parser()
+        args = parser.parse_args()
+        console = init_logging(args._log_level)
+
+        if args._command:
+            args._command(args, console)
+        else:
+            from rich.syntax import Syntax
+
+            examples = [
+                "> sailfish run sod --plot      # see a standard preset problem",
+                "> sailfish doc models          # print information about model problems",
+                "> sailfish dep                 # see python module dependencies",
+                "> sailfish todo                # see status of development goals",
+                "> sailfish code --line-numbers # print generated solver code",
+            ]
+            parser.print_help()
+            console.print()
+            console.print("Examples:")
+            console.print()
+            for example in examples:
+                console.print(Syntax(example, lexer="bash"))
+
     except KeyboardInterrupt:
         print()
         print("ctrl-c interrupt")
