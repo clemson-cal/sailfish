@@ -165,6 +165,7 @@ class Strategy:
 
 
 BoundaryConditionType = Literal["outflow", "periodic", "reflecting"]
+Coordinates = Literal["cartesian", "spherical-polar", "cylindrical-polar"]
 
 
 @schema
@@ -238,11 +239,7 @@ class Sailfish:
     initial_data: ModelData = Field(DefaultModelData(), discriminator="model")
     boundary_condition: BoundaryCondition = BoundaryCondition()
     domain: CoordinateBox = CoordinateBox()
-    coordinates: Literal[
-        "cartesian",
-        "spherical-polar",
-        "cylindrical-polar",
-    ] = "cartesian"
+    coordinates: Coordinates = "cartesian"
     strategy: Strategy = Strategy()
     scheme: Scheme = Scheme()
     forcing: Forcing = None
@@ -254,6 +251,11 @@ class Sailfish:
         if mdim != ddim:
             raise ValueError(
                 f"model dimensionality is {mdim} whereas domain dimensionality is {ddim}"
+            )
+
+        if self.coordinates != "cartesian" and self.physics.metric != "newtonian":
+            raise ValueError(
+                f"curvilinear coordinates only implemented for newtonian hydro"
             )
 
 

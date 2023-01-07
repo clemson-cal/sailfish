@@ -543,6 +543,7 @@ def sailfish(config, overrides, console):
             config = Sailfish(**s)
             config.validate()
         except ValidationError as e:
+            console.print("[red]configuration error[red]:")
             print(e)
             return
         except ValueError as e:
