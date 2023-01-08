@@ -1265,7 +1265,7 @@ class Scheme:
     update_cons_from_fluxes_code = R"""
     KERNEL void update_cons_from_fluxes(
         double *urk,
-        double *q,
+        double *u,
         double *f,
         double *stm,
         double *dv,
@@ -1331,7 +1331,7 @@ class Scheme:
             int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
             #endif
 
-            double *uc = &q[nccc];
+            double *uc = &u[nccc];
             #if USE_RK == 1
             double *u0 = &urk[nccc];
             #endif
@@ -1382,7 +1382,7 @@ class Scheme:
     def update_cons_from_fluxes(
         self,
         urk: NDArray[float],
-        q: NDArray[float],
+        u: NDArray[float],
         f: NDArray[float],
         stm: NDArray[float],
         dv: NDArray[float],
@@ -1411,9 +1411,9 @@ class Scheme:
             May be invalid in two layers of guard zones on each non-trivial
             array axis.
 
-        q : `ndarray[(ni, nj, nk, ncons), float64]`
+        u : `ndarray[(ni, nj, nk, ncons), float64]`
 
-            Read-write array of conserved variable charges at the RK sub-step.
+            Read-write array of conserved variable densities at the RK sub-step.
 
             On input, must be valid in all zones including guard zones. On
             output, will be invalid in two layers of guard zones on each
@@ -1462,8 +1462,8 @@ class Scheme:
            of the conserved charge.
         """
         dim = self._dim
-        s = q.shape[:3]
-        return s[:dim], (urk, q, f, stm, dv, dt, rk, *s)
+        s = u.shape[:3]
+        return s[:dim], (urk, u, f, stm, dv, dt, rk, *s)
 
 
 def apply_bc(
