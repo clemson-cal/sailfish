@@ -45,10 +45,6 @@ class Sod:
     """
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
@@ -82,14 +78,10 @@ class Uniform:
     coordinates: str = "cartesian"
 
     @property
-    def dimensionality(self):
-        return (1, 2, 3)
-
-    @property
     def primitive_fields(self):
         return "density", "i-velocity", "j-velocity", "k-velocity", "pressure"
 
-    def primitive(self, box: CoordinateBox, config=None):
+    def primitive(self, box: CoordinateBox):
         p = zeros(box.num_zones + (5,))
         p[...] = [1.0, 0.0, 0.0, 0.0, 1.0]
         return p
@@ -125,7 +117,6 @@ def uniform2d():
         "domain.num_zones": [200, 200, 1],
         "domain.extent_i": [1.0, 10.0],
         "domain.extent_j": [0.0, pi],
-        # "domain.extent_j": [0.0, 9.0],
         "coordinates": "spherical-polar",
         "driver.tfinal": 0.1,
     }
@@ -140,27 +131,42 @@ class IsothermalVortex:
     mach_number: float = 1.0
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
-        return "density", "r-velocity", "z-velocity", "f-velocity", "pressure"
+        return "density", "i-velocity", "j-velocity", "k-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
-        r = box.cell_centers()
         p = zeros(box.num_zones + (5,))
+
+        if self.coordinates == "cartesian" and box.dimensionality == 2:
+            x, y = box.cell_centers()
+            r = sqrt(x**2 + y**2)
+            rho, uf, pre = self.vortex(r)
+            ux = -uf * y / r
+            uy = +uf * x / r
+            p[:, :, 0, 0] = rho
+            p[:, :, 0, 1] = ux
+            p[:, :, 0, 2] = uy
+            p[:, :, 0, 3] = 0.0
+            p[:, :, 0, 4] = pre
+        elif self.coordinates == "cylindrical-polar" and box.dimensionality == 1:
+            r = box.cell_centers()
+            rho, uf, pre = self.vortex(r)
+            p[:, 0, 0, 0] = rho
+            p[:, 0, 0, 1] = 0.0
+            p[:, 0, 0, 2] = 0.0
+            p[:, 0, 0, 3] = uf
+            p[:, 0, 0, 4] = pre
+        else:
+            raise ValueError("unsupported coordinates configuration")
+        return p
+
+    def vortex(self, r):
         omega0 = 1.0
         r0 = 1.0  # radius of vortex core
         cs = r0 * omega0 / self.mach_number  # nominal sound speed
         omega = omega0 * exp(-0.5 * r**2 / r0**2)
         rho = exp(-0.5 * self.mach_number**2 * exp(-((r / r0) ** 2)))
-        p[:, 0, 0, 0] = rho
-        p[:, 0, 0, 1] = 0.0
-        p[:, 0, 0, 2] = 0.0
-        p[:, 0, 0, 3] = omega * r
-        p[:, 0, 0, 4] = rho * cs**2
-        return p
+        return rho, omega * r, rho * cs**2
 
 
 @preset
@@ -168,6 +174,10 @@ def isothermal_vortex():
     return {
         "initial_data.model": "isothermal-vortex",
         "initial_data.mach_number": 1.5,
+        # "domain.num_zones": [200, 200, 1],
+        # "domain.extent_i": [-5.0, 5.0],
+        # "domain.extent_j": [-5.0, 5.0],
+        # "coordinates": "cartesian",
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
         "coordinates": "cylindrical-polar",
@@ -183,10 +193,6 @@ class CylindricalExplosion:
     Initializes a circular region of high pressure and density. A shock wave
     and contact discontinuity should expand outward with a circular profile.
     """
-
-    @property
-    def dimensionality(self):
-        return 2
 
     @property
     def primitive_fields(self):
@@ -221,10 +227,6 @@ class CylinderInWind:
     medium moving from left to right. After some time, the high-density region
     is disrupted by Kelvin-Helmholtz instabilities.
     """
-
-    @property
-    def dimensionality(self):
-        return 2
 
     @property
     def primitive_fields(self):
@@ -262,10 +264,6 @@ class Ram41:
     """
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "pressure"
 
@@ -299,10 +297,6 @@ class Ram42:
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "pressure"
 
-    @property
-    def dimensionality(self):
-        return 1
-
     def primitive(self, box: CoordinateBox):
         return two_state(box.cell_centers() < 0.5, [1.0, 0.0, 1000.0], [1.0, 0.0, 1e-2])
 
@@ -328,10 +322,6 @@ class Ram43:
     Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
     pp. 255-279.
     """
-
-    @property
-    def dimensionality(self):
-        return 1
 
     @property
     def primitive_fields(self):
@@ -369,10 +359,6 @@ class Ram44:
     """
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "y-gamma-beta", "pressure"
 
@@ -406,10 +392,6 @@ class Ram45:
     Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
     pp. 255-279.
     """
-
-    @property
-    def dimensionality(self):
-        return 1
 
     @property
     def primitive_fields(self):
@@ -450,10 +432,6 @@ class Ram61:
     """
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "y-gamma-beta", "pressure"
 
@@ -487,10 +465,6 @@ class FuShu33:
     """
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
@@ -521,10 +495,6 @@ class FuShu34:
     indicator for discontinuous Galerkin methods for hyperbolic conservation
     laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
-
-    @property
-    def dimensionality(self):
-        return 1
 
     @property
     def primitive_fields(self):
@@ -561,10 +531,6 @@ class FuShu35:
     """
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
         return "density", "x-velocity", "pressure"
 
@@ -595,10 +561,6 @@ class FuShu36:
     indicator for discontinuous Galerkin methods for hyperbolic conservation
     laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
-
-    @property
-    def dimensionality(self):
-        return 1
 
     @property
     def primitive_fields(self):
@@ -641,10 +603,6 @@ class FuShu37:
     """
 
     @property
-    def dimensionality(self):
-        return 1
-
-    @property
     def primitive_fields(self):
         "density", "x-velocity", "pressure"
 
@@ -677,10 +635,6 @@ class DensityWave:
     """
 
     amplitude: float = 0.2
-
-    @property
-    def dimensionality(self):
-        return 1
 
     @property
     def primitive_fields(self):

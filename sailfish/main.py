@@ -542,7 +542,7 @@ def sailfish(config, overrides, console):
         deep_update(s, overrides)
         try:
             config = Sailfish(**s)
-            config.validate()
+            config.initialize()
         except ValidationError as e:
             console.print("[red]configuration error[red]:")
             print(e)
@@ -830,7 +830,7 @@ def todo(args=None, console=None, parser=None):
             - [ ] 1d accretion disk
             - [ ] 2d accretion disk
             - [x] 1d isothermal vortex
-            - [ ] 2d isothermal vortex
+            - [x] 2d isothermal vortex
             - [x] 1d relativistic shocktubes from RAM
         - [ ] crash detection
         - [ ] crash recovery (fallback strategies)

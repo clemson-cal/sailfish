@@ -244,20 +244,12 @@ class Sailfish:
     scheme: Scheme = Scheme()
     forcing: Forcing = None
 
-    def validate(self):
-        mdim = self.initial_data.dimensionality
-        ddim = self.domain.dimensionality
+    def initialize(self):
+        self.initial_data.physics = self.physics
+        self.initial_data.coordinates = self.coordinates
+        self.initial_data.boundary_condition = self.boundary_condition
 
-        if mdim != ddim:
-            if type(mdim) is tuple and ddim in mdim:
-                pass
-            else:
-                raise ValueError(
-                    f"model dimensionality is {mdim} whereas "
-                    f"domain dimensionality is {ddim}"
-                )
-
-        if self.domain.num_zones.index(1) < ddim:
+        if self.domain.num_zones.index(1) < self.domain.dimensionality:
             raise ValueError(
                 f"domain.num_zones = {self.domain.num_zones}; "
                 f"squeezed axes must be at the end"
