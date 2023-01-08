@@ -433,7 +433,7 @@ class SourceTerms:
         int sk = 1;
         #endif
         #endif
-        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
+        int sf = TRANSPOSE ? 1 : nq; // stride correction for geometry arrays
 
         #if DIM == 1
         FOR_RANGE_1D(2, ni - 2)
@@ -461,54 +461,54 @@ class SourceTerms:
             
             #if COORDS == 1 // spherical polar
             #if DIM == 1
-            double x0 = x[(0 * nd + nccc) / sf];
-            double x1 = x[(0 * nd + nrcc) / sf];
+            double x0 = x[0 * nd / nq + nccc / sf];
+            double x1 = x[0 * nd / nq + nrcc / sf];
             double y0 = 0.0;
             double y1 = M_PI;
             double z0 = 0.0;
             double z1 = 2.0 * M_PI;
 
             #elif DIM == 2
-            double x0 = x[(0 * nd + nccc) / sf];
-            double x1 = x[(0 * nd + nrcc) / sf];
-            double y0 = x[(1 * nd + nccc) / sf];
-            double y1 = x[(1 * nd + ncrc) / sf];
+            double x0 = x[0 * nd / nq + nccc / sf];
+            double x1 = x[0 * nd / nq + nrcc / sf];
+            double y0 = x[1 * nd / nq + nccc / sf];
+            double y1 = x[1 * nd / nq + ncrc / sf];
             double z0 = 0.0;
             double z1 = 2.0 * M_PI;
 
             #elif DIM == 3
-            double x0 = x[(0 * nd + nccc) / sf];
-            double x1 = x[(0 * nd + nrcc) / sf];
-            double y0 = x[(1 * nd + nccc) / sf];
-            double y1 = x[(1 * nd + ncrc) / sf];
-            double z0 = x[(2 * nd + nccc) / sf];
-            double z1 = x[(2 * nd + nccr) / sf];
+            double x0 = x[0 * nd / nq + nccc / sf];
+            double x1 = x[0 * nd / nq + nrcc / sf];
+            double y0 = x[1 * nd / nq + nccc / sf];
+            double y1 = x[1 * nd / nq + ncrc / sf];
+            double z0 = x[2 * nd / nq + nccc / sf];
+            double z1 = x[2 * nd / nq + nccr / sf];
             #endif
 
             #elif COORDS == 2 // cylindrical polar
             #if DIM == 1
-            double x0 = x[(0 * nd + nccc) / sf];
-            double x1 = x[(0 * nd + nrcc) / sf];
+            double x0 = x[0 * nd / nq + nccc / sf];
+            double x1 = x[0 * nd / nq + nrcc / sf];
             double y0 = 0.0;
             double y1 = 1.0;
             double z0 = 0.0;
             double z1 = 2.0 * M_PI;
 
             #elif DIM == 2
-            double x0 = x[(0 * nd + nccc) / sf];
-            double x1 = x[(0 * nd + nrcc) / sf];
-            double y0 = x[(1 * nd + nccc) / sf];
-            double y1 = x[(1 * nd + ncrc) / sf];
+            double x0 = x[0 * nd / nq + nccc / sf];
+            double x1 = x[0 * nd / nq + nrcc / sf];
+            double y0 = x[1 * nd / nq + nccc / sf];
+            double y1 = x[1 * nd / nq + ncrc / sf];
             double z0 = 0.0;
             double z1 = 2.0 * M_PI;
 
             #elif DIM == 3
-            double x0 = x[(0 * nd + nccc) / sf];
-            double x1 = x[(0 * nd + nrcc) / sf];
-            double y0 = x[(1 * nd + nccc) / sf];
-            double y1 = x[(1 * nd + ncrc) / sf];
-            double z0 = x[(2 * nd + nccc) / sf];
-            double z1 = x[(2 * nd + nccr) / sf];
+            double x0 = x[0 * nd / nq + nccc / sf];
+            double x1 = x[0 * nd / nq + nrcc / sf];
+            double y0 = x[1 * nd / nq + nccc / sf];
+            double y1 = x[1 * nd / nq + ncrc / sf];
+            double z0 = x[2 * nd / nq + nccc / sf];
+            double z1 = x[2 * nd / nq + nccr / sf];
             #endif
             #else
             #error("COORDS must be either 1 (spherical) or 2 (cylindrical)")
@@ -851,7 +851,7 @@ class Scheme:
         #endif
         #endif
 
-        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
+        int sf = TRANSPOSE ? 1 : nq; // stride correction for geometry arrays
         double fm[NCONS];
 
         #if DIM == 1
@@ -873,9 +873,10 @@ class Scheme:
             double am;
 
             #if DIM >= 1
-            am = da[(0 * nd + nc) / sf];
+            am = da[0 * nd / nq + nc / sf];
 
             _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
+
             for (int q = 0; q < NCONS; ++q)
             {
                 fwr[0 * nd + nc + q * sq] = fm[q] * am;
@@ -883,9 +884,10 @@ class Scheme:
             #endif
 
             #if DIM >= 2
-            am = da[(1 * nd + nc) / sf];
+            am = da[1 * nd / nq + nc / sf];
 
             _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
+
             for (int q = 0; q < NCONS; ++q)
             {
                 fwr[1 * nd + nc + q * sq] = fm[q] * am;
@@ -893,9 +895,10 @@ class Scheme:
             #endif
 
             #if DIM >= 3
-            am = da[(2 * nd + nc) / sf];
+            am = da[2 * nd / nq + nc / sf];
 
             _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
+
             for (int q = 0; q < NCONS; ++q)
             {
                 fwr[2 * nd + nc + q * sq] = fm[q] * am;
@@ -1039,7 +1042,7 @@ class Scheme:
         int sk = 1;
         #endif
         #endif
-        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
+        int sf = TRANSPOSE ? 1 : nq; // stride correction for geometry arrays
 
         #if DIM >= 1
         double fm[NCONS];
@@ -1097,18 +1100,18 @@ class Scheme:
                 double ap;
 
                 #if DIM >= 1
-                am = da[(0 * nd + nccc) / sf];
-                ap = da[(0 * nd + nrcc) / sf];
+                am = da[0 * nd / nq + nccc / sf];
+                ap = da[0 * nd / nq + nrcc / sf];
                 du -= fp[q] * ap - fm[q] * am;
                 #endif
                 #if DIM >= 2
-                am = da[(1 * nd + nccc) / sf];
-                ap = da[(1 * nd + ncrc) / sf];
+                am = da[1 * nd / nq + nccc / sf];
+                ap = da[1 * nd / nq + ncrc / sf];
                 du -= gp[q] * ap - gm[q] * am;
                 #endif
                 #if DIM >= 3
-                am = da[(2 * nd + nccc) / sf];
-                ap = da[(2 * nd + nccr) / sf];
+                am = da[2 * nd / nq + nccc / sf];
+                ap = da[2 * nd / nq + nccr / sf];
                 du -= hp[q] * ap - hm[q] * am;
                 #endif
 
@@ -1307,7 +1310,7 @@ class Scheme:
         int sk = 1;
         #endif
         #endif
-        int sf = TRANSPOSE ? 1 : nq; // stride associated with field data
+        int sf = TRANSPOSE ? 1 : nq; // stride correction for geometry arrays
 
         #if DIM == 1
         FOR_RANGE_1D(2, ni - 2)
