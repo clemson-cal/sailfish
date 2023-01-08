@@ -225,7 +225,7 @@ class Sailfish:
     name:               a name given to the run
     driver:             runs the simulation main loop, handles IO
     physics:            the physics equations to be solved
-    initial_data:       initial condition if not a restart (also called a model)
+    initial_data:       initial condition, used if not a restart
     boundary_condition: boundary condition to apply at domain edges
     domain:             the physical domain of the problem
     strategy:           the solution strategy; does not affect the numerical solution
@@ -249,9 +249,13 @@ class Sailfish:
         ddim = self.domain.dimensionality
 
         if mdim != ddim:
-            raise ValueError(
-                f"model dimensionality is {mdim} whereas domain dimensionality is {ddim}"
-            )
+            if type(mdim) is tuple and ddim in mdim:
+                pass
+            else:
+                raise ValueError(
+                    f"model dimensionality is {mdim} whereas "
+                    f"domain dimensionality is {ddim}"
+                )
 
         if self.domain.num_zones.index(1) < ddim:
             raise ValueError(

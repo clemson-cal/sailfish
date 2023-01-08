@@ -79,23 +79,19 @@ class Uniform:
     boundary conditions or geometrical source terms, see example presets below.
     """
 
-    dimensionality: int = 1
     coordinates: str = "cartesian"
 
     @property
-    def primitive_fields(self):
-        if self.dimensionality == 1:
-            return "density", "i-velocity", "pressure"
-        if self.dimensionality == 2:
-            return "density", "i-velocity", "j-velocity", "pressure"
+    def dimensionality(self):
+        return (1, 2, 3)
 
-    def primitive(self, box: CoordinateBox):
-        if self.dimensionality == 1:
-            p = zeros(box.num_zones + (3,))
-            p[...] = [1.0, 0.0, 1.0]
-        if self.dimensionality == 2:
-            p = zeros(box.num_zones + (4,))
-            p[...] = [1.0, 0.0, 0.0, 1.0]
+    @property
+    def primitive_fields(self):
+        return "density", "i-velocity", "j-velocity", "k-velocity", "pressure"
+
+    def primitive(self, box: CoordinateBox, config=None):
+        p = zeros(box.num_zones + (5,))
+        p[...] = [1.0, 0.0, 0.0, 0.0, 1.0]
         return p
 
 
@@ -109,7 +105,6 @@ def uniform1d():
     """
     return {
         "initial_data.model": "uniform",
-        "initial_data.dimensionality": 1,
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
         "coordinates": "spherical-polar",
@@ -127,7 +122,6 @@ def uniform2d():
     """
     return {
         "initial_data.model": "uniform",
-        "initial_data.dimensionality": 2,
         "domain.num_zones": [200, 200, 1],
         "domain.extent_i": [1.0, 10.0],
         "domain.extent_j": [0.0, pi],

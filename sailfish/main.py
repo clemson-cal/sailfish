@@ -827,19 +827,19 @@ def todo(args=None, console=None, parser=None):
             - [x] 1d problems from Fu-Shu (2017)
             - [x] 1d density wave
             - [ ] 2d kelvin-helmholtz
+            - [ ] 1d accretion disk
             - [ ] 2d accretion disk
-            - [ ] 1d shock in wind
-            - [ ] 1d accretion disk (need cylindrical-polar coordinates and viscosity)
-            - [ ] 2d accretion disk
+            - [x] 1d isothermal vortex
+            - [ ] 2d isothermal vortex
+            - [x] 1d relativistic shocktubes from RAM
         - [ ] crash detection
         - [ ] crash recovery (fallback strategies)
         - [ ] FMR
         - [x] relativistic solver
-        - [x] relativistic shocktube problems, including with transverse velocity
         - [ ] viscosity
         - [x] geometric source terms; cell geometry data
         - [x] spherical polar coordinate system
-        - [ ] cylindrical polar coordinates
+        - [x] cylindrical polar coordinates
         - [ ] expanding homologous mesh option
         - [ ] gravitational source terms
             - [ ] single-point-mass gravity
