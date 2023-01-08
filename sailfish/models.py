@@ -29,9 +29,13 @@ def two_state(region_a, state_a, state_b):
 MODEL_DATA_CLASSES = list()
 
 
-def modeldata(f):
-    MODEL_DATA_CLASSES.append(f)
-    return schema(f)
+def modeldata(cls):
+    MODEL_DATA_CLASSES.append(cls)
+    cls.model = "".join(
+        ["-" + c.lower() if c.isupper() else c for c in cls.__name__]
+    ).lstrip("-")
+    cls.__annotations__["model"] = Literal[cls.model]
+    return schema(cls)
 
 
 @modeldata
@@ -39,8 +43,6 @@ class Sod:
     """
     Classic Sod shocktube initial data
     """
-
-    model: Literal["sod"] = "sod"
 
     @property
     def dimensionality(self):
@@ -77,7 +79,6 @@ class Uniform:
     boundary conditions or geometrical source terms, see example presets below.
     """
 
-    model: Literal["uniform"] = "uniform"
     dimensionality: int = 1
     coordinates: str = "cartesian"
 
@@ -142,7 +143,6 @@ class IsothermalVortex:
     An isothermal vortex
     """
 
-    model: Literal["isothermal-vortex"] = "isothermal-vortex"
     mach_number: float = 1.0
 
     @property
@@ -190,8 +190,6 @@ class CylindricalExplosion:
     and contact discontinuity should expand outward with a circular profile.
     """
 
-    model: Literal["cylindrical-explosion"] = "cylindrical-explosion"
-
     @property
     def dimensionality(self):
         return 2
@@ -229,8 +227,6 @@ class CylinderInWind:
     medium moving from left to right. After some time, the high-density region
     is disrupted by Kelvin-Helmholtz instabilities.
     """
-
-    model: Literal["cylinder-in-wind"] = "cylinder-in-wind"
 
     @property
     def dimensionality(self):
@@ -271,8 +267,6 @@ class Ram41:
     pp. 255-279.
     """
 
-    model: Literal["ram-41"] = "ram-41"
-
     @property
     def dimensionality(self):
         return 1
@@ -307,8 +301,6 @@ class Ram42:
     pp. 255-279.
     """
 
-    model: Literal["ram-42"] = "ram-42"
-
     @property
     def primitive_fields(self):
         return "proper-density", "x-gamma-beta", "pressure"
@@ -342,8 +334,6 @@ class Ram43:
     Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
     pp. 255-279.
     """
-
-    model: Literal["ram-43"] = "ram-43"
 
     @property
     def dimensionality(self):
@@ -384,8 +374,6 @@ class Ram44:
     pp. 255-279.
     """
 
-    model: Literal["ram-44"] = "ram-44"
-
     @property
     def dimensionality(self):
         return 1
@@ -424,8 +412,6 @@ class Ram45:
     Code" The Astrophysical Journal Supplement Series, Volume 164, Issue 1,
     pp. 255-279.
     """
-
-    model: Literal["ram-45"] = "ram-45"
 
     @property
     def dimensionality(self):
@@ -469,8 +455,6 @@ class Ram61:
     pp. 255-279.
     """
 
-    model: Literal["ram-61"] = "ram-61"
-
     @property
     def dimensionality(self):
         return 1
@@ -508,8 +492,6 @@ class FuShu33:
     laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
 
-    model: Literal["fu-shu-33"] = "fu-shu-33"
-
     @property
     def dimensionality(self):
         return 1
@@ -545,8 +527,6 @@ class FuShu34:
     indicator for discontinuous Galerkin methods for hyperbolic conservation
     laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
-
-    model: Literal["fu-shu-34"] = "fu-shu-34"
 
     @property
     def dimensionality(self):
@@ -586,8 +566,6 @@ class FuShu35:
     Note: use log-scaling to plot the mass density profile.
     """
 
-    model: Literal["fu-shu-35"] = "fu-shu-35"
-
     @property
     def dimensionality(self):
         return 1
@@ -623,8 +601,6 @@ class FuShu36:
     indicator for discontinuous Galerkin methods for hyperbolic conservation
     laws," Journal of Computational Physics, v347 (2017), pp.305-327.
     """
-
-    model: Literal["fu-shu-36"] = "fu-shu-36"
 
     @property
     def dimensionality(self):
@@ -670,8 +646,6 @@ class FuShu37:
     - use log-scaling to plot the mass density profile
     """
 
-    model: Literal["fu-shu-37"] = "fu-shu-37"
-
     @property
     def dimensionality(self):
         return 1
@@ -708,7 +682,6 @@ class DensityWave:
     Sinusoidal density wave translating rigidly
     """
 
-    model: Literal["density-wave"] = "density-wave"
     amplitude: float = 0.2
 
     @property
