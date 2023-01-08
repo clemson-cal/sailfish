@@ -1117,7 +1117,7 @@ class Scheme:
                     du += stm[n];
                 }
 
-                du *= dt / dv[n / sf];
+                du *= dt / dv[nccc / sf];
                 uwr[n] = urd[n] + du;
 
                 #if USE_RK == 1
