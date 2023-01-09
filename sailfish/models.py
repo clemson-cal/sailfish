@@ -408,6 +408,8 @@ class Ram45:
         v = 1.0 - 1e-10
         u = v / sqrt(1.0 - v * v)
         pre_small = 1e-3
+        x = box.cell_centers()
+        p = zeros(x.shape + (3,))
         p[...] = [1.0, u, pre_small]
         return p
 
@@ -611,7 +613,7 @@ class FuShu37:
 
     @property
     def primitive_fields(self):
-        "density", "x-velocity", "pressure"
+        return "density", "x-velocity", "pressure"
 
     def primitive(self, box: CoordinateBox):
         x = box.cell_centers()
