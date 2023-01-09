@@ -427,9 +427,10 @@ def plot():
                 )
             if state.box.dimensionality == 2:
                 x, y = state.cell_centers
-                z = state.primitive[:, :, 0, 0]
-                ax1.pcolormesh(x, y, z, vmin=None, vmax=None)
+                z = state.primitive[:, :, 0, 2]
+                cm = ax1.pcolormesh(x, y, z, vmin=None, vmax=None)
                 ax1.set_aspect("equal")
+                fig.colorbar(cm)
             plt.show()
 
     while True:
@@ -705,11 +706,21 @@ def doc(args=None, console=None, parser=None):
         if topic == "presets":
             if args.more:
                 for name, func in get_preset_functions().items():
-                    console.print(name)
                     if isgeneratorfunction(func):
-                        console.print(list(func()))
+                        pass
                     else:
+                        console.rule()
+                        console.print(f"{name}:")
+                        if func.__doc__:
+                            console.print(dedent(func.__doc__))
                         console.print(func())
+                        console.print(
+                            dedent(
+                                Sailfish(
+                                    **unflatten(func())
+                                ).initial_data.__class__.__doc__
+                            )
+                        )
             else:
                 console.print("\n".join(get_preset_functions()))
 

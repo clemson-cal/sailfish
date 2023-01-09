@@ -170,18 +170,25 @@ class IsothermalVortex:
 
 
 @preset
-def isothermal_vortex():
+def isothermal_vortex1d():
     return {
         "initial_data.model": "isothermal-vortex",
         "initial_data.mach_number": 1.5,
-        # "domain.num_zones": [200, 200, 1],
-        # "domain.extent_i": [-5.0, 5.0],
-        # "domain.extent_j": [-5.0, 5.0],
-        # "coordinates": "cartesian",
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [1.0, 10.0],
         "coordinates": "cylindrical-polar",
-        "driver.tfinal": 0.1,
+    }
+
+
+@preset
+def isothermal_vortex2d():
+    return {
+        "initial_data.model": "isothermal-vortex",
+        "initial_data.mach_number": 1.5,
+        "domain.num_zones": [200, 200, 1],
+        "domain.extent_i": [-5.0, 5.0],
+        "domain.extent_j": [-5.0, 5.0],
+        "coordinates": "cartesian",
     }
 
 
@@ -272,9 +279,9 @@ class Ram41:
 
 
 @preset
-def ram_41():
+def ram41():
     return {
-        "initial_data.model": "ram-41",
+        "initial_data.model": "ram41",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.4,
@@ -302,9 +309,9 @@ class Ram42:
 
 
 @preset
-def ram_42():
+def ram42():
     return {
-        "initial_data.model": "ram-42",
+        "initial_data.model": "ram42",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.4,
@@ -335,9 +342,9 @@ class Ram43:
 
 
 @preset
-def ram_43():
+def ram43():
     return {
-        "initial_data.model": "ram-43",
+        "initial_data.model": "ram43",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.4,
@@ -370,9 +377,9 @@ class Ram44:
 
 
 @preset
-def ram_44():
+def ram44():
     return {
-        "initial_data.model": "ram-44",
+        "initial_data.model": "ram44",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.4,
@@ -406,9 +413,9 @@ class Ram45:
 
 
 @preset
-def ram_45():
+def ram45():
     return {
-        "initial_data.model": "ram-45",
+        "initial_data.model": "ram45",
         "domain.num_zones": [100, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "boundary_condition.lower_i": "outflow",
@@ -443,9 +450,9 @@ class Ram61:
 
 
 @preset
-def ram_61():
+def ram61():
     return {
-        "initial_data.model": "ram-61",
+        "initial_data.model": "ram61",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.6,
@@ -477,9 +484,9 @@ class FuShu33:
 
 
 @preset
-def fu_shu_33():
+def fu_shu33():
     return {
-        "initial_data.model": "fu-shu-33",
+        "initial_data.model": "fu-shu33",
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [-5.0, 5.0],
         "driver.tfinal": 1.3,
@@ -509,9 +516,9 @@ class FuShu34:
 
 
 @preset
-def fu_shu_34():
+def fu_shu34():
     return {
-        "initial_data.model": "fu-shu-34",
+        "initial_data.model": "fu-shu34",
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [-1.0, 1.0],
         "driver.tfinal": 0.6,
@@ -543,9 +550,9 @@ class FuShu35:
 
 
 @preset
-def fu_shu_35():
+def fu_shu35():
     return {
-        "initial_data.model": "fu-shu-35",
+        "initial_data.model": "fu-shu35",
         "domain.num_zones": [600, 1, 1],
         "domain.extent_i": [-3.0, 6.0],
         "driver.tfinal": 6.0,
@@ -579,9 +586,9 @@ class FuShu36:
 
 
 @preset
-def fu_shu_36():
+def fu_shu36():
     return {
-        "initial_data.model": "fu-shu-36",
+        "initial_data.model": "fu-shu36",
         "domain.num_zones": [200, 1, 1],
         "domain.extent_i": [-5.0, 5.0],
         "driver.tfinal": 1.8,
@@ -619,9 +626,9 @@ class FuShu37:
 
 
 @preset
-def fu_shu_37():
+def fu_shu37():
     return {
-        "initial_data.model": "fu-shu-37",
+        "initial_data.model": "fu-shu37",
         "domain.num_zones": [400, 1, 1],
         "domain.extent_i": [0.0, 1.0],
         "driver.tfinal": 0.038,
