@@ -1,0 +1,147 @@
+#!/usr/bin/env python3
+
+from sys import path
+from inspect import isgeneratorfunction
+from pathlib import Path
+from asyncio import create_task
+
+from rich.pretty import Pretty
+from rich.markdown import Markdown
+
+from textual import events
+from textual.app import App, ComposeResult
+from textual.containers import Container, Horizontal, Vertical
+from textual.reactive import reactive
+from textual.widgets import (
+    Footer,
+    Header,
+    Static,
+    TextLog,
+    Input,
+    Placeholder,
+    ListView,
+    ListItem,
+)
+from textual.widget import Widget
+
+path.append(str(Path(__file__).parent.parent))
+
+from sailfish.config import Sailfish
+from sailfish.preset import get_preset_functions
+from sailfish.main import unflatten, drive, iteration_report
+
+
+class SailfishUI(App):
+    CSS = """
+    TextLog, #description, #inputs, #config_view {
+        width: 1fr;
+        height: 1fr;
+        border: solid green;
+    }
+
+    ListItem {
+        padding: 0 1;
+    }
+    """
+
+    BINDINGS = [
+        ("r", "reset", "Reset"),
+        ("s", "step", "Step"),
+        ("p", "start_stop", "Start/Stop"),
+    ]
+
+    config: dict = None
+    pause = False
+    _simulation = None
+
+    def compose(self) -> ComposeResult:
+        yield Header(show_clock=True)
+        yield Horizontal(
+            ListView(
+                *(
+                    ListItem(Static(k), name=f)
+                    for k, f in get_preset_functions().items()
+                    if not isgeneratorfunction(f)
+                ),
+                id="inputs",
+            ),
+            Static(Pretty(Sailfish()), id="config_view"),
+            id="main",
+        )
+
+        yield Horizontal(
+            TextLog(),
+            Static(Markdown(str()), id="description"),
+        )
+        yield Static("idle", id="status")
+        yield Footer()
+
+    def action_reset(self):
+        self.simulation = None
+        self.text_log.clear()
+
+    def action_step(self):
+        if self.simulation is not None:
+            self.step_simulation()
+
+    def action_start_stop(self):
+        if self.simulation is not None:
+            if self.pause:
+                self.timer.resume()
+                self.pause = False
+            else:
+                self.timer.pause()
+                self.pause = True
+
+    def on_mount(self) -> None:
+        self.timer = self.set_interval(1 / 100, self.step_simulation)
+
+    def on_list_view_highlighted(self, event: ListView.Highlighted):
+        self.config = unflatten(dict(event.item.name(), **{"driver.report.cadence": 1}))
+        sailfish = Sailfish(**self.config)
+        self.query_one("#config_view").update(Pretty(sailfish))
+        self.query_one("#description").update(
+            Markdown(
+                (event.item.name.__doc__ or str())
+                + sailfish.initial_data.__class__.__doc__
+                or str()
+            )
+        )
+
+    def on_list_view_selected(self, event: ListView.Selected):
+        sailfish = Sailfish(**self.config)
+        sailfish.initialize()
+        self.simulation = drive([(sailfish, dict())])
+
+    def step_simulation(self) -> None:
+        if self.simulation is None:
+            return
+        try:
+            event = next(self.simulation)
+            if type(event) is iteration_report:
+                self.text_log.write(Pretty(event))
+            elif type(event) is str:
+                self.text_log.write(event)
+        except StopIteration:
+            self.simulation = None
+
+    @property
+    def simulation(self):
+        return self._simulation
+
+    @simulation.setter
+    def simulation(self, new_simulation):
+        if new_simulation is None:
+            self.query_one("#status").update("idle")
+        else:
+            self.query_one("#status").update("running")
+            self.text_log.clear()
+        self._simulation = new_simulation
+
+    @property
+    def text_log(self):
+        return self.query_one(TextLog)
+
+
+if __name__ == "__main__":
+    SailfishUI().run()
