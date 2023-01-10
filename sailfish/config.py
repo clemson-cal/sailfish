@@ -88,6 +88,19 @@ EquationOfState = Union[GammaLawEOS, IsothermalEOS, LocallyIsothermalEOS]
 
 
 @schema
+class ConstantNu:
+    nu: float
+
+
+@schema
+class ConstantAlpha:
+    alpha: float
+
+
+ViscosityModel = Union[ConstantNu, ConstantAlpha]
+
+
+@schema
 class Physics:
     """
     Physics equations to be solved
@@ -101,6 +114,7 @@ class Physics:
 
     equation_of_state: EquationOfState = GammaLawEOS()
     metric: Literal["newtonian", "minkowski"] = "newtonian"
+    viscosity: ViscosityModel = None
 
 
 Reconstruction = Union[Literal["pcm"], tuple[Literal["plm"], float]]

@@ -427,7 +427,7 @@ def plot():
                 )
             if state.box.dimensionality == 2:
                 x, y = state.cell_centers
-                z = state.primitive[:, :, 0, 2]
+                z = state.primitive[:, :, 0, 0]
                 cm = ax1.pcolormesh(x, y, z, vmin=None, vmax=None)
                 ax1.set_aspect("equal")
                 fig.colorbar(cm)

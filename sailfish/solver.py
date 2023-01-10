@@ -598,15 +598,13 @@ class SourceTerms:
 
             Read-only array of cell vertex coordinates.
 
-            Each element corresponds to the respective coordinate of the
-            lower-left corner of the respective zone.
+            Each element corresponds to the coordinate of the lower-left corner
+            of the respective zone.
 
             May be invalid in two layers of guard zones on the left and one
             layer of guard zones at the right of each non-trivial array axis.
 
-            Strides must be `(dim, ni, nj, nk, nprim)` if `data_layout ==
-            "fields-last"` or `(dim, nprim, ni, nj, nk)` if `data_layout ==
-            "fields-first"`.
+            Strides must be `(dim, ni, nj, nk)`.
 
         s : `ndarray[(ni, nj, nk, ncons), float64]`
 
@@ -667,6 +665,7 @@ class Scheme:
             device_funcs.append(hydro_lib.cons_to_prim)
 
         device_funcs.append(hydro_lib.riemann_hlle)
+        device_funcs.append(self._shear_strain)
         device_funcs.append(self._godunov_fluxes)
 
         self._dim = config.domain.dimensionality
@@ -684,6 +683,27 @@ class Scheme:
         return self._device_funcs
 
     @device
+    def _shear_strain():
+        R"""
+        DEVICE void _shear_strain(
+            double *gx,
+            double *gy,
+            double *s,
+            int sq)
+        {
+            // The viscous strain scaled by dx (= dy).
+            double sxx = 4.0 / 3.0 * gx[1 * sq] - 2.0 / 3.0 * gy[2 * sq];
+            double syy =-2.0 / 3.0 * gx[1 * sq] + 4.0 / 3.0 * gy[2 * sq];
+            double sxy = 1.0 / 1.0 * gx[2 * sq] + 1.0 / 1.0 * gy[1 * sq];
+            double syx = sxy;
+            s[0] = sxx;
+            s[1] = sxy;
+            s[2] = syx;
+            s[3] = syy;
+        }
+        """
+
+    @device
     def _godunov_fluxes(self):
         R"""
         DEVICE void _godunov_fluxes(
@@ -691,10 +711,12 @@ class Scheme:
             double *grd,
             double *urd,
             double fh[NCONS],
+            double viscosity_param,
             double plm_theta,
             int axis,
             int si,
-            int sq)
+            int sq,
+            int nd)
         {
             double pp[NCONS];
             double pm[NCONS];
@@ -762,8 +784,8 @@ class Scheme:
 
             for (int q = 0; q < NCONS; ++q)
             {
-                double gl = grd[-1 * si + q * sq];
-                double gr = grd[+0 * si + q * sq];
+                double gl = grd[(axis - 1) * nd - 1 * si + q * sq];
+                double gr = grd[(axis - 1) * nd + 0 * si + q * sq];
                 pm[q] = pl[q] + 0.5 * gl;
                 pp[q] = pr[q] - 0.5 * gr;
             }
@@ -794,8 +816,8 @@ class Scheme:
             {
                 double pl = prd[-1 * si + q * sq];
                 double pr = prd[+0 * si + q * sq];
-                double gl = grd[-1 * si + q * sq];
-                double gr = grd[+0 * si + q * sq];
+                double gl = grd[(axis - 1) * nd - 1 * si + q * sq];
+                double gr = grd[(axis - 1) * nd + 0 * si + q * sq];
                 pm[q] = pl + 0.5 * gl;
                 pp[q] = pr - 0.5 * gr;
             }
@@ -803,6 +825,30 @@ class Scheme:
 
             // =====================================================
             riemann_hlle(pm, pp, fh, axis);
+
+            // double strainl[4];
+            // double strainr[4];
+            // double *gxl = &grd[0 * nd - 1 * si];
+            // double *gyl = &grd[1 * nd - 1 * si];
+            // double *gxr = &grd[0 * nd + 0 * si];
+            // double *gyr = &grd[1 * nd + 0 * si];
+
+            // double rhol = prd[-1 * si + 0 * sq];
+            // double rhor = prd[+0 * si + 0 * sq];
+
+            // _shear_strain(gxl, gyl, strainl, sq);
+            // _shear_strain(gxr, gyr, strainr, sq);
+
+            // if (axis == 1)
+            // {
+            //     fh[1] -= 0.5 * viscosity_param * (rhol * strainl[0] + rhor * strainr[0]); // x-x
+            //     fh[2] -= 0.5 * viscosity_param * (rhol * strainl[1] + rhor * strainr[1]); // x-y
+            // }
+            // if (axis == 2)
+            // {
+            //     fh[1] -= 0.5 * viscosity_param * (rhol * strainl[2] + rhor * strainr[2]); // y-x
+            //     fh[2] -= 0.5 * viscosity_param * (rhol * strainl[3] + rhor * strainr[3]); // y-y
+            // }
         }
         """
 
@@ -813,6 +859,7 @@ class Scheme:
         double *grd,
         double *fwr,
         double *da,
+        double viscosity_param,
         double plm_theta,
         int ni,
         int nj,
@@ -871,11 +918,11 @@ class Scheme:
             #endif
 
             double am;
+            double dx;
 
             #if DIM >= 1
             am = da[0 * nd / nq + nc / sf];
-
-            _godunov_fluxes(prd + nc, grd + 0 * nd + nc, urd + nc, fm, plm_theta, 1, si, sq);
+            _godunov_fluxes(prd + nc, grd + nc, urd + nc, fm, viscosity_param, plm_theta, 1, si, sq, nd);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -885,8 +932,7 @@ class Scheme:
 
             #if DIM >= 2
             am = da[1 * nd / nq + nc / sf];
-
-            _godunov_fluxes(prd + nc, grd + 1 * nd + nc, urd + nc, fm, plm_theta, 2, sj, sq);
+            _godunov_fluxes(prd + nc, grd + nc, urd + nc, fm, viscosity_param, plm_theta, 2, sj, sq, nd);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -896,8 +942,7 @@ class Scheme:
 
             #if DIM >= 3
             am = da[2 * nd / nq + nc / sf];
-
-            _godunov_fluxes(prd + nc, grd + 2 * nd + nc, urd + nc, fm, plm_theta, 3, sk, sq);
+            _godunov_fluxes(prd + nc, grd + nc, urd + nc, fm, viscosity_param, plm_theta, 3, sk, sq, nd);
 
             for (int q = 0; q < NCONS; ++q)
             {
@@ -916,6 +961,7 @@ class Scheme:
         grd: NDArray[float],
         fwr: NDArray[float],
         da: NDArray[float],
+        viscosity_param: float,
         plm_theta: float = None,
         ni: int = None,
         nj: int = None,
@@ -984,11 +1030,29 @@ class Scheme:
 
             May be invalid in two layers of guard zones on the left and one
             layer of guard zones at the right of each non-trivial array axis.
+
+        viscosity_param : `float64`
+
+            Conversion factor from scaled gradients to specific stress.
+
+            This factor must be given if viscous fluxes are computed (i.e. if
+            `physics.viscosity` is not `None`). If the viscosity model is
+            constant-nu, this parameter will be the inverse grid spacing
+            multiplied by the kinematic viscosity coefficient nu (the solver
+            multiplies by rho). Constant-alpha viscosity model is not
+            implemented yet.
+
+            The following constraints apply to the solver if viscous fluxes are
+            computed:
+
+            - The grid spacing must be uniform and isotropic
+            - The strategy must enable cache_prim
+            - The strategy must enable cache_grad
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, urd, grd, fwr, da, plm, *s)
+        return s[:dim], (prd, urd, grd, fwr, da, viscosity_param, plm, *s)
 
     """
     Native implementation of the update_cons kernel
@@ -1005,6 +1069,7 @@ class Scheme:
         double *dv,
         double dt,
         double rk,
+        double viscosity_param,
         double plm_theta,
         int ni,
         int nj,
@@ -1080,16 +1145,16 @@ class Scheme:
             #endif
 
             #if DIM >= 1
-            _godunov_fluxes(prd + nccc, grd + 0 * nd + nccc, urd + nccc, fm, plm_theta, 1, si, sq);
-            _godunov_fluxes(prd + nrcc, grd + 0 * nd + nrcc, urd + nrcc, fp, plm_theta, 1, si, sq);
+            _godunov_fluxes(prd + nccc, grd + nccc, urd + nccc, fm, viscosity_param, plm_theta, 1, si, sq, nd);
+            _godunov_fluxes(prd + nrcc, grd + nrcc, urd + nrcc, fp, viscosity_param, plm_theta, 1, si, sq, nd);
             #endif
             #if DIM >= 2
-            _godunov_fluxes(prd + nccc, grd + 1 * nd + nccc, urd + nccc, gm, plm_theta, 2, sj, sq);
-            _godunov_fluxes(prd + ncrc, grd + 1 * nd + ncrc, urd + ncrc, gp, plm_theta, 2, sj, sq);
+            _godunov_fluxes(prd + nccc, grd + nccc, urd + nccc, gm, viscosity_param, plm_theta, 2, sj, sq, nd);
+            _godunov_fluxes(prd + ncrc, grd + ncrc, urd + ncrc, gp, viscosity_param, plm_theta, 2, sj, sq, nd);
             #endif
             #if DIM >= 3
-            _godunov_fluxes(prd + nccc, grd + 2 * nd + nccc, urd + nccc, hm, plm_theta, 3, sk, sq);
-            _godunov_fluxes(prd + nccr, grd + 2 * nd + nccr, urd + nccr, hp, plm_theta, 3, sk, sq);
+            _godunov_fluxes(prd + nccc, grd + nccc, urd + nccc, hm, viscosity_param, plm_theta, 3, sk, sq, nd);
+            _godunov_fluxes(prd + nccr, grd + nccr, urd + nccr, hp, viscosity_param, plm_theta, 3, sk, sq, nd);
             #endif
 
             for (int q = 0; q < NCONS; ++q)
@@ -1148,6 +1213,7 @@ class Scheme:
         dv: NDArray[float],
         dt: float,
         rk: float,
+        viscosity_param: float,
         plm_theta: float = None,
         ni: int = None,
         nj: int = None,
@@ -1256,11 +1322,43 @@ class Scheme:
            Unused if `time_integration == "fwd"`. The formula used is: `uwr =
            urk * rk + (uwr + du) * (1 - rk)` where `du` is the time-difference
            of the conserved density.
+
+        viscosity_param : `float64`
+
+            Conversion factor from scaled gradients to specific stress.
+
+            This factor must be given if viscous fluxes are computed (i.e. if
+            `physics.viscosity` is not `None`). If the viscosity model is
+            constant-nu, this parameter will be the inverse grid spacing
+            multiplied by the kinematic viscosity coefficient nu (the solver
+            multiplies by rho). Constant-alpha viscosity model is not
+            implemented yet.
+
+            The following constraints apply to the solver if viscous fluxes are
+            computed:
+
+            - The grid spacing must be uniform and isotropic
+            - The strategy must enable cache_prim
+            - The strategy must enable cache_grad
         """
         plm = plm_theta if plm_theta is not None else self._plm_theta
         dim = self._dim
         s = urd.shape[:3]
-        return s[:dim], (prd, grd, urk, urd, uwr, stm, da, dv, dt, rk, plm, *s)
+        return s[:dim], (
+            prd,
+            grd,
+            urk,
+            urd,
+            uwr,
+            stm,
+            da,
+            dv,
+            dt,
+            rk,
+            viscosity_param,
+            plm,
+            *s,
+        )
 
     """
     Native implementation of the update_cons_from_fluxes_code kernel
@@ -1909,6 +2007,8 @@ def patch_solver(
         prim_to_cons(pdr, udr)
         del pdr
 
+    visc = 0.0
+
     dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 
     # =========================================================================
@@ -1935,10 +2035,10 @@ def patch_solver(
             if cache_grad:
                 plm_gradient(p1, g1)
             if cache_flux:
-                godunov_fluxes(p1, u1, g1, fh, da)
+                godunov_fluxes(p1, u1, g1, fh, da, visc)
                 update_cons_from_fluxes(u0, u1, fh, stm, dv, dt, rk)
             else:
-                update_cons(p1, g1, u0, u1, u2, stm, da, dv, dt, rk)
+                update_cons(p1, g1, u0, u1, u2, stm, da, dv, dt, rk, visc)
                 u1, u2 = u2, u1
 
             yield FillGuardZones(u1)
