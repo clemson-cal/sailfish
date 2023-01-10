@@ -648,6 +648,7 @@ class Scheme:
         define_macros["CACHE_PRIM"] = int(config.strategy.cache_prim)
         define_macros["CACHE_GRAD"] = int(config.strategy.cache_grad)
         define_macros["USE_RK"] = int(config.scheme.time_integration != "fwd")
+        define_macros["VISCOSITY"] = int(config.physics.viscosity is not None)
 
         r = config.scheme.reconstruction
 
@@ -664,8 +665,10 @@ class Scheme:
         if not config.strategy.cache_prim:
             device_funcs.append(hydro_lib.cons_to_prim)
 
+        if config.physics.viscosity is not None:
+            device_funcs.append(self._shear_strain)
+
         device_funcs.append(hydro_lib.riemann_hlle)
-        device_funcs.append(self._shear_strain)
         device_funcs.append(self._godunov_fluxes)
 
         self._dim = config.domain.dimensionality
@@ -826,29 +829,37 @@ class Scheme:
             // =====================================================
             riemann_hlle(pm, pp, fh, axis);
 
-            // double strainl[4];
-            // double strainr[4];
-            // double *gxl = &grd[0 * nd - 1 * si];
-            // double *gyl = &grd[1 * nd - 1 * si];
-            // double *gxr = &grd[0 * nd + 0 * si];
-            // double *gyr = &grd[1 * nd + 0 * si];
+            // =====================================================
+            // VISCOSITY IMPLEMENTATION (2d cartesian)
+            // =====================================================
+            #if VISCOSITY == 1
+            #if !(DIM == 2 && CACHE_PRIM == 1 && CACHE_GRAD == 1)
+            #error("VISCOSITY == 1 requires DIM == 2 && CACHE_PRIM == 1 && CACHE_GRAD == 1")
+            #endif
+            double strainl[4];
+            double strainr[4];
+            double *gxl = &grd[0 * nd - 1 * si];
+            double *gyl = &grd[1 * nd - 1 * si];
+            double *gxr = &grd[0 * nd + 0 * si];
+            double *gyr = &grd[1 * nd + 0 * si];
 
-            // double rhol = prd[-1 * si + 0 * sq];
-            // double rhor = prd[+0 * si + 0 * sq];
+            double rhol = prd[-1 * si + 0 * sq];
+            double rhor = prd[+0 * si + 0 * sq];
 
-            // _shear_strain(gxl, gyl, strainl, sq);
-            // _shear_strain(gxr, gyr, strainr, sq);
+            _shear_strain(gxl, gyl, strainl, sq);
+            _shear_strain(gxr, gyr, strainr, sq);
 
-            // if (axis == 1)
-            // {
-            //     fh[1] -= 0.5 * viscosity_param * (rhol * strainl[0] + rhor * strainr[0]); // x-x
-            //     fh[2] -= 0.5 * viscosity_param * (rhol * strainl[1] + rhor * strainr[1]); // x-y
-            // }
-            // if (axis == 2)
-            // {
-            //     fh[1] -= 0.5 * viscosity_param * (rhol * strainl[2] + rhor * strainr[2]); // y-x
-            //     fh[2] -= 0.5 * viscosity_param * (rhol * strainl[3] + rhor * strainr[3]); // y-y
-            // }
+            if (axis == 1)
+            {
+                fh[1] -= 0.5 * viscosity_param * (rhol * strainl[0] + rhor * strainr[0]); // x-x
+                fh[2] -= 0.5 * viscosity_param * (rhol * strainl[1] + rhor * strainr[1]); // x-y
+            }
+            if (axis == 2)
+            {
+                fh[1] -= 0.5 * viscosity_param * (rhol * strainl[2] + rhor * strainr[2]); // y-x
+                fh[2] -= 0.5 * viscosity_param * (rhol * strainl[3] + rhor * strainr[3]); // y-y
+            }
+            #endif
         }
         """
 
@@ -918,7 +929,6 @@ class Scheme:
             #endif
 
             double am;
-            double dx;
 
             #if DIM >= 1
             am = da[0 * nd / nq + nc / sf];
@@ -2007,7 +2017,10 @@ def patch_solver(
         prim_to_cons(pdr, udr)
         del pdr
 
-    visc = 0.0
+    if config.physics.viscosity is not None:
+        visc = config.physics.viscosity.nu / box.grid_spacing[0]
+    else:
+        visc = 0.0
 
     dt = yield PatchState(n, t, u1, interior_box, c2p_user, amax)
 

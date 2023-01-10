@@ -269,6 +269,20 @@ class Sailfish:
                 f"squeezed axes must be at the end"
             )
 
+        if type(self.physics.viscosity) is ConstantNu:
+            if self.coordinates != "cartesian":
+                raise ValueError("viscosity only implemented in cartesian coordinates")
+            if self.domain.dimensionality != 2:
+                raise ValueError("viscosity only implemented in 2d")
+            if self.domain.grid_spacing[0] != self.domain.grid_spacing[1]:
+                raise ValueError("viscosity requires isotropic grid spacing (dx = dy)")
+            if not self.strategy.cache_prim:
+                raise ValueError("viscosity requires strategy.cache_prim")
+            if not self.strategy.cache_grad:
+                raise ValueError("viscosity requires strategy.cache_grad")
+        if type(self.physics.viscosity) is ConstantAlpha:
+            raise ValueError("constant-alpha viscosity is not implemented yet")
+
 
 def parse_num_zones(arg):
     """

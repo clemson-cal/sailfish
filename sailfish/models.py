@@ -189,6 +189,7 @@ def isothermal_vortex2d():
         "domain.extent_i": [-5.0, 5.0],
         "domain.extent_j": [-5.0, 5.0],
         "coordinates": "cartesian",
+        "physics.viscosity.nu": 0.2,
     }
 
 
