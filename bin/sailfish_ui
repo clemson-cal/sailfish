@@ -45,9 +45,10 @@ class SailfishUI(App):
     """
 
     BINDINGS = [
-        ("r", "reset", "Reset"),
+        ("q", "quit", "Quit"),
         ("s", "step", "Step"),
         ("p", "start_stop", "Start/Stop"),
+        ("space", "run", "Run"),
     ]
 
     config: dict = None
@@ -59,7 +60,7 @@ class SailfishUI(App):
         yield Horizontal(
             ListView(
                 *(
-                    ListItem(Static(k), name=f)
+                    ListItem(Static(k))
                     for k, f in get_preset_functions().items()
                     if not isgeneratorfunction(f)
                 ),
@@ -76,10 +77,6 @@ class SailfishUI(App):
         yield Static("idle", id="status")
         yield Footer()
 
-    def action_reset(self):
-        self.simulation = None
-        self.text_log.clear()
-
     def action_step(self):
         if self.simulation is not None:
             self.step_simulation()
@@ -95,23 +92,29 @@ class SailfishUI(App):
 
     def on_mount(self) -> None:
         self.timer = self.set_interval(1 / 100, self.step_simulation)
+        self.query_one(ListView).focus()
+        self.update_config()
 
-    def on_list_view_highlighted(self, event: ListView.Highlighted):
-        self.config = unflatten(dict(event.item.name(), **{"driver.report.cadence": 1}))
-        sailfish = Sailfish(**self.config)
-        self.query_one("#config_view").update(Pretty(sailfish))
-        self.query_one("#description").update(
-            Markdown(
-                (event.item.name.__doc__ or str())
-                + sailfish.initial_data.__class__.__doc__
-                or str()
-            )
-        )
+    def on_list_view_highlighted(self):
+        self.update_config()
 
     def on_list_view_selected(self, event: ListView.Selected):
         sailfish = Sailfish(**self.config)
         sailfish.initialize()
         self.simulation = drive([(sailfish, dict())])
+
+    def update_config(self) -> None:
+        index = self.query_one(ListView).index
+        func = list(get_preset_functions().values())[index]
+        self.config = unflatten(dict(func(), **{"driver.report.cadence": 1}))
+        sailfish = Sailfish(**self.config)
+        self.query_one("#config_view").update(Pretty(sailfish))
+        self.query_one("#description").update(
+            Markdown(
+                (func.__doc__ or str()) + sailfish.initial_data.__class__.__doc__
+                or str()
+            )
+        )
 
     def step_simulation(self) -> None:
         if self.simulation is None:
@@ -135,7 +138,6 @@ class SailfishUI(App):
             self.query_one("#status").update("idle")
         else:
             self.query_one("#status").update("running")
-            self.text_log.clear()
         self._simulation = new_simulation
 
     @property
