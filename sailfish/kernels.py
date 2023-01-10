@@ -522,7 +522,10 @@ class KernelData:
         self._define_macros = define_macros
 
     def kernel_code(self):
-        return self._code or dedent(self._stub.__doc__)
+        if self._code:
+            return dedent(self._code)
+        if self._stub.__doc__:
+            return dedent(self._stub.__doc__)
 
     def device_funcs(self):
         return self._device_funcs
