@@ -3,6 +3,7 @@ Multi-dimensional 2nd order Godunov solver using the method of lines
 """
 
 from contextlib import nullcontext
+from ctypes import c_int, c_double, Structure
 from logging import getLogger
 from math import prod
 from multiprocessing.pool import ThreadPool
@@ -343,6 +344,18 @@ class Fields:
         return a.size, (u, a, a.size)
 
 
+class PointMass(Structure):
+    _fields_ = [
+        ("m", c_double),
+        ("x", c_double),
+        ("y", c_double),
+        ("vx", c_double),
+        ("vy", c_double),
+        ("rs", c_double),
+        ("mode", c_int),
+    ]
+
+
 @kernel_class
 class SourceTerms:
     """
@@ -396,8 +409,28 @@ class SourceTerms:
     """
     Native implementation of source terms kernel
     """
-    geometric_source_terms_code = R"""
-    KERNEL void geometric_source_terms(double *p, double *u, double *x, double *s, int ni, int nj, int nk)
+    source_terms_code = R"""
+
+    struct PointMass {
+        double m;
+        double x;
+        double y;
+        double vx;
+        double vy;
+        double rs;
+        int mode;
+    };
+
+    KERNEL void source_terms(
+        double *p,
+        double *u,
+        double *x,
+        double *s,
+        struct PointMass point_mass1,
+        struct PointMass point_mass2,
+        int ni,
+        int nj,
+        int nk)
     {
         #if COORDS != 0 // cartesian
 
@@ -458,7 +491,7 @@ class SourceTerms:
             int ncrc = (i + 0) * si + (j + 1) * sj + (k + 0) * sk;
             int nccr = (i + 0) * si + (j + 0) * sj + (k + 1) * sk;
             #endif
-            
+
             #if COORDS == 1 // spherical polar
             #if DIM == 1
             double x0 = x[0 * nd / nq + nccc / sf];
@@ -549,19 +582,21 @@ class SourceTerms:
     }
     """
 
-    @kernel(code=geometric_source_terms_code)
-    def geometric_source_terms(
+    @kernel(code=source_terms_code)
+    def source_terms(
         self,
         p: NDArray[float],
         u: NDArray[float],
         x: NDArray[float],
         s: NDArray[float],
+        m1: PointMass = PointMass(),
+        m2: PointMass = PointMass(),
         ni: int = None,
         nj: int = None,
         nk: int = None,
     ):
         """
-        Append geometric source terms
+        Set geometric source terms
 
         Parameters
         ----------
@@ -622,7 +657,7 @@ class SourceTerms:
         """
         dim = self._dim
         shape = s.shape[:3]
-        return shape[:dim], (p, u, x, s, *shape)
+        return shape[:dim], (p, u, x, s, m1, m2, *shape)
 
 
 @kernel_class
@@ -1795,7 +1830,7 @@ class SolverKernels(NamedTuple):
     prim_to_cons: Callable
     cons_to_prim: Callable
     max_wavespeeds: Callable
-    geometric_source_terms: Callable
+    source_terms: Callable
 
 
 def make_solver_kernels(config: Sailfish, native_code: bool = False):
@@ -1823,7 +1858,7 @@ def make_solver_kernels(config: Sailfish, native_code: bool = False):
             fields.prim_to_cons_array,
             fields.cons_to_prim_array,
             fields.max_wavespeeds_array,
-            source_terms.geometric_source_terms,
+            source_terms.source_terms,
         )
 
 
@@ -1897,7 +1932,7 @@ def patch_solver(
         prim_to_cons,
         cons_to_prim,
         max_wavespeeds,
-        geometric_source_terms,
+        source_terms,
     ) = kernels
 
     dim = box.dimensionality
@@ -2039,7 +2074,7 @@ def patch_solver(
                 cons_to_prim(u1, p1)
 
             if coords.needs_geometrical_source_terms:
-                geometric_source_terms(p1, u1, xv, stm)
+                source_terms(p1, u1, xv, stm)
 
             if forcing is not None:
                 # THIS MIGHT FAIL DUE TO BROADCASTING dv
@@ -2069,7 +2104,7 @@ def doc():
         godunov_fluxes=Scheme.godunov_fluxes.__doc__,
         update_cons=Scheme.update_cons.__doc__,
         update_cons_from_fluxes=Scheme.update_cons_from_fluxes.__doc__,
-        geometric_source_terms=SourceTerms.geometric_source_terms.__doc__,
+        source_terms=SourceTerms.source_terms.__doc__,
         patch_solver=dedent(patch_solver.__doc__),
         make_solver=dedent(make_solver.__doc__),
     )
