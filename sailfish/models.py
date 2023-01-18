@@ -11,6 +11,7 @@ discriminating field.
 """
 
 
+from sys import version_info
 from typing import Literal, Union
 from numpy import logical_not, zeros, sqrt, exp, sin, cos, pi
 from .preset import preset
@@ -34,7 +35,14 @@ def modeldata(cls):
     cls.model = "".join(
         ["-" + c.lower() if c.isupper() else c for c in cls.__name__]
     ).lstrip("-")
+
+    if version_info.minor <= 9:
+        # __annotations__ dict is not created by access in Python <= 3.9
+        # https://docs.python.org/3/howto/annotations.html
+        if not hasattr(cls, "__annotations__"):
+            cls.__annotations__ = dict()
     cls.__annotations__["model"] = Literal[cls.model]
+
     return schema(cls)
 
 
