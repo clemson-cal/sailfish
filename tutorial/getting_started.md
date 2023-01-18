@@ -41,6 +41,26 @@ cd sailfish
 Now you are in the Sailfish project directory where you can run the code, and also browse or modify the source code. The `sailfish` executable is located at `bin/sailfish`. Try running it with no arguments to see a help message:
 
 ```bash
-/bin/sailfish
+bin/sailfish
 ```
 If that works, then you are ready to start doing science!
+
+# Running your first simulation
+
+The code comes with a number of "preset" configurations. You can see the list of presets by typing `sailfish run` or `sailfish doc presets --more`. The Sod shocktube problem is a common and easy test for a compressible gas dynamics code. To run the `sod` preset, and see a plot of the result, type this:
+```bash
+bin/sailfish run sod --plot
+```
+This will run the simulation at a low resolution (200 zones), on a single CPU core, using a scheme that is first-order accurate in both space and time. Type `sailfish run -h` to see a list of command line flags which can affect the accuracy of the solution. For example, to run with more zones, or using a scheme that is 2nd order accurate in space and time, you could try:
+
+```bash
+bin/sailfish run sod --plot --reconstruction=plm --time-integration=rk2 # or
+bin/sailfish run sod --plot --resolution=20000 # or any combination!
+```
+
+When you are doing science, you will generally run the code to produce "checkpoint" outputs (these are entire snapshots of the code's internal state) at some cadence, and then load the checkpoint files using your own Python scrips to do analysis on the data. You can control the end-time of the simulation, and the cadence at which it writes checkpoints, with the `--end-time/-e` and `--checkpoint/-c` options respectively. For example if you type
+
+```bash
+bin/sailfish run sod --plot --resolution=20000 -e 0.2 -c 0.01
+```
+the code will run to a time of 0.2 seconds, and produce 20 checkpoints equally spaced in time.
