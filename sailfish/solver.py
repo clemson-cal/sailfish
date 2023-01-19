@@ -21,7 +21,7 @@ from .geometry import (
     SphericalPolarCoordinates,
     CylindricalPolarCoordinates,
 )
-from .index_space import IndexSpace
+from .index_space import IndexSpace, three_space_axes
 
 
 @device
@@ -1956,9 +1956,9 @@ def patch_solver(
         cons_to_prim(u, p)
 
         try:
-            return p[space.interior].get()
+            return p[space.interior].squeeze().get()
         except AttributeError:
-            return p[space.interior]
+            return p[space.interior].squeeze()
 
     def amax(u):
         """
@@ -2158,7 +2158,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
         if checkpoint:
             t = checkpoint["time"]
             n = checkpoint["iteration"]
-            p[space.interior] = checkpoint["primitive"][i0:i1]
+            p[space.interior] = three_space_axes(checkpoint["primitive"], 1)[i0:i1]
         else:
             t = 0.0
             n = 0
