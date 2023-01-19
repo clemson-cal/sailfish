@@ -91,6 +91,9 @@ with open("chkpt.0000.pk", "rb") as infile:
 
 config = Sailfish(**chkpt["config"])
 domain = config.domain
+x = domain.cell_centers()
 rho1 = chkpt["primitive"][:,0,0,0]
 rho0 = config.initial_data(domain)[:,0]
+plt.plot(x, rho1 - rho0)
+plt.show()
 ```
