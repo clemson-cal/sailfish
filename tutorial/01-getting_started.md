@@ -15,7 +15,7 @@ On MacOS, I recommend using [Homebrew](https://brew.sh) to install the latest Py
 brew install python3
 ```
 
-__Do not use Anaconda if you can help it__ (not that on Palmetto we do currently use Anaconda, because it is the only choice for Python >= 3.9). Use `pip3` to install Python module dependencies. The following command should install all the Python modules you'll need:
+__Do not use Anaconda if you can help it__ (note that on Palmetto we do currently use Anaconda, because it is the only choice for Python >= 3.9). Use `pip3` to install Python module dependencies. The following command should install all the Python modules you'll need:
 
 ```bash
 pip3 install numpy matplotlib cffi pydantic rich textual cpuinfo
