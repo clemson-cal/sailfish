@@ -68,8 +68,8 @@ class run_summary:
 
 @dataclass
 class event_state:
-    number: int
-    last_time: float
+    number: int = 0
+    last_time: float = None
 
 
 def recurring_event(interval: float, number: int = 0, last_time: float = None):
@@ -186,10 +186,13 @@ def drive(setups: Iterable[tuple[Sailfish, dict]]):
             cp_state = dict()
             timestep = state.timestep(cfl_number)
 
-        event_states = dict()
         events = dict(
             timeseries=recurring_event(driver.timeseries.cadence, **ts_state),
             checkpoint=recurring_event(driver.checkpoint.cadence, **cp_state),
+        )
+        event_states = dict(
+            timeseries=event_state(**ts_state),
+            checkpoint=event_state(**cp_state),
         )
         event_funcs = dict(
             timeseries=timeseries,
