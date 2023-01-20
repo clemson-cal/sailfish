@@ -2,14 +2,15 @@
 
 ## System dependencies
 
-Sailfish requires Python 3, version 3.9.0 or later. You can check your
-system's Python version by typing
+Sailfish requires Python 3, version 3.9.0 or later. You can check your system's
+Python version by typing
 
 ```bash
 python3 --version
 ```
 
-On MacOS, I recommend using [Homebrew](https://brew.sh) to install the latest Python:
+On MacOS, I recommend using [Homebrew](https://brew.sh) to install the latest
+Python:
 
 ```bash
 brew install python3
