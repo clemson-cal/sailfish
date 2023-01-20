@@ -29,6 +29,19 @@ def subdivide(interval: tuple[int, int], num_parts: int):
         a += n
 
 
+def make_coordinate_system(coordinates: str):
+    """
+    Construct a coordinate system instance from a string description
+    """
+    if coordinates == "cartesian":
+        return CartesianCoordinates()
+    if coordinates == "spherical-polar":
+        return SphericalPolarCoordinates()
+    if coordinates == "cylindrical-polar":
+        return CylindricalPolarCoordinates()
+    raise ValueError(f"unknown coordinate system {coordinates}")
+
+
 @schema
 class CoordinateBox:
     """

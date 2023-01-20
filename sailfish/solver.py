@@ -15,12 +15,7 @@ from numpy.typing import NDArray
 
 from .kernels import kernel, kernel_class, device, kernel_metadata
 from .config import Sailfish, Strategy, Reconstruction, BoundaryCondition
-from .geometry import (
-    CoordinateBox,
-    CartesianCoordinates,
-    SphericalPolarCoordinates,
-    CylindricalPolarCoordinates,
-)
+from .geometry import CoordinateBox, make_coordinate_system
 from .index_space import IndexSpace, three_space_axes
 
 
@@ -666,6 +661,11 @@ class Scheme:
     Godunov scheme using method-of-lines and many strategy modes
     """
 
+    @staticmethod
+    def needs_source_terms_array(config: Sailfish):
+        coords = make_coordinate_system(config.coordinates)
+        return config.forcing is not None or coords.needs_geometrical_source_terms
+
     def __init__(self, config: Sailfish):
         if config.physics.metric == "newtonian":
             from . import lib_euler as hydro_lib
@@ -684,6 +684,7 @@ class Scheme:
         define_macros["CACHE_GRAD"] = int(config.strategy.cache_grad)
         define_macros["USE_RK"] = int(config.scheme.time_integration != "fwd")
         define_macros["VISCOSITY"] = int(config.physics.viscosity is not None)
+        define_macros["SOURCE_TERMS"] = int(self.needs_source_terms_array(config))
 
         r = config.scheme.reconstruction
 
@@ -1225,10 +1226,9 @@ class Scheme:
                 du -= hp[q] * ap - hm[q] * am;
                 #endif
 
-                if (stm)
-                {
-                    du += stm[n];
-                }
+                #if SOURCE_TERMS == 1
+                du += stm[n];
+                #endif
 
                 du *= dt / dv[nccc / sf];
                 uwr[n] = urd[n] + du;
@@ -1502,10 +1502,9 @@ class Scheme:
                 du -= hp - hm;
                 #endif
 
-                if (stm)
-                {
-                    du += stm[nccc + q * sq];
-                }
+                #if SOURCE_TERMS == 1
+                du += stm[nccc + q * sq];
+                #endif
 
                 du *= dt / dv[nccc / sf];
                 double u1 = uc[q * sq] + du;
@@ -1984,13 +1983,7 @@ def patch_solver(
     # =========================================================================
     # Arrays for grid geometry (TODO: don't compute these if trivial grid geometry)
     # =========================================================================
-    if config.coordinates == "cartesian":
-        coords = CartesianCoordinates()
-    if config.coordinates == "spherical-polar":
-        coords = SphericalPolarCoordinates()
-    if config.coordinates == "cylindrical-polar":
-        coords = CylindricalPolarCoordinates()
-
+    coords = make_coordinate_system(config.coordinates)
     dv = space.create(xp.zeros, data=xp.array(coords.cell_volumes(box)))
     da = space.create(xp.zeros, vectors=dim, data=xp.array(coords.face_areas(box)))
     xv = space.create(xp.zeros, vectors=dim, data=xp.array(coords.cell_vertices(box)))
@@ -2040,7 +2033,7 @@ def patch_solver(
     # =========================================================================
     # Arrays for source terms, including driving fields
     # =========================================================================
-    if config.forcing is not None or coords.needs_geometrical_source_terms:
+    if Scheme.needs_source_terms_array(config):
         stm = space.create(xp.zeros, fields=ncons)
     else:
         stm = None
