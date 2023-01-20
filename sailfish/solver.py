@@ -1991,9 +1991,9 @@ def patch_solver(
     if config.coordinates == "cylindrical-polar":
         coords = CylindricalPolarCoordinates()
 
-    dv = space.create(xp.zeros, data=coords.cell_volumes(box))
-    da = space.create(xp.zeros, vectors=dim, data=coords.face_areas(box))
-    xv = space.create(xp.zeros, vectors=dim, data=coords.cell_vertices(box))
+    dv = space.create(xp.zeros, data=xp.array(coords.cell_volumes(box)))
+    da = space.create(xp.zeros, vectors=dim, data=xp.array(coords.face_areas(box)))
+    xv = space.create(xp.zeros, vectors=dim, data=xp.array(coords.cell_vertices(box)))
 
     # =========================================================================
     # Array of cached Runge-Kutta conserved fields
