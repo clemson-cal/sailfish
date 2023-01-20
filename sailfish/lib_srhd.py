@@ -146,8 +146,8 @@ def cons_to_prim(u: NDArray[float], p: NDArray[float]):
             }
             if (iteration == newton_iter_max)
             {
-                printf("c2p failed: %f %f %f\n", u[0], u[1], u[2]);
-                exit(1);
+                // printf("c2p failed: %f %f %f\n", u[0], u[1], u[2]);
+                // exit(1);
             }
             iteration += 1;
         }
