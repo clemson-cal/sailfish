@@ -21,7 +21,7 @@ currently use Anaconda, because it is the only choice for Python >= 3.9). Use
 install all the Python modules you'll need:
 
 ```bash
-pip3 install numpy matplotlib cffi pydantic rich textual cpuinfo
+pip3 install numpy matplotlib cffi pydantic rich textual py-cpuinfo
 ```
 
 If you are on Windows or Linux and have a CUDA or ROCm enabled GPU, you will
