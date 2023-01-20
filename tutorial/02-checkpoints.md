@@ -120,16 +120,16 @@ Whereas `chkpt["config"]` is a dictionary, `config` is now an instance of the `S
 x = config.domain.cell_centers()
 ```
 
-You could also take advantage of the fact that `config.initial_data` is the
-initial data function; it can recreate the primitive variable arrays as they
-would have been at `t=0`! This might be useful, let's say, if you were tweaking
-a steady-state initial condition, and you wanted to validate the initial
-condition by comparing the solution at `t=0` to the evolved solution at say
-`t=1` (if you have a good steady state, it should not evolve away from the
-initial condition). The `initial_data` instance has a member function with
-signature `primitive(box: CoordinateBox) -> ndarray`. Here is a complete piece
-of code to plot the difference in the density field in the first (non-zero)
-checkpoint to the density field in the initial condition:
+You could also take advantage of the fact that `config.initial_data` is a
+"model data" class instance; it can recreate the primitive variable arrays
+as they would have been at `t=0`! This might be useful, let's say, if you
+were tweaking a steady-state initial condition, and you wanted to validate
+the initial condition by comparing the solution at `t=0` to the evolved
+solution at say `t=1` (if you have a good steady state, it should not evolve
+away from the initial condition). The `initial_data` instance has a member
+function with signature `primitive(box: CoordinateBox) -> ndarray`. Here is
+a complete piece of code to plot the difference in the density field in the
+first (non-zero) checkpoint to the density field in the initial condition:
 
 ```python
 from pickle import load
@@ -143,7 +143,7 @@ config = Sailfish(**chkpt["config"])
 domain = config.domain
 x = domain.cell_centers()
 rho1 = chkpt["primitive"][:,0]
-rho0 = config.initial_data(domain)[:,0]
+rho0 = config.initial_data.primitive(domain)[:,0]
 plt.plot(x, rho1 - rho0)
 plt.show()
 ```
