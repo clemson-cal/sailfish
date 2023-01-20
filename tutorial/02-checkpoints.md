@@ -147,3 +147,44 @@ rho0 = config.initial_data.primitive(domain)[:,0]
 plt.plot(x, rho1 - rho0)
 plt.show()
 ```
+
+
+# Restarting from checkpoint files
+
+Checkpoint files are also "restart" files. Restarting a run is useful anytime:
+
+1. Your run was interrupted before it finished evolving
+2. You need to continue your run longer than initially intended
+3. You need to continue an evolved run with different parameters
+4. You are up-sampling a run to a higher grid resolution
+
+Let's start first with scenario (1). Suppose you have a run that meant to
+evolve to a time t = 10.0, but your computer ran out of batteries or the job
+was kicked off the queue at time t = 9.0. To complete your run, just provide
+the checkpoint name on the command line in place of the name of a preset or
+configuration file:
+
+```bash
+bin/sailfish run chkpt.0009.pk
+```
+
+Your run should continue to its intended end-point, and the result should be
+bitwise identical to the output of a run that was completed in one session.
+
+Now consider scenario (2). Your run is evolved to 10 seconds, but you want it
+to go to 20 seconds. You would do this by using the `--end-time/-e`
+command-line flag to override the `driver.end_time` parameter stored in the
+checkpoint's `"config"` dictionary:
+
+```bash
+bin/sailfish run chkpt.0010.pk -e 20.0
+```
+
+The ability to override parameters can also be exploited to restart a run with
+other pieces of the configuration modified. For example, if you'd like to
+switch to a different time integration scheme, and write checkpoints at a new
+cadence, you could do this:
+
+```bash
+bin/sailfish run chkpt.0010.pk -e 20.0 --time-integration=rk3 --checkpoint=0.01
+```
