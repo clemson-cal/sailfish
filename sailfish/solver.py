@@ -1938,7 +1938,7 @@ def patch_solver(
     nprim = primitive.shape[-1]
     ncons = nprim
     dx = box.grid_spacing[0]
-    p = xp.array(primitive)
+    p = xp.asarray(primitive)
     t = time
     n = iteration
     a = space.create(xp.zeros)  # wavespeeds array
@@ -1984,9 +1984,9 @@ def patch_solver(
     # Arrays for grid geometry (TODO: don't compute these if trivial grid geometry)
     # =========================================================================
     coords = make_coordinate_system(config.coordinates)
-    dv = space.create(xp.zeros, data=xp.array(coords.cell_volumes(box)))
-    da = space.create(xp.zeros, vectors=dim, data=xp.array(coords.face_areas(box)))
-    xv = space.create(xp.zeros, vectors=dim, data=xp.array(coords.cell_vertices(box)))
+    dv = space.create(xp.zeros, data=xp.asarray(coords.cell_volumes(box)))
+    da = space.create(xp.zeros, vectors=dim, data=xp.asarray(coords.face_areas(box)))
+    xv = space.create(xp.zeros, vectors=dim, data=xp.asarray(coords.cell_vertices(box)))
 
     # =========================================================================
     # Array of cached Runge-Kutta conserved fields
