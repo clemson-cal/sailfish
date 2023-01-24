@@ -55,7 +55,7 @@ Python indexes start from zero), you could obtain and plot that data like this:
 from matplotlib import pyplot as plt
 
 rho = chkpt["primitive"][:,0]
-pre = chkpt["primitive"][:,1]
+pre = chkpt["primitive"][:,2]
 plt.plot(rho)
 plt.plot(pre)
 plt.show()
