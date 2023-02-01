@@ -1502,6 +1502,7 @@ class Scheme:
                 du -= hp - hm;
                 #endif
 
+
                 #if SOURCE_TERMS == 1
                 du += stm[nccc + q * sq];
                 #endif
@@ -1937,7 +1938,6 @@ def patch_solver(
     dim = box.dimensionality
     nprim = primitive.shape[-1]
     ncons = nprim
-    dx = box.grid_spacing[0]
     p = xp.asarray(primitive)
     t = time
     n = iteration
