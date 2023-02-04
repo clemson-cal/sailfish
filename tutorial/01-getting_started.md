@@ -2,8 +2,8 @@
 
 ## System dependencies
 
-Sailfish requires Python 3, version 3.9.0 or later. You can check your system's
-Python version by typing
+Sailfish requires Python 3, version 3.9.0 or later. You can check your
+system's Python version by typing
 
 ```bash
 python3 --version
@@ -40,8 +40,8 @@ There is more information about `cupy` installation
 
 Sailfish is hosted on GitHub and requires `git` (Linux and MacOS systems will
 have that already). To get a local copy of the Sailfish code base, create a
-directory on your machine (I use `/Users/jzrake/Work/Codes` for science codes),
-then change directory there, and then clone the repository:
+directory on your machine (I use `/Users/jzrake/Work/Codes` for science
+codes), then change directory there, and then clone the repository:
 
 ```
 mkdir /Users/<your-username>/Work/Codes

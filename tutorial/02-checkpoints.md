@@ -75,7 +75,8 @@ x0 = domain["extent_i"][0]
 x1 = domain["extent_i"][1]
 ```
 
-From here, you can use `numpy.linspace` to generate coordinates for the zones, and then plot your data against physical coordinates:
+From here, you can use `numpy.linspace` to generate coordinates for the zones,
+and then plot your data against physical coordinates:
 
 ```python
 from numpy import linspace
@@ -114,7 +115,11 @@ from sailfish.config import Sailfish
 config = Sailfish(**chkpt["config"])
 ```
 
-Whereas `chkpt["config"]` is a dictionary, `config` is now an instance of the `Sailfish` class, and its attributes have useful member functions attached. For example, to obtain the cell coordinates, you can exploit the fact that `config.domain` is an instance of `sailfish.geometry.CoordinateBox`, and that class has a member function called `cell_centers`:
+Whereas `chkpt["config"]` is a dictionary, `config` is now an instance of the
+`Sailfish` class, and its attributes have useful member functions attached.
+For example, to obtain the cell coordinates, you can exploit the fact that
+`config.domain` is an instance of `sailfish.geometry.CoordinateBox`, and that
+class has a member function called `cell_centers`:
 
 ```python
 x = config.domain.cell_centers()
