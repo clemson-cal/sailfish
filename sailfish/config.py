@@ -261,18 +261,34 @@ class Sailfish:
         from dataclasses import asdict
         from .models import get_model_data_class
 
+        # The model data class instance is computed after the constructor,
+        # from the `initial_data` dictionary. Then the dictionary is replaced
+        # with the model data class instance. The reason is that all of the
+        # model data classes which compose the type union cannot be known at
+        # the time the Sailfish class is first defined. Otherwise it imposes
+        # confusing constraints on the order in which this module is imported,
+        # relative to user modules that could create new model data classes.
+        #
         model_cls = get_model_data_class(self.initial_data["model"])
         self.initial_data = model_cls(**self.initial_data)
         self.initial_data.physics = self.physics
         self.initial_data.coordinates = self.coordinates
         self.initial_data.boundary_condition = self.boundary_condition
 
+        # Internal solver functions assume that all the fleshed-out axes come
+        # at the beginning of the domain shape. Generalizing this was too much
+        # of a headache, and the constraint should not be a problem from the
+        # user perspective.
+        #
         if self.domain.num_zones.index(1) < self.domain.dimensionality:
             raise ValueError(
                 f"domain.num_zones = {self.domain.num_zones}; "
                 f"squeezed axes must be at the end"
             )
 
+        # The viscosity implementation is limited to 2d cartesian coordinates.
+        # It also requires primitive data and gradients to be cached.
+        #
         if type(self.physics.viscosity) is ConstantNu:
             if self.coordinates != "cartesian":
                 raise ValueError("viscosity only implemented in cartesian coordinates")
@@ -284,6 +300,9 @@ class Sailfish:
                 raise ValueError("viscosity requires strategy.cache_prim")
             if not self.strategy.cache_grad:
                 raise ValueError("viscosity requires strategy.cache_grad")
+
+        # Constant-alpha viscosity is not yet implemented.
+        #
         if type(self.physics.viscosity) is ConstantAlpha:
             raise ValueError("constant-alpha viscosity is not implemented yet")
 
