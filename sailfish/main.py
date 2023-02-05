@@ -887,6 +887,15 @@ def argument_parser():
         choices=("debug", "info", "warning", "error", "critical"),
         help="log messages at and above this severity level",
     )
+    parser.add_argument(
+        "--user-module",
+        "-u",
+        dest="_user_module",
+        metavar="U",
+        default=None,
+        type=str,
+        help="a module containing user models and presets (e.g. -u my_setups)",
+    )
 
     subparsers = parser.add_subparsers()
     _run = subparsers.add_parser("run", usage=SUPPRESS, help=run.__doc__)
@@ -921,6 +930,9 @@ def main():
         parser = argument_parser()
         args = parser.parse_args()
         console = init_logging(args._log_level)
+
+        if m := args._user_module:
+            __import__(m)
 
         if args._command:
             args._command(args, console)
