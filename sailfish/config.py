@@ -3,7 +3,6 @@ from typing import Literal, Union
 from pydantic import Field
 from .schema import schema
 from .geometry import CoordinateBox
-from .models import ModelData, DefaultModelData
 
 
 @schema
@@ -250,7 +249,7 @@ class Sailfish:
     name: str = None
     driver: Driver = Driver()
     physics: Physics = Physics()
-    initial_data: ModelData = Field(DefaultModelData(), discriminator="model")
+    initial_data: dict = None
     boundary_condition: BoundaryCondition = BoundaryCondition()
     domain: CoordinateBox = CoordinateBox()
     coordinates: Coordinates = "cartesian"
@@ -259,6 +258,11 @@ class Sailfish:
     forcing: Forcing = None
 
     def initialize(self):
+        from dataclasses import asdict
+        from .models import get_model_data_class
+
+        model_cls = get_model_data_class(self.initial_data["model"])
+        self.initial_data = model_cls(**self.initial_data)
         self.initial_data.physics = self.physics
         self.initial_data.coordinates = self.coordinates
         self.initial_data.boundary_condition = self.boundary_condition

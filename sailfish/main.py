@@ -25,7 +25,7 @@ from .config import (
     Driver,
     add_config_arguments,
 )
-from .models import ModelData
+from .models import get_model_data_classes
 from .preset import preset, get_preset_functions
 from .system import system_info
 
@@ -703,7 +703,7 @@ def doc(args=None, console=None, parser=None):
         if topic == "physics":
             console.print("Not yet documented")
         if topic == "models":
-            for cls in ModelData.__args__:
+            for cls in get_model_data_classes():
                 console.rule()
                 console.print(Markdown(f"*{cls.__name__}*\n{dedent(cls.__doc__)}"))
         if topic == "presets":

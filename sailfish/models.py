@@ -46,6 +46,17 @@ def modeldata(cls):
     return schema(cls)
 
 
+def get_model_data_class(model: str):
+    for cls in MODEL_DATA_CLASSES:
+        if cls.model == model:
+            return cls
+    raise ValueError(f"no such initial data model '{model}'")
+
+
+def get_model_data_classes():
+    return MODEL_DATA_CLASSES.copy()
+
+
 @modeldata
 class Sod:
     """
@@ -679,7 +690,3 @@ def density_wave():
             "upper_i": "periodic",
         },
     }
-
-
-DefaultModelData = Sod
-ModelData = Union[tuple(MODEL_DATA_CLASSES)]
