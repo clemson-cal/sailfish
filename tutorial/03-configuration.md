@@ -87,11 +87,11 @@ it directly, which is generally more convenient:
 sailfish run sod -n 20000
 ```
 
-## The Sailfish Class
+## The `Sailfish` class
 
 You can read the full description of the code configuration in the
-`sailfish.config` module. In that module you can find the `Sailfish` class,
-which looks like this:
+`sailfish.config` module. That module defines the `Sailfish` class, which
+looks like this:
 
 ```python
 class Sailfish:
@@ -124,19 +124,19 @@ class Sailfish:
     forcing: Forcing = None
 ```
 
-Several of these items refer to configuration sub-classes, for example
-`Driver`, `Physics`, and `Strategy`. These are classes you can also find in
-the `config` module. You can figure out everything about the possible code
+Several of the class attributes refer to configuration sub-classes, for
+example `Driver`, `Physics`, and `Strategy`. You can also find these classes
+in the `config` module. You can figure out everything about the possible code
 configurations by reading the source code of that module.
 
 Configuration data you supply through JSON files, presets, checkpoints, or
-command line flags, is first packed into a Python dictionary, and then
+command line flags is first packed into a Python dictionary, and then
 converted to a `Sailfish` struct and validated. The mapping of a Python
-dictionary to the `Sailfish` class is pretty self-explanatory. Be aware that
-it is allowable to use either dot-syntax in the dictionary keys, or nested
-dictionaries. The following two JSON configuration files are equivalent.
+dictionary to the `Sailfish` class is pretty self-explanatory. It is allowable
+to use either dot-syntax in the dictionary keys, or nested dictionaries, i.e.
+the following two JSON configuration files are equivalent:
 
-##### Using nested dictionaries:
+_Using nested dictionaries_
 ```json
 {
     "initial_data": {
@@ -145,15 +145,80 @@ dictionaries. The following two JSON configuration files are equivalent.
 }
 ```
 
-##### Using dot-syntax:
+_Using dot-syntax_
 ```json
 {
     "initial_data.model": "sod"
 }
 ```
 
-
+ 
 
 ## Model data classes
 
-Soon...
+
+The `Sailfish.initial_data` attribute contains configuration items that will
+be used to construct a class that provides initial conditions for the
+hydrodynamic fields. When a new simulation is started, the solver will
+construct initial data by calling a member function on the initial data class
+with the signature `primitive(self, box: CoordinateBox) -> ndarray`. The
+classes that provide initial data classes are also called "model data"
+classes, and they are marked with the `@modeldata` decorator. This decorator
+registers model data classes and allows configuration files to refer to those
+classes by name (note that the name is converted from `TitleCase` to
+`dash-case`).
+
+The `sailfish.models` module contains many examples of model data classes. A
+simple example is one that defines the initial conditions for a sinusoidal
+density wave in a one-dimensional hydrodynamics problem:
+
+```python
+@modeldata
+class DensityWave:
+    """
+    Sinusoidal density wave translating rigidly
+    """
+
+    amplitude: float = 0.2
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        x = box.cell_centers()
+        p = zeros(x.shape + (3,))
+        p[..., 0] = 1.0 + self.amplitude * sin(2 * pi * x)
+        p[..., 1] = 1.0
+        p[..., 2] = 1.0
+        return p
+```
+
+This model data class defines one _model parameter_ called `amplitude`, which
+can be controlled through the configuration data, for example:
+
+```json
+{
+    "initial_data": {
+        "model": "density-wave",
+        "amplitude": 0.5
+    }
+}
+```
+
+Also note there is a (property) function called `primitive_fields`. This
+property must be implemented by the model data class to return the names of
+the primitive variable fields. This provides some self-documentation, but it
+is also used by the solver to infer the _number_ of hydrodynamic fields that
+will be evolved, which could be 3, 4, or 5 depending on the number of vector
+components of the velocity field need to be evolved. Note that the ordering of
+these fields is imposed by the solver, and is e.g. `[density, vx, pressure]`
+if one vector component of the velocity field is evolved, or e.g. `[density,
+vx, vy, vz, pressure]` if three vector components are evolved. Also note that
+while the solver reads the _number_ of fields that are returned, it does not
+actually read the names of the fields. The field names are there only for
+self-documentation purposes. Especially with the velocity components, it could
+make sense to name them e.g. `"density, x-velocity, pressure"` if your setup
+is intended for a one-dimensional planar Cartesian geometry, or e.g.
+`"density, radial-velocity", "polar-velocity, pressure"` if your setup is
+intended for a two-dimensional axisymmetric spherical-polar coordinate system.
