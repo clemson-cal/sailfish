@@ -18,7 +18,12 @@ data from a sequence of inputs. Here is the procedure used by the code:
 3. The configuration is finally updated with key-value pairs taken from command
    line flags
 
-Configuration items coming later in the procedure take precedence. This enables the creation of base configurations, which can be "tweaked" with input from JSON files or from the command line. A most-basic example is to start the code from a single JSON file. Save the following code in a file called `my-run.json`
+Configuration items coming later in the procedure take precedence. This
+enables the creation of base configurations, which can be "tweaked" with input
+from JSON files or from the command line.
+
+A most-basic example is to start the code from a single JSON file. Try saving
+the following code in a file called `my-run.json`,
 
 ```json
 {
@@ -34,7 +39,12 @@ and then run sailfish with that file supplied as input:
 sailfish run my-run.json
 ```
 
-This configuration is very close to the default one, which is why not many key-value pairs need to be provided. It is also a very easy and common test case, and as such it is a Sailfish built-in _preset_. A preset is a function that is built-in to the code and which emits these configuration items. This particular configuration can be found in a function called `sod` in the `sailfish.models` module, which looks like this:
+This configuration is very close to the default one, so not many configuration
+items need to be overridden. This is also a very easy and common test case, and
+as such it is a Sailfish built-in _preset_. A preset is a function that is
+built-in to the code and which emits these configuration items. This
+particular configuration can be found in a function called `sod` in the
+`sailfish.models` module, which looks like this:
 
 ```python
 @preset
@@ -46,9 +56,18 @@ def sod():
     }
 ```
 
-The decorator `@preset` tells the application that this function should be recognized as a preset. Running `sailfish doc presets` prints a list of the available presets. To invoke this preset, you would type on the command line `sailfish run sod`.
+The decorator `@preset` tells the application that this function should be
+recognized as a preset. Running `sailfish doc presets` prints a list of the
+available presets. To invoke this preset, you would type on the command line
+`sailfish run sod`.
 
-Now suppose that you want to reuse _most_ of a particular preset, or configuration file, but you want to override certain pieces of it. You have two options: (a) you can _chain_ the configuration files or (b) use command line flags. Option (a) is more general, since there is not a command line flag to control every possible configuration item. For example if you wanted to run the Sod problem but with higher resolution, you could put the following text in a second JSON file `res.json`
+Now suppose that you want to reuse _most_ of a particular preset, or
+configuration file, but you also want to override certain pieces of it. You
+have two options: (a) you can _chain_ the configuration files or (b) use
+command line flags. Option (a) is more general, since there is not a command
+line flag to control all the configuration items. For example if you wanted to
+run the Sod problem but with higher resolution, you could put the following
+text in a second JSON file `res.json`
 
 ```json
 {
@@ -56,7 +75,13 @@ Now suppose that you want to reuse _most_ of a particular preset, or configurati
 }
 ```
 
-and then invoke the code like this: `sailfish run sod res.json`. The `domain.num_zones` configuration item from the JSON file takes precedence, so you would get all the configuration items from the `sod` preset, except with 20,000 zones instead of 200. Since the grid resolution is a commonly modified parameter, so there also is a command line flag `--resolution/-n` to control it directly, which is generally more convenient:
+and then invoke the code like this: `sailfish run sod res.json`. The
+`domain.num_zones` configuration item from the JSON file takes precedence, so
+you would get all the configuration items from the `sod` preset, except with
+20,000 zones instead of 200. Since the grid resolution is a commonly modified
+parameter, so there also is a command line flag `--resolution/-n` to control
+it directly, which is generally more convenient:
+
 
 ```bash
 sailfish run sod -n 20000
@@ -64,7 +89,9 @@ sailfish run sod -n 20000
 
 ## The Sailfish Class
 
-You can read the full description of the code configuration in the `sailfish.config` module. In that module you can find the `Sailfish` class, which looks like this:
+You can read the full description of the code configuration in the
+`sailfish.config` module. In that module you can find the `Sailfish` class,
+which looks like this:
 
 ```python
 class Sailfish:
@@ -97,9 +124,17 @@ class Sailfish:
     forcing: Forcing = None
 ```
 
-Several of these items refer to configuration sub-classes, for example `Driver`, `Physics`, and `Strategy`. These are classes you can also find in the `config` module. You can figure out everything about the possible code configurations by reading the source code of that module.
+Several of these items refer to configuration sub-classes, for example
+`Driver`, `Physics`, and `Strategy`. These are classes you can also find in
+the `config` module. You can figure out everything about the possible code
+configurations by reading the source code of that module.
 
-Configuration data you supply through JSON files, presets, checkpoints, or command line flags, is first packed into a Python dictionary, and then converted to a `Sailfish` struct and validated. The mapping of a Python dictionary to the `Sailfish` class is pretty self-explanatory. Be aware that it is allowable to use either dot-syntax in the dictionary keys, or nested dictionaries. The following two JSON configuration files are equivalent.
+Configuration data you supply through JSON files, presets, checkpoints, or
+command line flags, is first packed into a Python dictionary, and then
+converted to a `Sailfish` struct and validated. The mapping of a Python
+dictionary to the `Sailfish` class is pretty self-explanatory. Be aware that
+it is allowable to use either dot-syntax in the dictionary keys, or nested
+dictionaries. The following two JSON configuration files are equivalent.
 
 ##### Using nested dictionaries:
 ```json
