@@ -56,7 +56,7 @@ Now suppose that you want to reuse _most_ of a particular preset, or configurati
 }
 ```
 
-and then invoke the code like this: `sailfish run sod res.json`. The `domain.num_zones` configuration item from the second JSON file would override the entry in the first one, and you would get the same simulation but with 20,000 zones instead of 200. However, the grid resolution is a very commonly used parameter, so it can be controlled from the command line using the flag `--resolution/-n`. The following invocation is equivalent and often more convenient:
+and then invoke the code like this: `sailfish run sod res.json`. The `domain.num_zones` configuration item from the JSON file takes precedence, so you would get all the configuration items from the `sod` preset, except with 20,000 zones instead of 200. Since the grid resolution is a commonly modified parameter, so there also is a command line flag `--resolution/-n` to control it directly, which is generally more convenient:
 
 ```bash
 sailfish run sod -n 20000
@@ -97,7 +97,7 @@ class Sailfish:
     forcing: Forcing = None
 ```
 
-Several of these items refer to configuration sub-classes, for example `Driver`, `Physics`, and `Strategy` are classes you can also find in the `config` module. You can figure out everything about the possible code configurations by reading the contents of this module should.
+Several of these items refer to configuration sub-classes, for example `Driver`, `Physics`, and `Strategy`. These are classes you can also find in the `config` module. You can figure out everything about the possible code configurations by reading the source code of that module.
 
 Configuration data you supply through JSON files, presets, checkpoints, or command line flags, is first packed into a Python dictionary, and then converted to a `Sailfish` struct and validated. The mapping of a Python dictionary to the `Sailfish` class is pretty self-explanatory. Be aware that it is allowable to use either dot-syntax in the dictionary keys, or nested dictionaries. The following two JSON configuration files are equivalent.
 
