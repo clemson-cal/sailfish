@@ -1637,25 +1637,25 @@ def apply_bc(
         if kind == "outflow":
             u[:, :+2, :] = u[:, +2:+3, :]
         if kind == "periodic":
-            u[:, :+2, :] = patches[-1][:, -4:-2, :]
+            u[:, :+2, :] = u[:, -4:-2, :]
 
     if location == "upper_j":
         if kind == "outflow":
             u[:, -2:, :] = u[:, -4:-3, :]
         if kind == "periodic":
-            u[:, -2:, :] = patches[0][:, +2:+4, :]
+            u[:, -2:, :] = u[:, +2:+4, :]
 
     if location == "lower_k":
         if kind == "outflow":
             u[:, :, :+2] = u[:, :, +2:+3]
         if kind == "periodic":
-            u[:, :, :+2] = patches[-1][:, :, -4:-2]
+            u[:, :, :+2] = u[:, :, -4:-2]
 
     if location == "upper_k":
         if kind == "outflow":
             u[:, :, -2:] = u[:, :, -4:-3]
         if kind == "periodic":
-            u[:, :, -2:] = patches[0][:, :, +2:+4]
+            u[:, :, -2:] = u[:, :, +2:+4]
 
 
 def fill_guard_zones(arrays: list[NDArray[float]], boundary: BoundaryCondition):
@@ -2172,7 +2172,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     with make_worker_pool(num_threads) as pool:
         while True:
             events = list(pool.map(next_with, zip(streams, solvers)))
-
+            
             if type(events[0]) is PatchState:
                 timestep = yield State(config.domain, events)
 
