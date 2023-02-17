@@ -1772,7 +1772,7 @@ class State:
 
     @property
     def cell_centers(self):
-        return concatenate([s.cell_centers for s in self._states])
+        return concatenate([s.cell_centers for s in self._states], axis=self._box.dimensionality - 1)
 
     def minimum_zone_size(self):
         return float(min(s.minimum_zone_size() for s in self._states))
