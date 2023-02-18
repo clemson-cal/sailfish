@@ -2172,6 +2172,7 @@ def make_solver(config: Sailfish, checkpoint: dict = None):
     with make_worker_pool(num_threads) as pool:
         while True:
             events = list(pool.map(next_with, zip(streams, solvers)))
+            
             if type(events[0]) is PatchState:
                 timestep = yield State(config.domain, events)
 
