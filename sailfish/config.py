@@ -49,9 +49,9 @@ class Driver:
 
     tstart: float = 0.0
     tfinal: float = 1.0
-    report: Report = Report()
-    checkpoint: Checkpoint = Checkpoint()
-    timeseries: Timeseries = Timeseries()
+    report: Report = Field(default_factory=Report)
+    checkpoint: Checkpoint = Field(default_factory=Checkpoint)
+    timeseries: Timeseries = Field(default_factory=Timeseries)
     cfl_number: float = 0.1
     new_timestep_cadence: int = 1
 
@@ -111,7 +111,7 @@ class Physics:
     metric:            currently either newtonian or minkowski
     """
 
-    equation_of_state: EquationOfState = GammaLawEOS()
+    equation_of_state: EquationOfState = Field(default_factory=GammaLawEOS)
     metric: Literal["newtonian", "minkowski"] = "newtonian"
     viscosity: ViscosityModel = None
 
@@ -247,14 +247,14 @@ class Sailfish:
     """
 
     name: str = None
-    driver: Driver = Driver()
-    physics: Physics = Physics()
+    driver: Driver = Field(default_factory=Driver)
+    physics: Physics = Field(default_factory=Physics)
     initial_data: dict = None
-    boundary_condition: BoundaryCondition = BoundaryCondition()
-    domain: CoordinateBox = CoordinateBox()
+    boundary_condition: BoundaryCondition = Field(default_factory=BoundaryCondition)
+    domain: CoordinateBox = Field(default_factory=CoordinateBox)
     coordinates: Coordinates = "cartesian"
-    strategy: Strategy = Strategy()
-    scheme: Scheme = Scheme()
+    strategy: Strategy = Field(default_factory=Strategy)
+    scheme: Scheme = Field(default_factory=Scheme)
     forcing: Forcing = None
 
     def initialize(self):

@@ -224,7 +224,7 @@ def main():
         radius: float = 0.1
         pressure_inside: float = 1.0
         gamma_law_index: float = 1.66666666
-        physics: Physics = Physics(1.0, 0.01)
+        physics: Physics = None  # Physics(1.0, 0.01)
 
     console = Console(width=80)
     model = CylindricalShocktube(

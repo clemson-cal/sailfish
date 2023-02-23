@@ -1,4 +1,4 @@
-from inspect import getargspec
+from inspect import getfullargspec
 
 
 PRESET_FUNCTIONS = dict()
@@ -21,7 +21,7 @@ def preset(func):
     like setup could be confused with installation or package distribution
     scripts.
     """
-    if getargspec(func).args:
+    if getfullargspec(func).args:
         raise ValueError("preset function cannot take any arguments")
 
     func.__preset_function__ = True
