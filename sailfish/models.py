@@ -690,3 +690,52 @@ def density_wave():
             "upper_i": "periodic",
         },
     }
+
+
+@modeldata
+class KelvinHelmholtz:
+    """
+    Tangentially discontinuous velocity field which is KH-unstable
+    """
+
+    @property
+    def primitive_fields(self):
+        return "density", "x-velocity", "y-velocity", "pressure"
+
+    def primitive(self, box: CoordinateBox):
+        from numpy import random
+
+        x, y = box.cell_centers()
+        p = zeros(x.shape + (4,))
+        a = 1e-8
+        noise = random.uniform(-a, a, x.shape)
+        a = (-0.25 < y) * (y < +0.25)
+        b = logical_not(a)
+        # density
+        p[b, 0] = 0.5
+        p[a, 0] = 1.0
+        # x-velocity
+        p[b, 1] = -1.0
+        p[a, 1] = +1.0
+        # y-velocity
+        p[..., 2] = 0.0
+        # pressure
+        p[..., 3] = 1.0 + noise
+        return p
+
+
+@preset
+def kelvin_helmholtz():
+    return {
+        "initial_data.model": "kelvin-helmholtz",
+        "domain.num_zones": [100, 100, 1],
+        "domain.extent_i": [-0.5, +0.5],
+        "domain.extent_j": [-0.5, +0.5],
+        "driver.tfinal": 0.1,
+        "boundary_condition": {
+            "lower_i": "periodic",
+            "upper_i": "periodic",
+            "lower_j": "periodic",
+            "upper_j": "periodic",
+        },
+    }
