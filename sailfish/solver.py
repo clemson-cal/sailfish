@@ -362,6 +362,7 @@ class SourceTerms:
         self._nprim = len(config.initial_data.primitive_fields)
         self._transpose = config.strategy.transpose
         self._cache_prim = config.strategy.cache_prim
+        self._gamma_law_index = config.physics.equation_of_state.gamma_law_index
 
         device_funcs = list()
 
@@ -394,7 +395,7 @@ class SourceTerms:
             NPRIM=self._nprim,
             TRANSPOSE=int(self._transpose),
             CACHE_PRIM=int(self._cache_prim),
-            GAMMA_LAW_INDEX=config.physics.equation_of_state.gamma_law_index,
+            ADIABATIC_GAMMA=float(self._gamma_law_index),
         )
 
     @property
