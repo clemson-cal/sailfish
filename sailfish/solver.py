@@ -394,7 +394,7 @@ class SourceTerms:
             NPRIM=self._nprim,
             TRANSPOSE=int(self._transpose),
             CACHE_PRIM=int(self._cache_prim),
-            COORDS=self._coords,
+            GAMMA_LAW_INDEX=config.physics.equation_of_state.gamma_law_index,
         )
 
     @property
